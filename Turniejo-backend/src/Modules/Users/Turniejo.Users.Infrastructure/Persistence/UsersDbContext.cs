@@ -42,4 +42,10 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(UsersDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
+
+    public async Task<User?> GetUserByEmailAsync(
+    string email,
+    CancellationToken cancellationToken = default) =>
+    await Users
+        .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 }

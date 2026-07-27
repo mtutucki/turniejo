@@ -8,4 +8,8 @@ public interface IKeycloakAdminService
         string firstName,
         string lastName,
         CancellationToken cancellationToken = default);
+
+    Task SendPasswordResetEmailAsync(
+        Guid keycloakUserId,
+        CancellationToken cancellationToken = default);
 }

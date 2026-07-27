@@ -50,4 +50,22 @@ internal sealed class KeycloakAdminService(
         var userId = location.Split('/').Last();
         return Guid.Parse(userId);
     }
+
+    public async Task SendPasswordResetEmailAsync(
+    Guid keycloakUserId,
+    CancellationToken cancellationToken = default)
+    {
+        var realm = configuration["Keycloak:Realm"];
+        var response = await httpClient.PutAsJsonAsync(
+            $"/admin/realms/{realm}/users/{keycloakUserId}/execute-actions-email",
+            new[] { "UPDATE_PASSWORD" },
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Keycloak password reset failed: {response.StatusCode} - {error}");
+        }
+    }
 }
