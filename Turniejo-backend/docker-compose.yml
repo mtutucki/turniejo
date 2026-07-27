@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: turniejo-postgres
+    environment:
+      POSTGRES_USER: turniejo
+      POSTGRES_PASSWORD: turniejo
+      POSTGRES_DB: turniejo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turniejo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: turniejo-keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/turniejo
+      KC_DB_USERNAME: turniejo
+      KC_DB_PASSWORD: turniejo
+    ports:
+      - "8080:8080"
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: turniejo-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@turniejo.pl
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.16" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.6">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Turniejo.SharedKernel\Turniejo.SharedKernel.csproj" />
+    <ProjectReference Include="..\Modules\Auth\Turniejo.Auth.Infrastructure\Turniejo.Auth.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Users\Turniejo.Users.Application\Turniejo.Users.Application.csproj" />
+    <ProjectReference Include="..\Modules\Users\Turniejo.Users.Infrastructure\Turniejo.Users.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Tournaments\Turniejo.Tournaments.Application\Turniejo.Tournaments.Application.csproj" />
+    <ProjectReference Include="..\Modules\Tournaments\Turniejo.Tournaments.Infrastructure\Turniejo.Tournaments.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Teams\Turniejo.Teams.Application\Turniejo.Teams.Application.csproj" />
+    <ProjectReference Include="..\Modules\Teams\Turniejo.Teams.Infrastructure\Turniejo.Teams.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Matches\Turniejo.Matches.Application\Turniejo.Matches.Application.csproj" />
+    <ProjectReference Include="..\Modules\Matches\Turniejo.Matches.Infrastructure\Turniejo.Matches.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Notifications\Turniejo.Notifications.Application\Turniejo.Notifications.Application.csproj" />
+    <ProjectReference Include="..\Modules\Notifications\Turniejo.Notifications.Infrastructure\Turniejo.Notifications.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

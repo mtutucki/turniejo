@@ -1,0 +1,6 @@
+@Turniejo.Api_HostAddress = http://localhost:5264
+
+GET {{Turniejo.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

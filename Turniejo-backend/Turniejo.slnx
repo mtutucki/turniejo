@@ -1,0 +1,45 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Turniejo.Api/Turniejo.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Auth/">
+    <Project Path="src/Modules/Auth/Turniejo.Auth.Infrastructure/Turniejo.Auth.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Matches/">
+    <Project Path="src/Modules/Matches/Turniejo.Matches.Application/Turniejo.Matches.Application.csproj" />
+    <Project Path="src/Modules/Matches/Turniejo.Matches.Domain/Turniejo.Matches.Domain.csproj" />
+    <Project Path="src/Modules/Matches/Turniejo.Matches.Infrastructure/Turniejo.Matches.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Notifications/">
+    <Project Path="src/Modules/Notifications/Turniejo.Notifications.Application/Turniejo.Notifications.Application.csproj" />
+    <Project Path="src/Modules/Notifications/Turniejo.Notifications.Infrastructure/Turniejo.Notifications.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Teams/">
+    <Project Path="src/Modules/Teams/Turniejo.Teams.Application/Turniejo.Teams.Application.csproj" />
+    <Project Path="src/Modules/Teams/Turniejo.Teams.Domain/Turniejo.Teams.Domain.csproj" />
+    <Project Path="src/Modules/Teams/Turniejo.Teams.Infrastructure/Turniejo.Teams.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Tournaments/">
+    <Project Path="src/Modules/Tournaments/Turniejo.Tournaments.Application/Turniejo.Tournaments.Application.csproj" />
+    <Project Path="src/Modules/Tournaments/Turniejo.Tournaments.Domain/Turniejo.Tournaments.Domain.csproj" />
+    <Project Path="src/Modules/Tournaments/Turniejo.Tournaments.Infrastructure/Turniejo.Tournaments.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Users/">
+    <Project Path="src/Modules/Users/Turniejo.Users.Application/Turniejo.Users.Application.csproj" />
+    <Project Path="src/Modules/Users/Turniejo.Users.Domain/Turniejo.Users.Domain.csproj" />
+    <Project Path="src/Modules/Users/Turniejo.Users.Infrastructure/Turniejo.Users.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/Turniejo.SharedKernel/Turniejo.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Turniejo.IntegrationTests/Turniejo.IntegrationTests.csproj" />
+    <Project Path="tests/Turniejo.Matches.UnitTests/Turniejo.Matches.UnitTests.csproj" />
+    <Project Path="tests/Turniejo.Tournaments.UnitTests/Turniejo.Tournaments.UnitTests.csproj" />
+    <Project Path="tests/Turniejo.Users.UnitTests/Turniejo.Users.UnitTests.csproj" />
+  </Folder>
+</Solution>
