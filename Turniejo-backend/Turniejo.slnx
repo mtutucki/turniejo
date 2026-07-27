@@ -1,7 +1,4 @@
 <Solution>
-  <Folder Name="/Solution Items/">
-    <File Path=".gitignore" />
-  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Turniejo.Api/Turniejo.Api.csproj" />
   </Folder>

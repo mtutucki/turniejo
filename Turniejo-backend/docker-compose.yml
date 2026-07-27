@@ -28,7 +28,9 @@ services:
       KC_DB_PASSWORD: turniejo
     ports:
       - "8080:8080"
-    command: start-dev
+    command: start-dev --import-realm
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import
     depends_on:
       postgres:
         condition: service_healthy
