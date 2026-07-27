@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Turniejo.Teams.Domain\Turniejo.Teams.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Turniejo.SharedKernel\Turniejo.SharedKernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

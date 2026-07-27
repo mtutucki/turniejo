@@ -10,6 +10,7 @@ using Turniejo.Users.Infrastructure.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
+builder.Services.AddControllers();
 
 // Auth
 builder.Services.AddAuthModule(builder.Configuration);
@@ -20,6 +21,8 @@ builder.Services.AddTournamentsModule(builder.Configuration);
 builder.Services.AddTeamsModule(builder.Configuration);
 builder.Services.AddMatchesModule(builder.Configuration);
 builder.Services.AddNotificationsModule(builder.Configuration);
+
+
 
 // MediatR
 builder.Services.AddMediatR(cfg =>
@@ -36,6 +39,8 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
 
+builder.Services.AddHostedService<Turniejo.Api.BackgroundServices.OutboxProcessor>();
+
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -44,6 +49,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+
+app.MapControllers();
 
 app.MapGet("/api/me", (Turniejo.SharedKernel.Contracts.ICurrentUserContext ctx) =>
 {

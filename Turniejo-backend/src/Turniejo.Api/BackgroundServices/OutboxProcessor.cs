@@ -13,6 +13,8 @@ public sealed class OutboxProcessor(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        logger.LogInformation("OutboxProcessor started");
+
         while (!stoppingToken.IsCancellationRequested)
         {
             await ProcessPendingMessagesAsync(stoppingToken);

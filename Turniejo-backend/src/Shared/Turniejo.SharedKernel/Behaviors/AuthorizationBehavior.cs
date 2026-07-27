@@ -16,6 +16,10 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
+        // Pomiń autoryzację dla publicznych requestów
+        if (request is CQRS.IPublicRequest)
+            return await next();
+
         if (!currentUserContext.IsAuthenticated)
             throw new UnauthorizedException();
 

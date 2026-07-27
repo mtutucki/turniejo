@@ -1,3 +1,5 @@
-﻿namespace Turniejo.SharedKernel.Primitives;
+﻿using MediatR;
 
-public interface IDomainEvent { }
+namespace Turniejo.SharedKernel.Primitives;
+
+public interface IDomainEvent : INotification { }

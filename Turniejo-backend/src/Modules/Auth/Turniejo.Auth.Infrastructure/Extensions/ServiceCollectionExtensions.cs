@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.Auth.Infrastructure.Identity;
+using Turniejo.Auth.Infrastructure.Keycloak;
 using Turniejo.SharedKernel.Contracts;
 
 namespace Turniejo.Auth.Infrastructure.Extensions;
@@ -13,7 +14,6 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.AddHttpContextAccessor();
-
         services.AddScoped<ICurrentUserContext, JwtCurrentUserContext>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -21,7 +21,7 @@ public static class ServiceCollectionExtensions
             {
                 options.Authority = configuration["Keycloak:Authority"];
                 options.Audience = configuration["Keycloak:Audience"];
-                options.RequireHttpsMetadata = false; // tylko na dev!
+                options.RequireHttpsMetadata = false;
                 options.TokenValidationParameters = new()
                 {
                     ValidateIssuer = true,
@@ -31,6 +31,14 @@ public static class ServiceCollectionExtensions
             });
 
         services.AddAuthorization();
+
+        // Keycloak Admin
+        services.AddTransient<KeycloakAdminTokenHandler>();
+        services.AddHttpClient<IKeycloakAdminService, KeycloakAdminService>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["Keycloak:BaseUrl"]!);
+        })
+        .AddHttpMessageHandler<KeycloakAdminTokenHandler>();
 
         return services;
     }

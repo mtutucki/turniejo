@@ -1,7 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.SharedKernel.Outbox;
+using Turniejo.Users.Application.Abstractions;
+using Turniejo.Users.Application.Users.RegisterUser;
 using Turniejo.Users.Infrastructure.Persistence;
 
 namespace Turniejo.Users.Infrastructure.Extensions;
@@ -22,6 +25,11 @@ public static class ServiceCollectionExtensions
                 }));
 
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+        services.AddScoped<IUsersDbContext>(sp => sp.GetRequiredService<UsersDbContext>());
+
+        // Rejestracja walidatorów
+        services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();
 
         return services;
     }

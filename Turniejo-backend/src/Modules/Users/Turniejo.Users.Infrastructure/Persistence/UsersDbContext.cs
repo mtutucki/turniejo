@@ -1,12 +1,22 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Turniejo.SharedKernel.Outbox;
+using Turniejo.Users.Application.Abstractions;
+using Turniejo.Users.Domain.Entities;
 
 namespace Turniejo.Users.Infrastructure.Persistence;
 
 public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
-    : DbContext(options)
+    : DbContext(options), IUsersDbContext
 {
+    public DbSet<User> Users => Set<User>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public async Task AddUserAsync(User user, CancellationToken ct) =>
+        await Users.AddAsync(user, ct);
+
+    public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken ct) =>
+        await OutboxMessages.AddAsync(message, ct);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("users");
