@@ -1,0 +1,33 @@
+﻿using MediatR;
+using Microsoft.AspNetCore.Mvc;
+using Turniejo.Organizations.Application.Organizations.CreateOrganization;
+using Turniejo.SharedKernel.Contracts;
+
+namespace Turniejo.Api.Controllers;
+
+[ApiController]
+[Route("api/organizations")]
+public sealed class OrganizationsController(
+    ISender sender,
+    ICurrentUserContext currentUserContext) : ControllerBase
+{
+    [HttpPost]
+    public async Task<IActionResult> Create(
+        [FromBody] CreateOrganizationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new CreateOrganizationCommand(
+            currentUserContext.UserId,
+            request.Name);
+
+        var result = await sender.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+            return BadRequest(result.Error);
+
+        return Created($"/api/organizations/{result.Value.OrganizationId}",
+            result.Value);
+    }
+}
+
+public sealed record CreateOrganizationRequest(string Name);
