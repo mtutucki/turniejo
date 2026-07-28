@@ -103,6 +103,46 @@ namespace Turniejo.Users.Infrastructure.Persistence.Migrations
 
                     b.ToTable("users", "users");
                 });
+
+            modelBuilder.Entity("Turniejo.Users.Domain.Entities.UserRoleAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ScopeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ScopeType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Role", "ScopeType", "ScopeId")
+                        .HasDatabaseName("IX_user_role_assignments_composite");
+
+                    b.ToTable("user_role_assignments", "users");
+                });
+
+            modelBuilder.Entity("Turniejo.Users.Domain.Entities.UserRoleAssignment", b =>
+                {
+                    b.HasOne("Turniejo.Users.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
 #pragma warning restore 612, 618
         }
     }
