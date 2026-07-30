@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Users.Application.Abstractions;
 using Turniejo.Users.Application.Users.RegisterUser;
@@ -27,6 +28,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         services.AddScoped<IUsersDbContext>(sp => sp.GetRequiredService<UsersDbContext>());
+
+        services.AddScoped<IUserModule, UserModule>();
 
         // Rejestracja walidatorów
         services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();

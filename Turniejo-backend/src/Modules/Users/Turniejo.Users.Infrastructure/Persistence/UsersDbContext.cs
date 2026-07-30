@@ -86,4 +86,6 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
         if (assignment is not null)
             UserRoleAssignments.Remove(assignment);
     }
+
+    public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => await Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 }

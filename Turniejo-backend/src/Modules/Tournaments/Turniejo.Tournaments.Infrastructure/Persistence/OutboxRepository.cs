@@ -16,7 +16,7 @@ internal sealed class OutboxRepository(TournamentsDbContext dbContext) : IOutbox
         CancellationToken cancellationToken = default)
     {
         return await dbContext.OutboxMessages
-            .Where(x => x.ProcessedAt == null)
+            .Where(x => x.ProcessedAt == null && x.RetryCount < 5)
             .OrderBy(x => x.OccurredAt)
             .Take(batchSize)
             .ToListAsync(cancellationToken);

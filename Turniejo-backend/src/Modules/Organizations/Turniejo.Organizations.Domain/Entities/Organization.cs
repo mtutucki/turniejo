@@ -1,4 +1,5 @@
-﻿using Turniejo.SharedKernel.Primitives;
+﻿using Turniejo.SharedKernel.Helpers;
+using Turniejo.SharedKernel.Primitives;
 using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Organizations.Domain.Entities;
@@ -24,7 +25,7 @@ public sealed class Organization : BaseEntity
             return Result.Failure<Organization>(
                 Error.Validation("Name", "Name cannot be empty."));
 
-        var slug = GenerateSlug(name);
+        var slug = SlugGenerator.Generate(name);
 
         var organization = new Organization(Guid.NewGuid())
         {
@@ -36,13 +37,5 @@ public sealed class Organization : BaseEntity
         return Result.Success(organization);
     }
 
-    private static string GenerateSlug(string name) =>
-        name.ToLowerInvariant()
-            .Replace(" ", "-")
-            .Replace("ą", "a").Replace("ć", "c")
-            .Replace("ę", "e").Replace("ł", "l")
-            .Replace("ń", "n").Replace("ó", "o")
-            .Replace("ś", "s").Replace("ź", "z")
-            .Replace("ż", "z")
-            + "-" + Guid.NewGuid().ToString("N")[..6];
+
 }
