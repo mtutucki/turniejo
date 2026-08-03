@@ -76,6 +76,70 @@ public sealed class Tournament : BaseEntity
         return Result.Success(tournament);
     }
 
+    public Result ChangeStatus(TournamentStatus newStatus, Guid changedByUserId)
+    {
+        if (Status == newStatus)
+            return Result.Failure(Error.Validation("Status", "Tournament status is already set to the specified value"));
+
+        if (Status == TournamentStatus.Cancelled)
+            return Result.Failure(Error.Validation("Status", "Tournament status cannot be changed after cancellation"));
+
+        if (Status == TournamentStatus.Finished)
+            return Result.Failure(Error.Validation("Status", "Tournament status cannot be changed after it has finished"));
+
+        Dictionary<TournamentStatus, List<TournamentStatus>> allowedTransitions = new()
+        {
+            { TournamentStatus.Draft, new List<TournamentStatus> { TournamentStatus.RegistrationOpen, TournamentStatus.Cancelled } },
+            { TournamentStatus.RegistrationOpen, new List<TournamentStatus> { TournamentStatus.RegistrationClosed, TournamentStatus.Cancelled } },
+            { TournamentStatus.RegistrationClosed, new List<TournamentStatus> { TournamentStatus.ScheduleGenerated, TournamentStatus.Cancelled } },
+            { TournamentStatus.ScheduleGenerated, new List<TournamentStatus> { TournamentStatus.InProgress, TournamentStatus.Cancelled } },
+            { TournamentStatus.InProgress, new List<TournamentStatus> { TournamentStatus.Finished, TournamentStatus.Cancelled } },
+        };
+
+        if (!allowedTransitions.TryGetValue(Status, out var allowedStatuses) || !allowedStatuses.Contains(newStatus))
+        {
+            return Result.Failure(Error.Validation("Status", $"Tournament status cannot be changed from {Status} to {newStatus}"));
+        }
+
+        _domainEvents.Add(new TournamentStatusChanged(Id, OrganizationId, changedByUserId, Status, newStatus));
+        Status = newStatus;
+        SetUpdatedAt();
+
+        return Result.Success();
+    }
+
+    public Result UpdateDetails(string name, DateTimeOffset startAt, DateTimeOffset endAt, int teamLimit, string? description)
+    {
+        if (Status == TournamentStatus.Cancelled)
+            return Result.Failure(Error.Validation("Status", "Tournament status cannot be changed after cancellation"));
+
+        if (Status == TournamentStatus.Finished)
+            return Result.Failure(Error.Validation("Status", "Tournament status cannot be changed after it has finished"));
+
+        if (string.IsNullOrWhiteSpace(name))
+            return Result.Failure(Error.Validation("Name", "Tournament name cannot be empty"));
+        if (endAt < startAt)
+            return Result.Failure(Error.Validation("EndAt", "Tournament end date cannot be before start date"));
+        if (teamLimit < 0)
+            return Result.Failure(Error.Validation("TeamLimit", "Tournament team limit cannot be negative"));
+        Name = name;
+        StartAt = startAt;
+        EndAt = endAt;
+        TeamLimit = teamLimit;
+        Description = description;
+        SetUpdatedAt();
+        return Result.Success();
+    }
+
+    public Result SetFormat(TournamentFormat format)
+    {
+        if (Status >= TournamentStatus.ScheduleGenerated)
+            return Result.Failure(Error.Validation("Format", "Cannot change format after schedule has been generated."));
+        Format = format;
+        SetUpdatedAt();
+        return Result.Success();
+    }
+
     public void ClearDomainEvents() => _domainEvents.Clear();
 
 }

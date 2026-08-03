@@ -15,6 +15,32 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         private static DateTimeOffset ValidEndAt => DateTimeOffset.UtcNow.AddDays(2);
         private const int ValidTeamLimit = 16;
         private const string ValidDescription = "Opis turnieju";
+
+        private static Tournament CreateTournamentWithStatus(TournamentStatus targetStatus)
+        {
+            var tournament = Tournament.Create(
+                ValidId, ValidOrganizationId, ValidUserId,
+                ValidName, ValidStartAt, ValidEndAt,
+                ValidTeamLimit, ValidDescription).Value;
+
+            var path = new[]
+            {
+                TournamentStatus.RegistrationOpen,
+                TournamentStatus.RegistrationClosed,
+                TournamentStatus.ScheduleGenerated,
+                TournamentStatus.InProgress,
+                TournamentStatus.Finished
+            };
+
+            foreach (var status in path)
+            {
+                if (tournament.Status == targetStatus) break;
+                tournament.ChangeStatus(status, ValidUserId);
+            }
+
+            return tournament;
+        }
+
         [Fact]
         public void Create_ShouldSucceed_WhenAllDataIsValid()
         {
@@ -125,5 +151,213 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             result2.IsSuccess.Should().BeTrue();
             result1.Value.Slug.Should().NotBe(result2.Value.Slug);
         }
+
+        [Fact]
+        public void ChangeStatus_ShouldUpdateStatus_WhenValid()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var newStatus = TournamentStatus.RegistrationOpen;
+            // Act
+            var result = tournament.ChangeStatus(newStatus, ValidUserId);
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            tournament.Status.Should().Be(newStatus);
+        }
+
+        [Fact]
+        public void ChangeStatus_ShouldFail_WhenStatusIsSame()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var newStatus = tournament.Status; // same status
+            // Act
+            var result = tournament.ChangeStatus(newStatus, ValidUserId);
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Status");
+            result.Error.Message.Should().Be("Tournament status is already set to the specified value");
+        }
+
+        [Fact]
+        public void ChangeStatus_ShouldFail_WhenStatusIsCancelled()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            tournament.ChangeStatus(TournamentStatus.Cancelled, ValidUserId);
+            var newStatus = TournamentStatus.RegistrationOpen; // trying to change from Cancelled
+            // Act
+            var result = tournament.ChangeStatus(newStatus, ValidUserId);
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Status");
+            result.Error.Message.Should().Be("Tournament status cannot be changed after cancellation");
+        }
+        [Fact]
+        public void ChangeStatus_ShouldFail_WhenStatusIsFinished()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            tournament.ChangeStatus(TournamentStatus.RegistrationOpen, ValidUserId);
+            tournament.ChangeStatus(TournamentStatus.RegistrationClosed, ValidUserId);
+            tournament.ChangeStatus(TournamentStatus.ScheduleGenerated, ValidUserId);
+            tournament.ChangeStatus(TournamentStatus.InProgress, ValidUserId);
+            tournament.ChangeStatus(TournamentStatus.Finished, ValidUserId);
+            var newStatus = TournamentStatus.RegistrationOpen;
+            // Act
+            var result = tournament.ChangeStatus(newStatus, ValidUserId);
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Status");
+            result.Error.Message.Should().Be("Tournament status cannot be changed after it has finished");
+        }
+
+        [Theory]
+        [InlineData(TournamentStatus.Draft, TournamentStatus.InProgress)]
+        [InlineData(TournamentStatus.Draft, TournamentStatus.Finished)]
+        [InlineData(TournamentStatus.Draft, TournamentStatus.RegistrationClosed)]
+        [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.InProgress)]
+        [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.Draft)]
+        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.InProgress)]
+        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.RegistrationOpen)]
+        [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.Finished)]
+        [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.Draft)]
+        public void ChangeStatus_ShouldFail_WhenTransitionIsNotAllowed(TournamentStatus currentStatus, TournamentStatus newStatus)
+        {
+            // Arrange
+            var tournament = CreateTournamentWithStatus(currentStatus);
+            // doprowadź do currentStatus
+            // Act
+            var result = tournament.ChangeStatus(newStatus, ValidUserId);
+            // Assert
+            result.IsFailure.Should().BeTrue();
+        }
+
+        [Fact]
+        public void ChangeStatus_ShouldAddTournamentStatusChangedEvent_WhenValid()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var newStatus = TournamentStatus.RegistrationOpen;
+            // Act
+            var result = tournament.ChangeStatus(newStatus, ValidUserId);
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            tournament.DomainEvents.Should().ContainSingle(e => e is TournamentStatusChanged);
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldUpdateTournament_WhenValid()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var newName = "Updated Tournament";
+            var newStartAt = ValidStartAt.AddDays(1);
+            var newEndAt = ValidEndAt.AddDays(1);
+            var newTeamLimit = 32;
+            var newDescription = "Updated description";
+            // Act
+            var result = tournament.UpdateDetails(newName, newStartAt, newEndAt, newTeamLimit, newDescription);
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            tournament.Name.Should().Be(newName);
+            tournament.StartAt.Should().Be(newStartAt);
+            tournament.EndAt.Should().Be(newEndAt);
+            tournament.TeamLimit.Should().Be(newTeamLimit);
+            tournament.Description.Should().Be(newDescription);
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenTournamentIsCancelled()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            tournament.ChangeStatus(TournamentStatus.Cancelled, ValidUserId);
+            // Act
+            var result = tournament.UpdateDetails("New Name", ValidStartAt, ValidEndAt, ValidTeamLimit, "New Description");
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Status");
+            result.Error.Message.Should().Be("Tournament status cannot be changed after cancellation");
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenTournamentIsFinished()
+        {
+            // Arrange
+            var tournament = CreateTournamentWithStatus(TournamentStatus.Finished);
+            // Act
+            var result = tournament.UpdateDetails("New Name", ValidStartAt, ValidEndAt, ValidTeamLimit, "New Description");
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Status");
+            result.Error.Message.Should().Be("Tournament status cannot be changed after it has finished");
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenNameIsEmpty()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            // Act
+            var result = tournament.UpdateDetails(string.Empty, ValidStartAt, ValidEndAt, ValidTeamLimit, "New Description");
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Name");
+            result.Error.Message.Should().Be("Tournament name cannot be empty");
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenEndAtIsBeforeStartAt()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            // Act
+            var result = tournament.UpdateDetails("New Name", ValidEndAt, ValidStartAt, ValidTeamLimit, "New Description");
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.EndAt");
+            result.Error.Message.Should().Be("Tournament end date cannot be before start date");
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenTeamLimitIsNegative()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            // Act
+            var result = tournament.UpdateDetails("New Name", ValidStartAt, ValidEndAt, -1, "New Description");
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.TeamLimit");
+            result.Error.Message.Should().Be("Tournament team limit cannot be negative");
+        }
+
+        [Fact]
+        public void SetFormat_ShouldUpdateFormat_WhenValid()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var newFormat = TournamentFormat.Knockout;
+            // Act
+            tournament.SetFormat(newFormat);
+            // Assert
+            tournament.Format.Should().Be(newFormat);
+        }
+
+        [Fact]
+        public void SetFormat_ShouldFail_WhenTournamentIsScheduleGeneratedOrLater()
+        {
+            // Arrange
+            var tournament = CreateTournamentWithStatus(TournamentStatus.ScheduleGenerated);
+            var newFormat = TournamentFormat.Knockout;
+            // Act
+            var result = tournament.SetFormat(newFormat);
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Format");
+            result.Error.Message.Should().Be("Cannot change format after schedule has been generated.");
+        }
+
     }
 }
