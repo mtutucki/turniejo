@@ -9,5 +9,6 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default);
         Task<bool> TournamentSlugExistsAsync(string slug, CancellationToken cancellationToken);
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        Task<Tournament?> GetTournamentByCodeAsync(string code, CancellationToken cancellationToken = default);
     }
 }

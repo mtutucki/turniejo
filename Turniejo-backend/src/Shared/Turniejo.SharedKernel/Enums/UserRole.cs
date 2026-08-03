@@ -9,6 +9,7 @@
         Referee = 5,
         Parent = 6,
         Player = 7,
-        Admin = 8
+        Admin = 8,
+        Viewer = 9
     }
 }

@@ -26,6 +26,11 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         return await Tournaments.AnyAsync(t => t.Slug == slug);
     }
 
+    public async Task<Tournament?> GetTournamentByCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        return await Tournaments.FirstOrDefaultAsync(t => t.RefereeCode == code || t.CoachCode == code || t.ViewerCode == code, cancellationToken);
+    }
+
     public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
     await base.SaveChangesAsync(cancellationToken);
 
