@@ -1,8 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Turniejo.Matches.Infrastructure.Persistence;
 using Turniejo.SharedKernel.Outbox;
 
-namespace Turniejo.Users.Infrastructure.Persistence;
+namespace Turniejo.Matches.Infrastructure.Persistence;
 
 internal sealed class OutboxRepository(MatchesDbContext dbContext) : IOutboxRepository
 {
@@ -16,7 +15,7 @@ internal sealed class OutboxRepository(MatchesDbContext dbContext) : IOutboxRepo
         CancellationToken cancellationToken = default)
     {
         return await dbContext.OutboxMessages
-            .Where(x => x.ProcessedAt == null)
+            .Where(x => x.ProcessedAt == null && x.RetryCount < 5)
             .OrderBy(x => x.OccurredAt)
             .Take(batchSize)
             .ToListAsync(cancellationToken);

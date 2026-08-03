@@ -1,8 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Turniejo.SharedKernel.Outbox;
-using Turniejo.Teams.Infrastructure.Persistence;
 
-namespace Turniejo.Users.Infrastructure.Persistence;
+namespace Turniejo.Teams.Infrastructure.Persistence;
 
 internal sealed class OutboxRepository(TeamsDbContext dbContext) : IOutboxRepository
 {
@@ -16,7 +15,7 @@ internal sealed class OutboxRepository(TeamsDbContext dbContext) : IOutboxReposi
         CancellationToken cancellationToken = default)
     {
         return await dbContext.OutboxMessages
-            .Where(x => x.ProcessedAt == null)
+            .Where(x => x.ProcessedAt == null && x.RetryCount < 5)
             .OrderBy(x => x.OccurredAt)
             .Take(batchSize)
             .ToListAsync(cancellationToken);

@@ -61,6 +61,171 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
 
                     b.ToTable("outbox_messages", "tournaments");
                 });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.Tournament", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CoachCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("EndAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("Format")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsPaid")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrganizerCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("RefereeCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(220)
+                        .HasColumnType("character varying(220)");
+
+                    b.Property<DateTimeOffset>("StartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TeamLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ViewerCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "Status");
+
+                    b.ToTable("tournaments", "tournaments");
+                });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.Tournament", b =>
+                {
+                    b.OwnsOne("Turniejo.Tournaments.Domain.Entities.TournamentPublicSettings", "PublicSettings", b1 =>
+                        {
+                            b1.Property<Guid>("TournamentId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<bool>("IsPublic")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowBracket")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowLiveMatches")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowPlayers")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowSchedule")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowStandings")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowTeams")
+                                .HasColumnType("boolean");
+
+                            b1.HasKey("TournamentId");
+
+                            b1.ToTable("tournaments", "tournaments");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TournamentId");
+                        });
+
+                    b.OwnsOne("Turniejo.Tournaments.Domain.Entities.TournamentSettings", "Settings", b1 =>
+                        {
+                            b1.Property<Guid>("TournamentId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("BreakDurationMinutes")
+                                .HasColumnType("integer");
+
+                            b1.Property<bool>("CanCoachEditSquadAfterStart")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("IsThirdPlaceMatchEnabled")
+                                .HasColumnType("boolean");
+
+                            b1.Property<int>("MatchDurationMinutes")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("PointsForDraw")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("PointsForLoss")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("PointsForWin")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("RefereeEditWindowMinutes")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("WalkoverAwayScore")
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("WalkoverHomeScore")
+                                .HasColumnType("integer");
+
+                            b1.HasKey("TournamentId");
+
+                            b1.ToTable("tournaments", "tournaments");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TournamentId");
+                        });
+
+                    b.Navigation("PublicSettings")
+                        .IsRequired();
+
+                    b.Navigation("Settings")
+                        .IsRequired();
+                });
 #pragma warning restore 612, 618
         }
     }
