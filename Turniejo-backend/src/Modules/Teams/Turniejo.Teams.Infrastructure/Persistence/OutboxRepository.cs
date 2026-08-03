@@ -1,8 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Turniejo.SharedKernel.Outbox;
-using Turniejo.Teams.Infrastructure.Persistence;
 
-namespace Turniejo.Users.Infrastructure.Persistence;
+namespace Turniejo.Teams.Infrastructure.Persistence;
 
 internal sealed class OutboxRepository(TeamsDbContext dbContext) : IOutboxRepository
 {

@@ -1,8 +1,8 @@
 ﻿using MediatR;
 using Turniejo.SharedKernel.Contracts;
+using Turniejo.SharedKernel.Enums;
 using Turniejo.Users.Application.Abstractions;
 using Turniejo.Users.Application.Users.AssignUserRole;
-using Turniejo.Users.Domain.Enums;
 
 namespace Turniejo.Users.Infrastructure;
 

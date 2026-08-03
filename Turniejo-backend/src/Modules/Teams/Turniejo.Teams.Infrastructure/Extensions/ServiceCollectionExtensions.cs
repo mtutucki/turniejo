@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Teams.Infrastructure.Persistence;
-using Turniejo.Users.Infrastructure.Persistence;
 
 namespace Turniejo.Teams.Infrastructure.Extensions;
 

@@ -2,6 +2,7 @@
 using Turniejo.SharedKernel.Primitives;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Domain.Enums;
+using Turniejo.Tournaments.Domain.Events;
 
 namespace Turniejo.Tournaments.Domain.Entities;
 
@@ -63,7 +64,18 @@ public sealed class Tournament : BaseEntity
             PublicSettings = TournamentPublicSettings.CreateDefault(id)
         };
 
+        tournament._domainEvents.Add(new TournamentCreated(
+            tournament.Id,
+            tournament.OrganizationId,
+            tournament.CreatedByUserId,
+            tournament.Name,
+            tournament.StartAt,
+            tournament.EndAt)
+        );
+
         return Result.Success(tournament);
     }
+
+    public void ClearDomainEvents() => _domainEvents.Clear();
 
 }

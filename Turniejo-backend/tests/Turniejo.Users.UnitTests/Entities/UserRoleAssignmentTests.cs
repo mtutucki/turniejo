@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
+using Turniejo.SharedKernel.Enums;
 using Turniejo.Users.Domain.Entities;
-using Turniejo.Users.Domain.Enums;
 
 namespace Turniejo.Users.UnitTests.Entities;
 

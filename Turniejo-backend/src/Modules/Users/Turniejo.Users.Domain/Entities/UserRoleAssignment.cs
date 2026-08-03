@@ -1,6 +1,6 @@
-﻿using Turniejo.SharedKernel.Primitives;
+﻿using Turniejo.SharedKernel.Enums;
+using Turniejo.SharedKernel.Primitives;
 using Turniejo.SharedKernel.Results;
-using Turniejo.Users.Domain.Enums;
 
 namespace Turniejo.Users.Domain.Entities;
 

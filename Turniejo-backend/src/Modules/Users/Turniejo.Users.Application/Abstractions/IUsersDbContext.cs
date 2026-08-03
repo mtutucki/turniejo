@@ -1,6 +1,6 @@
-﻿using Turniejo.SharedKernel.Outbox;
+﻿using Turniejo.SharedKernel.Enums;
+using Turniejo.SharedKernel.Outbox;
 using Turniejo.Users.Domain.Entities;
-using Turniejo.Users.Domain.Enums;
 
 namespace Turniejo.Users.Application.Abstractions;
 

@@ -1,8 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Turniejo.Notifications.Infrastructure.Persistence;
 using Turniejo.SharedKernel.Outbox;
 
-namespace Turniejo.Users.Infrastructure.Persistence;
+namespace Turniejo.Notifications.Infrastructure.Persistence;
 
 internal sealed class OutboxRepository(NotificationsDbContext dbContext) : IOutboxRepository
 {

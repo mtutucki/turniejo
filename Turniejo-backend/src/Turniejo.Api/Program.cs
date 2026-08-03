@@ -35,7 +35,8 @@ builder.Services.AddMediatR(cfg =>
         typeof(Turniejo.Teams.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Matches.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Notifications.Application.AssemblyReference).Assembly,
-        typeof(Turniejo.Organizations.Application.AssemblyReference).Assembly
+        typeof(Turniejo.Organizations.Application.AssemblyReference).Assembly,
+        typeof(Turniejo.Tournaments.Application.AssemblyReference).Assembly
     );
 
     cfg.AddOpenBehavior(typeof(AuthorizationBehavior<,>));

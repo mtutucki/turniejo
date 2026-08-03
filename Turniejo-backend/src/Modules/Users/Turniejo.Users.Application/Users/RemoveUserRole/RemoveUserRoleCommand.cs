@@ -1,5 +1,5 @@
 ﻿using Turniejo.SharedKernel.CQRS;
-using Turniejo.Users.Domain.Enums;
+using Turniejo.SharedKernel.Enums;
 
 namespace Turniejo.Users.Application.Users.RemoveUserRole;
 

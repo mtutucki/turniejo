@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Turniejo.SharedKernel.Enums;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Users.Application.Abstractions;
 using Turniejo.Users.Domain.Entities;
-using Turniejo.Users.Domain.Enums;
 
 namespace Turniejo.Users.Infrastructure.Persistence;
 
@@ -18,32 +18,6 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken ct) =>
         await OutboxMessages.AddAsync(message, ct);
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.HasDefaultSchema("users");
-
-        foreach (var entity in modelBuilder.Model.GetEntityTypes())
-        {
-            if (entity.FindPrimaryKey()?.Properties
-                .Any(p => p.ClrType == typeof(Guid)) == true)
-            {
-                entity.FindPrimaryKey()!.Properties
-                    .Where(p => p.ClrType == typeof(Guid))
-                    .ToList()
-                    .ForEach(p => p.ValueGenerated =
-                        Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never);
-            }
-        }
-
-        foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
-        {
-            relationship.DeleteBehavior = DeleteBehavior.Restrict;
-        }
-
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(UsersDbContext).Assembly);
-        base.OnModelCreating(modelBuilder);
-    }
 
     public async Task<User?> GetUserByEmailAsync(
     string email,
@@ -88,4 +62,30 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
     }
 
     public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => await Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema("users");
+
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entity.FindPrimaryKey()?.Properties
+                .Any(p => p.ClrType == typeof(Guid)) == true)
+            {
+                entity.FindPrimaryKey()!.Properties
+                    .Where(p => p.ClrType == typeof(Guid))
+                    .ToList()
+                    .ForEach(p => p.ValueGenerated =
+                        Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never);
+            }
+        }
+
+        foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
+        {
+            relationship.DeleteBehavior = DeleteBehavior.Restrict;
+        }
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(UsersDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
 }
