@@ -59,4 +59,9 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TournamentsDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
+
+    public async Task<Tournament?> GetTournamentByIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
+    {
+        return await Tournaments.FirstOrDefaultAsync(t => t.Id == tournamentId, cancellationToken);
+    }
 }
