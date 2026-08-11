@@ -1,0 +1,61 @@
+﻿using FluentAssertions;
+using NSubstitute;
+using Turniejo.Tournaments.Application.Abstractions;
+using Turniejo.Tournaments.Application.Tournaments.GetTournamentById;
+using Turniejo.Tournaments.Domain.Entities;
+
+namespace Turniejo.Tournaments.UnitTests.Tournaments;
+
+public sealed class GetTournamentByIdQueryHandlerTests
+{
+    private readonly ITournamentsDbContext _dbContext;
+    private readonly GetTournamentByIdQueryHandler _handler;
+
+    public GetTournamentByIdQueryHandlerTests()
+    {
+        _dbContext = Substitute.For<ITournamentsDbContext>();
+        _handler = new GetTournamentByIdQueryHandler(_dbContext);
+    }
+
+    private static Tournament CreateFakeTournament() =>
+        Tournament.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Turniej testowy",
+            DateTimeOffset.UtcNow.AddDays(1), DateTimeOffset.UtcNow.AddDays(2),
+            8, null).Value;
+
+    [Fact]
+    public async Task Handle_ShouldFail_WhenTournamentNotFound()
+    {
+        // Arrange
+        var tournamentId = Guid.NewGuid();
+        _dbContext.GetTournamentByIdAsync(tournamentId, Arg.Any<CancellationToken>())
+            .Returns((Tournament?)null);
+        var query = new GetTournamentByIdQuery(tournamentId);
+
+        // Act
+        var result = await _handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Tournament.NotFound");
+    }
+
+    [Fact]
+    public async Task Handle_ShouldReturnDto_WhenTournamentExists()
+    {
+        // Arrange
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>())
+            .Returns(tournament);
+        var query = new GetTournamentByIdQuery(tournament.Id);
+
+        // Act
+        var result = await _handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Id.Should().Be(tournament.Id);
+        result.Value.Slug.Should().Be(tournament.Slug);
+    }
+}

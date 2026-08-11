@@ -13,9 +13,7 @@ internal sealed class RegisterUserCommandHandler(
     IUsersDbContext dbContext)
     : ICommandHandler<RegisterUserCommand, RegisterUserResponse>
 {
-    public async Task<Result<RegisterUserResponse>> Handle(
-        RegisterUserCommand request,
-        CancellationToken cancellationToken)
+    public async Task<Result<RegisterUserResponse>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         Guid keycloakUserId;
         try
