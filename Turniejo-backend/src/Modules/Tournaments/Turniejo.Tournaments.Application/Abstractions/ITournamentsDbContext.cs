@@ -11,5 +11,6 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentByIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
     }
 }

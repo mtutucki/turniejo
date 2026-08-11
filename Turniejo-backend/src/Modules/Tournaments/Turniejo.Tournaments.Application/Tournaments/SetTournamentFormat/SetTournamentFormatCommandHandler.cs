@@ -1,10 +1,12 @@
-﻿using Turniejo.SharedKernel.CQRS;
+﻿using System.Text.Json;
+using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
 
 namespace Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat
 {
-    public sealed class SetTournamentFormatCommandHandler(ITournamentsDbContext tournamentsDbContext) : ICommandHandler<SetTournamentFormatCommand, SetTournamentFormatResponse>
+    internal sealed class SetTournamentFormatCommandHandler(ITournamentsDbContext tournamentsDbContext) : ICommandHandler<SetTournamentFormatCommand, SetTournamentFormatResponse>
     {
         public async Task<Result<SetTournamentFormatResponse>> Handle(SetTournamentFormatCommand request, CancellationToken cancellationToken)
         {
@@ -18,9 +20,19 @@ namespace Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat
             if (setFormatResult.IsFailure)
                 return Result.Failure<SetTournamentFormatResponse>(setFormatResult.Error);
 
-            await tournamentsDbContext.SaveChangesAsync(cancellationToken);
-            return Result.Success(new SetTournamentFormatResponse(result.Id, result.Slug));
+            foreach (var domainEvent in result.DomainEvents)
+            {
+                var outboxMessage = OutboxMessage.Create(
+                    domainEvent.GetType().AssemblyQualifiedName!,
+                    JsonSerializer.Serialize(domainEvent, domainEvent.GetType()));
 
+                await tournamentsDbContext.AddOutboxMessageAsync(outboxMessage, cancellationToken);
+            }
+
+            await tournamentsDbContext.SaveChangesAsync(cancellationToken);
+            result.ClearDomainEvents();
+
+            return Result.Success(new SetTournamentFormatResponse(result.Id, result.Slug));
         }
     }
 }

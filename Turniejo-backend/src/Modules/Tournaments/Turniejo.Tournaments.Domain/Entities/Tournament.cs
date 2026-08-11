@@ -127,6 +127,7 @@ public sealed class Tournament : BaseEntity
         EndAt = endAt;
         TeamLimit = teamLimit;
         Description = description;
+        _domainEvents.Add(new TournamentUpdated(Id, OrganizationId, name, startAt, endAt, teamLimit, description));
         SetUpdatedAt();
         return Result.Success();
     }
@@ -136,6 +137,7 @@ public sealed class Tournament : BaseEntity
         if (Status >= TournamentStatus.ScheduleGenerated)
             return Result.Failure(Error.Validation("Format", "Cannot change format after schedule has been generated."));
         Format = format;
+        _domainEvents.Add(new TournamentFormatChanged(Id, OrganizationId, format));
         SetUpdatedAt();
         return Result.Success();
     }

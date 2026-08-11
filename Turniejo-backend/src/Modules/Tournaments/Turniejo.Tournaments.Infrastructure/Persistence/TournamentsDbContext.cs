@@ -64,4 +64,11 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
     {
         return await Tournaments.FirstOrDefaultAsync(t => t.Id == tournamentId, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+    await Tournaments
+        .AsNoTracking()
+        .Where(t => t.OrganizationId == organizationId)
+        .OrderByDescending(t => t.CreatedAt)
+        .ToListAsync(cancellationToken);
 }
