@@ -28,7 +28,8 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournamentById
                 tournament.OrganizerCode,
                 tournament.RefereeCode,
                 tournament.CoachCode,
-                tournament.ViewerCode
+                tournament.ViewerCode,
+                tournament.Description
             );
 
             return Result.Success(tournamentDto);

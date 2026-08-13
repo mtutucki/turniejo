@@ -21,7 +21,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournaments
                 t.StartAt, t.EndAt,
                 t.TeamLimit, t.IsPaid,
                 t.OrganizerCode, t.RefereeCode,
-                t.CoachCode, t.ViewerCode)).ToList();
+                t.CoachCode, t.ViewerCode, t.Description)).ToList();
 
             return Result.Success<IReadOnlyList<TournamentDto>>(dtos);
         }

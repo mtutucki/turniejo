@@ -101,6 +101,9 @@ public sealed class Tournament : BaseEntity
             return Result.Failure(Error.Validation("Status", $"Tournament status cannot be changed from {Status} to {newStatus}"));
         }
 
+        if (newStatus == TournamentStatus.ScheduleGenerated && Format == null)
+            return Result.Failure(Error.Validation("Format", "Cannot generate schedule before setting tournament format."));
+
         _domainEvents.Add(new TournamentStatusChanged(Id, OrganizationId, changedByUserId, Status, newStatus));
         Status = newStatus;
         SetUpdatedAt();

@@ -35,6 +35,10 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             foreach (var status in path)
             {
                 if (tournament.Status == targetStatus) break;
+
+                if (status == TournamentStatus.ScheduleGenerated)
+                    tournament.SetFormat(TournamentFormat.Group);
+
                 tournament.ChangeStatus(status, ValidUserId);
             }
 
@@ -200,6 +204,7 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
             tournament.ChangeStatus(TournamentStatus.RegistrationOpen, ValidUserId);
             tournament.ChangeStatus(TournamentStatus.RegistrationClosed, ValidUserId);
+            tournament.SetFormat(TournamentFormat.Group);
             tournament.ChangeStatus(TournamentStatus.ScheduleGenerated, ValidUserId);
             tournament.ChangeStatus(TournamentStatus.InProgress, ValidUserId);
             tournament.ChangeStatus(TournamentStatus.Finished, ValidUserId);
@@ -350,6 +355,7 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         {
             // Arrange
             var tournament = CreateTournamentWithStatus(TournamentStatus.ScheduleGenerated);
+
             var newFormat = TournamentFormat.Knockout;
             // Act
             var result = tournament.SetFormat(newFormat);

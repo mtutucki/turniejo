@@ -8,6 +8,7 @@ using Turniejo.Tournaments.Application.Tournaments.GetTournaments;
 using Turniejo.Tournaments.Application.Tournaments.JoinTournament;
 using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
 using Turniejo.Tournaments.Application.Tournaments.UpdateTournament;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Api.Controllers
 {
@@ -48,24 +49,32 @@ namespace Turniejo.Api.Controllers
         }
 
         [HttpPatch("{tournamentId}/status")]
-        public async Task<IActionResult> ChangeTournamentStatus([FromRoute] Guid tournamentId, [FromBody] ChangeTournamentStatusCommand command, CancellationToken cancellationToken)
+        public async Task<IActionResult> ChangeTournamentStatus([FromRoute] Guid tournamentId, [FromBody] ChangeTournamentStatusRequest request, CancellationToken cancellationToken)
         {
+            var command = new ChangeTournamentStatusCommand(tournamentId, request.TournamentStatus);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
 
         [HttpPatch("{tournamentId}/format")]
-        public async Task<IActionResult> UpdateTournamentFormat([FromRoute] Guid tournamentId, [FromBody] SetTournamentFormatCommand command, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateTournamentFormat([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentFormatRequest request, CancellationToken cancellationToken)
         {
+            var command = new SetTournamentFormatCommand(tournamentId, request.TournamentFormat);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
 
         [HttpPut("{tournamentId}")]
-        public async Task<IActionResult> UpdateTournamentDetails([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentDetailsCommand command, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateTournamentDetails([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentDetailsRequest request, CancellationToken cancellationToken)
         {
+            var command = new UpdateTournamentDetailsCommand(tournamentId, request.Name, request.StartAt, request.EndAt, request.TeamLimit, request.Description);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
+
+        public sealed record ChangeTournamentStatusRequest(TournamentStatus TournamentStatus);
+        public sealed record UpdateTournamentFormatRequest(TournamentFormat TournamentFormat);
+        public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description);
+
     }
 }
