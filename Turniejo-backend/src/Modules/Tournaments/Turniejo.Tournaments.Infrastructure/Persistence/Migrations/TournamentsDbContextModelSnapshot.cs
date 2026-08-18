@@ -62,6 +62,34 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "tournaments");
                 });
 
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.TieBreakerRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TournamentId", "Order")
+                        .IsUnique();
+
+                    b.ToTable("tie_breaker_rules", "tournaments");
+                });
+
             modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.Tournament", b =>
                 {
                     b.Property<Guid>("Id")
@@ -139,6 +167,86 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "Status");
 
                     b.ToTable("tournaments", "tournaments");
+                });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.TournamentCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("MaxBirthDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("MinBirthDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TournamentId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("tournament_categories", "tournaments");
+                });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.TournamentGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TournamentId");
+
+                    b.HasIndex("CategoryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("tournament_groups", "tournaments");
+                });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.TieBreakerRule", b =>
+                {
+                    b.HasOne("Turniejo.Tournaments.Domain.Entities.Tournament", null)
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.Tournament", b =>
@@ -224,6 +332,30 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Settings")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.TournamentCategory", b =>
+                {
+                    b.HasOne("Turniejo.Tournaments.Domain.Entities.Tournament", null)
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Turniejo.Tournaments.Domain.Entities.TournamentGroup", b =>
+                {
+                    b.HasOne("Turniejo.Tournaments.Domain.Entities.TournamentCategory", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Turniejo.Tournaments.Domain.Entities.Tournament", null)
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 #pragma warning restore 612, 618
