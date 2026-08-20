@@ -57,5 +57,21 @@ namespace Turniejo.Tournaments.Domain.Entities
 
             return Result.Success(tournamentCategory);
         }
+
+        public Result UpdateDetails(string name, DateTime? minBirthDate, DateTime? maxBirthDate, int order)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Result.Failure(Error.Validation("Name", "TournamentCategory name cannot be empty"));
+            if (minBirthDate > maxBirthDate)
+                return Result.Failure(Error.Validation("BirthDate", "TournamentCategory minBirthDate cannot be greater than maxBirthDate"));
+            Name = name;
+            MinBirthDate = minBirthDate;
+            MaxBirthDate = maxBirthDate;
+            Order = order;
+
+            return Result.Success();
+        }
+
+        public void ClearDomainEvents() => _domainEvents.Clear();
     }
 }

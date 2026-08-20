@@ -12,8 +12,8 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCa
     {
         public async Task<Result<AddTournamentCategoryResponse>> Handle(AddTournamentCategoryCommand request, CancellationToken cancellationToken)
         {
-            var tournamentExists = await tournamentsDbContext.GetTournamentByIdAsync(request.TournamentId, cancellationToken);
-            if (tournamentExists == null)
+            var tournament = await tournamentsDbContext.GetTournamentByIdAsync(request.TournamentId, cancellationToken);
+            if (tournament == null)
                 return Result.Failure<AddTournamentCategoryResponse>(Error.NotFound("Tournament", request.TournamentId));
 
             var tournamentCategoryNameExists = await tournamentsDbContext.CategoryNameExistsAsync(request.TournamentId, request.Name, cancellationToken);
@@ -22,7 +22,7 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCa
 
             var result = TournamentCategory.Create(
                 Guid.NewGuid(),
-                tournamentExists.OrganizationId,
+                tournament.OrganizationId,
                 request.TournamentId,
                 currentUserContext.UserId,
                 request.Name,

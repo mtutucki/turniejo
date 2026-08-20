@@ -6,7 +6,6 @@ using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
 using Turniejo.Tournaments.Domain.Entities;
 using Turniejo.Tournaments.Domain.Enums;
-// using Turniejo.Tournaments.Domain.Enums; ← dopasuj namespace TournamentStatus u siebie
 
 namespace Turniejo.Tournaments.UnitTests.Tournaments;
 

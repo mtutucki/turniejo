@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Domain.Entities;
@@ -34,8 +35,17 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         return await Tournaments.FirstOrDefaultAsync(t => t.RefereeCode == code || t.CoachCode == code || t.ViewerCode == code, cancellationToken);
     }
 
-    public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
-    await base.SaveChangesAsync(cancellationToken);
+    public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503" })
+        {
+            throw new Exception("Cannot delete this resource because it is referenced by other data.");
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -116,5 +126,16 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
 
         TieBreakerRules.RemoveRange(existing);
         await TieBreakerRules.AddRangeAsync(newRules, cancellationToken);
+    }
+
+    public async Task<TournamentCategory?> GetTournamentCategoryByIdAsync(Guid categoryId, CancellationToken cancellationToken = default)
+    {
+        return await TournamentCategories.FirstOrDefaultAsync(t => t.Id == categoryId, cancellationToken);
+    }
+
+    public Task RemoveTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToke = default)
+    {
+        TournamentCategories.Remove(category);
+        return Task.CompletedTask;
     }
 }

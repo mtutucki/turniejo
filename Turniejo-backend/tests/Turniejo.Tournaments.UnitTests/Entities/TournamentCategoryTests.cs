@@ -148,5 +148,60 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             result.Value.MinBirthDate.Should().Be(validMinBirthDate);
             result.Value.MaxBirthDate.Should().Be(validMinBirthDate);
         }
+
+        [Fact]
+        public void UpdateDetails_ShouldSucceed_WhenAllDataIsValid()
+        {
+            //Arrange
+            var tournamentCategoryResult = CreateValidTournamentCategory();
+            tournamentCategoryResult.IsSuccess.Should().BeTrue();
+            var tournamentCategory = tournamentCategoryResult.Value;
+            var newName = "Updated Category";
+            var newMinBirthDate = DateTime.Now.AddDays(-1);
+            var newMaxBirthDate = DateTime.Now.AddDays(2);
+            var newOrder = 2;
+            //Act
+            var updateResult = tournamentCategory.UpdateDetails(newName, newMinBirthDate, newMaxBirthDate, newOrder);
+            //Assert
+            updateResult.IsSuccess.Should().BeTrue();
+            tournamentCategory.Name.Should().Be(newName);
+            tournamentCategory.MinBirthDate.Should().Be(newMinBirthDate);
+            tournamentCategory.MaxBirthDate.Should().Be(newMaxBirthDate);
+            tournamentCategory.Order.Should().Be(newOrder);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData(" ")]
+        [InlineData("  ")]
+        public void UpdateDetails_ShouldFail_WhenNameIsEmptyOrWhitespace(string invalidName)
+        {
+            //Arrange
+            var tournamentCategoryResult = CreateValidTournamentCategory();
+            tournamentCategoryResult.IsSuccess.Should().BeTrue();
+            var tournamentCategory = tournamentCategoryResult.Value;
+            //Act
+            var updateResult = tournamentCategory.UpdateDetails(invalidName, validMinBirthDate, validMaxBirthDate, validOrder);
+            //Assert
+            updateResult.IsFailure.Should().BeTrue();
+            updateResult.Error.Code.Should().Be("Validation.Name");
+            updateResult.Error.Message.Should().Be("TournamentCategory name cannot be empty");
+
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenMinBirthDateIsAfterMaxBirthDate()
+        {
+            //Arrange
+            var tournamentCategoryResult = CreateValidTournamentCategory();
+            tournamentCategoryResult.IsSuccess.Should().BeTrue();
+            var tournamentCategory = tournamentCategoryResult.Value;
+            //Act
+            var updateResult = tournamentCategory.UpdateDetails(validName, validMaxBirthDate, validMinBirthDate, validOrder);
+            //Assert
+            updateResult.IsFailure.Should().BeTrue();
+            updateResult.Error.Code.Should().Be("Validation.BirthDate");
+            updateResult.Error.Message.Should().Be("TournamentCategory minBirthDate cannot be greater than maxBirthDate");
+        }
     }
 }

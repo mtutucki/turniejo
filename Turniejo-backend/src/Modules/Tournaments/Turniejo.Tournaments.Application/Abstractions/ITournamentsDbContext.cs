@@ -17,6 +17,8 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task AddTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToken = default);
         Task<bool> CategoryNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<TournamentCategory?> GetTournamentCategoryByIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
+        public Task RemoveTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToke = default);
 
         // TournamentGroup
         Task AddTournamentGroupAsync(TournamentGroup group, CancellationToken cancellationToken = default);
