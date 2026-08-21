@@ -18,11 +18,11 @@ public sealed class GetTournamentsQueryHandlerTests
     }
 
     private static Tournament CreateFakeTournament(Guid organizationId) =>
-        Tournament.Create(
-            Guid.NewGuid(), organizationId, Guid.NewGuid(),
-            "Turniej testowy",
-            DateTimeOffset.UtcNow.AddDays(1), DateTimeOffset.UtcNow.AddDays(2),
-            8, null).Value;
+    Tournament.Create(
+        Guid.NewGuid(), organizationId, Guid.NewGuid(),
+        "Turniej testowy",
+        DateTimeOffset.UtcNow.AddDays(1), DateTimeOffset.UtcNow.AddDays(2),
+        8, "Opis testowego turnieju").Value;
 
     [Fact]
     public async Task Handle_ShouldReturnEmptyList_WhenNoTournamentsExist()
@@ -60,5 +60,8 @@ public sealed class GetTournamentsQueryHandlerTests
         result.Value[0].Id.Should().Be(tournament.Id);
         result.Value[0].Slug.Should().Be(tournament.Slug);
         result.Value[0].Status.Should().Be(tournament.Status.ToString());
+        result.Value[0].Description.Should().Be(tournament.Description);
     }
+
+
 }

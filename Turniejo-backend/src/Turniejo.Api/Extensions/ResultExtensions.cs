@@ -15,5 +15,16 @@ namespace Turniejo.Api.Extensions
                     ErrorType.Conflict => new ConflictObjectResult(result.Error),
                     _ => new BadRequestObjectResult(result.Error)
                 };
+
+        public static IActionResult ToActionResult(this Result result) =>
+        result.IsSuccess
+            ? new NoContentResult()
+            : result.Error.Type switch
+            {
+                ErrorType.NotFound => new NotFoundObjectResult(result.Error),
+                ErrorType.Validation => new BadRequestObjectResult(result.Error),
+                ErrorType.Conflict => new ConflictObjectResult(result.Error),
+                _ => new BadRequestObjectResult(result.Error)
+            };
     }
 }

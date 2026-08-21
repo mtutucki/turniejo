@@ -6,7 +6,6 @@ using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
 using Turniejo.Tournaments.Domain.Entities;
 using Turniejo.Tournaments.Domain.Enums;
-// using Turniejo.Tournaments.Domain.Enums; ← dopasuj namespace TournamentStatus u siebie
 
 namespace Turniejo.Tournaments.UnitTests.Tournaments;
 
@@ -106,5 +105,27 @@ public sealed class ChangeTournamentStatusCommandHandlerTests
 
         // Assert
         await _dbContext.Received(1).AddOutboxMessageAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldFail_WhenTransitioningToScheduleGeneratedWithoutFormat()
+    {
+        // Arrange — turniej bez ustawionego formatu, przeprowadzony do RegistrationClosed
+        var tournament = CreateFakeTournament();
+        tournament.ChangeStatus(TournamentStatus.RegistrationOpen, tournament.CreatedByUserId);
+        tournament.ChangeStatus(TournamentStatus.RegistrationClosed, tournament.CreatedByUserId);
+
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>())
+            .Returns(tournament);
+        _currentUserContext.UserId.Returns(tournament.CreatedByUserId);
+        var command = new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.ScheduleGenerated);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Validation.Format");
+        await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

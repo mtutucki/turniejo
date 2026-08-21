@@ -12,5 +12,22 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task<Tournament?> GetTournamentByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentByIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+
+        // TournamentCategory
+        Task AddTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToken = default);
+        Task<bool> CategoryNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<TournamentCategory?> GetTournamentCategoryByIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
+        public Task RemoveTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToke = default);
+
+        // TournamentGroup
+        Task AddTournamentGroupAsync(TournamentGroup group, CancellationToken cancellationToken = default);
+        Task<bool> GroupNameExistsAsync(Guid categoryId, string name, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentGroup>> GetTournamentGroupsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+
+        // TieBreakerRule
+        Task<IReadOnlyList<TieBreakerRule>> GetTieBreakerRulesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task ReplaceTieBreakerRulesAsync(Guid tournamentId, IReadOnlyList<TieBreakerRule> newRules, CancellationToken cancellationToken = default);
+
     }
 }

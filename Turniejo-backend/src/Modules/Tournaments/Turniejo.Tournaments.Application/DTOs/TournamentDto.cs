@@ -13,5 +13,7 @@
     string OrganizerCode,
     string RefereeCode,
     string CoachCode,
-    string ViewerCode);
+    string ViewerCode,
+    string? Description
+    );
 }

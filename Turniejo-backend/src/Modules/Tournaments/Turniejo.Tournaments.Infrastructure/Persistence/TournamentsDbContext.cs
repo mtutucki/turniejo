@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Domain.Entities;
@@ -9,6 +10,9 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
     : DbContext(options), ITournamentsDbContext
 {
     public DbSet<Tournament> Tournaments => Set<Tournament>();
+    public DbSet<TournamentCategory> TournamentCategories => Set<TournamentCategory>();
+    public DbSet<TournamentGroup> TournamentGroups => Set<TournamentGroup>();
+    public DbSet<TieBreakerRule> TieBreakerRules => Set<TieBreakerRule>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default)
@@ -31,8 +35,17 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         return await Tournaments.FirstOrDefaultAsync(t => t.RefereeCode == code || t.CoachCode == code || t.ViewerCode == code, cancellationToken);
     }
 
-    public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
-    await base.SaveChangesAsync(cancellationToken);
+    public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503" })
+        {
+            throw new Exception("Cannot delete this resource because it is referenced by other data.");
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,4 +84,58 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         .Where(t => t.OrganizationId == organizationId)
         .OrderByDescending(t => t.CreatedAt)
         .ToListAsync(cancellationToken);
+
+    public async Task AddTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToken = default) =>
+    await TournamentCategories.AddAsync(category, cancellationToken);
+
+    public async Task<bool> CategoryNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default) =>
+        await TournamentCategories.AnyAsync(c => c.TournamentId == tournamentId && c.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await TournamentCategories
+            .AsNoTracking()
+            .Where(c => c.TournamentId == tournamentId)
+            .OrderBy(c => c.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddTournamentGroupAsync(TournamentGroup group, CancellationToken cancellationToken = default) =>
+        await TournamentGroups.AddAsync(group, cancellationToken);
+
+    public async Task<bool> GroupNameExistsAsync(Guid categoryId, string name, CancellationToken cancellationToken = default) =>
+        await TournamentGroups.AnyAsync(g => g.CategoryId == categoryId && g.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<TournamentGroup>> GetTournamentGroupsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await TournamentGroups
+            .AsNoTracking()
+            .Where(g => g.TournamentId == tournamentId)
+            .OrderBy(g => g.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TieBreakerRule>> GetTieBreakerRulesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await TieBreakerRules
+            .AsNoTracking()
+            .Where(r => r.TournamentId == tournamentId)
+            .OrderBy(r => r.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task ReplaceTieBreakerRulesAsync(Guid tournamentId, IReadOnlyList<TieBreakerRule> newRules, CancellationToken cancellationToken = default)
+    {
+        var existing = await TieBreakerRules
+            .Where(r => r.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+        TieBreakerRules.RemoveRange(existing);
+        await TieBreakerRules.AddRangeAsync(newRules, cancellationToken);
+    }
+
+    public async Task<TournamentCategory?> GetTournamentCategoryByIdAsync(Guid categoryId, CancellationToken cancellationToken = default)
+    {
+        return await TournamentCategories.FirstOrDefaultAsync(t => t.Id == categoryId, cancellationToken);
+    }
+
+    public Task RemoveTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToke = default)
+    {
+        TournamentCategories.Remove(category);
+        return Task.CompletedTask;
+    }
 }
