@@ -145,6 +145,23 @@ public sealed class Tournament : BaseEntity
         return Result.Success();
     }
 
+    public Result UpdateSettings(int pointsForWin, int pointsForDraw, int pointsForLoss, int matchDurationMinutes, int breakDurationMinutes,
+        bool isThirdPlaceMatchEnabled, int refereeEditWindowMinutes, int walkoverHomeScore, int walkoverAwayScore, bool canCoachEditSquadAfterStart, Guid changedByUserId)
+    {
+        if (Status >= TournamentStatus.InProgress)
+            return Result.Failure(Error.Conflict("Status", "You cannot edit tournament settings after tournament is in progres"));
+
+        var result = Settings.Update(pointsForWin, pointsForDraw, pointsForLoss, matchDurationMinutes, breakDurationMinutes,
+            isThirdPlaceMatchEnabled, refereeEditWindowMinutes, walkoverHomeScore, walkoverAwayScore, canCoachEditSquadAfterStart);
+
+        if (result.IsFailure)
+            return Result.Failure(result.Error);
+
+        _domainEvents.Add(new TournamentSettingsUpdated(Id, OrganizationId, changedByUserId));
+
+        return Result.Success();
+    }
+
     public void ClearDomainEvents() => _domainEvents.Clear();
 
 }

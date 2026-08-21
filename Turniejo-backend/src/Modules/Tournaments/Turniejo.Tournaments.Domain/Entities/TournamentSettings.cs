@@ -1,4 +1,6 @@
-﻿namespace Turniejo.Tournaments.Domain.Entities;
+﻿using Turniejo.SharedKernel.Results;
+
+namespace Turniejo.Tournaments.Domain.Entities;
 
 public sealed class TournamentSettings
 {
@@ -24,6 +26,43 @@ public sealed class TournamentSettings
         };
 
         return tournamentSettings;
+    }
+
+    public Result Update(int pointsForWin, int pointsForDraw, int pointsForLoss, int matchDurationMinutes, int breakDurationMinutes,
+        bool isThirdPlaceMatchEnabled, int refereeEditWindowMinutes, int walkoverHomeScore, int walkoverAwayScore, bool canCoachEditSquadAfterStart)
+    {
+        if (pointsForWin < pointsForDraw)
+            return Result.Failure(Error.Validation("PointsForWin", "PointsForWin cannot be less than pointsForDraw"));
+
+        if (pointsForDraw < pointsForLoss)
+            return Result.Failure(Error.Validation("PointsForDraw", "pointsForDraw cannot be less than pointsForLoss"));
+
+        if (pointsForLoss < 0)
+            return Result.Failure(Error.Validation("PointsForLoss", "pointsForLoss cannot be negative"));
+
+        if (matchDurationMinutes <= 0)
+            return Result.Failure(Error.Validation("MatchDurationMinutes", "matchDurationMinutes must be higher than 0"));
+
+        if (walkoverHomeScore == walkoverAwayScore)
+            return Result.Failure(Error.Validation("WalkoverHomeScore", "walkoverHomeScore cannot equal to walkoverAwayScore"));
+
+        if (breakDurationMinutes < 0)
+            return Result.Failure(Error.Validation("BreakDurationMinutes", "breakDurationMinutes must be higher than 0"));
+        if (refereeEditWindowMinutes < 0)
+            return Result.Failure(Error.Validation("RefereeEditWindowMinutes", "refereeEditWindowMinutes must be higher than 0"));
+
+        PointsForWin = pointsForWin;
+        PointsForDraw = pointsForDraw;
+        PointsForLoss = pointsForLoss;
+        MatchDurationMinutes = matchDurationMinutes;
+        BreakDurationMinutes = breakDurationMinutes;
+        WalkoverHomeScore = walkoverHomeScore;
+        WalkoverAwayScore = walkoverAwayScore;
+        RefereeEditWindowMinutes = refereeEditWindowMinutes;
+        IsThirdPlaceMatchEnabled = isThirdPlaceMatchEnabled;
+        CanCoachEditSquadAfterStart = canCoachEditSquadAfterStart;
+
+        return Result.Success();
     }
 }
 

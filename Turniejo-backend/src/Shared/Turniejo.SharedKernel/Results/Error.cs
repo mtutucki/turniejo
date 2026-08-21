@@ -9,4 +9,7 @@ public record Error(string Code, string Message, ErrorType Type = ErrorType.Fail
 
     public static Error Validation(string field, string message) =>
         new($"Validation.{field}", message, ErrorType.Validation);
+
+    public static Error Conflict(string field, string message) =>
+        new($"Conflict.{field}", message, ErrorType.Conflict);
 }

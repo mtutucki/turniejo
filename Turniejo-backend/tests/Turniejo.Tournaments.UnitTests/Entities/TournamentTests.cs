@@ -365,5 +365,52 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             result.Error.Message.Should().Be("Cannot change format after schedule has been generated.");
         }
 
+        [Fact]
+        public void UpdateSettings_ShouldUpdateSettings_WhenValid()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var settings = TournamentSettings.CreateDefault(tournament.Id);
+
+            // Act
+            var result = tournament.UpdateSettings(settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss, settings.MatchDurationMinutes, settings.BreakDurationMinutes, settings.IsThirdPlaceMatchEnabled, settings.RefereeEditWindowMinutes, settings.WalkoverHomeScore, settings.WalkoverAwayScore, settings.CanCoachEditSquadAfterStart, Guid.NewGuid());
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+        }
+
+        [Theory]
+        [InlineData(TournamentStatus.InProgress)]
+        [InlineData(TournamentStatus.Finished)]
+        [InlineData(TournamentStatus.Cancelled)]
+        public void UpdateSettings_ShouldFail_WhenStatusIsInProgressOrFurther(TournamentStatus tournamentStatus)
+        {
+            // Assert
+            var tournament = CreateTournamentWithStatus(tournamentStatus);
+            var settings = TournamentSettings.CreateDefault(tournament.Id);
+
+            Console.WriteLine(tournament.Status);
+
+            // Act
+            var result = tournament.UpdateSettings(settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss, settings.MatchDurationMinutes, settings.BreakDurationMinutes, settings.IsThirdPlaceMatchEnabled, settings.RefereeEditWindowMinutes, settings.WalkoverHomeScore, settings.WalkoverAwayScore, settings.CanCoachEditSquadAfterStart, Guid.NewGuid());
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        [Fact]
+        public void UpdateSettings_ShouldAddTournamentSettingsUpdatedEvent_WhenValid()
+        {
+            // Arrange
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+            var settings = TournamentSettings.CreateDefault(tournament.Id);
+
+            // Act
+            var result = tournament.UpdateSettings(settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss, settings.MatchDurationMinutes, settings.BreakDurationMinutes, settings.IsThirdPlaceMatchEnabled, settings.RefereeEditWindowMinutes, settings.WalkoverHomeScore, settings.WalkoverAwayScore, settings.CanCoachEditSquadAfterStart, Guid.NewGuid());
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            tournament.DomainEvents.Should().ContainSingle(t => t is TournamentSettingsUpdated);
+        }
     }
 }
