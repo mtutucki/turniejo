@@ -20,6 +20,11 @@
     <Project Path="src/Modules/Organizations/Turniejo.Organizations.Domain/Turniejo.Organizations.Domain.csproj" />
     <Project Path="src/Modules/Organizations/Turniejo.Organizations.Infrastructure/Turniejo.Organizations.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Players/">
+    <Project Path="src/Modules/Players/Turniejo.Players.Application/Turniejo.Players.Application.csproj" />
+    <Project Path="src/Modules/Players/Turniejo.Players.Domain/Turniejo.Players.Domain.csproj" />
+    <Project Path="src/Modules/Players/Turniejo.Players.Infrastructure/Turniejo.Players.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Teams/">
     <Project Path="src/Modules/Teams/Turniejo.Teams.Application/Turniejo.Teams.Application.csproj" />
     <Project Path="src/Modules/Teams/Turniejo.Teams.Domain/Turniejo.Teams.Domain.csproj" />
@@ -42,6 +47,7 @@
     <Project Path="tests/Turniejo.IntegrationTests/Turniejo.IntegrationTests.csproj" />
     <Project Path="tests/Turniejo.Matches.UnitTests/Turniejo.Matches.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Organizations.UnitTests/Turniejo.Organizations.UnitTests.csproj" />
+    <Project Path="tests/Turniejo.Players.UnitTests/Turniejo.Players.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Teams.UnitTests/Turniejo.Teams.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Tournaments.UnitTests/Turniejo.Tournaments.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Users.UnitTests/Turniejo.Users.UnitTests.csproj" />

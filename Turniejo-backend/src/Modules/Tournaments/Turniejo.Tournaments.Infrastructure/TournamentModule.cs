@@ -18,4 +18,15 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext) : ITourn
             tournament.OrganizationId,
             tournament.TeamLimit);
     }
+
+    public async Task<TournamentCategoryDto?> GetTournamentCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default)
+    {
+        var category = await dbContext.GetTournamentCategoryByIdAsync(categoryId, cancellationToken);
+        if (category is null)
+            return null;
+
+        return new TournamentCategoryDto(
+            category.Id, category.TournamentId, category.Name,
+            category.MinBirthDate, category.MaxBirthDate);
+    }
 }

@@ -11,6 +11,7 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
 {
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TournamentTeam> TournamentTeams => Set<TournamentTeam>();
+    public DbSet<TeamStaff> TeamStaffs => Set<TeamStaff>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default)
@@ -50,6 +51,20 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
         await TournamentTeams.CountAsync(t =>
             t.TournamentId == tournamentId && t.RegistrationStatus == RegistrationStatus.Accepted,
             cancellationToken);
+
+    public async Task AddTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default) =>
+        await TeamStaffs.AddAsync(teamStaff, cancellationToken);
+
+    public async Task<bool> TeamStaffExistsAsync(Guid tournamentTeamId, Guid userId, TeamStaffRole role, CancellationToken cancellationToken = default) =>
+        await TeamStaffs.AnyAsync(s =>
+            s.TournamentTeamId == tournamentTeamId && s.UserId == userId && s.Role == role,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<TeamStaff>> GetTeamStaffByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default) =>
+        await TeamStaffs
+            .AsNoTracking()
+            .Where(s => s.TournamentTeamId == tournamentTeamId)
+            .ToListAsync(cancellationToken);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,5 +1,6 @@
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Teams.Domain.Entities;
+using Turniejo.Teams.Domain.Enums;
 
 namespace Turniejo.Teams.Application.Abstractions
 {
@@ -18,5 +19,10 @@ namespace Turniejo.Teams.Application.Abstractions
         Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<bool> TournamentTeamExistsAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default);
         Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+
+        // TeamStaff
+        Task AddTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default);
+        Task<bool> TeamStaffExistsAsync(Guid tournamentTeamId, Guid userId, TeamStaffRole role, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TeamStaff>> GetTeamStaffByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
     }
 }

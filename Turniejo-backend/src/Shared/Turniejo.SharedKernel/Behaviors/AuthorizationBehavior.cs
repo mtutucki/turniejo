@@ -36,6 +36,18 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(
                 authorizedRequest.AllowedRoles,
                 cancellationToken);
 
+            // Jeśli primary scope nie przepuszcza, sprawdź alternatywny scope
+            // (np. Coach konkretnej TournamentTeam zamiast Organizer całego turnieju).
+            if (!hasAccess && request is IAlternateAuthorizedScope alternateScope)
+            {
+                hasAccess = await authorizationService.HasAnyRoleAsync(
+                    currentUserContext.UserId,
+                    alternateScope.AlternateScopeType,
+                    alternateScope.AlternateScopeId,
+                    alternateScope.AlternateAllowedRoles,
+                    cancellationToken);
+            }
+
             if (!hasAccess)
                 throw new UnauthorizedException();
         }

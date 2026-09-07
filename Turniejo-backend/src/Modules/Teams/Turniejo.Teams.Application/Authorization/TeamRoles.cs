@@ -16,4 +16,11 @@ internal static class TeamRoles
         nameof(UserRole.Coach),
         nameof(UserRole.Viewer)
     ];
+
+    public static readonly IReadOnlyCollection<string> AnyTeamStaff =
+    [
+        nameof(UserRole.Coach),
+        nameof(UserRole.AssistantCoach),
+        nameof(UserRole.Manager)
+    ];
 }

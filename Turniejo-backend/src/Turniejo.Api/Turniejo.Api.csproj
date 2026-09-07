@@ -30,6 +30,8 @@
     <ProjectReference Include="..\Modules\Notifications\Turniejo.Notifications.Infrastructure\Turniejo.Notifications.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Organizations\Turniejo.Organizations.Application\Turniejo.Organizations.Application.csproj" />
     <ProjectReference Include="..\Modules\Organizations\Turniejo.Organizations.Infrastructure\Turniejo.Organizations.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Players\Turniejo.Players.Application\Turniejo.Players.Application.csproj" />
+    <ProjectReference Include="..\Modules\Players\Turniejo.Players.Infrastructure\Turniejo.Players.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

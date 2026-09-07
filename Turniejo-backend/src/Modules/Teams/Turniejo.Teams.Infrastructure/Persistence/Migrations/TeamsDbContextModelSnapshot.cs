@@ -96,6 +96,34 @@ namespace Turniejo.Teams.Infrastructure.Persistence.Migrations
                     b.ToTable("teams", "teams");
                 });
 
+            modelBuilder.Entity("Turniejo.Teams.Domain.Entities.TeamStaff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TournamentTeamId", "UserId", "Role")
+                        .IsUnique();
+
+                    b.ToTable("team_staff", "teams");
+                });
+
             modelBuilder.Entity("Turniejo.Teams.Domain.Entities.TournamentTeam", b =>
                 {
                     b.Property<Guid>("Id")
@@ -138,6 +166,15 @@ namespace Turniejo.Teams.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("tournament_teams", "teams");
+                });
+
+            modelBuilder.Entity("Turniejo.Teams.Domain.Entities.TeamStaff", b =>
+                {
+                    b.HasOne("Turniejo.Teams.Domain.Entities.TournamentTeam", null)
+                        .WithMany()
+                        .HasForeignKey("TournamentTeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Turniejo.Teams.Domain.Entities.TournamentTeam", b =>

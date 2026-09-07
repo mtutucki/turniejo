@@ -3,6 +3,7 @@ using Turniejo.Auth.Infrastructure.Extensions;
 using Turniejo.Matches.Infrastructure.Extensions;
 using Turniejo.Notifications.Infrastructure.Extensions;
 using Turniejo.Organizations.Infrastructure.Extensions;
+using Turniejo.Players.Infrastructure.Extensions;
 using Turniejo.SharedKernel.Behaviors;
 using Turniejo.Teams.Infrastructure.Extensions;
 using Turniejo.Tournaments.Infrastructure.Extensions;
@@ -23,6 +24,7 @@ builder.Services.AddTeamsModule(builder.Configuration);
 builder.Services.AddMatchesModule(builder.Configuration);
 builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddOrganizationsModule(builder.Configuration);
+builder.Services.AddPlayersModule(builder.Configuration);
 
 
 
@@ -36,6 +38,7 @@ builder.Services.AddMediatR(cfg =>
         typeof(Turniejo.Matches.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Notifications.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Organizations.Application.AssemblyReference).Assembly,
+        typeof(Turniejo.Players.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Tournaments.Application.AssemblyReference).Assembly
     );
 
