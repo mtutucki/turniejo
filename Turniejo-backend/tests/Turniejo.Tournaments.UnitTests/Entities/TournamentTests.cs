@@ -370,7 +370,7 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         {
             // Arrange
             var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
-            var settings = TournamentSettings.CreateDefault(tournament.Id);
+            var settings = Domain.Entities.TournamentSettings.CreateDefault(tournament.Id);
 
             // Act
             var result = tournament.UpdateSettings(settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss, settings.MatchDurationMinutes, settings.BreakDurationMinutes, settings.IsThirdPlaceMatchEnabled, settings.RefereeEditWindowMinutes, settings.WalkoverHomeScore, settings.WalkoverAwayScore, settings.CanCoachEditSquadAfterStart, Guid.NewGuid());
@@ -385,15 +385,14 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         [InlineData(TournamentStatus.Cancelled)]
         public void UpdateSettings_ShouldFail_WhenStatusIsInProgressOrFurther(TournamentStatus tournamentStatus)
         {
-            // Assert
+            // Arrange
             var tournament = CreateTournamentWithStatus(tournamentStatus);
-            var settings = TournamentSettings.CreateDefault(tournament.Id);
-
-            Console.WriteLine(tournament.Status);
+            var settings = Domain.Entities.TournamentSettings.CreateDefault(tournament.Id);
 
             // Act
             var result = tournament.UpdateSettings(settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss, settings.MatchDurationMinutes, settings.BreakDurationMinutes, settings.IsThirdPlaceMatchEnabled, settings.RefereeEditWindowMinutes, settings.WalkoverHomeScore, settings.WalkoverAwayScore, settings.CanCoachEditSquadAfterStart, Guid.NewGuid());
 
+            // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
         }
@@ -403,7 +402,7 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         {
             // Arrange
             var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
-            var settings = TournamentSettings.CreateDefault(tournament.Id);
+            var settings = Domain.Entities.TournamentSettings.CreateDefault(tournament.Id);
 
             // Act
             var result = tournament.UpdateSettings(settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss, settings.MatchDurationMinutes, settings.BreakDurationMinutes, settings.IsThirdPlaceMatchEnabled, settings.RefereeEditWindowMinutes, settings.WalkoverHomeScore, settings.WalkoverAwayScore, settings.CanCoachEditSquadAfterStart, Guid.NewGuid());

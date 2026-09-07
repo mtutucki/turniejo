@@ -1,5 +1,4 @@
 ﻿using FluentAssertions;
-using Turniejo.Tournaments.Domain.Entities;
 
 namespace Turniejo.Tournaments.UnitTests.Entities
 {
@@ -18,9 +17,9 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         private static readonly int validWalkoverAwayScore = 0;
         private static readonly bool validCanCoachEditSquadAfterStart = false;
 
-        private static TournamentSettings CreateValidTournamentSettings()
+        private static Domain.Entities.TournamentSettings CreateValidTournamentSettings()
         {
-            return TournamentSettings.CreateDefault(validTournamentId);
+            return Domain.Entities.TournamentSettings.CreateDefault(validTournamentId);
         }
 
         [Fact]

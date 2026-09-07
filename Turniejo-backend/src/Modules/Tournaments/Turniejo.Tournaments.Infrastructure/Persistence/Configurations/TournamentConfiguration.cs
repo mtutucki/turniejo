@@ -48,8 +48,25 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Configurations
 
             builder.OwnsOne(x => x.Settings, s =>
             {
+                s.ToTable("tournament_settings");
+                s.HasKey(ts => ts.TournamentId);
                 s.WithOwner().HasForeignKey("TournamentId");
+
+                var ownership = s.WithOwner().HasForeignKey("TournamentId");
+                ownership.Metadata.DeleteBehavior = DeleteBehavior.Cascade;
+
+                s.Property(ts => ts.PointsForWin).IsRequired();
+                s.Property(ts => ts.PointsForDraw).IsRequired();
+                s.Property(ts => ts.PointsForLoss).IsRequired();
+                s.Property(ts => ts.MatchDurationMinutes).IsRequired();
+                s.Property(ts => ts.BreakDurationMinutes).IsRequired();
+                s.Property(ts => ts.IsThirdPlaceMatchEnabled).IsRequired();
+                s.Property(ts => ts.RefereeEditWindowMinutes).IsRequired();
+                s.Property(ts => ts.WalkoverHomeScore).IsRequired();
+                s.Property(ts => ts.WalkoverAwayScore).IsRequired();
+                s.Property(ts => ts.CanCoachEditSquadAfterStart).IsRequired();
             });
+
             builder.OwnsOne(x => x.PublicSettings, s =>
             {
                 s.WithOwner().HasForeignKey("TournamentId");

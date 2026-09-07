@@ -10,11 +10,13 @@ using Turniejo.Tournaments.Application.Tournaments.GetTournamentById;
 using Turniejo.Tournaments.Application.Tournaments.GetTournaments;
 using Turniejo.Tournaments.Application.Tournaments.JoinTournament;
 using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
+using Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateTournamentSettings;
 using Turniejo.Tournaments.Application.Tournaments.UpdateTournament;
 using Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory;
 using Turniejo.Tournaments.Application.TournamentsCategories.DeleteTournamentCategory;
 using Turniejo.Tournaments.Application.TournamentsCategories.GetTournamentCategories;
 using Turniejo.Tournaments.Application.TournamentsCategories.UpdateTournamentCategory;
+using Turniejo.Tournaments.Application.TournamentSetting.GetTournamentSettings;
 using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Api.Controllers
@@ -143,6 +145,34 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpPut("{tournamentId}/settings")]
+        public async Task<IActionResult> UpdateTournamentSettings([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentSettingsRequest request, CancellationToken cancellationToken)
+        {
+            var command = new UpdateTournamentSettingsCommand(
+                tournamentId,
+                request.PointsForWin,
+                request.PointsForDraw,
+                request.PointsForLoss,
+                request.MatchDurationMinutes,
+                request.BreakDurationMinutes,
+                request.IsThirdPlaceMatchEnabled,
+                request.RefereeEditWindowMinutes,
+                request.WalkoverHomeScore,
+                request.WalkoverAwayScore,
+                request.CanCoachEditSquadAfterStart);
+
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{tournamentId}/settings")]
+        public async Task<IActionResult> GetTournamentSettings([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        {
+            var query = new GetTournamentSettingsQuery(tournamentId);
+            var result = await sender.Send(query, cancellationToken);
+            return result.ToActionResult();
+        }
+
         public sealed record ChangeTournamentStatusRequest(TournamentStatus TournamentStatus);
         public sealed record UpdateTournamentFormatRequest(TournamentFormat TournamentFormat);
         public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description);
@@ -150,5 +180,6 @@ namespace Turniejo.Api.Controllers
         public sealed record UpdateTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
+        public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart);
     }
 }
