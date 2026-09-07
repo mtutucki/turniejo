@@ -1,7 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
+using Turniejo.Teams.Application.Abstractions;
+using Turniejo.Teams.Application.Teams.CreateTeam;
 using Turniejo.Teams.Infrastructure.Persistence;
 
 namespace Turniejo.Teams.Infrastructure.Extensions;
@@ -21,7 +25,13 @@ public static class ServiceCollectionExtensions
                     npgsql.MigrationsAssembly(typeof(TeamsDbContext).Assembly.FullName);
                 }));
 
+        services.AddScoped<ITeamsDbContext>(sp => sp.GetRequiredService<TeamsDbContext>());
+
+        services.AddScoped<ITeamModule, TeamModule>();
+
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+        services.AddValidatorsFromAssemblyContaining<CreateTeamCommandValidator>();
 
         return services;
     }

@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Users\Turniejo.Users.Domain\Turniejo.Users.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Users\Turniejo.Users.Application\Turniejo.Users.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Users\Turniejo.Users.Infrastructure\Turniejo.Users.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,12 +1,56 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Turniejo.SharedKernel.Outbox;
+using Turniejo.Teams.Application.Abstractions;
+using Turniejo.Teams.Domain.Entities;
+using Turniejo.Teams.Domain.Enums;
 
 namespace Turniejo.Teams.Infrastructure.Persistence;
 
 public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
-    : DbContext(options)
+    : DbContext(options), ITeamsDbContext
 {
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<TournamentTeam> TournamentTeams => Set<TournamentTeam>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default)
+    {
+        await OutboxMessages.AddAsync(message, cancellationToken);
+    }
+
+    public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task AddTeamAsync(Team team, CancellationToken cancellationToken = default) =>
+        await Teams.AddAsync(team, cancellationToken);
+
+    public async Task<Team?> GetTeamByIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
+        await Teams.FirstOrDefaultAsync(t => t.Id == teamId, cancellationToken);
+
+    public async Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AddAsync(tournamentTeam, cancellationToken);
+
+    public async Task<TournamentTeam?> GetTournamentTeamByIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.FirstOrDefaultAsync(t => t.Id == tournamentTeamId, cancellationToken);
+
+    public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .AsNoTracking()
+            .Where(t => t.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<bool> TournamentTeamExistsAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AnyAsync(t =>
+            t.TournamentId == tournamentId && t.TeamId == teamId && t.CategoryId == categoryId,
+            cancellationToken);
+
+    public async Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.CountAsync(t =>
+            t.TournamentId == tournamentId && t.RegistrationStatus == RegistrationStatus.Accepted,
+            cancellationToken);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("teams");

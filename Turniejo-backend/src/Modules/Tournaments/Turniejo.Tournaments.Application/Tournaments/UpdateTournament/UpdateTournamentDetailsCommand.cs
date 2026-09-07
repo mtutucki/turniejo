@@ -1,4 +1,6 @@
 ﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Enums;
+using Turniejo.Tournaments.Application.Authorization;
 
 namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
 {
@@ -9,5 +11,10 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
         DateTimeOffset EndAt,
         int TeamLimit,
         string? Description
-    ) : ICommand<UpdateTournamentDetailsResponse>;
+    ) : ICommand<UpdateTournamentDetailsResponse>, IAuthorizedRequest
+    {
+        public string ScopeType => nameof(RoleScopeType.Tournament);
+        public Guid ScopeId => TournamentId;
+        public IReadOnlyCollection<string> AllowedRoles => TournamentRoles.OrganizerOnly;
+    }
 }

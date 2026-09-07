@@ -71,7 +71,7 @@ namespace Turniejo.Tournaments.UnitTests.TournamentSettings
 
             // Assert
             result.IsFailure.Should().BeTrue();
-            result.Error.Code.Should().Be("tournament.NotFound");
+            result.Error.Code.Should().Be("Tournament.NotFound");
             await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 

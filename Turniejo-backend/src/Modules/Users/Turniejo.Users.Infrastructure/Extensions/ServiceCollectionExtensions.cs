@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUsersDbContext>(sp => sp.GetRequiredService<UsersDbContext>());
 
         services.AddScoped<IUserModule, UserModule>();
+        services.AddScoped<IAuthorizationService, AuthorizationService>();
 
         // Rejestracja walidatorów
         services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();

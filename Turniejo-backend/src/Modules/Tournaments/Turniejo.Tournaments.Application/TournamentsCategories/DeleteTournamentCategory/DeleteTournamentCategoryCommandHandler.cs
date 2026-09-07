@@ -9,7 +9,7 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.DeleteTournamen
         public async Task<Result> Handle(DeleteTournamentCategoryCommand request, CancellationToken cancellationToken)
         {
             var category = await tournamentsDbContext.GetTournamentCategoryByIdAsync(request.CategoryId, cancellationToken);
-            if (category == null)
+            if (category == null || category.TournamentId != request.TournamentId)
                 return Result.Failure(Error.NotFound("TournamentCategory", request.CategoryId));
 
             await tournamentsDbContext.RemoveTournamentCategoryAsync(category, cancellationToken);

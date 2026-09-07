@@ -12,7 +12,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateT
         {
             var tournament = await dbContext.GetTournamentByIdAsync(request.TournamentId, cancellationToken);
             if (tournament == null)
-                return Result.Failure<UpdateTournamentSettingsResponse>(Error.NotFound("tournament", request.TournamentId));
+                return Result.Failure<UpdateTournamentSettingsResponse>(Error.NotFound("Tournament", request.TournamentId));
 
             var updateResult = tournament.UpdateSettings(
                 request.PointsForWin, request.PointsForDraw, request.PointsForLoss, request.MatchDurationMinutes, request.BreakDurationMinutes, request.IsThirdPlaceMatchEnabled,

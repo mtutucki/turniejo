@@ -42,6 +42,7 @@
     <Project Path="tests/Turniejo.IntegrationTests/Turniejo.IntegrationTests.csproj" />
     <Project Path="tests/Turniejo.Matches.UnitTests/Turniejo.Matches.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Organizations.UnitTests/Turniejo.Organizations.UnitTests.csproj" />
+    <Project Path="tests/Turniejo.Teams.UnitTests/Turniejo.Teams.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Tournaments.UnitTests/Turniejo.Tournaments.UnitTests.csproj" />
     <Project Path="tests/Turniejo.Users.UnitTests/Turniejo.Users.UnitTests.csproj" />
   </Folder>

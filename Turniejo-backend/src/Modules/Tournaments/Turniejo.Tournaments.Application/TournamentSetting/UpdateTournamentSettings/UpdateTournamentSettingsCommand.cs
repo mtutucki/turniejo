@@ -1,4 +1,6 @@
 ﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Enums;
+using Turniejo.Tournaments.Application.Authorization;
 using Turniejo.Tournaments.Application.TournamentSetting.UpdateTournamentSettings;
 
 namespace Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateTournamentSettings
@@ -15,5 +17,10 @@ namespace Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateT
         int WalkoverHomeScore,
         int WalkoverAwayScore,
         bool CanCoachEditSquadAfterStart
-        ) : ICommand<UpdateTournamentSettingsResponse>;
+        ) : ICommand<UpdateTournamentSettingsResponse>, IAuthorizedRequest
+    {
+        public string ScopeType => nameof(RoleScopeType.Tournament);
+        public Guid ScopeId => TournamentId;
+        public IReadOnlyCollection<string> AllowedRoles => TournamentRoles.OrganizerOnly;
+    }
 }

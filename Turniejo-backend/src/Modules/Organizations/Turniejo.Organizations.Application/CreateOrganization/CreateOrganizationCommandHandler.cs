@@ -2,14 +2,17 @@
 using Turniejo.Organizations.Application.Abstractions;
 using Turniejo.Organizations.Domain.Entities;
 using Turniejo.Organizations.Domain.Events;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Enums;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Organizations.Application.Organizations.CreateOrganization;
 
 internal sealed class CreateOrganizationCommandHandler(
-    IOrganizationsDbContext dbContext)
+    IOrganizationsDbContext dbContext,
+    IUserModule userModule)
     : ICommandHandler<CreateOrganizationCommand, CreateOrganizationResponse>
 {
     public async Task<Result<CreateOrganizationResponse>> Handle(
@@ -41,6 +44,14 @@ internal sealed class CreateOrganizationCommandHandler(
                 organization.Name)));
 
         await dbContext.AddOutboxMessageAsync(outboxMessage, cancellationToken);
+
+        await userModule.AssignRoleAsync(
+            organization.OwnerUserId,
+            nameof(UserRole.Organizer),
+            nameof(RoleScopeType.Organization),
+            organization.Id,
+            cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CreateOrganizationResponse(

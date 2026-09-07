@@ -2,5 +2,5 @@
 
 public interface IAuthorizationService
 {
-    Task<bool> HasRoleAsync(Guid userId, string role, string scopeType, Guid? scopeId, CancellationToken cancellationToken = default);
+    Task<bool> HasAnyRoleAsync(Guid userId, string scopeType, Guid scopeId, IReadOnlyCollection<string> roles, CancellationToken cancellationToken = default);
 }

@@ -1,4 +1,6 @@
 ﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Enums;
+using Turniejo.Tournaments.Application.Authorization;
 
 namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory
 {
@@ -7,5 +9,10 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCa
         string Name,
         DateTime? MinBirthDate,
         DateTime? MaxBirthDate,
-        int Order) : ICommand<AddTournamentCategoryResponse>;
+        int Order) : ICommand<AddTournamentCategoryResponse>, IAuthorizedRequest
+    {
+        public string ScopeType => nameof(RoleScopeType.Tournament);
+        public Guid ScopeId => TournamentId;
+        public IReadOnlyCollection<string> AllowedRoles => TournamentRoles.OrganizerOnly;
+    }
 }
