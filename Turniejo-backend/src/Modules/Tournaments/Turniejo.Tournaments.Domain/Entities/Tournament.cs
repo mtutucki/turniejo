@@ -162,6 +162,19 @@ public sealed class Tournament : BaseEntity
         return Result.Success();
     }
 
+    public Result UpdatePublicSettings(
+        bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
+        bool showStandings, bool showBracket, bool showLiveMatches)
+    {
+        var result = PublicSettings.Update(isPublic, showTeams, showPlayers, showSchedule, showStandings, showBracket, showLiveMatches);
+        if (result.IsFailure)
+            return result;
+
+        SetUpdatedAt();
+
+        return Result.Success();
+    }
+
     public void ClearDomainEvents() => _domainEvents.Clear();
 
 }

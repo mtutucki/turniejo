@@ -1,0 +1,45 @@
+using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.DTOs;
+using Turniejo.Matches.Domain.Enums;
+using Turniejo.SharedKernel.Contracts;
+using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Results;
+
+namespace Turniejo.Matches.Application.Stats.GetTopScorers
+{
+    internal sealed class GetTopScorersQueryHandler(
+        IMatchesDbContext dbContext,
+        IPlayerModule playerModule) : IQueryHandler<GetTopScorersQuery, IReadOnlyList<PlayerRankingEntryDto>>
+    {
+        private static readonly MatchEventType[] GoalTypes =
+        [
+            MatchEventType.Goal,
+            MatchEventType.OwnGoal,
+            MatchEventType.PenaltyGoal
+        ];
+
+        public async Task<Result<IReadOnlyList<PlayerRankingEntryDto>>> Handle(GetTopScorersQuery request, CancellationToken cancellationToken)
+        {
+            var events = await dbContext.GetMatchEventsByTournamentIdAndTypesAsync(request.TournamentId, GoalTypes, cancellationToken);
+
+            var goalCounts = events
+                .Where(e => e.PlayerId.HasValue)
+                .GroupBy(e => e.PlayerId!.Value)
+                .Select(g => new { PlayerId = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .Take(request.Top)
+                .ToList();
+
+            var players = await playerModule.GetPlayersAsync(goalCounts.Select(x => x.PlayerId).ToList(), cancellationToken);
+            var playersById = players.ToDictionary(p => p.Id);
+
+            var ranking = goalCounts
+                .Select(x => playersById.TryGetValue(x.PlayerId, out var player)
+                    ? new PlayerRankingEntryDto(x.PlayerId, player.FirstName, player.LastName, x.Count)
+                    : new PlayerRankingEntryDto(x.PlayerId, "Unknown", "Unknown", x.Count))
+                .ToList();
+
+            return Result.Success<IReadOnlyList<PlayerRankingEntryDto>>(ranking);
+        }
+    }
+}

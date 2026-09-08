@@ -1,4 +1,6 @@
 ﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Enums;
+using Turniejo.Tournaments.Application.Authorization;
 using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules
@@ -7,5 +9,10 @@ namespace Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules
 
     public sealed record SetTieBreakerRulesCommand(
         Guid TournamentId,
-        IReadOnlyList<TieBreakerRuleItem> Rules) : ICommand<SetTieBreakerRulesResponse>;
+        IReadOnlyList<TieBreakerRuleItem> Rules) : ICommand<SetTieBreakerRulesResponse>, IAuthorizedRequest
+    {
+        public string ScopeType => nameof(RoleScopeType.Tournament);
+        public Guid ScopeId => TournamentId;
+        public IReadOnlyCollection<string> AllowedRoles => TournamentRoles.OrganizerOnly;
+    }
 }

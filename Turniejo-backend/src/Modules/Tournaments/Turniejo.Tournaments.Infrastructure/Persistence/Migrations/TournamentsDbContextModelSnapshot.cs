@@ -322,7 +322,7 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
 
                             b1.HasKey("TournamentId");
 
-                            b1.ToTable("tournaments", "tournaments");
+                            b1.ToTable("tournament_settings", "tournaments");
 
                             b1.WithOwner()
                                 .HasForeignKey("TournamentId");

@@ -1,0 +1,54 @@
+using System.Text.Json;
+using MediatR;
+using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Matches.RecalculateMatchScore;
+using Turniejo.Matches.Domain.Entities;
+using Turniejo.Matches.Domain.Events;
+using Turniejo.SharedKernel.Contracts;
+using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Outbox;
+using Turniejo.SharedKernel.Results;
+
+namespace Turniejo.Matches.Application.Matches.AddGoal
+{
+    internal sealed class AddGoalCommandHandler(
+        IMatchesDbContext dbContext,
+        ISender sender,
+        ICurrentUserContext currentUserContext) : ICommandHandler<AddGoalCommand, AddGoalResponse>
+    {
+        public async Task<Result<AddGoalResponse>> Handle(AddGoalCommand request, CancellationToken cancellationToken)
+        {
+            var match = await dbContext.GetMatchByIdAsync(request.MatchId, cancellationToken);
+            if (match == null || match.TournamentId != request.TournamentId)
+                return Result.Failure<AddGoalResponse>(Error.NotFound("Match", request.MatchId));
+
+            var editableCheck = match.EnsureEditable();
+            if (editableCheck.IsFailure)
+                return Result.Failure<AddGoalResponse>(editableCheck.Error);
+
+            if (request.TournamentTeamId != match.HomeTournamentTeamId && request.TournamentTeamId != match.AwayTournamentTeamId)
+                return Result.Failure<AddGoalResponse>(Error.Validation("TournamentTeamId", "Team is not playing in this match"));
+
+            var eventResult = MatchEvent.Create(
+                Guid.NewGuid(), match.Id, request.GoalType, request.Minute, currentUserContext.UserId,
+                request.TournamentTeamId, request.PlayerId, request.AssistPlayerId, request.Second);
+            if (eventResult.IsFailure)
+                return Result.Failure<AddGoalResponse>(eventResult.Error);
+
+            await dbContext.AddMatchEventAsync(eventResult.Value, cancellationToken);
+
+            var addedEvent = new MatchEventAdded(eventResult.Value.Id, match.Id, match.TournamentId, request.GoalType.ToString());
+            await dbContext.AddOutboxMessageAsync(
+                OutboxMessage.Create(addedEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(addedEvent, addedEvent.GetType())),
+                cancellationToken);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            var recalcResult = await sender.Send(new RecalculateMatchScoreCommand(match.Id), cancellationToken);
+            if (recalcResult.IsFailure)
+                return Result.Failure<AddGoalResponse>(recalcResult.Error);
+
+            return Result.Success(new AddGoalResponse(eventResult.Value.Id, recalcResult.Value.HomeScore, recalcResult.Value.AwayScore));
+        }
+    }
+}

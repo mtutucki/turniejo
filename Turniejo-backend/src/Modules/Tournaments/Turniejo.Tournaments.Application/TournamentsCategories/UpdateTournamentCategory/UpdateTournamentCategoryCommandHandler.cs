@@ -10,7 +10,7 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.UpdateTournamen
         public async Task<Result<UpdateTournamentCategoryResponse>> Handle(UpdateTournamentCategoryCommand request, CancellationToken cancellationToken)
         {
             var tournamentCategory = await tournamentsDbContext.GetTournamentCategoryByIdAsync(request.CategoryId, cancellationToken);
-            if (tournamentCategory == null)
+            if (tournamentCategory == null || tournamentCategory.TournamentId != request.TournamentId)
                 return Result.Failure<UpdateTournamentCategoryResponse>(Error.NotFound("TournamentCategory", request.CategoryId));
 
             var updateResult = tournamentCategory.UpdateDetails(request.Name, request.MinBirthDate, request.MaxBirthDate, request.Order);

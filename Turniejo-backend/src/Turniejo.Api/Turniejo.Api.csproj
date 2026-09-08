@@ -30,6 +30,12 @@
     <ProjectReference Include="..\Modules\Notifications\Turniejo.Notifications.Infrastructure\Turniejo.Notifications.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Organizations\Turniejo.Organizations.Application\Turniejo.Organizations.Application.csproj" />
     <ProjectReference Include="..\Modules\Organizations\Turniejo.Organizations.Infrastructure\Turniejo.Organizations.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Players\Turniejo.Players.Application\Turniejo.Players.Application.csproj" />
+    <ProjectReference Include="..\Modules\Players\Turniejo.Players.Infrastructure\Turniejo.Players.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Standings\Turniejo.Standings.Application\Turniejo.Standings.Application.csproj" />
+    <ProjectReference Include="..\Modules\Standings\Turniejo.Standings.Infrastructure\Turniejo.Standings.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Brackets\Turniejo.Brackets.Application\Turniejo.Brackets.Application.csproj" />
+    <ProjectReference Include="..\Modules\Brackets\Turniejo.Brackets.Infrastructure\Turniejo.Brackets.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

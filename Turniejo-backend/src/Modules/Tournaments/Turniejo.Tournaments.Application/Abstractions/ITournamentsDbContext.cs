@@ -11,6 +11,7 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentByIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<Tournament?> GetTournamentBySlugAsync(string slug, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
         // TournamentCategory
@@ -24,6 +25,7 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task AddTournamentGroupAsync(TournamentGroup group, CancellationToken cancellationToken = default);
         Task<bool> GroupNameExistsAsync(Guid categoryId, string name, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentGroup>> GetTournamentGroupsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<TournamentGroup?> GetTournamentGroupByIdAsync(Guid groupId, CancellationToken cancellationToken = default);
 
         // TieBreakerRule
         Task<IReadOnlyList<TieBreakerRule>> GetTieBreakerRulesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);

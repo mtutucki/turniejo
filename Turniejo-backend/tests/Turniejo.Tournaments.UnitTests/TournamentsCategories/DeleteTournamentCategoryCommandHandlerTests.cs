@@ -33,7 +33,7 @@ namespace Turniejo.Tournaments.UnitTests.TournamentsCategories
             //Arrange
             var category = CreateFakeTournamentCategory();
             _dbContext.GetTournamentCategoryByIdAsync(category.Id, Arg.Any<CancellationToken>()).Returns(category);
-            var command = new DeleteTournamentCategoryCommand(category.Id);
+            var command = new DeleteTournamentCategoryCommand(category.TournamentId, category.Id);
 
             //Act
             var result = await _handler.Handle(command, CancellationToken.None);
@@ -49,13 +49,30 @@ namespace Turniejo.Tournaments.UnitTests.TournamentsCategories
             //Arrange
             var category = CreateFakeTournamentCategory();
             _dbContext.GetTournamentCategoryByIdAsync(category.Id, Arg.Any<CancellationToken>()).Returns((TournamentCategory?)null);
-            var command = new DeleteTournamentCategoryCommand(category.Id);
+            var command = new DeleteTournamentCategoryCommand(category.TournamentId, category.Id);
 
             //Act
             var result = await _handler.Handle(command, CancellationToken.None);
 
             //Assert
             result.IsFailure.Should().BeTrue();
+            await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenCategoryBelongsToDifferentTournament()
+        {
+            //Arrange
+            var category = CreateFakeTournamentCategory();
+            _dbContext.GetTournamentCategoryByIdAsync(category.Id, Arg.Any<CancellationToken>()).Returns(category);
+            var command = new DeleteTournamentCategoryCommand(Guid.NewGuid(), category.Id);
+
+            //Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            //Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("TournamentCategory.NotFound");
             await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         }
     }

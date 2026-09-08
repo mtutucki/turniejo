@@ -45,6 +45,14 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
             .Where(x => x.UserId == userId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<UserRoleAssignment>> GetUserRoleAssignmentsByScopeAsync(
+        RoleScopeType scopeType,
+        Guid scopeId,
+        CancellationToken cancellationToken = default) =>
+        await UserRoleAssignments
+            .Where(x => x.ScopeType == scopeType && x.ScopeId == scopeId)
+            .ToListAsync(cancellationToken);
+
     public async Task RemoveUserRoleAssignmentAsync(
         Guid userId, UserRole role, RoleScopeType scopeType, Guid? scopeId,
         CancellationToken cancellationToken = default)

@@ -1,0 +1,19 @@
+using Turniejo.Matches.Application.Authorization;
+using Turniejo.Matches.Application.DTOs;
+using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Enums;
+
+namespace Turniejo.Matches.Application.Matches.GetMatchLivePanel
+{
+    public sealed record GetMatchLivePanelQuery(Guid TournamentId, Guid MatchId)
+        : IQuery<MatchLivePanelDto>, IAuthorizedRequest, IAlternateAuthorizedScope
+    {
+        public string ScopeType => nameof(RoleScopeType.Tournament);
+        public Guid ScopeId => TournamentId;
+        public IReadOnlyCollection<string> AllowedRoles => MatchRoles.AnyTournamentMember;
+
+        public string AlternateScopeType => nameof(RoleScopeType.Match);
+        public Guid AlternateScopeId => MatchId;
+        public IReadOnlyCollection<string> AlternateAllowedRoles => MatchRoles.RefereeOnly;
+    }
+}

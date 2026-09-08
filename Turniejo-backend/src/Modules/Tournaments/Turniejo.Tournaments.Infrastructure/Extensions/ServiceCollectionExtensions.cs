@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Tournaments.CreateTournament;
@@ -26,6 +27,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<ITournamentsDbContext>(sp =>
             sp.GetRequiredService<TournamentsDbContext>());
+
+        services.AddScoped<ITournamentModule, TournamentModule>();
 
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 

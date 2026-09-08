@@ -78,6 +78,11 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         return await Tournaments.FirstOrDefaultAsync(t => t.Id == tournamentId, cancellationToken);
     }
 
+    public async Task<Tournament?> GetTournamentBySlugAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        return await Tournaments.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
     await Tournaments
         .AsNoTracking()
@@ -110,6 +115,9 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
             .Where(g => g.TournamentId == tournamentId)
             .OrderBy(g => g.Order)
             .ToListAsync(cancellationToken);
+
+    public async Task<TournamentGroup?> GetTournamentGroupByIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await TournamentGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == groupId, cancellationToken);
 
     public async Task<IReadOnlyList<TieBreakerRule>> GetTieBreakerRulesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TieBreakerRules
