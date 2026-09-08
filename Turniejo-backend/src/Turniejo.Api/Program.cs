@@ -56,6 +56,7 @@ builder.Services.AddMediatR(cfg =>
 });
 
 builder.Services.AddHostedService<Turniejo.Api.BackgroundServices.OutboxProcessor>();
+builder.Services.AddHostedService<Turniejo.Api.BackgroundServices.MatchReminderBackgroundService>();
 
 var app = builder.Build();
 

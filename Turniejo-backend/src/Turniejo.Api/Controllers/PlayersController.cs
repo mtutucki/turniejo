@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Players.Application.Players.AssignUserToPlayer;
 using Turniejo.Players.Application.Players.CreatePlayer;
+using Turniejo.Players.Application.Players.GetPlayerBasicStats;
 using Turniejo.Players.Application.Players.GetPlayerById;
+using Turniejo.Players.Application.Players.GetPlayerMatchHistory;
 using Turniejo.Players.Application.Players.UpdatePlayer;
 using Turniejo.Players.Application.PlayerGuardians.AssignGuardianToPlayer;
 using Turniejo.Players.Application.PlayerGuardians.GetMyChildren;
@@ -48,6 +50,20 @@ namespace Turniejo.Api.Controllers
         {
             var query = new GetPlayerByIdQuery(playerId);
             var result = await sender.Send(query, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{playerId}/stats")]
+        public async Task<IActionResult> GetPlayerStats([FromRoute] Guid playerId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPlayerBasicStatsQuery(playerId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{playerId}/matches")]
+        public async Task<IActionResult> GetPlayerMatchHistory([FromRoute] Guid playerId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPlayerMatchHistoryQuery(playerId), cancellationToken);
             return result.ToActionResult();
         }
 

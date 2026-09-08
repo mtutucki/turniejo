@@ -96,6 +96,22 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
             .Where(m => matchIds.Contains(m.Id))
             .ToListAsync(cancellationToken);
 
+    public async Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await Matches.AnyAsync(m => m.CategoryId == categoryId, cancellationToken);
+
+    private static readonly MatchStatus[] CancellableStatuses = [MatchStatus.Scheduled, MatchStatus.Ready, MatchStatus.Postponed];
+
+    public async Task<IReadOnlyList<Match>> GetCancellableMatchesByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default) =>
+        await Matches
+            .Where(m => (m.HomeTournamentTeamId == tournamentTeamId || m.AwayTournamentTeamId == tournamentTeamId)
+                        && CancellableStatuses.Contains(m.Status))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Match>> GetCancellableMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await Matches
+            .Where(m => m.TournamentId == tournamentId && CancellableStatuses.Contains(m.Status))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Match>> GetMatchesByTournamentTeamIdsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default) =>
         await Matches
             .AsNoTracking()

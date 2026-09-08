@@ -288,9 +288,9 @@ namespace Turniejo.Api.Controllers
         }
 
         [HttpPatch("matches/{matchId}/correct-score")]
-        public async Task<IActionResult> CorrectFinishedMatchScore([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] SetMatchScoreRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> CorrectFinishedMatchScore([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] CorrectFinishedMatchScoreRequest request, CancellationToken cancellationToken)
         {
-            var command = new CorrectFinishedMatchScoreCommand(tournamentId, matchId, request.HomeScore, request.AwayScore);
+            var command = new CorrectFinishedMatchScoreCommand(tournamentId, matchId, request.HomeScore, request.AwayScore, request.WinnerTournamentTeamId);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -309,5 +309,6 @@ namespace Turniejo.Api.Controllers
         public sealed record SelectMatchMvpRequest(Guid TournamentTeamId, Guid PlayerId);
         public sealed record UpdateMatchEventRequest(MatchEventType Type, int Minute, int? Second, Guid? PlayerId, Guid? RelatedPlayerId);
         public sealed record SetMatchScoreRequest(int HomeScore, int AwayScore);
+        public sealed record CorrectFinishedMatchScoreRequest(int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId);
     }
 }

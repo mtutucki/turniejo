@@ -38,6 +38,9 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         return staff.Select(s => s.UserId).Distinct().ToList();
     }
 
+    public async Task<bool> AnyTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyTournamentTeamsByCategoryIdAsync(categoryId, cancellationToken);
+
     private static TournamentTeamDto ToDto(TournamentTeam tournamentTeam) =>
         new(tournamentTeam.Id, tournamentTeam.TournamentId, tournamentTeam.TeamId,
             tournamentTeam.CategoryId, tournamentTeam.GroupId, tournamentTeam.RegistrationStatus.ToString());

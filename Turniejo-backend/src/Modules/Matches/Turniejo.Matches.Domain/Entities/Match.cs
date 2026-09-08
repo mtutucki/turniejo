@@ -289,7 +289,7 @@ namespace Turniejo.Matches.Domain.Entities
             return Result.Success();
         }
 
-        public Result CorrectFinishedScore(int homeScore, int awayScore, Guid changedByUserId)
+        public Result CorrectFinishedScore(int homeScore, int awayScore, Guid? winnerTournamentTeamId, Guid changedByUserId)
         {
             if (Status != MatchStatus.Finished)
                 return Result.Failure(Error.Conflict("Status", "Match must be finished to correct its score"));
@@ -300,12 +300,39 @@ namespace Turniejo.Matches.Domain.Entities
             if (homeScore < 0 || awayScore < 0)
                 return Result.Failure(Error.Validation("Score", "Score cannot be negative"));
 
+            // Zwycięzca jest deklarowany przez wywołującego (tak samo jak w Finish) — nie da się go
+            // wywnioskować z samego wyniku przy ExtraTime/Penalties. Bez tego korekta zmieniała
+            // HomeScore/AwayScore, ale WinnerTournamentTeamId zostawał nieaktualny, więc drabinka
+            // (subskrybująca MatchScoreCorrected) nie miała czym się kierować przy ponownym awansie.
+            if (winnerTournamentTeamId.HasValue &&
+                winnerTournamentTeamId.Value != HomeTournamentTeamId &&
+                winnerTournamentTeamId.Value != AwayTournamentTeamId)
+                return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be one of the two teams playing"));
+
             HomeScore = homeScore;
             AwayScore = awayScore;
+            WinnerTournamentTeamId = winnerTournamentTeamId;
             Version++;
             SetUpdatedAt();
 
-            _domainEvents.Add(new MatchScoreCorrected(Id, TournamentId, GroupId, homeScore, awayScore, changedByUserId));
+            _domainEvents.Add(new MatchScoreCorrected(Id, TournamentId, GroupId, homeScore, awayScore, winnerTournamentTeamId, changedByUserId));
+
+            return Result.Success();
+        }
+
+        public Result Cancel(string reason, Guid changedByUserId)
+        {
+            if (Status is MatchStatus.Live or MatchStatus.Paused or MatchStatus.Finished)
+                return Result.Failure(Error.Conflict("Status", "Cannot cancel a match that is live, paused, or already finished"));
+
+            if (Status == MatchStatus.Cancelled)
+                return Result.Failure(Error.Conflict("Status", "Match is already cancelled"));
+
+            Status = MatchStatus.Cancelled;
+            Version++;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new MatchCancelled(Id, TournamentId, GroupId, reason, changedByUserId));
 
             return Result.Success();
         }

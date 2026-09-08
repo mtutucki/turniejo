@@ -27,6 +27,9 @@ namespace Turniejo.Matches.Application.Abstractions
         Task<bool> MatchExistsAtPitchAndTimeAsync(Guid pitchId, DateTimeOffset scheduledAt, Guid? excludeMatchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByTournamentTeamIdsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesScheduledBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
+        Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Match>> GetCancellableMatchesByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Match>> GetCancellableMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
 
         // MatchEvent
         Task AddMatchEventAsync(MatchEvent matchEvent, CancellationToken cancellationToken = default);

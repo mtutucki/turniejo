@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Organizations.Application.Organizations.CreateOrganization;
+using Turniejo.Organizations.Application.Organizations.GetMyOrganization;
 using Turniejo.SharedKernel.Contracts;
 
 namespace Turniejo.Api.Controllers;
@@ -23,6 +24,13 @@ public sealed class OrganizationsController(
             return result.ToActionResult();
 
         return Created($"/api/organizations/{result.Value.OrganizationId}", result.Value);
+    }
+
+    [HttpGet("mine")]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMyOrganizationQuery(), cancellationToken);
+        return result.ToActionResult();
     }
 }
 

@@ -82,7 +82,7 @@ namespace Turniejo.Standings.UnitTests.Standings
             var sender = Substitute.For<ISender>();
             var handler = new MatchScoreCorrectedHandler(sender);
             var groupId = Guid.NewGuid();
-            var notification = new MatchScoreCorrected(Guid.NewGuid(), Guid.NewGuid(), groupId, 3, 2, Guid.NewGuid());
+            var notification = new MatchScoreCorrected(Guid.NewGuid(), Guid.NewGuid(), groupId, 3, 2, null, Guid.NewGuid());
 
             // Act
             await handler.Handle(notification, CancellationToken.None);
@@ -99,7 +99,7 @@ namespace Turniejo.Standings.UnitTests.Standings
             // Arrange
             var sender = Substitute.For<ISender>();
             var handler = new MatchScoreCorrectedHandler(sender);
-            var notification = new MatchScoreCorrected(Guid.NewGuid(), Guid.NewGuid(), null, 3, 2, Guid.NewGuid());
+            var notification = new MatchScoreCorrected(Guid.NewGuid(), Guid.NewGuid(), null, 3, 2, null, Guid.NewGuid());
 
             // Act
             await handler.Handle(notification, CancellationToken.None);

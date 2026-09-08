@@ -74,6 +74,9 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender) :
             .ToList();
     }
 
+    public async Task<bool> AnyMatchesForCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyMatchesByCategoryIdAsync(categoryId, cancellationToken);
+
     private static TournamentMatchDto ToTournamentMatchDto(Turniejo.Matches.Domain.Entities.Match m) =>
         new(m.Id, m.TournamentId, m.Status.ToString(), m.ScheduledAt, m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.HomeScore, m.AwayScore);
 }

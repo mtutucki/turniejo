@@ -74,9 +74,13 @@ public sealed class OutboxProcessor(
                             message.Id, message.RetryCount, OutboxMessage.MaxRetryCount);
                     }
                 }
-            }
 
-            await repository.SaveChangesAsync(cancellationToken);
+                // SaveChanges per wiadomość, nie raz na cały batch 20 — handlery (np. tworzenie
+                // Notification) nie są idempotentne, więc crash w środku batcha z jednym SaveChanges
+                // na końcu powtarzał przy restarcie WSZYSTKIE już zastosowane efekty uboczne z tego
+                // batcha, nie tylko tę jedną wiadomość, na której faktycznie padło.
+                await repository.SaveChangesAsync(cancellationToken);
+            }
         }
     }
 }

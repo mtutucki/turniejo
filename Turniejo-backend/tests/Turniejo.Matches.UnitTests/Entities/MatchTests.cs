@@ -633,7 +633,7 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.ClearDomainEvents();
 
             // Act
-            var result = match.CorrectFinishedScore(3, 2, ValidUserId);
+            var result = match.CorrectFinishedScore(3, 2, null, ValidUserId);
 
             // Assert
             result.IsSuccess.Should().BeTrue();
@@ -643,10 +643,43 @@ namespace Turniejo.Matches.UnitTests.Entities
         }
 
         [Fact]
+        public void CorrectFinishedScore_ShouldUpdateWinnerTournamentTeamId_WhenCorrectionFlipsTheResult()
+        {
+            // Zamyka lukę z audytu: korekta zmieniała HomeScore/AwayScore, ale nigdy
+            // WinnerTournamentTeamId, więc drabinka nie miała czym się kierować przy ponownym awansie.
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.Finish(MatchResultType.Regular, match.HomeTournamentTeamId, 60, ValidUserId);
+            match.ClearDomainEvents();
+
+            // Act — wynik się odwraca, zwycięzcą jest teraz drużyna gości
+            var result = match.CorrectFinishedScore(1, 3, match.AwayTournamentTeamId, ValidUserId);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.WinnerTournamentTeamId.Should().Be(match.AwayTournamentTeamId);
+            var raised = match.DomainEvents.OfType<MatchScoreCorrected>().Single();
+            raised.WinnerTournamentTeamId.Should().Be(match.AwayTournamentTeamId);
+        }
+
+        [Fact]
+        public void CorrectFinishedScore_ShouldFail_WhenWinnerIsNeitherTeam()
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.Finish(MatchResultType.Regular, match.HomeTournamentTeamId, 60, ValidUserId);
+
+            var result = match.CorrectFinishedScore(1, 1, Guid.NewGuid(), ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.WinnerTournamentTeamId");
+        }
+
+        [Fact]
         public void CorrectFinishedScore_ShouldFail_WhenNotFinished()
         {
             var match = CreateValidMatch();
-            var result = match.CorrectFinishedScore(1, 1, ValidUserId);
+            var result = match.CorrectFinishedScore(1, 1, null, ValidUserId);
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
         }
@@ -660,11 +693,70 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.Finish(MatchResultType.Regular, null, -1, ValidUserId);
 
             // Act
-            var result = match.CorrectFinishedScore(1, 1, ValidUserId);
+            var result = match.CorrectFinishedScore(1, 1, null, ValidUserId);
 
             // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.EditLockedAt");
+        }
+
+        // --- Cancel ---
+
+        [Fact]
+        public void Cancel_ShouldSetStatusToCancelled_WhenScheduled()
+        {
+            // Zamyka lukę z audytu: wycofanie drużyny/anulowanie turnieju musi realnie blokować
+            // start/zakończenie meczu, a nie tylko "zostawić go tak jak jest".
+            var match = CreateValidMatch();
+
+            var result = match.Cancel("Turniej został anulowany.", ValidUserId);
+
+            result.IsSuccess.Should().BeTrue();
+            match.Status.Should().Be(MatchStatus.Cancelled);
+            match.DomainEvents.Should().ContainSingle(e => e is MatchCancelled);
+        }
+
+        [Theory]
+        [InlineData(nameof(Match.Start))]
+        [InlineData(nameof(Match.Finish))]
+        public void Cancel_ShouldFail_WhenMatchIsLiveOrFinished(string setupOperation)
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            if (setupOperation == nameof(Match.Finish))
+                match.Finish(MatchResultType.Regular, null, 60, ValidUserId);
+
+            var result = match.Cancel("test", ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        [Fact]
+        public void Cancel_ShouldFail_WhenAlreadyCancelled()
+        {
+            var match = CreateValidMatch();
+            match.Cancel("test", ValidUserId);
+
+            var result = match.Cancel("test", ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        [Fact]
+        public void Start_ShouldFail_AfterCancel()
+        {
+            // Ten test jest sercem fixa: Match.Status zostaje jedynym źródłem prawdy — po anulowaniu
+            // (np. przez zdarzenie z Tournaments/Teams) Start() sam odmawia, bez potrzeby osobnego
+            // cross-modułowego sprawdzenia statusu turnieju w każdej komendzie mutującej mecz.
+            var match = CreateValidMatch();
+            match.Cancel("Turniej został anulowany.", ValidUserId);
+
+            var result = match.Start(ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
         }
 
         // --- Version (optimistic concurrency) ---
@@ -734,7 +826,7 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.Version.Should().Be(5u);
 
             // Korekta wyniku po meczu
-            match.CorrectFinishedScore(2, 0, ValidUserId);
+            match.CorrectFinishedScore(2, 0, null, ValidUserId);
             match.Version.Should().Be(6u);
         }
 

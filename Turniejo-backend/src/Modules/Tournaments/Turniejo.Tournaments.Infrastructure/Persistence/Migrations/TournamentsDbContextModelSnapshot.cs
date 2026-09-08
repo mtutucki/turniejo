@@ -248,7 +248,7 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.HasOne("Turniejo.Tournaments.Domain.Entities.Tournament", null)
                         .WithMany()
                         .HasForeignKey("TournamentId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

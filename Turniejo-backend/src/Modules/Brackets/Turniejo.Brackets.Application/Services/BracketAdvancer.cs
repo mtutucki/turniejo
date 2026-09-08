@@ -23,6 +23,16 @@ namespace Turniejo.Brackets.Application.Services
             if (targetNode == null)
                 return false;
 
+            var currentTeamId = slot == BracketSlot.Home ? targetNode.HomeTournamentTeamId : targetNode.AwayTournamentTeamId;
+
+            // Węzeł, dla którego mecz już powstał, ma zamrożone drużyny — Match.HomeTournamentTeamId/
+            // AwayTournamentTeamId są niemutowalne po utworzeniu (Match.cs), więc ciche nadpisanie samego
+            // węzła zostawiłoby węzeł i już istniejący mecz w sprzecznych stanach. Dotyczy to głównie
+            // korekty wyniku poprzedniego meczu, która zmieniła zwycięzcę PO tym, jak kolejny mecz już
+            // powstał — to wymaga ręcznej interwencji, nie automatycznej podmianki.
+            if (targetNode.MatchId.HasValue && currentTeamId.HasValue && currentTeamId != tournamentTeamId)
+                return false;
+
             var resolveResult = targetNode.ResolveSlot(slot, tournamentTeamId);
             if (resolveResult.IsFailure)
                 return false;

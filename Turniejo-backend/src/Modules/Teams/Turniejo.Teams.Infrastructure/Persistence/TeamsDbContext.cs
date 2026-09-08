@@ -47,6 +47,9 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             t.TournamentId == tournamentId && t.TeamId == teamId && t.CategoryId == categoryId,
             cancellationToken);
 
+    public async Task<bool> AnyTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AnyAsync(t => t.CategoryId == categoryId, cancellationToken);
+
     public async Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.CountAsync(t =>
             t.TournamentId == tournamentId && t.RegistrationStatus == RegistrationStatus.Accepted,

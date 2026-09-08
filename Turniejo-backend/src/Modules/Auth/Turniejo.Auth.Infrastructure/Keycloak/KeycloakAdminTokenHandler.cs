@@ -21,9 +21,16 @@ internal sealed class KeycloakAdminTokenHandler(IConfiguration configuration)
     {
         var realm = configuration["Keycloak:AdminRealm"] ?? "master";
         var clientId = configuration["Keycloak:AdminClientId"] ?? "admin-cli";
-        var username = configuration["Keycloak:AdminUsername"] ?? "admin";
-        var password = configuration["Keycloak:AdminPassword"] ?? "admin";
+        var username = configuration["Keycloak:AdminUsername"];
+        var password = configuration["Keycloak:AdminPassword"];
         var baseUrl = configuration["Keycloak:BaseUrl"];
+
+        // Bez tego brak zmiennej środowiskowej/sekretu na produkcji cicho "fail-open"owało do
+        // zgadywalnego admin/admin zamiast rzucić błąd konfiguracji — realm/client-id to publiczne,
+        // nie-sekretne konwencje Keycloaka, więc tylko one dostają nieszkodliwy fallback.
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException(
+                "Keycloak:AdminUsername and Keycloak:AdminPassword must be configured — refusing to fall back to a default credential.");
 
         using var client = new HttpClient();
         var response = await client.PostAsync(

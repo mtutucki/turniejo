@@ -4,7 +4,7 @@ using Turniejo.SharedKernel.Enums;
 
 namespace Turniejo.Matches.Application.Matches.CorrectFinishedMatchScore
 {
-    public sealed record CorrectFinishedMatchScoreCommand(Guid TournamentId, Guid MatchId, int HomeScore, int AwayScore)
+    public sealed record CorrectFinishedMatchScoreCommand(Guid TournamentId, Guid MatchId, int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId)
         : ICommand<CorrectFinishedMatchScoreResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);

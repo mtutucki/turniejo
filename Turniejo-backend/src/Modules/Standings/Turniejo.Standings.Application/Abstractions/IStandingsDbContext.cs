@@ -11,5 +11,6 @@ namespace Turniejo.Standings.Application.Abstractions
         Task AddStandingAsync(Standing standing, CancellationToken cancellationToken = default);
         Task<Standing?> GetStandingAsync(Guid groupId, Guid tournamentTeamId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Standing>> GetStandingsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task RemoveStandingAsync(Standing standing, CancellationToken cancellationToken = default);
     }
 }
