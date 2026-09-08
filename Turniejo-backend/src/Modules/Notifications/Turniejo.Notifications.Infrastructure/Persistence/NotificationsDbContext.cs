@@ -1,12 +1,47 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Turniejo.Notifications.Application.Abstractions;
+using Turniejo.Notifications.Domain.Entities;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Notifications.Infrastructure.Persistence;
 
 public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options)
-    : DbContext(options)
+    : DbContext(options), INotificationsDbContext
 {
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationRecipient> NotificationRecipients => Set<NotificationRecipient>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public async Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default) =>
+        await Notifications.AddAsync(notification, cancellationToken);
+
+    public async Task<Notification?> GetNotificationByIdAsync(Guid notificationId, CancellationToken cancellationToken = default) =>
+        await Notifications.AsNoTracking().FirstOrDefaultAsync(n => n.Id == notificationId, cancellationToken);
+
+    public async Task<bool> MatchReminderExistsAsync(Guid matchId, CancellationToken cancellationToken = default) =>
+        await Notifications.AnyAsync(n => n.MatchId == matchId, cancellationToken);
+
+    public async Task AddNotificationRecipientAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
+        await NotificationRecipients.AddAsync(recipient, cancellationToken);
+
+    public async Task AddNotificationRecipientsAsync(IReadOnlyCollection<NotificationRecipient> recipients, CancellationToken cancellationToken = default) =>
+        await NotificationRecipients.AddRangeAsync(recipients, cancellationToken);
+
+    public async Task<NotificationRecipient?> GetNotificationRecipientByIdAsync(Guid notificationRecipientId, CancellationToken cancellationToken = default) =>
+        await NotificationRecipients.FirstOrDefaultAsync(r => r.Id == notificationRecipientId, cancellationToken);
+
+    public async Task<IReadOnlyList<NotificationRecipient>> GetNotificationRecipientsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        await NotificationRecipients
+            .AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
+        await OutboxMessages.AddAsync(message, cancellationToken);
+
+    public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        await base.SaveChangesAsync(cancellationToken);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("notifications");

@@ -1,21 +1,34 @@
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Players.Application.Abstractions;
+using Turniejo.Players.Application.Services;
 using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
 using Turniejo.Players.Domain.Entities;
 using Turniejo.Players.Domain.Enums;
+using Turniejo.SharedKernel.Contracts;
 
 namespace Turniejo.Players.UnitTests.TournamentPlayers
 {
     public sealed class UpdateTournamentPlayerCommandHandlerTests
     {
         private readonly IPlayersDbContext _dbContext;
+        private readonly IAuthorizationService _authorizationService;
+        private readonly ITournamentModule _tournamentModule;
+        private readonly ICurrentUserContext _currentUserContext;
         private readonly UpdateTournamentPlayerCommandHandler _handler;
 
         public UpdateTournamentPlayerCommandHandlerTests()
         {
             _dbContext = Substitute.For<IPlayersDbContext>();
-            _handler = new UpdateTournamentPlayerCommandHandler(_dbContext);
+            _authorizationService = Substitute.For<IAuthorizationService>();
+            _tournamentModule = Substitute.For<ITournamentModule>();
+            _currentUserContext = Substitute.For<ICurrentUserContext>();
+            var squadEditGuard = new SquadEditGuard(_authorizationService, _tournamentModule);
+            _handler = new UpdateTournamentPlayerCommandHandler(_dbContext, squadEditGuard, _currentUserContext);
+
+            // domyślnie: organizer -> blokada składu nie dotyczy
+            _authorizationService.HasAnyRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+                .Returns(true);
         }
 
         private static TournamentPlayer CreateFakeTournamentPlayer(Guid tournamentTeamId)

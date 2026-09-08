@@ -64,6 +64,40 @@ namespace Turniejo.Players.Infrastructure.Persistence.Migrations
                     b.ToTable("players", "players");
                 });
 
+            modelBuilder.Entity("Turniejo.Players.Domain.Entities.PlayerGuardian", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CanEdit")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CanReceiveNotifications")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RelationshipType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("player_guardians", "players");
+                });
+
             modelBuilder.Entity("Turniejo.Players.Domain.Entities.TournamentPlayer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -141,6 +175,15 @@ namespace Turniejo.Players.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_outbox_messages_type");
 
                     b.ToTable("outbox_messages", "players");
+                });
+
+            modelBuilder.Entity("Turniejo.Players.Domain.Entities.PlayerGuardian", b =>
+                {
+                    b.HasOne("Turniejo.Players.Domain.Entities.Player", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Turniejo.Players.Domain.Entities.TournamentPlayer", b =>

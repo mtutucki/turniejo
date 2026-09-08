@@ -14,6 +14,7 @@ public interface IUsersDbContext
     Task AddUserRoleAssignmentAsync(UserRoleAssignment assignment, CancellationToken cancellationToken = default);
     Task<bool> UserRoleAssignmentExistsAsync(Guid userId, UserRole role, RoleScopeType scopeType, Guid? scopeId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserRoleAssignment>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserRoleAssignment>> GetUserRoleAssignmentsByScopeAsync(RoleScopeType scopeType, Guid scopeId, CancellationToken cancellationToken = default);
     Task RemoveUserRoleAssignmentAsync(Guid userId, UserRole role, RoleScopeType scopeType, Guid? scopeId, CancellationToken cancellationToken = default);
     Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 

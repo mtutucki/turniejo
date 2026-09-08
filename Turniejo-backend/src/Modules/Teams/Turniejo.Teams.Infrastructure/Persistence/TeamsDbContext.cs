@@ -66,6 +66,12 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .Where(s => s.TournamentTeamId == tournamentTeamId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<TeamStaff>> GetTeamStaffByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        await TeamStaffs
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .ToListAsync(cancellationToken);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("teams");

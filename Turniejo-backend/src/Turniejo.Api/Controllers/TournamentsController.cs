@@ -7,6 +7,8 @@ using Turniejo.Tournaments.Application.TournamentGroups.GetTournamentGroups;
 using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
 using Turniejo.Tournaments.Application.Tournaments.CreateTournament;
 using Turniejo.Tournaments.Application.Tournaments.GetTournamentById;
+using Turniejo.Tournaments.Application.Tournaments.GetTournamentDashboard;
+using Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSettings;
 using Turniejo.Tournaments.Application.Tournaments.GetTournaments;
 using Turniejo.Tournaments.Application.Tournaments.JoinTournament;
 using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
@@ -66,6 +68,14 @@ namespace Turniejo.Api.Controllers
         [HttpGet("{tournamentId}")]
         public async Task<IActionResult> GetTournamentById([FromRoute] GetTournamentByIdQuery query, CancellationToken cancellationToken)
         {
+            var result = await sender.Send(query, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{tournamentId}/dashboard")]
+        public async Task<IActionResult> GetTournamentDashboard([FromRoute] Guid tournamentId, [FromQuery] int upcomingMatchesCount = 5, CancellationToken cancellationToken = default)
+        {
+            var query = new GetTournamentDashboardQuery(tournamentId, upcomingMatchesCount);
             var result = await sender.Send(query, cancellationToken);
             return result.ToActionResult();
         }
@@ -186,6 +196,17 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpPut("{tournamentId}/public-settings")]
+        public async Task<IActionResult> UpdateTournamentPublicSettings([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentPublicSettingsRequest request, CancellationToken cancellationToken)
+        {
+            var command = new UpdateTournamentPublicSettingsCommand(
+                tournamentId, request.IsPublic, request.ShowTeams, request.ShowPlayers,
+                request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches);
+
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpPost("{tournamentId}/teams")]
         public async Task<IActionResult> AddTeamToTournament([FromRoute] Guid tournamentId, [FromBody] AddTeamToTournamentRequest request, CancellationToken cancellationToken)
         {
@@ -298,6 +319,7 @@ namespace Turniejo.Api.Controllers
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
         public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart);
+        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches);
         public sealed record AddTeamToTournamentRequest(Guid TeamId, Guid CategoryId);
         public sealed record ChangeTournamentTeamRegistrationStatusRequest(RegistrationStatus RegistrationStatus);
         public sealed record ChangeTournamentTeamPaymentStatusRequest(PaymentStatus PaymentStatus);

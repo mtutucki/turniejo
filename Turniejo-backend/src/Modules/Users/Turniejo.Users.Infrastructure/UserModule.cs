@@ -45,4 +45,15 @@ internal sealed class UserModule(
             userId, userRole, roleScopeType, scopeId),
             cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetUserIdsByScopeAsync(
+        string scopeType,
+        Guid scopeId,
+        CancellationToken cancellationToken = default)
+    {
+        var roleScopeType = Enum.Parse<RoleScopeType>(scopeType);
+        var assignments = await dbContext.GetUserRoleAssignmentsByScopeAsync(roleScopeType, scopeId, cancellationToken);
+
+        return assignments.Select(a => a.UserId).Distinct().ToList();
+    }
 }

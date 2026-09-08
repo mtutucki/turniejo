@@ -11,12 +11,20 @@ namespace Turniejo.Players.Application.Abstractions
         // Player
         Task AddPlayerAsync(Player player, CancellationToken cancellationToken = default);
         Task<Player?> GetPlayerByIdAsync(Guid playerId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Player>> GetPlayersByIdsAsync(IReadOnlyCollection<Guid> playerIds, CancellationToken cancellationToken = default);
 
         // TournamentPlayer
         Task AddTournamentPlayerAsync(TournamentPlayer tournamentPlayer, CancellationToken cancellationToken = default);
         Task<TournamentPlayer?> GetTournamentPlayerByIdAsync(Guid tournamentPlayerId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentPlayer>> GetTournamentPlayersByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentPlayer>> GetTournamentPlayersByPlayerIdAsync(Guid playerId, CancellationToken cancellationToken = default);
         Task<bool> TournamentPlayerExistsAsync(Guid tournamentTeamId, Guid playerId, CancellationToken cancellationToken = default);
         Task<bool> ShirtNumberExistsAsync(Guid tournamentTeamId, int shirtNumber, CancellationToken cancellationToken = default);
+
+        // PlayerGuardian
+        Task AddPlayerGuardianAsync(PlayerGuardian playerGuardian, CancellationToken cancellationToken = default);
+        Task<bool> PlayerGuardianExistsAsync(Guid playerId, Guid userId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<PlayerGuardian>> GetPlayerGuardiansByPlayerIdAsync(Guid playerId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<PlayerGuardian>> GetGuardianshipsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
     }
 }

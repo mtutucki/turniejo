@@ -1,0 +1,87 @@
+using FluentAssertions;
+using NSubstitute;
+using Turniejo.Notifications.Application.Abstractions;
+using Turniejo.Notifications.Application.Notifications.CreateMatchReminderNotifications;
+using Turniejo.Notifications.Application.Services;
+using Turniejo.SharedKernel.Contracts;
+
+namespace Turniejo.Notifications.UnitTests.Notifications;
+
+public sealed class CreateMatchReminderNotificationsCommandHandlerTests
+{
+    private readonly INotificationsDbContext _dbContext;
+    private readonly IMatchModule _matchModule;
+    private readonly ITeamModule _teamModule;
+    private readonly CreateMatchReminderNotificationsCommandHandler _handler;
+
+    public CreateMatchReminderNotificationsCommandHandlerTests()
+    {
+        _dbContext = Substitute.For<INotificationsDbContext>();
+        _matchModule = Substitute.For<IMatchModule>();
+        _teamModule = Substitute.For<ITeamModule>();
+
+        var publisher = new NotificationPublisher(_dbContext);
+        var resolver = new MatchNotificationRecipientResolver(_teamModule);
+
+        _handler = new CreateMatchReminderNotificationsCommandHandler(_dbContext, publisher, resolver, _matchModule, _teamModule);
+
+        _teamModule.GetTournamentTeamAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((TournamentTeamDto?)null);
+    }
+
+    private static MatchInfoDto CreateMatch(Guid? refereeId = null) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), refereeId, null, DateTimeOffset.UtcNow.AddMinutes(20), "Scheduled");
+
+    [Fact]
+    public async Task Handle_ShouldCreateReminder_WhenMatchHasRecipientsAndNoExistingReminder()
+    {
+        // Arrange
+        var match = CreateMatch(refereeId: Guid.NewGuid());
+        _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([match]);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(false);
+
+        // Act
+        var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.CreatedCount.Should().Be(1);
+        await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldSkipMatch_WhenReminderAlreadyExists()
+    {
+        // Arrange
+        var match = CreateMatch(refereeId: Guid.NewGuid());
+        _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([match]);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        // Act
+        var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.CreatedCount.Should().Be(0);
+        await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldSkipMatch_WhenNoRecipientsResolved()
+    {
+        // Arrange
+        var match = CreateMatch(refereeId: null);
+        _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([match]);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(false);
+        _teamModule.GetTeamStaffUserIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new List<Guid>());
+
+        // Act
+        var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.CreatedCount.Should().Be(0);
+    }
+}

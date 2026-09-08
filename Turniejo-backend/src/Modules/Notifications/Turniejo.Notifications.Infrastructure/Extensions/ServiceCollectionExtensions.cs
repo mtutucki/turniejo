@@ -1,6 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Turniejo.Notifications.Application.Abstractions;
+using Turniejo.Notifications.Application.Services;
 using Turniejo.Notifications.Infrastructure.Persistence;
 using Turniejo.SharedKernel.Outbox;
 
@@ -22,7 +24,10 @@ public static class ServiceCollectionExtensions
 
                 }));
 
+        services.AddScoped<INotificationsDbContext>(sp => sp.GetRequiredService<NotificationsDbContext>());
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddScoped<NotificationPublisher>();
+        services.AddScoped<MatchNotificationRecipientResolver>();
 
         return services;
     }

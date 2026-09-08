@@ -1,18 +1,25 @@
 using System.Text.Json;
 using Turniejo.Players.Application.Abstractions;
+using Turniejo.Players.Application.Services;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer
 {
-    internal sealed class UpdateTournamentPlayerCommandHandler(IPlayersDbContext dbContext) : ICommandHandler<UpdateTournamentPlayerCommand, UpdateTournamentPlayerResponse>
+    internal sealed class UpdateTournamentPlayerCommandHandler(
+        IPlayersDbContext dbContext,
+        SquadEditGuard squadEditGuard,
+        ICurrentUserContext currentUserContext) : ICommandHandler<UpdateTournamentPlayerCommand, UpdateTournamentPlayerResponse>
     {
         public async Task<Result<UpdateTournamentPlayerResponse>> Handle(UpdateTournamentPlayerCommand request, CancellationToken cancellationToken)
         {
             var tournamentPlayer = await dbContext.GetTournamentPlayerByIdAsync(request.TournamentPlayerId, cancellationToken);
             if (tournamentPlayer == null || tournamentPlayer.TournamentTeamId != request.TournamentTeamId)
                 return Result.Failure<UpdateTournamentPlayerResponse>(Error.NotFound("TournamentPlayer", request.TournamentPlayerId));
+
+            await squadEditGuard.EnsureCanEditSquadAsync(request.TournamentId, currentUserContext.UserId, cancellationToken);
 
             if (request.ShirtNumber.HasValue && request.ShirtNumber != tournamentPlayer.ShirtNumber)
             {

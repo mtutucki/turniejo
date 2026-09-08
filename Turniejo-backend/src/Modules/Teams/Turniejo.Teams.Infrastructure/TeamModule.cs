@@ -1,5 +1,6 @@
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.Teams.Application.Abstractions;
+using Turniejo.Teams.Domain.Entities;
 
 namespace Turniejo.Teams.Infrastructure;
 
@@ -20,8 +21,24 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         if (tournamentTeam is null)
             return null;
 
-        return new TournamentTeamDto(
-            tournamentTeam.Id, tournamentTeam.TournamentId, tournamentTeam.TeamId,
-            tournamentTeam.CategoryId, tournamentTeam.GroupId);
+        return ToDto(tournamentTeam);
     }
+
+    public async Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
+    {
+        var tournamentTeams = await dbContext.GetTournamentTeamsByTournamentIdAsync(tournamentId, cancellationToken);
+
+        return tournamentTeams.Select(ToDto).ToList();
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetTeamStaffUserIdsAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default)
+    {
+        var staff = await dbContext.GetTeamStaffByTournamentTeamIdAsync(tournamentTeamId, cancellationToken);
+
+        return staff.Select(s => s.UserId).Distinct().ToList();
+    }
+
+    private static TournamentTeamDto ToDto(TournamentTeam tournamentTeam) =>
+        new(tournamentTeam.Id, tournamentTeam.TournamentId, tournamentTeam.TeamId,
+            tournamentTeam.CategoryId, tournamentTeam.GroupId, tournamentTeam.RegistrationStatus.ToString());
 }

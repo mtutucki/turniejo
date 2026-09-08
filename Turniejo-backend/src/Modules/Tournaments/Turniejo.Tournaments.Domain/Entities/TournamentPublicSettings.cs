@@ -1,4 +1,6 @@
-﻿namespace Turniejo.Tournaments.Domain.Entities;
+﻿using Turniejo.SharedKernel.Results;
+
+namespace Turniejo.Tournaments.Domain.Entities;
 
 public sealed class TournamentPublicSettings
 {
@@ -20,6 +22,21 @@ public sealed class TournamentPublicSettings
             TournamentId = tournamentId
         };
         return tournamentPublicSettings;
+    }
+
+    public Result Update(
+        bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
+        bool showStandings, bool showBracket, bool showLiveMatches)
+    {
+        IsPublic = isPublic;
+        ShowTeams = showTeams;
+        ShowPlayers = showPlayers;
+        ShowSchedule = showSchedule;
+        ShowStandings = showStandings;
+        ShowBracket = showBracket;
+        ShowLiveMatches = showLiveMatches;
+
+        return Result.Success();
     }
 }
 

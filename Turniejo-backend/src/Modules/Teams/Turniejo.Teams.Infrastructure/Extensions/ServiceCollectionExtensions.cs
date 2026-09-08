@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Teams.Application.Abstractions;
+using Turniejo.Teams.Application.Services;
 using Turniejo.Teams.Application.Teams.CreateTeam;
 using Turniejo.Teams.Infrastructure.Persistence;
 
@@ -30,6 +31,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITeamModule, TeamModule>();
 
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+        services.AddScoped<TeamMatchResolver>();
 
         services.AddValidatorsFromAssemblyContaining<CreateTeamCommandValidator>();
 

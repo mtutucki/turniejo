@@ -10,10 +10,14 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
         Guid TournamentTeamId,
         Guid PlayerId,
         int? ShirtNumber,
-        PlayerPosition? Position) : ICommand<AssignPlayerToTournamentTeamResponse>, IAuthorizedRequest
+        PlayerPosition? Position) : ICommand<AssignPlayerToTournamentTeamResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;
         public IReadOnlyCollection<string> AllowedRoles => PlayerRoles.OrganizerOnly;
+
+        public string AlternateScopeType => nameof(RoleScopeType.TournamentTeam);
+        public Guid AlternateScopeId => TournamentTeamId;
+        public IReadOnlyCollection<string> AlternateAllowedRoles => PlayerRoles.CoachOnly;
     }
 }

@@ -16,4 +16,14 @@ internal static class PlayerRoles
         nameof(UserRole.Coach),
         nameof(UserRole.Viewer)
     ];
+
+    public static readonly IReadOnlyCollection<string> GuardianOnly =
+    [
+        nameof(UserRole.Parent)
+    ];
+
+    public static readonly IReadOnlyCollection<string> CoachOnly =
+    [
+        nameof(UserRole.Coach)
+    ];
 }

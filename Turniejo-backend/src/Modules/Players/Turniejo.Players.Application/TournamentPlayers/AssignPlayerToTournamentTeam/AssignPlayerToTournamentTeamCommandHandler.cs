@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Players.Application.Abstractions;
+using Turniejo.Players.Application.Services;
 using Turniejo.Players.Domain.Entities;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
@@ -12,6 +13,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
         IPlayersDbContext dbContext,
         ITeamModule teamModule,
         ITournamentModule tournamentModule,
+        SquadEditGuard squadEditGuard,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignPlayerToTournamentTeamCommand, AssignPlayerToTournamentTeamResponse>
     {
         public async Task<Result<AssignPlayerToTournamentTeamResponse>> Handle(AssignPlayerToTournamentTeamCommand request, CancellationToken cancellationToken)
@@ -19,6 +21,8 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
             var tournamentTeam = await teamModule.GetTournamentTeamAsync(request.TournamentTeamId, cancellationToken);
             if (tournamentTeam == null || tournamentTeam.TournamentId != request.TournamentId)
                 return Result.Failure<AssignPlayerToTournamentTeamResponse>(Error.NotFound("TournamentTeam", request.TournamentTeamId));
+
+            await squadEditGuard.EnsureCanEditSquadAsync(request.TournamentId, currentUserContext.UserId, cancellationToken);
 
             var player = await dbContext.GetPlayerByIdAsync(request.PlayerId, cancellationToken);
             if (player == null)

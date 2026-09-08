@@ -4,7 +4,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.Players.Application.Abstractions;
 using Turniejo.Players.Application.Players.CreatePlayer;
+using Turniejo.Players.Application.Services;
 using Turniejo.Players.Infrastructure.Persistence;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Players.Infrastructure.Extensions;
@@ -26,7 +28,13 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IPlayersDbContext>(sp => sp.GetRequiredService<PlayersDbContext>());
 
+        services.AddScoped<IPlayerModule, PlayerModule>();
+
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+
+        services.AddScoped<GuardianAccessChecker>();
+        services.AddScoped<MyChildMatchResolver>();
+        services.AddScoped<SquadEditGuard>();
 
         services.AddValidatorsFromAssemblyContaining<CreatePlayerCommandValidator>();
 

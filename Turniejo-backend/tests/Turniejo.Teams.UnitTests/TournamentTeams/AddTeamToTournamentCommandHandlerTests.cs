@@ -40,7 +40,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             var categoryId = Guid.NewGuid();
 
             _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", organizationId, TeamLimit: 16));
+                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", null, organizationId, TeamLimit: 16));
             _dbContext.GetTeamByIdAsync(team.Id, Arg.Any<CancellationToken>()).Returns(team);
             _dbContext.TournamentTeamExistsAsync(tournamentId, team.Id, categoryId, Arg.Any<CancellationToken>()).Returns(false);
             _dbContext.CountAcceptedTournamentTeamsAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(0);
@@ -81,7 +81,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             var tournamentId = Guid.NewGuid();
             var teamId = Guid.NewGuid();
             _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", Guid.NewGuid(), TeamLimit: 16));
+                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", null, Guid.NewGuid(), TeamLimit: 16));
             _dbContext.GetTeamByIdAsync(teamId, Arg.Any<CancellationToken>()).Returns((Team?)null);
             var command = new AddTeamToTournamentCommand(tournamentId, teamId, Guid.NewGuid());
 
@@ -100,7 +100,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             var tournamentId = Guid.NewGuid();
             var team = CreateFakeTeam(Guid.NewGuid());
             _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", Guid.NewGuid(), TeamLimit: 16));
+                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", null, Guid.NewGuid(), TeamLimit: 16));
             _dbContext.GetTeamByIdAsync(team.Id, Arg.Any<CancellationToken>()).Returns(team);
             var command = new AddTeamToTournamentCommand(tournamentId, team.Id, Guid.NewGuid());
 
@@ -122,7 +122,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             var categoryId = Guid.NewGuid();
 
             _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", organizationId, TeamLimit: 16));
+                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", null, organizationId, TeamLimit: 16));
             _dbContext.GetTeamByIdAsync(team.Id, Arg.Any<CancellationToken>()).Returns(team);
             _dbContext.TournamentTeamExistsAsync(tournamentId, team.Id, categoryId, Arg.Any<CancellationToken>()).Returns(true);
 
@@ -147,7 +147,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             var categoryId = Guid.NewGuid();
 
             _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", organizationId, TeamLimit: 2));
+                .Returns(new TournamentDto(tournamentId, "Turniej", "RegistrationOpen", null, organizationId, TeamLimit: 2));
             _dbContext.GetTeamByIdAsync(team.Id, Arg.Any<CancellationToken>()).Returns(team);
             _dbContext.TournamentTeamExistsAsync(tournamentId, team.Id, categoryId, Arg.Any<CancellationToken>()).Returns(false);
             _dbContext.CountAcceptedTournamentTeamsAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(2);

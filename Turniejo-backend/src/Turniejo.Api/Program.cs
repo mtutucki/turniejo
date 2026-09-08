@@ -1,10 +1,13 @@
 using Turniejo.Api.Middleware;
 using Turniejo.Auth.Infrastructure.Extensions;
+using Turniejo.Brackets.Infrastructure.Extensions;
 using Turniejo.Matches.Infrastructure.Extensions;
+using Turniejo.Matches.Infrastructure.Hubs;
 using Turniejo.Notifications.Infrastructure.Extensions;
 using Turniejo.Organizations.Infrastructure.Extensions;
 using Turniejo.Players.Infrastructure.Extensions;
 using Turniejo.SharedKernel.Behaviors;
+using Turniejo.Standings.Infrastructure.Extensions;
 using Turniejo.Teams.Infrastructure.Extensions;
 using Turniejo.Tournaments.Infrastructure.Extensions;
 using Turniejo.Users.Infrastructure.Extensions;
@@ -25,6 +28,8 @@ builder.Services.AddMatchesModule(builder.Configuration);
 builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddOrganizationsModule(builder.Configuration);
 builder.Services.AddPlayersModule(builder.Configuration);
+builder.Services.AddStandingsModule(builder.Configuration);
+builder.Services.AddBracketsModule(builder.Configuration);
 
 
 
@@ -39,6 +44,8 @@ builder.Services.AddMediatR(cfg =>
         typeof(Turniejo.Notifications.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Organizations.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Players.Application.AssemblyReference).Assembly,
+        typeof(Turniejo.Standings.Application.AssemblyReference).Assembly,
+        typeof(Turniejo.Brackets.Application.AssemblyReference).Assembly,
         typeof(Turniejo.Tournaments.Application.AssemblyReference).Assembly
     );
 
@@ -58,6 +65,8 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+app.MapHub<MatchHub>("/hubs/matches");
+app.MapHub<TournamentHub>("/hubs/tournaments");
 
 app.MapGet("/api/me", (Turniejo.SharedKernel.Contracts.ICurrentUserContext ctx) =>
 {
