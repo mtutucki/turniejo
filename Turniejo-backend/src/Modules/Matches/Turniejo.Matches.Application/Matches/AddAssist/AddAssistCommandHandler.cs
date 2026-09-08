@@ -1,9 +1,7 @@
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Services;
-using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
-using Turniejo.Matches.Domain.Events;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -11,6 +9,10 @@ using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Matches.Application.Matches.AddAssist
 {
+    // Asysta ma jedną ścieżkę zapisu: RelatedPlayerId na evencie gola/rzutu karnego. AddGoalCommand
+    // ustawia je od razu przy strzale; ta komenda dopisuje asystę po fakcie do gola, który jeszcze
+    // jej nie ma — nigdy nie tworzy osobnego, równoległego eventu typu Assist (wcześniej dwie
+    // niezależne ścieżki zapisu groziły podwójnym naliczeniem tej samej asysty w rankingu).
     internal sealed class AddAssistCommandHandler(
         IMatchesDbContext dbContext,
         MatchEventRosterGuard rosterGuard,
@@ -37,22 +39,38 @@ namespace Turniejo.Matches.Application.Matches.AddAssist
             if (scorerCheck.IsFailure)
                 return Result.Failure<AddAssistResponse>(scorerCheck.Error);
 
-            var eventResult = MatchEvent.Create(
-                Guid.NewGuid(), match.Id, MatchEventType.Assist, request.Minute, currentUserContext.UserId,
-                request.TournamentTeamId, request.PlayerId, request.ScorerPlayerId, request.Second);
-            if (eventResult.IsFailure)
-                return Result.Failure<AddAssistResponse>(eventResult.Error);
+            var events = await dbContext.GetMatchEventsByMatchIdAsync(match.Id, cancellationToken);
+            var goalEvent = events.FirstOrDefault(e =>
+                !e.IsDeleted &&
+                e.Type is MatchEventType.Goal or MatchEventType.PenaltyGoal &&
+                e.TournamentTeamId == request.TournamentTeamId &&
+                e.PlayerId == request.ScorerPlayerId &&
+                e.Minute == request.Minute &&
+                (!request.Second.HasValue || e.Second == request.Second) &&
+                e.RelatedPlayerId == null);
 
-            await dbContext.AddMatchEventAsync(eventResult.Value, cancellationToken);
+            if (goalEvent == null)
+                return Result.Failure<AddAssistResponse>(Error.Validation(
+                    "ScorerPlayerId", "No goal without an assist was found for this player at this minute"));
 
-            var addedEvent = new MatchEventAdded(eventResult.Value.Id, match.Id, match.TournamentId, MatchEventType.Assist.ToString());
-            await dbContext.AddOutboxMessageAsync(
-                OutboxMessage.Create(addedEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(addedEvent, addedEvent.GetType())),
-                cancellationToken);
+            var updateResult = goalEvent.UpdateDetails(
+                goalEvent.Type, goalEvent.Minute, goalEvent.Second, goalEvent.PlayerId, request.PlayerId,
+                currentUserContext.UserId, request.TournamentId);
+            if (updateResult.IsFailure)
+                return Result.Failure<AddAssistResponse>(updateResult.Error);
+
+            foreach (var domainEvent in goalEvent.DomainEvents)
+            {
+                var outboxMessage = OutboxMessage.Create(
+                    domainEvent.GetType().AssemblyQualifiedName!,
+                    JsonSerializer.Serialize(domainEvent, domainEvent.GetType()));
+
+                await dbContext.AddOutboxMessageAsync(outboxMessage, cancellationToken);
+            }
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            return Result.Success(new AddAssistResponse(eventResult.Value.Id));
+            return Result.Success(new AddAssistResponse(goalEvent.Id));
         }
     }
 }

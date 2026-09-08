@@ -242,11 +242,21 @@ namespace Turniejo.Matches.Domain.Entities
             if (homeScore < 0 || awayScore < 0)
                 return Result.Failure(Error.Validation("Score", "Score cannot be negative"));
 
-            if (HomeScore == homeScore && AwayScore == awayScore)
+            // Ten wynik jest liczony od nowa z eventów meczowych (goli/rzutów karnych), więc jeśli
+            // ResultType był ManualDecision (ustawiony przez SetManualScore), przestaje być aktualny —
+            // bez tego kolejny AddGoal/RevertMatchEvent nadpisywał wynik, ale etykieta ManualDecision
+            // zostawała, mimo że wynik nie jest już ręczną decyzją.
+            var resultTypeIsStale = ResultType == MatchResultType.ManualDecision;
+
+            if (HomeScore == homeScore && AwayScore == awayScore && !resultTypeIsStale)
                 return Result.Success();
 
             HomeScore = homeScore;
             AwayScore = awayScore;
+
+            if (resultTypeIsStale)
+                ResultType = MatchResultType.Regular;
+
             Version++;
             SetUpdatedAt();
 
@@ -259,6 +269,11 @@ namespace Turniejo.Matches.Domain.Entities
         {
             if (Status == MatchStatus.Finished)
                 return Result.Failure(Error.Conflict("Status", "Use CorrectFinishedMatchScoreCommand to change the score of a finished match"));
+
+            // Blokada obejmowała tylko Finished — dało się ustawić wynik meczowi, który jeszcze się
+            // nie zaczął (Scheduled/Ready) albo nigdy się nie odbędzie (Postponed/Cancelled).
+            if (Status is not (MatchStatus.Live or MatchStatus.Paused))
+                return Result.Failure(Error.Conflict("Status", "Match must be live or paused to set a manual score"));
 
             if (homeScore < 0 || awayScore < 0)
                 return Result.Failure(Error.Validation("Score", "Score cannot be negative"));

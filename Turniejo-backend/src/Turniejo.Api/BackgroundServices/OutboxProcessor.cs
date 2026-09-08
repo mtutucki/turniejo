@@ -57,8 +57,22 @@ public sealed class OutboxProcessor(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to process outbox message {Id}", message.Id);
                     message.MarkAsFailed(ex.Message);
+
+                    if (message.IsDeadLettered)
+                    {
+                        // LogCritical celowo — to jest moment, w którym wiadomość przestaje być
+                        // w ogóle podejmowana przez GetPendingAsync i utyka na stałe. Bez tego
+                        // przekroczenie progu retry było nieodróżnialne od zwykłego LogError.
+                        logger.LogCritical(ex,
+                            "Outbox message {Id} of type {Type} exceeded {MaxRetryCount} retries and is now dead-lettered — requires manual intervention",
+                            message.Id, message.Type, OutboxMessage.MaxRetryCount);
+                    }
+                    else
+                    {
+                        logger.LogError(ex, "Failed to process outbox message {Id} (attempt {RetryCount}/{MaxRetryCount})",
+                            message.Id, message.RetryCount, OutboxMessage.MaxRetryCount);
+                    }
                 }
             }
 

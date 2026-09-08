@@ -26,4 +26,14 @@ internal static class PlayerRoles
     [
         nameof(UserRole.Coach)
     ];
+
+    // Lustro Teams.Application.Authorization.TeamRoles.AnyTeamStaff — reszta panelu trenera
+    // (harmonogram/wyniki/statystyki drużyny) dopuszcza AssistantCoach/Manager, więc lista
+    // zawodników nie może być jedynym widokiem ograniczonym do samego Coacha.
+    public static readonly IReadOnlyCollection<string> AnyTeamStaff =
+    [
+        nameof(UserRole.Coach),
+        nameof(UserRole.AssistantCoach),
+        nameof(UserRole.Manager)
+    ];
 }

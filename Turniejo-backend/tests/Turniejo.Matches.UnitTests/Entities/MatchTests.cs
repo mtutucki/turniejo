@@ -541,10 +541,12 @@ namespace Turniejo.Matches.UnitTests.Entities
         }
 
         [Fact]
-        public void SetManualScore_ShouldSetScoreAndResultType_WhenNotFinished()
+        public void SetManualScore_ShouldSetScoreAndResultType_WhenLive()
         {
             // Arrange
             var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.ClearDomainEvents();
 
             // Act
             var result = match.SetManualScore(4, 1, ValidUserId);
@@ -555,6 +557,54 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.AwayScore.Should().Be(1);
             match.ResultType.Should().Be(MatchResultType.ManualDecision);
             match.DomainEvents.Should().ContainSingle(e => e is MatchScoreChanged);
+        }
+
+        [Fact]
+        public void SetManualScore_ShouldFail_WhenMatchIsScheduled()
+        {
+            // Zamyka lukę z audytu: blokada obejmowała tylko Finished, więc dało się ustawić wynik
+            // meczowi, który jeszcze się nie zaczął.
+            var match = CreateValidMatch();
+
+            var result = match.SetManualScore(2, 0, ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        [Fact]
+        public void UpdateScore_ShouldResetResultTypeFromManualDecisionToRegular_WhenRecalculatedFromEvents()
+        {
+            // Zamyka lukę z audytu: kolejny AddGoal/RevertMatchEvent po SetManualScore przeliczał wynik
+            // z eventów, ale zostawiał ResultType=ManualDecision — mimo że wynik nie jest już ręczną decyzją.
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.SetManualScore(4, 1, ValidUserId);
+            match.ClearDomainEvents();
+
+            var result = match.UpdateScore(2, 0);
+
+            result.IsSuccess.Should().BeTrue();
+            match.HomeScore.Should().Be(2);
+            match.AwayScore.Should().Be(0);
+            match.ResultType.Should().Be(MatchResultType.Regular);
+            match.DomainEvents.Should().ContainSingle(e => e is MatchScoreChanged);
+        }
+
+        [Fact]
+        public void UpdateScore_ShouldResetResultTypeFromManualDecisionToRegular_EvenWhenScoreNumbersAreUnchanged()
+        {
+            // Ten sam wynik liczbowy, ale musi przestać być oznaczony jako ManualDecision, skoro
+            // pochodzi teraz z przeliczenia eventów, a nie z ręcznego wpisu.
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.SetManualScore(2, 0, ValidUserId);
+            match.ClearDomainEvents();
+
+            var result = match.UpdateScore(2, 0);
+
+            result.IsSuccess.Should().BeTrue();
+            match.ResultType.Should().Be(MatchResultType.Regular);
         }
 
         [Fact]

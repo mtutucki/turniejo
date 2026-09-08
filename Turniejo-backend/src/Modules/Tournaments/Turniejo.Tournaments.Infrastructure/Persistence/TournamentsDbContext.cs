@@ -48,6 +48,13 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
             // DomainException jest jawnie obsługiwany -> czytelne 422 zamiast tego.
             throw new DomainException("Cannot delete this resource because it is referenced by other data.");
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "IX_tournaments_Slug" })
+        {
+            // Check-then-insert (TournamentSlugExistsAsync) to nie wystarczy przy równoległych
+            // żądaniach — to jest ostatnia linia obrony. Slug ma losowy sufiks (SlugGenerator), więc
+            // kolizja jest ekstremalnie rzadka, ale bez tego kończyła się surowym 500 zamiast 422.
+            throw new DomainException("A tournament with this slug already exists — please try again.");
+        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

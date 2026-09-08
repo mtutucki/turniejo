@@ -37,4 +37,26 @@ internal sealed class PlayerModule(IPlayersDbContext dbContext) : IPlayerModule
 
         return players.Select(p => new PlayerDto(p.Id, p.FirstName, p.LastName)).ToList();
     }
+
+    public async Task<bool> IsGuardianOfAnyPlayerOnTeamsAsync(
+        Guid userId, IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentTeamIds.Count == 0)
+            return false;
+
+        var guardianships = await dbContext.GetGuardianshipsByUserIdAsync(userId, cancellationToken);
+        if (guardianships.Count == 0)
+            return false;
+
+        var guardedPlayerIds = guardianships.Select(g => g.PlayerId).ToHashSet();
+
+        foreach (var tournamentTeamId in tournamentTeamIds)
+        {
+            var roster = await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(tournamentTeamId, cancellationToken);
+            if (roster.Any(tp => guardedPlayerIds.Contains(tp.PlayerId)))
+                return true;
+        }
+
+        return false;
+    }
 }

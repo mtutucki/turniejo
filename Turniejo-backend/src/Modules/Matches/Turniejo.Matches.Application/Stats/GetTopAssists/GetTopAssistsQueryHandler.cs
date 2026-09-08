@@ -11,9 +11,11 @@ namespace Turniejo.Matches.Application.Stats.GetTopAssists
         IMatchesDbContext dbContext,
         IPlayerModule playerModule) : IQueryHandler<GetTopAssistsQuery, IReadOnlyList<PlayerRankingEntryDto>>
     {
+        // Assist ma jedną ścieżkę zapisu: RelatedPlayerId gola/rzutu karnego (AddGoalCommand przy
+        // strzale, AddAssistCommand dopisując go po fakcie do istniejącego gola). Osobny typ
+        // MatchEventType.Assist już nie jest nigdzie tworzony — liczenie go tutaj podwajałoby wynik.
         private static readonly MatchEventType[] AssistRelevantTypes =
         [
-            MatchEventType.Assist,
             MatchEventType.Goal,
             MatchEventType.PenaltyGoal
         ];
@@ -23,14 +25,8 @@ namespace Turniejo.Matches.Application.Stats.GetTopAssists
             var events = await dbContext.GetMatchEventsByTournamentIdAndTypesAsync(request.TournamentId, AssistRelevantTypes, cancellationToken);
 
             var assisterIds = events
-                .Select(e => e.Type switch
-                {
-                    MatchEventType.Assist => e.PlayerId,
-                    MatchEventType.Goal or MatchEventType.PenaltyGoal => e.RelatedPlayerId,
-                    _ => null
-                })
-                .Where(id => id.HasValue)
-                .Select(id => id!.Value);
+                .Where(e => e.RelatedPlayerId.HasValue)
+                .Select(e => e.RelatedPlayerId!.Value);
 
             var assistCounts = assisterIds
                 .GroupBy(id => id)

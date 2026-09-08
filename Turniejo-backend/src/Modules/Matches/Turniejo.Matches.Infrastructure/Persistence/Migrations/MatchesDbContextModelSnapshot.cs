@@ -146,7 +146,8 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PitchId", "ScheduledAt");
+                    b.HasIndex("PitchId", "ScheduledAt")
+                        .IsUnique();
 
                     b.HasIndex("RefereeId", "ScheduledAt");
 
@@ -252,6 +253,9 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
                     b.Property<string>("Error")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");

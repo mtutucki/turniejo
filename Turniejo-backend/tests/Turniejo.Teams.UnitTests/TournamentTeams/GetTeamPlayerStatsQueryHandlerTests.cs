@@ -37,7 +37,6 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             {
                 new(Guid.NewGuid(), "Goal", scorerId, assisterId),
                 new(Guid.NewGuid(), "YellowCard", scorerId, null),
-                new(Guid.NewGuid(), "Assist", assisterId, scorerId),
             };
             _matchModule.GetMatchEventsByTournamentTeamIdAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(events);
 
@@ -51,8 +50,34 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             scorerStats.YellowCards.Should().Be(1);
 
             var assisterStats = result.Value.Single(s => s.PlayerId == assisterId);
-            // Assist counted twice: once via the dedicated "Assist" event and once via the Goal's RelatedPlayerId.
-            assisterStats.Assists.Should().Be(2);
+            assisterStats.Assists.Should().Be(1);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotCountOwnGoal_AsTheScorersOwnGoal()
+        {
+            // Zamyka lukę z audytu: OwnGoal liczy się dla przeciwnej drużyny (patrz
+            // RecalculateMatchScoreCommandHandler), więc nie może zasilać rankingu strzelca sprawcy.
+            var tournamentTeamId = Guid.NewGuid();
+            var playerId = Guid.NewGuid();
+            var roster = new List<TournamentTeamPlayerDto>
+            {
+                new(Guid.NewGuid(), tournamentTeamId, playerId, "Jan", "Kowalski", 9, "Forward", "Active"),
+            };
+            _playerModule.GetTournamentTeamPlayersAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(roster);
+
+            var events = new List<TeamMatchEventDto>
+            {
+                new(Guid.NewGuid(), "OwnGoal", playerId, null),
+            };
+            _matchModule.GetMatchEventsByTournamentTeamIdAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(events);
+
+            // Act
+            var result = await _handler.Handle(new GetTeamPlayerStatsQuery(tournamentTeamId), CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Single(s => s.PlayerId == playerId).Goals.Should().Be(0);
         }
     }
 }

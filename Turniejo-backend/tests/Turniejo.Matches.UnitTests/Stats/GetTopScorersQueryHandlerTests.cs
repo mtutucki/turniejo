@@ -25,7 +25,7 @@ namespace Turniejo.Matches.UnitTests.Stats
             MatchEvent.Create(Guid.NewGuid(), Guid.NewGuid(), type, 10, Guid.NewGuid(), Guid.NewGuid(), playerId, relatedPlayerId).Value;
 
         [Fact]
-        public async Task Handle_ShouldCountGoalsOwnGoalsAndPenalties_GroupedByPlayer_OrderedDescending()
+        public async Task Handle_ShouldCountGoalsAndPenalties_GroupedByPlayer_OrderedDescending()
         {
             // Arrange
             var tournamentId = Guid.NewGuid();
@@ -36,7 +36,6 @@ namespace Turniejo.Matches.UnitTests.Stats
             {
                 CreateEvent(MatchEventType.Goal, topScorerId),
                 CreateEvent(MatchEventType.PenaltyGoal, topScorerId),
-                CreateEvent(MatchEventType.OwnGoal, topScorerId),
                 CreateEvent(MatchEventType.Goal, secondScorerId),
             };
             _dbContext.GetMatchEventsByTournamentIdAndTypesAsync(
@@ -57,10 +56,32 @@ namespace Turniejo.Matches.UnitTests.Stats
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().HaveCount(2);
             result.Value[0].PlayerId.Should().Be(topScorerId);
-            result.Value[0].Count.Should().Be(3);
+            result.Value[0].Count.Should().Be(2);
             result.Value[0].FirstName.Should().Be("Jan");
             result.Value[1].PlayerId.Should().Be(secondScorerId);
             result.Value[1].Count.Should().Be(1);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotRequestOwnGoal_AsAScorerType()
+        {
+            // Zamyka lukę z audytu: samobój nie może zasilać rankingu strzelców jego sprawcy —
+            // filtr typów przekazany do zapytania nie może już zawierać OwnGoal.
+            var tournamentId = Guid.NewGuid();
+            _dbContext.GetMatchEventsByTournamentIdAndTypesAsync(
+                tournamentId, Arg.Any<IReadOnlyCollection<MatchEventType>>(), Arg.Any<CancellationToken>())
+                .Returns(new List<MatchEvent>());
+            _playerModule.GetPlayersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(new List<PlayerDto>());
+
+            // Act
+            await _handler.Handle(new GetTopScorersQuery(tournamentId), CancellationToken.None);
+
+            // Assert
+            await _dbContext.Received(1).GetMatchEventsByTournamentIdAndTypesAsync(
+                tournamentId,
+                Arg.Is<IReadOnlyCollection<MatchEventType>>(types => !types.Contains(MatchEventType.OwnGoal)),
+                Arg.Any<CancellationToken>());
         }
 
         [Fact]

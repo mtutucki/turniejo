@@ -22,10 +22,11 @@ namespace Turniejo.Matches.UnitTests.Matches
         }
 
         [Fact]
-        public async Task Handle_ShouldSetScoreAndCreateAuditLog_WhenNotFinished()
+        public async Task Handle_ShouldSetScoreAndCreateAuditLog_WhenLive()
         {
             // Arrange
             var match = Match.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
+            match.Start(Guid.NewGuid());
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _currentUserContext.UserId.Returns(Guid.NewGuid());
             var command = new SetMatchScoreCommand(match.TournamentId, match.Id, 5, 3);
@@ -41,6 +42,23 @@ namespace Turniejo.Matches.UnitTests.Matches
             await _dbContext.Received(1).AddAuditLogAsync(
                 Arg.Is<AuditLog>(a => a.EntityType == "Match" && a.Action == "SetManualScore"),
                 Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenMatchIsScheduled()
+        {
+            // Zamyka lukę z audytu: blokada obejmowała tylko Finished, więc dało się ustawić wynik
+            // meczowi, który jeszcze się nie zaczął.
+            var match = Match.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new SetMatchScoreCommand(match.TournamentId, match.Id, 1, 0);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
         }
 
         [Fact]

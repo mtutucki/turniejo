@@ -14,6 +14,6 @@ namespace Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayer
 
         public string AlternateScopeType => nameof(RoleScopeType.TournamentTeam);
         public Guid AlternateScopeId => TournamentTeamId;
-        public IReadOnlyCollection<string> AlternateAllowedRoles => PlayerRoles.CoachOnly;
+        public IReadOnlyCollection<string> AlternateAllowedRoles => PlayerRoles.AnyTeamStaff;
     }
 }

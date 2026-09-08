@@ -1,8 +1,14 @@
+# ⚠️ DEV ONLY — NIE UŻYWAĆ NA PRODUKCJI.
+# Wszystkie hasła poniżej (turniejo/turniejo, admin/admin) są celowo trywialne i jawnie wpisane —
+# to lokalne środowisko developerskie, nie ma tu żadnych prawdziwych sekretów. Na produkcji dane
+# logowania i connection stringi muszą pochodzić z appsettings.Production.json/zmiennych
+# środowiskowych/vaulta (patrz .gitignore), nigdy z tego pliku ani z niczego do niego podobnego.
 services:
   postgres:
     image: postgres:16
     container_name: turniejo-postgres
     environment:
+      # Hasło dev — patrz ostrzeżenie na górze pliku.
       POSTGRES_USER: turniejo
       POSTGRES_PASSWORD: turniejo
       POSTGRES_DB: turniejo
@@ -20,6 +26,8 @@ services:
     image: quay.io/keycloak/keycloak:24.0
     container_name: turniejo-keycloak
     environment:
+      # Hasło dev — patrz ostrzeżenie na górze pliku. `start-dev` poniżej też jawnie oznacza to jako
+      # tryb deweloperski Keycloaka (bez HTTPS, bez hardeningu produkcyjnego).
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_DB: postgres
@@ -39,6 +47,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: turniejo-pgadmin
     environment:
+      # Hasło dev — patrz ostrzeżenie na górze pliku.
       PGADMIN_DEFAULT_EMAIL: admin@turniejo.pl
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:

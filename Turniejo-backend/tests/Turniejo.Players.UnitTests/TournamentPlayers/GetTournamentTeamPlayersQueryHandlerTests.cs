@@ -52,5 +52,16 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().BeEmpty();
         }
+
+        [Fact]
+        public void AlternateAllowedRoles_ShouldMatchRestOfCoachPanel_IncludingAssistantCoachAndManager()
+        {
+            // Zamyka niespójność z audytu: reszta panelu trenera (harmonogram/wyniki/statystyki)
+            // dopuszcza AssistantCoach/Manager (TeamRoles.AnyTeamStaff), a lista zawodników wymagała
+            // dotąd samego Coacha — jedyny widok panelu niedostępny dla reszty sztabu.
+            var query = new GetTournamentTeamPlayersQuery(Guid.NewGuid(), Guid.NewGuid());
+
+            query.AlternateAllowedRoles.Should().BeEquivalentTo(["Coach", "AssistantCoach", "Manager"]);
+        }
     }
 }

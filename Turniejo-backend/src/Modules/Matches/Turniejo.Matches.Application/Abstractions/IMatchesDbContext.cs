@@ -22,7 +22,7 @@ namespace Turniejo.Matches.Application.Abstractions
         Task AddMatchesAsync(IReadOnlyCollection<Match> matches, CancellationToken cancellationToken = default);
         Task<Match?> GetMatchByIdAsync(Guid matchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
-        Task<IReadOnlyList<Match>> GetMatchesByRefereeIdAsync(Guid refereeId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Match>> GetMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<bool> MatchExistsAtPitchAndTimeAsync(Guid pitchId, DateTimeOffset scheduledAt, Guid? excludeMatchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByTournamentTeamIdsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);

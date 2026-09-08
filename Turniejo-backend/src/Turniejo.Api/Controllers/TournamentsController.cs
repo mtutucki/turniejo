@@ -14,6 +14,7 @@ using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamPaymentStat
 using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistrationStatus;
 using Turniejo.Teams.Application.TournamentTeams.GetTeamStaff;
 using Turniejo.Teams.Application.TournamentTeams.GetTournamentTeams;
+using Turniejo.Teams.Domain.Enums;
 using Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules;
 using Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup;
 using Turniejo.Tournaments.Application.TournamentGroups.GetTournamentGroups;

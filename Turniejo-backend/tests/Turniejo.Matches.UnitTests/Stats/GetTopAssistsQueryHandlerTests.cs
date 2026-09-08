@@ -25,19 +25,18 @@ namespace Turniejo.Matches.UnitTests.Stats
             MatchEvent.Create(Guid.NewGuid(), Guid.NewGuid(), type, 10, Guid.NewGuid(), Guid.NewGuid(), playerId, relatedPlayerId).Value;
 
         [Fact]
-        public async Task Handle_ShouldCountBothDedicatedAssistEvents_AndGoalRelatedPlayer()
+        public async Task Handle_ShouldCountGoalRelatedPlayer_AsTheOnlyAssistSource()
         {
-            // Arrange
+            // Asysta ma jedną ścieżkę zapisu — RelatedPlayerId na evencie gola/rzutu karnego —
+            // więc handler nie może już liczyć osobnego typu MatchEventType.Assist (podwajałoby wynik).
             var tournamentId = Guid.NewGuid();
             var assisterId = Guid.NewGuid();
             var scorerId = Guid.NewGuid();
 
             var events = new List<MatchEvent>
             {
-                // Dedicated Assist event: PlayerId = assister.
-                CreateEvent(MatchEventType.Assist, assisterId, scorerId),
-                // Goal recorded with AssistPlayerId as RelatedPlayerId.
                 CreateEvent(MatchEventType.Goal, scorerId, assisterId),
+                CreateEvent(MatchEventType.PenaltyGoal, scorerId, assisterId),
                 // Penalty goal with no assist recorded.
                 CreateEvent(MatchEventType.PenaltyGoal, scorerId, null),
             };
@@ -58,28 +57,27 @@ namespace Turniejo.Matches.UnitTests.Stats
         }
 
         [Fact]
-        public async Task Handle_ShouldNotCountOwnGoalRelatedPlayer()
+        public async Task Handle_ShouldNotRequestOwnGoalOrDedicatedAssistType_FromTheRepository()
         {
-            // Arrange
+            // Zamyka lukę z audytu: dwie niezależne ścieżki zapisu asysty (osobny event Assist i
+            // RelatedPlayerId gola) groziły podwójnym naliczeniem. Filtr przekazany do zapytania
+            // ma teraz obejmować wyłącznie Goal/PenaltyGoal.
             var tournamentId = Guid.NewGuid();
-            var relatedPlayerId = Guid.NewGuid();
-            var events = new List<MatchEvent>
-            {
-                CreateEvent(MatchEventType.OwnGoal, Guid.NewGuid(), relatedPlayerId),
-            };
             _dbContext.GetMatchEventsByTournamentIdAndTypesAsync(
                 tournamentId, Arg.Any<IReadOnlyCollection<MatchEventType>>(), Arg.Any<CancellationToken>())
-                .Returns(events);
+                .Returns(new List<MatchEvent>());
             _playerModule.GetPlayersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
                 .Returns(new List<PlayerDto>());
 
             // Act
-            var result = await _handler.Handle(new GetTopAssistsQuery(tournamentId), CancellationToken.None);
+            await _handler.Handle(new GetTopAssistsQuery(tournamentId), CancellationToken.None);
 
-            // Assert: the handler only requests Assist/Goal/PenaltyGoal event types from the repository,
-            // so an OwnGoal (even if one were returned) contributes nothing.
-            result.IsSuccess.Should().BeTrue();
-            result.Value.Should().BeEmpty();
+            // Assert
+            await _dbContext.Received(1).GetMatchEventsByTournamentIdAndTypesAsync(
+                tournamentId,
+                Arg.Is<IReadOnlyCollection<MatchEventType>>(types =>
+                    !types.Contains(MatchEventType.OwnGoal) && !types.Contains(MatchEventType.Assist)),
+                Arg.Any<CancellationToken>());
         }
     }
 }

@@ -63,7 +63,14 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
                         return result;
                 }
 
-                return 0;
+                // Wszystkie skonfigurowane reguły się wyczerpały bez rozstrzygnięcia (m.in. tak zawsze
+                // kończy się ManualDecision — nie da się go policzyć bez udziału organizatora, dla
+                // którego nie ma dziś żadnego mechanizmu zapisu decyzji). Bez tego kolejność remisujących
+                // drużyn zależałaby od nieokreślonej kolejności zwróconej przez bazę (OrderBy jest
+                // stabilny, ale samo wejście nie jest sortowane) — więc jako absolutny ostatni fallback
+                // sortujemy po deterministycznym kluczu z ID drużyny, żeby przeliczenie tabeli zawsze
+                // dawało ten sam wynik.
+                return StableTieBreakKey(a.TournamentTeamId).CompareTo(StableTieBreakKey(b.TournamentTeamId));
             });
 
             return stats.OrderBy(s => s, comparer).Select(s => s.TournamentTeamId).ToList();
@@ -80,9 +87,19 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
                 "Wins" => b.Wins.CompareTo(a.Wins),
                 "HeadToHeadPoints" => CompareHeadToHead(a, b, matches, pointsForWin, pointsForDraw, pointsForLoss, byGoalDiff: false),
                 "HeadToHeadGoalDiff" => CompareHeadToHead(a, b, matches, pointsForWin, pointsForDraw, pointsForLoss, byGoalDiff: true),
+                // Prawdziwe losowanie musiałoby być deterministyczne między kolejnymi przeliczeniami
+                // tabeli (StandingUpdated potrafi się odpalić wielokrotnie) — inaczej kolejność
+                // migałaby przy każdym przeliczeniu. Stabilny klucz z ID drużyny daje efekt losowego
+                // rozstrzygnięcia bez faktycznej niedeterministyczności.
+                "RandomDraw" => StableTieBreakKey(a.TournamentTeamId).CompareTo(StableTieBreakKey(b.TournamentTeamId)),
+                // ManualDecision celowo zostaje no-opem na tym poziomie — wymaga realnej decyzji
+                // organizatora, dla której dziś nie ma żadnego mechanizmu zapisu w domenie. Ostateczna
+                // kolejność i tak nie zostanie niedeterministyczna dzięki fallbackowi w SortTeams.
                 _ => 0
             };
         }
+
+        private static int StableTieBreakKey(Guid tournamentTeamId) => tournamentTeamId.GetHashCode();
 
         private static int CompareHeadToHead(
             TeamStats a, TeamStats b, IReadOnlyList<GroupMatchDto> matches,

@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
+using Turniejo.SharedKernel.Exceptions;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Matches.Infrastructure.Persistence;
@@ -22,7 +24,17 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
 
     public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return await base.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "IX_matches_PitchId_ScheduledAt" })
+        {
+            // Aplikacyjny check-then-save (MatchExistsAtPitchAndTimeAsync) to nie wystarczy przy
+            // równoległych żądaniach — to jest ostatnia linia obrony, więc zamieniamy surowy błąd bazy
+            // na czytelny DomainException (422), a nie 500.
+            throw new DomainException("Another match is already scheduled on this pitch at this time.");
+        }
     }
 
     public async Task AddPitchAsync(Pitch pitch, CancellationToken cancellationToken = default) =>
@@ -67,13 +79,6 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
             .Where(m => m.TournamentId == tournamentId)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Match>> GetMatchesByRefereeIdAsync(Guid refereeId, CancellationToken cancellationToken = default) =>
-        await Matches
-            .AsNoTracking()
-            .Where(m => m.RefereeId == refereeId)
-            .OrderBy(m => m.ScheduledAt)
-            .ToListAsync(cancellationToken);
-
     public async Task<IReadOnlyList<Match>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
         await Matches
             .AsNoTracking()
@@ -84,6 +89,12 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
         await Matches.AnyAsync(m =>
             m.PitchId == pitchId && m.ScheduledAt == scheduledAt && m.Id != excludeMatchId,
             cancellationToken);
+
+    public async Task<IReadOnlyList<Match>> GetMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default) =>
+        await Matches
+            .AsNoTracking()
+            .Where(m => matchIds.Contains(m.Id))
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<Match>> GetMatchesByTournamentTeamIdsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default) =>
         await Matches

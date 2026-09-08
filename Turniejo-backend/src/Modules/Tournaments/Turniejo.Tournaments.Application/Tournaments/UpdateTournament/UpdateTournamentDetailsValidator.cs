@@ -23,6 +23,9 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
 
             RuleFor(x => x.TeamLimit)
                 .GreaterThanOrEqualTo(0).WithMessage("TeamLimit must be greater than or equal to 0.");
+
+            RuleFor(x => x.Description)
+                .MaximumLength(500).WithMessage("Description must not exceed 500 characters.");
         }
     }
 }

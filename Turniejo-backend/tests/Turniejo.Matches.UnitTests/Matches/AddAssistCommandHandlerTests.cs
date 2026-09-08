@@ -42,15 +42,21 @@ namespace Turniejo.Matches.UnitTests.Matches
         }
 
         [Fact]
-        public async Task Handle_ShouldSucceed_AndLinkScorer_WhenDataIsValid()
+        public async Task Handle_ShouldAttachAssistToExistingUnassistedGoal_WhenDataIsValid()
         {
-            // Arrange
+            // Domyka lukę z audytu: asysta miała dwie niezależne ścieżki zapisu (AssistPlayerId przy
+            // AddGoal i osobny event Assist tutaj), co groziło podwójnym naliczeniem w rankingu.
+            // Teraz jest jedna ścieżka — RelatedPlayerId na już istniejącym evencie gola.
             var tournamentId = Guid.NewGuid();
             var match = CreateLiveMatch(tournamentId);
             var assistingPlayerId = Guid.NewGuid();
             var scorerPlayerId = Guid.NewGuid();
             SetUpRoster(match.HomeTournamentTeamId, assistingPlayerId, scorerPlayerId);
+            var goalEvent = MatchEvent.Create(
+                Guid.NewGuid(), match.Id, MatchEventType.Goal, 30, Guid.NewGuid(),
+                match.HomeTournamentTeamId, scorerPlayerId).Value;
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _dbContext.GetMatchEventsByMatchIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns([goalEvent]);
             _currentUserContext.UserId.Returns(Guid.NewGuid());
             var command = new AddAssistCommand(tournamentId, match.Id, match.HomeTournamentTeamId, assistingPlayerId, scorerPlayerId, 30, null);
 
@@ -59,15 +65,56 @@ namespace Turniejo.Matches.UnitTests.Matches
 
             // Assert
             result.IsSuccess.Should().BeTrue();
-            await _dbContext.Received(1).AddMatchEventAsync(
-                Arg.Is<MatchEvent>(e =>
-                    e.Type == MatchEventType.Assist &&
-                    e.PlayerId == assistingPlayerId &&
-                    e.RelatedPlayerId == scorerPlayerId),
-                Arg.Any<CancellationToken>());
+            result.Value.MatchEventId.Should().Be(goalEvent.Id);
+            goalEvent.RelatedPlayerId.Should().Be(assistingPlayerId);
+            await _dbContext.DidNotReceive().AddMatchEventAsync(Arg.Any<MatchEvent>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).AddOutboxMessageAsync(
-                Arg.Is<Turniejo.SharedKernel.Outbox.OutboxMessage>(m => m.Type.Contains("MatchEventAdded")),
+                Arg.Is<Turniejo.SharedKernel.Outbox.OutboxMessage>(m => m.Type.Contains("MatchEventUpdated")),
                 Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenNoMatchingUnassistedGoalExists()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var assistingPlayerId = Guid.NewGuid();
+            var scorerPlayerId = Guid.NewGuid();
+            SetUpRoster(match.HomeTournamentTeamId, assistingPlayerId, scorerPlayerId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _dbContext.GetMatchEventsByMatchIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns([]);
+            var command = new AddAssistCommand(tournamentId, match.Id, match.HomeTournamentTeamId, assistingPlayerId, scorerPlayerId, 30, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.ScorerPlayerId");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenGoalAlreadyHasAnAssist()
+        {
+            // Bez tego dało się dopisać drugą asystę do tego samego gola.
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var assistingPlayerId = Guid.NewGuid();
+            var scorerPlayerId = Guid.NewGuid();
+            SetUpRoster(match.HomeTournamentTeamId, assistingPlayerId, scorerPlayerId);
+            var goalEvent = MatchEvent.Create(
+                Guid.NewGuid(), match.Id, MatchEventType.Goal, 30, Guid.NewGuid(),
+                match.HomeTournamentTeamId, scorerPlayerId, Guid.NewGuid()).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _dbContext.GetMatchEventsByMatchIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns([goalEvent]);
+            var command = new AddAssistCommand(tournamentId, match.Id, match.HomeTournamentTeamId, assistingPlayerId, scorerPlayerId, 30, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.ScorerPlayerId");
         }
 
         [Fact]

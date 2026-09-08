@@ -14,6 +14,8 @@ namespace Turniejo.Matches.Application.Matches.AddAssist
                 .NotEmpty().WithMessage("TournamentTeamId is required.");
             RuleFor(x => x.PlayerId)
                 .NotEmpty().WithMessage("PlayerId is required.");
+            RuleFor(x => x.ScorerPlayerId)
+                .NotEmpty().WithMessage("ScorerPlayerId is required — the assist must be attached to a specific goal.");
             RuleFor(x => x.Minute)
                 .InclusiveBetween(0, 300).WithMessage("Minute must be between 0 and 300.");
             RuleFor(x => x.Second)

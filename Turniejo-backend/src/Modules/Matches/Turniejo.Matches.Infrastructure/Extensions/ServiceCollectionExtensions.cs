@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<RealtimeAccessGuard>();
         services.AddScoped<MatchEventRosterGuard>();
+        services.AddScoped<MatchAccessGuard>();
 
         services.AddSignalR();
         services.AddSingleton<IRealtimeService, SignalRRealtimeService>();

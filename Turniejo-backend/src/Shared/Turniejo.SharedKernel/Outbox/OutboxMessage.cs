@@ -2,6 +2,11 @@
 
 public sealed class OutboxMessage
 {
+    // Po tylu nieudanych próbach wiadomość jest martwa na stałe (GetPendingAsync ją pomija) —
+    // OutboxProcessor loguje to jako LogCritical w chwili przekroczenia progu, żeby nie utykała po
+    // cichu bez żadnego alertu operacyjnego.
+    public const int MaxRetryCount = 5;
+
     public Guid Id { get; private set; }
     public string Type { get; private set; } = string.Empty;
     public string Payload { get; private set; } = string.Empty;
@@ -9,6 +14,9 @@ public sealed class OutboxMessage
     public DateTimeOffset? ProcessedAt { get; private set; }
     public int RetryCount { get; private set; }
     public string? Error { get; private set; }
+    public DateTimeOffset? NextAttemptAt { get; private set; }
+
+    public bool IsDeadLettered => ProcessedAt == null && RetryCount >= MaxRetryCount;
 
     private OutboxMessage() { }
 
@@ -21,7 +29,8 @@ public sealed class OutboxMessage
             OccurredAt = DateTimeOffset.UtcNow,
             ProcessedAt = null,
             RetryCount = 0,
-            Error = null
+            Error = null,
+            NextAttemptAt = null
         };
 
     public void MarkAsProcessed() =>
@@ -31,5 +40,12 @@ public sealed class OutboxMessage
     {
         RetryCount++;
         Error = error;
+
+        // Backoff wykładniczy (20s, 40s, 80s, 160s) — bez tego OutboxProcessor bił w tę samą
+        // wiadomość co każdy cykl (10s) niezależnie od tego, ile razy już zawiodła, zamiast dać
+        // padniętej zależności (np. SMTP, webhook) czas na powrót.
+        NextAttemptAt = RetryCount < MaxRetryCount
+            ? DateTimeOffset.UtcNow.AddSeconds(10 * Math.Pow(2, RetryCount))
+            : null;
     }
 }

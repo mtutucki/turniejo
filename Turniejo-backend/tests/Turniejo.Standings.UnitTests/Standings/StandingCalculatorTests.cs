@@ -136,5 +136,62 @@ namespace Turniejo.Standings.UnitTests.Standings
 
             sorted.Should().ContainInOrder(TeamB, TeamA);
         }
+
+        [Fact]
+        public void SortTeams_ShouldProduceDeterministicOrder_WhenOnlyManualDecisionRuleConfigured()
+        {
+            // Zamyka lukę z audytu: ManualDecision nie ma dziś mechanizmu zapisu decyzji organizatora,
+            // więc na poziomie reguły zostaje no-opem — ale wynik całego sortowania i tak musi być
+            // deterministyczny (ten sam za każdym przeliczeniem), a nie zależny od kolejności z bazy.
+            var stats = new List<StandingCalculator.TeamStats>
+            {
+                new(TeamA, 2, 1, 0, 1, 3, 3, 3),
+                new(TeamB, 2, 1, 0, 1, 3, 3, 3)
+            };
+            var rules = new List<TieBreakerRuleDto> { new(1, "ManualDecision") };
+
+            var firstRun = StandingCalculator.SortTeams(stats, [], rules, 3, 1, 0);
+            var secondRun = StandingCalculator.SortTeams(stats, [], rules, 3, 1, 0);
+
+            firstRun.Should().Equal(secondRun);
+        }
+
+        [Fact]
+        public void SortTeams_ShouldProduceDeterministicOrder_WhenNoRulesConfiguredAndTeamsAreFullyTied()
+        {
+            // Ten sam gap istniał też bez żadnych reguł skonfigurowanych — OrderBy jest stabilny, ale
+            // wejście (kolejność drużyn z bazy) nie jest sortowane, więc kolejność remisu mogła się
+            // zmieniać między przeliczeniami.
+            var stats = new List<StandingCalculator.TeamStats>
+            {
+                new(TeamA, 2, 1, 0, 1, 3, 3, 3),
+                new(TeamB, 2, 1, 0, 1, 3, 3, 3),
+                new(TeamC, 2, 1, 0, 1, 3, 3, 3)
+            };
+
+            var firstRun = StandingCalculator.SortTeams(stats, [], [], 3, 1, 0);
+            var reversedInputRun = StandingCalculator.SortTeams([.. stats.AsEnumerable().Reverse()], [], [], 3, 1, 0);
+
+            firstRun.Should().Equal(reversedInputRun);
+        }
+
+        [Fact]
+        public void SortTeams_ShouldApplyRandomDrawDeterministically_AndBeSymmetric()
+        {
+            // "Losowanie" musi być stabilne między przeliczeniami (nie może migać po każdym
+            // RecalculateStandingsCommand) i musi dawać spójny, odwracalny wynik dla obu drużyn.
+            var stats = new List<StandingCalculator.TeamStats>
+            {
+                new(TeamA, 2, 1, 0, 1, 3, 3, 3),
+                new(TeamB, 2, 1, 0, 1, 3, 3, 3)
+            };
+            var reversedStats = new List<StandingCalculator.TeamStats> { stats[1], stats[0] };
+            var rules = new List<TieBreakerRuleDto> { new(1, "RandomDraw") };
+
+            var sorted = StandingCalculator.SortTeams(stats, [], rules, 3, 1, 0);
+            var sortedFromReversedInput = StandingCalculator.SortTeams(reversedStats, [], rules, 3, 1, 0);
+
+            sorted.Should().Equal(sortedFromReversedInput);
+        }
     }
 }

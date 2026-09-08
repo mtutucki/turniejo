@@ -50,6 +50,13 @@ public sealed class OrganizationsDbContext(DbContextOptions<OrganizationsDbConte
             // na czytelny DomainException (422), a nie 500.
             throw new DomainException("You already have an organization.");
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "IX_organizations_slug" })
+        {
+            // Organization.Create nie ma żadnego check-then-insert dla sluga (w przeciwieństwie do
+            // ownera powyżej) — poleganie wyłącznie na indeksie unikalnym też kończyło się surowym 500
+            // zamiast czytelnego 422. Slug ma losowy sufiks (SlugGenerator), więc kolizja jest rzadka.
+            throw new DomainException("An organization with this slug already exists — please try again.");
+        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

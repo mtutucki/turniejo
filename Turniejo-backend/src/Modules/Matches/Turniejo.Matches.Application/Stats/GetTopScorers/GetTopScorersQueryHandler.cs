@@ -11,10 +11,11 @@ namespace Turniejo.Matches.Application.Stats.GetTopScorers
         IMatchesDbContext dbContext,
         IPlayerModule playerModule) : IQueryHandler<GetTopScorersQuery, IReadOnlyList<PlayerRankingEntryDto>>
     {
+        // OwnGoal celowo pominięty — to gol wliczany do wyniku przeciwnej drużyny (patrz
+        // RecalculateMatchScoreCommandHandler), więc nie może zasilać rankingu strzelców sprawcy.
         private static readonly MatchEventType[] GoalTypes =
         [
             MatchEventType.Goal,
-            MatchEventType.OwnGoal,
             MatchEventType.PenaltyGoal
         ];
 

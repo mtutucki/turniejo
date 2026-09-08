@@ -29,7 +29,12 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Configurations
                 .IsConcurrencyToken();
 
             builder.HasIndex(x => new { x.TournamentId, x.ScheduledAt });
-            builder.HasIndex(x => new { x.PitchId, x.ScheduledAt });
+            // Aplikacyjny check-then-save (MatchExistsAtPitchAndTimeAsync) nie wystarczy przy
+            // równoległych żądaniach — to jest ostatnia linia obrony przed podwójną rezerwacją
+            // boiska. PitchId jest nullable, a Postgres traktuje NULL-e jako różne od siebie, więc
+            // mecze bez przypisanego boiska nigdy się o ten indeks nie potkną.
+            builder.HasIndex(x => new { x.PitchId, x.ScheduledAt })
+                .IsUnique();
             builder.HasIndex(x => new { x.RefereeId, x.ScheduledAt });
 
             builder.HasOne<Pitch>()
