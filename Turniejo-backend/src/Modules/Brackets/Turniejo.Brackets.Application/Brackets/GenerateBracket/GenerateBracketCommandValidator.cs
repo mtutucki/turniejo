@@ -17,6 +17,11 @@ namespace Turniejo.Brackets.Application.Brackets.GenerateBracket
 
             RuleForEach(x => x.RoundOnePairings).ChildRules(pairing =>
             {
+                pairing.RuleFor(p => p)
+                    .Must(p => p.HomeSourceType != BracketSourceType.Bye || p.AwaySourceType != BracketSourceType.Bye)
+                    .WithMessage("A pairing cannot have Bye on both sides — there would be no team to advance.")
+                    .WithName("Bye");
+
                 pairing.RuleFor(p => p.HomeTournamentTeamId)
                     .NotNull().When(p => p.HomeSourceType == BracketSourceType.Fixed)
                     .WithMessage("HomeTournamentTeamId is required for Fixed source.");

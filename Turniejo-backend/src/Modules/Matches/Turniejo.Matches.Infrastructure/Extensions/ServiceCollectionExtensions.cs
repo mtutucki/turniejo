@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Pitches.AddPitch;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Infrastructure.Persistence;
 using Turniejo.Matches.Infrastructure.Realtime;
 using Turniejo.SharedKernel.Contracts;
@@ -34,6 +35,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         services.AddValidatorsFromAssemblyContaining<AddPitchCommandValidator>();
+
+        services.AddScoped<RealtimeAccessGuard>();
+        services.AddScoped<MatchEventRosterGuard>();
 
         services.AddSignalR();
         services.AddSingleton<IRealtimeService, SignalRRealtimeService>();

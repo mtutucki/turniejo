@@ -3,5 +3,6 @@ using Turniejo.SharedKernel.CQRS;
 
 namespace Turniejo.Players.Application.PlayerGuardians.GetMyChildSchedule
 {
-    public sealed record GetMyChildScheduleQuery(Guid PlayerId) : IQuery<IReadOnlyList<MyChildMatchDto>>;
+    // Handler weryfikuje GuardianAccessChecker.EnsureGuardianAsync(PlayerId, CurrentUserId) przed zwrotem danych.
+    public sealed record GetMyChildScheduleQuery(Guid PlayerId) : IQuery<IReadOnlyList<MyChildMatchDto>>, IAuthenticatedOnlyRequest;
 }

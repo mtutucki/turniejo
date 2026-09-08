@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
 using Turniejo.Users.Application.Users.RegisterUser;
 using Turniejo.Users.Application.Users.RequestPasswordReset;
@@ -8,6 +9,7 @@ namespace Turniejo.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[EnableRateLimiting(RateLimitingExtensions.AuthAnonymous)]
 public sealed class AuthController(ISender sender) : ControllerBase
 {
     [HttpPost("register")]

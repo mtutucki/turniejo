@@ -50,6 +50,7 @@ namespace Turniejo.Organizations.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId")
+                        .IsUnique()
                         .HasDatabaseName("IX_organizations_owner");
 
                     b.HasIndex("Slug")

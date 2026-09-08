@@ -24,7 +24,9 @@ namespace Turniejo.Matches.Application.Matches.FinishMatch
             if (settings == null)
                 return Result.Failure<FinishMatchResponse>(Error.NotFound("TournamentSettings", request.TournamentId));
 
-            var result = match.Finish(request.ResultType, request.WinnerTournamentTeamId, settings.RefereeEditWindowMinutes, currentUserContext.UserId);
+            var result = match.Finish(
+                request.ResultType, request.WinnerTournamentTeamId, settings.RefereeEditWindowMinutes, currentUserContext.UserId,
+                settings.WalkoverWinnerScore, settings.WalkoverLoserScore);
             if (result.IsFailure)
                 return Result.Failure<FinishMatchResponse>(result.Error);
 

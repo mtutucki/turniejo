@@ -11,11 +11,24 @@ namespace Turniejo.Players.Application.PlayerGuardians.AssignGuardianToPlayer
 {
     internal sealed class AssignGuardianToPlayerCommandHandler(
         IPlayersDbContext dbContext,
+        ITeamModule teamModule,
         IUserModule userModule,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignGuardianToPlayerCommand, AssignGuardianToPlayerResponse>
     {
         public async Task<Result<AssignGuardianToPlayerResponse>> Handle(AssignGuardianToPlayerCommand request, CancellationToken cancellationToken)
         {
+            // AuthorizationBehavior już potwierdził, że wywołujący jest Organizerem request.TournamentId
+            // albo Coachem request.TournamentTeamId — ale oba te ID pochodzą od klienta, więc trzeba
+            // jeszcze sprawdzić, że faktycznie do siebie pasują i że PlayerId naprawdę jest w tym składzie
+            // (inaczej Organizer dowolnego turnieju mógłby wskazać PlayerId spoza swojego zasięgu).
+            var tournamentTeam = await teamModule.GetTournamentTeamAsync(request.TournamentTeamId, cancellationToken);
+            if (tournamentTeam == null || tournamentTeam.TournamentId != request.TournamentId)
+                return Result.Failure<AssignGuardianToPlayerResponse>(Error.NotFound("TournamentTeam", request.TournamentTeamId));
+
+            var isOnRoster = await dbContext.TournamentPlayerExistsAsync(request.TournamentTeamId, request.PlayerId, cancellationToken);
+            if (!isOnRoster)
+                return Result.Failure<AssignGuardianToPlayerResponse>(Error.NotFound("Player", request.PlayerId));
+
             var player = await dbContext.GetPlayerByIdAsync(request.PlayerId, cancellationToken);
             if (player == null)
                 return Result.Failure<AssignGuardianToPlayerResponse>(Error.NotFound("Player", request.PlayerId));

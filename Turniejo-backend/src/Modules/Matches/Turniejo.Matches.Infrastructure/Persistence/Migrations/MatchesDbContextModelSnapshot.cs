@@ -138,6 +138,7 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<long>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("bigint");
 
                     b.Property<Guid?>("WinnerTournamentTeamId")

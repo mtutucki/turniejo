@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Events;
 using Turniejo.SharedKernel.Contracts;
@@ -11,6 +12,7 @@ namespace Turniejo.Matches.Application.Matches.AddCard
 {
     internal sealed class AddCardCommandHandler(
         IMatchesDbContext dbContext,
+        MatchEventRosterGuard rosterGuard,
         ICurrentUserContext currentUserContext) : ICommandHandler<AddCardCommand, AddCardResponse>
     {
         public async Task<Result<AddCardResponse>> Handle(AddCardCommand request, CancellationToken cancellationToken)
@@ -25,6 +27,10 @@ namespace Turniejo.Matches.Application.Matches.AddCard
 
             if (request.TournamentTeamId != match.HomeTournamentTeamId && request.TournamentTeamId != match.AwayTournamentTeamId)
                 return Result.Failure<AddCardResponse>(Error.Validation("TournamentTeamId", "Team is not playing in this match"));
+
+            var playerCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.PlayerId, "PlayerId", cancellationToken);
+            if (playerCheck.IsFailure)
+                return Result.Failure<AddCardResponse>(playerCheck.Error);
 
             var eventResult = MatchEvent.Create(
                 Guid.NewGuid(), match.Id, request.CardType, request.Minute, currentUserContext.UserId,

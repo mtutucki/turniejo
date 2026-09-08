@@ -13,6 +13,8 @@ public sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organiz
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Slug).HasMaxLength(220).IsRequired();
         builder.HasIndex(x => x.Slug).IsUnique().HasDatabaseName("IX_organizations_slug");
-        builder.HasIndex(x => x.OwnerUserId).HasDatabaseName("IX_organizations_owner");
+        // V1: 1 user = 1 organizacja (decyzja #21 w arkuszu) — indeks unikalny to ostatnia linia
+        // obrony przeciw wyścigowi przy równoległych żądaniach tworzenia organizacji.
+        builder.HasIndex(x => x.OwnerUserId).IsUnique().HasDatabaseName("IX_organizations_owner");
     }
 }

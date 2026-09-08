@@ -1,25 +1,11 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
-using Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules;
-using Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup;
-using Turniejo.Tournaments.Application.TournamentGroups.GetTournamentGroups;
-using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
-using Turniejo.Tournaments.Application.Tournaments.CreateTournament;
-using Turniejo.Tournaments.Application.Tournaments.GetTournamentById;
-using Turniejo.Tournaments.Application.Tournaments.GetTournamentDashboard;
-using Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSettings;
-using Turniejo.Tournaments.Application.Tournaments.GetTournaments;
-using Turniejo.Tournaments.Application.Tournaments.JoinTournament;
-using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
-using Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateTournamentSettings;
-using Turniejo.Tournaments.Application.Tournaments.UpdateTournament;
-using Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory;
-using Turniejo.Tournaments.Application.TournamentsCategories.DeleteTournamentCategory;
-using Turniejo.Tournaments.Application.TournamentsCategories.GetTournamentCategories;
-using Turniejo.Tournaments.Application.TournamentsCategories.UpdateTournamentCategory;
-using Turniejo.Tournaments.Application.TournamentSetting.GetTournamentSettings;
-using Turniejo.Tournaments.Domain.Enums;
+using Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamentTeam;
+using Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayers;
+using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
+using Turniejo.Players.Domain.Enums;
 using Turniejo.Teams.Application.TournamentTeams.AddTeamToTournament;
 using Turniejo.Teams.Application.TournamentTeams.AssignCoachToTeam;
 using Turniejo.Teams.Application.TournamentTeams.AssignTeamToGroup;
@@ -28,11 +14,25 @@ using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamPaymentStat
 using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistrationStatus;
 using Turniejo.Teams.Application.TournamentTeams.GetTeamStaff;
 using Turniejo.Teams.Application.TournamentTeams.GetTournamentTeams;
-using Turniejo.Teams.Domain.Enums;
-using Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamentTeam;
-using Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayers;
-using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
-using Turniejo.Players.Domain.Enums;
+using Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules;
+using Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup;
+using Turniejo.Tournaments.Application.TournamentGroups.GetTournamentGroups;
+using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
+using Turniejo.Tournaments.Application.Tournaments.CreateTournament;
+using Turniejo.Tournaments.Application.Tournaments.GetTournamentById;
+using Turniejo.Tournaments.Application.Tournaments.GetTournamentDashboard;
+using Turniejo.Tournaments.Application.Tournaments.GetTournaments;
+using Turniejo.Tournaments.Application.Tournaments.JoinTournament;
+using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
+using Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateTournamentSettings;
+using Turniejo.Tournaments.Application.Tournaments.UpdateTournament;
+using Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSettings;
+using Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory;
+using Turniejo.Tournaments.Application.TournamentsCategories.DeleteTournamentCategory;
+using Turniejo.Tournaments.Application.TournamentsCategories.GetTournamentCategories;
+using Turniejo.Tournaments.Application.TournamentsCategories.UpdateTournamentCategory;
+using Turniejo.Tournaments.Application.TournamentSetting.GetTournamentSettings;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Api.Controllers
 {
@@ -52,6 +52,7 @@ namespace Turniejo.Api.Controllers
         }
 
         [HttpPost("join")]
+        [EnableRateLimiting(RateLimitingExtensions.JoinTournament)]
         public async Task<IActionResult> Join([FromBody] JoinTournamentCommand command, CancellationToken cancellationToken)
         {
             var result = await sender.Send(command, cancellationToken);

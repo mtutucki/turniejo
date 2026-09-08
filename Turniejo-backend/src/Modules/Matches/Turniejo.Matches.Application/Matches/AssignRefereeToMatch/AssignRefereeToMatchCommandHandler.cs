@@ -19,9 +19,23 @@ namespace Turniejo.Matches.Application.Matches.AssignRefereeToMatch
             if (match == null || match.TournamentId != request.TournamentId)
                 return Result.Failure<AssignRefereeToMatchResponse>(Error.NotFound("Match", request.MatchId));
 
+            var previousRefereeId = match.RefereeId;
+
             var result = match.AssignReferee(request.RefereeId, currentUserContext.UserId);
             if (result.IsFailure)
                 return Result.Failure<AssignRefereeToMatchResponse>(result.Error);
+
+            // Bez tego zdjęty/zmieniony sędzia zachowywał UserRoleAssignment(Referee, Match, MatchId)
+            // i mógł dalej prowadzić mecz (start/pauza/eventy) mimo usunięcia z Match.RefereeId.
+            if (previousRefereeId.HasValue && previousRefereeId != request.RefereeId)
+            {
+                await userModule.RevokeRoleAsync(
+                    previousRefereeId.Value,
+                    nameof(UserRole.Referee),
+                    nameof(RoleScopeType.Match),
+                    match.Id,
+                    cancellationToken);
+            }
 
             if (request.RefereeId.HasValue)
             {

@@ -3,5 +3,6 @@ using Turniejo.SharedKernel.CQRS;
 
 namespace Turniejo.Players.Application.Players.GetPlayerById
 {
-    public sealed record GetPlayerByIdQuery(Guid PlayerId) : IQuery<PlayerDto>;
+    // Handler weryfikuje PlayerAccessGuard.CanViewAsync (self/guardian/Organizer/Coach).
+    public sealed record GetPlayerByIdQuery(Guid PlayerId) : IQuery<PlayerDto>, IAuthenticatedOnlyRequest;
 }

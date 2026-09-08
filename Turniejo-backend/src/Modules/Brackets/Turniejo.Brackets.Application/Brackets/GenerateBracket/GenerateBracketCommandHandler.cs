@@ -152,6 +152,14 @@ namespace Turniejo.Brackets.Application.Brackets.GenerateBracket
                 }
             }
 
+            // Bye: węzeł Rundy 1 z jedną stroną Bye nigdy nie dostaje meczu (druga strona sama nie
+            // wystarcza do IsFullyResolved), więc trzeba ręcznie wepchnąć drużynę dalej — inaczej drabinka
+            // zostaje z permanentnie pustym slotem w Rundzie 2, mimo że nikt nie musiał grać.
+            foreach (var node in nodesById.Values.Where(n => n.BracketRoundId == round1Result.Value.Id).ToList())
+            {
+                await bracketAdvancer.TryAdvanceByeAsync(node, request.TournamentId, request.CategoryId, cancellationToken);
+            }
+
             var round1StageType = totalRounds == 1 ? "Final" : "Knockout";
             foreach (var node in nodesById.Values.Where(n => n.BracketRoundId == round1Result.Value.Id))
             {

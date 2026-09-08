@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Turniejo.SharedKernel.Exceptions;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Domain.Entities;
@@ -43,7 +44,9 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503" })
         {
-            throw new Exception("Cannot delete this resource because it is referenced by other data.");
+            // Zwykły Exception tu trafiał w catch-all ExceptionHandlingMiddleware -> surowe 500.
+            // DomainException jest jawnie obsługiwany -> czytelne 422 zamiast tego.
+            throw new DomainException("Cannot delete this resource because it is referenced by other data.");
         }
     }
 

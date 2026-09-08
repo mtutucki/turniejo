@@ -218,7 +218,7 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentDto(tournamentId, "Cup", "InProgress", "Group", Guid.NewGuid(), 16));
             _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false));
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
 
             var command = new AssignPlayerToTournamentTeamCommand(tournamentId, tournamentTeamId, player.Id, null, null);
 

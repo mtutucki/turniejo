@@ -50,6 +50,8 @@ namespace Turniejo.Matches.UnitTests.Matches
             match.RefereeId.Should().Be(refereeId);
             await _userModule.Received(1).AssignRoleAsync(
                 refereeId, nameof(UserRole.Referee), nameof(RoleScopeType.Match), match.Id, Arg.Any<CancellationToken>());
+            await _userModule.DidNotReceive().RevokeRoleAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
@@ -69,6 +71,76 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.IsSuccess.Should().BeTrue();
             match.RefereeId.Should().BeNull();
             await _userModule.DidNotReceive().AssignRoleAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldRevokePreviousRefereeRole_WhenChangingReferee()
+        {
+            // Zamyka lukę z audytu: zdjęty sędzia nie ma już zachować dostępu do meczu.
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFakeMatch(tournamentId);
+            var previousRefereeId = Guid.NewGuid();
+            var newRefereeId = Guid.NewGuid();
+            match.AssignReferee(previousRefereeId, Guid.NewGuid());
+            match.ClearDomainEvents();
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new AssignRefereeToMatchCommand(tournamentId, match.Id, newRefereeId);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.RefereeId.Should().Be(newRefereeId);
+            await _userModule.Received(1).RevokeRoleAsync(
+                previousRefereeId, nameof(UserRole.Referee), nameof(RoleScopeType.Match), match.Id, Arg.Any<CancellationToken>());
+            await _userModule.Received(1).AssignRoleAsync(
+                newRefereeId, nameof(UserRole.Referee), nameof(RoleScopeType.Match), match.Id, Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldRevokePreviousRefereeRole_WhenUnassigningReferee()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFakeMatch(tournamentId);
+            var previousRefereeId = Guid.NewGuid();
+            match.AssignReferee(previousRefereeId, Guid.NewGuid());
+            match.ClearDomainEvents();
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new AssignRefereeToMatchCommand(tournamentId, match.Id, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.RefereeId.Should().BeNull();
+            await _userModule.Received(1).RevokeRoleAsync(
+                previousRefereeId, nameof(UserRole.Referee), nameof(RoleScopeType.Match), match.Id, Arg.Any<CancellationToken>());
+            await _userModule.DidNotReceive().AssignRoleAsync(
+                Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotRevokeOrReassign_WhenRefereeIsUnchanged()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFakeMatch(tournamentId);
+            var refereeId = Guid.NewGuid();
+            match.AssignReferee(refereeId, Guid.NewGuid());
+            match.ClearDomainEvents();
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new AssignRefereeToMatchCommand(tournamentId, match.Id, refereeId);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            await _userModule.DidNotReceive().RevokeRoleAsync(
                 Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         }
 

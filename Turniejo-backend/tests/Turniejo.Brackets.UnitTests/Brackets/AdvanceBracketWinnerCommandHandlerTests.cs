@@ -21,7 +21,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             _dbContext = Substitute.For<IBracketsDbContext>();
             _matchModule = Substitute.For<IMatchModule>();
             _standingModule = Substitute.For<IStandingModule>();
-            var advancer = new BracketAdvancer(_matchModule, _standingModule);
+            var advancer = new BracketAdvancer(_dbContext, _matchModule, _standingModule);
             _handler = new AdvanceBracketWinnerCommandHandler(_dbContext, advancer);
         }
 

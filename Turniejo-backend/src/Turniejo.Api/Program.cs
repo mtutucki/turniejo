@@ -1,3 +1,4 @@
+using Turniejo.Api.Extensions;
 using Turniejo.Api.Middleware;
 using Turniejo.Auth.Infrastructure.Extensions;
 using Turniejo.Brackets.Infrastructure.Extensions;
@@ -16,9 +17,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 builder.Services.AddControllers();
+builder.Services.AddApiRateLimiting();
 
 // Auth
-builder.Services.AddAuthModule(builder.Configuration);
+builder.Services.AddAuthModule(builder.Configuration, builder.Environment);
 
 // Moduły
 builder.Services.AddUsersModule(builder.Configuration);
@@ -61,6 +63,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
 

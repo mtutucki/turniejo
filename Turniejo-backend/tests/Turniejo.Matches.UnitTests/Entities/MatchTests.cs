@@ -349,6 +349,83 @@ namespace Turniejo.Matches.UnitTests.Entities
             result.Error.Code.Should().Be("Validation.WinnerTournamentTeamId");
         }
 
+        // --- Finish: Walkower ---
+        // Zamyka lukę z audytu: HomeScore/AwayScore zostawały 0:0 dla Walkower, więc tabela liczyła
+        // go jako remis mimo ustawionego zwycięzcy.
+
+        [Fact]
+        public void Finish_ShouldSetHomeWinnerScore_WhenHomeTeamWinsByWalkover()
+        {
+            // Arrange
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+
+            // Act
+            var result = match.Finish(MatchResultType.Walkover, match.HomeTournamentTeamId, 60, ValidUserId, walkoverWinnerScore: 3, walkoverLoserScore: 0);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.HomeScore.Should().Be(3);
+            match.AwayScore.Should().Be(0);
+        }
+
+        [Fact]
+        public void Finish_ShouldSetAwayWinnerScore_WhenAwayTeamWinsByWalkover()
+        {
+            // Zwycięzca walkoweru dostaje wynik zwycięzcy niezależnie od tego, czy jest drużyną
+            // gospodarzy czy gości — WalkoverWinnerScore/LoserScore to nie dosłowne Home/Away.
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+
+            // Act
+            var result = match.Finish(MatchResultType.Walkover, match.AwayTournamentTeamId, 60, ValidUserId, walkoverWinnerScore: 3, walkoverLoserScore: 0);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.HomeScore.Should().Be(0);
+            match.AwayScore.Should().Be(3);
+        }
+
+        [Fact]
+        public void Finish_ShouldFail_WhenWalkoverHasNoWinner()
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+
+            var result = match.Finish(MatchResultType.Walkover, null, 60, ValidUserId, walkoverWinnerScore: 3, walkoverLoserScore: 0);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.WinnerTournamentTeamId");
+        }
+
+        [Fact]
+        public void Finish_ShouldFail_WhenWalkoverScoresNotProvided()
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+
+            var result = match.Finish(MatchResultType.Walkover, match.HomeTournamentTeamId, 60, ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.ResultType");
+        }
+
+        [Fact]
+        public void Finish_ShouldNotAffectScore_WhenResultTypeIsNotWalkover()
+        {
+            // Regresja: upewniamy się, że dodanie logiki Walkower nie zaczęło nadpisywać wyniku
+            // dla zwykłych meczów.
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.UpdateScore(2, 1);
+
+            var result = match.Finish(MatchResultType.Regular, match.HomeTournamentTeamId, 60, ValidUserId, walkoverWinnerScore: 3, walkoverLoserScore: 0);
+
+            result.IsSuccess.Should().BeTrue();
+            match.HomeScore.Should().Be(2);
+            match.AwayScore.Should().Be(1);
+        }
+
         [Fact]
         public void GetElapsedSeconds_ShouldReturnZero_WhenNotStarted()
         {
@@ -538,6 +615,107 @@ namespace Turniejo.Matches.UnitTests.Entities
             // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.EditLockedAt");
+        }
+
+        // --- Version (optimistic concurrency) ---
+        // Version musi rosnąć przy KAŻDEJ udanej mutacji, żeby EF mogło wykryć równoczesną edycję
+        // (sędzia na słabym łączu + organizator korygujący harmonogram w tym samym momencie).
+
+        [Fact]
+        public void Version_ShouldBeZero_WhenJustCreated()
+        {
+            var match = CreateValidMatch();
+            match.Version.Should().Be(0u);
+        }
+
+        [Theory]
+        [InlineData(nameof(Match.Start))]
+        [InlineData(nameof(Match.UpdateSchedule))]
+        [InlineData(nameof(Match.AssignPitch))]
+        [InlineData(nameof(Match.Reschedule))]
+        [InlineData(nameof(Match.AssignReferee))]
+        public void Version_ShouldIncrement_OnEachSuccessfulMutation(string operation)
+        {
+            // Arrange
+            var match = CreateValidMatch();
+            var before = match.Version;
+
+            // Act
+            var result = operation switch
+            {
+                nameof(Match.Start) => match.Start(ValidUserId),
+                nameof(Match.UpdateSchedule) => match.UpdateSchedule(Guid.NewGuid(), ValidScheduledAt.AddHours(1), ValidUserId),
+                nameof(Match.AssignPitch) => match.AssignPitch(Guid.NewGuid(), ValidUserId),
+                nameof(Match.Reschedule) => match.Reschedule(ValidScheduledAt.AddDays(1), ValidUserId),
+                nameof(Match.AssignReferee) => match.AssignReferee(Guid.NewGuid(), ValidUserId),
+                _ => throw new InvalidOperationException()
+            };
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.Version.Should().Be(before + 1);
+        }
+
+        [Fact]
+        public void Version_ShouldIncrementOnEachStep_ThroughFullMatchLifecycle()
+        {
+            // Arrange
+            var match = CreateValidMatch();
+            match.Version.Should().Be(0u);
+
+            // Act & Assert — Start
+            match.Start(ValidUserId);
+            match.Version.Should().Be(1u);
+
+            // Pause
+            match.Pause(ValidUserId);
+            match.Version.Should().Be(2u);
+
+            // Resume
+            match.Resume(ValidUserId);
+            match.Version.Should().Be(3u);
+
+            // Gol (UpdateScore)
+            match.UpdateScore(1, 0);
+            match.Version.Should().Be(4u);
+
+            // Finish
+            match.Finish(MatchResultType.Regular, match.HomeTournamentTeamId, 60, ValidUserId);
+            match.Version.Should().Be(5u);
+
+            // Korekta wyniku po meczu
+            match.CorrectFinishedScore(2, 0, ValidUserId);
+            match.Version.Should().Be(6u);
+        }
+
+        [Fact]
+        public void Version_ShouldNotIncrement_WhenOperationFails()
+        {
+            // Arrange — mecz jeszcze nie wystartowany, Pause() musi się nie udać przed jakąkolwiek mutacją
+            var match = CreateValidMatch();
+
+            // Act
+            var result = match.Pause(ValidUserId);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            match.Version.Should().Be(0u);
+        }
+
+        [Fact]
+        public void Version_ShouldNotIncrement_WhenUpdateScoreIsANoOp()
+        {
+            // Arrange
+            var match = CreateValidMatch();
+            match.UpdateScore(1, 0);
+            var versionAfterFirstUpdate = match.Version;
+
+            // Act — ten sam wynik co już jest zapisany
+            var result = match.UpdateScore(1, 0);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.Version.Should().Be(versionAfterFirstUpdate);
         }
     }
 }

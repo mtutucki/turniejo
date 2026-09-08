@@ -19,7 +19,7 @@ public record TournamentGroupDto(Guid Id, Guid TournamentId, Guid CategoryId, st
 public record TournamentSettingsSummaryDto(
     Guid TournamentId, int MatchDurationMinutes, int BreakDurationMinutes, int RefereeEditWindowMinutes,
     int PointsForWin, int PointsForDraw, int PointsForLoss, bool IsThirdPlaceMatchEnabled,
-    bool CanCoachEditSquadAfterStart);
+    bool CanCoachEditSquadAfterStart, int WalkoverWinnerScore, int WalkoverLoserScore);
 public record TieBreakerRuleDto(int Order, string Type);
 public record TournamentPublicSettingsDto(
     Guid TournamentId, bool IsPublic, bool ShowTeams, bool ShowPlayers,

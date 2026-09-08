@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GuardianAccessChecker>();
         services.AddScoped<MyChildMatchResolver>();
         services.AddScoped<SquadEditGuard>();
+        services.AddScoped<PlayerAccessGuard>();
 
         services.AddValidatorsFromAssemblyContaining<CreatePlayerCommandValidator>();
 

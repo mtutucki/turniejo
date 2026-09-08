@@ -6,8 +6,65 @@ using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Brackets.Application.Services
 {
-    public sealed class BracketAdvancer(IMatchModule matchModule, IStandingModule standingModule)
+    public sealed class BracketAdvancer(
+        IBracketsDbContext dbContext,
+        IMatchModule matchModule,
+        IStandingModule standingModule)
     {
+        // Wpycha drużynę w konkretny slot węzła docelowego — po realnym meczu (AdvanceBracketWinnerCommand),
+        // po walkowerze-Bye przy generowaniu drabinki (GenerateBracketCommand), albo po rozwiązaniu
+        // GroupPosition ze zaktualizowanej tabeli grupowej (ResolveGroupPositionSlotsCommand). Trzy różne
+        // wyzwalacze, ten sam mechanizm awansu — stąd wspólne miejsce zamiast trzech kopii tej logiki.
+        public async Task<bool> AdvanceIntoAsync(
+            Guid targetNodeId, BracketSlot slot, Guid tournamentTeamId,
+            Guid tournamentId, Guid categoryId, CancellationToken cancellationToken)
+        {
+            var targetNode = await dbContext.GetBracketNodeByIdAsync(targetNodeId, cancellationToken);
+            if (targetNode == null)
+                return false;
+
+            var resolveResult = targetNode.ResolveSlot(slot, tournamentTeamId);
+            if (resolveResult.IsFailure)
+                return false;
+
+            var stageType = await ResolveStageTypeAsync(targetNode, cancellationToken);
+
+            await TryCreateMatchAsync(targetNode, tournamentId, categoryId, stageType, cancellationToken);
+
+            return true;
+        }
+
+        private async Task<string> ResolveStageTypeAsync(BracketNode node, CancellationToken cancellationToken)
+        {
+            if (node.WinnerGoesToNodeId is null)
+                return "Final";
+
+            var round = await dbContext.GetBracketRoundByIdAsync(node.BracketRoundId, cancellationToken);
+            return round?.RoundType == BracketRoundType.ThirdPlace ? "ThirdPlace" : "Knockout";
+        }
+
+        // Węzeł z Bye z jednej strony nigdy nie dostaje meczu (IsFullyResolved zawsze false), więc
+        // MatchFinished nigdy się dla niego nie zdarzy — jak tylko druga strona ma drużynę (od razu przy
+        // Fixed, albo później przy GroupPosition po aktualizacji tabeli), trzeba ją ręcznie wepchnąć dalej.
+        public async Task<bool> TryAdvanceByeAsync(
+            BracketNode node, Guid tournamentId, Guid categoryId, CancellationToken cancellationToken)
+        {
+            var isByeNode = (node.HomeSourceType == BracketSourceType.Bye) != (node.AwaySourceType == BracketSourceType.Bye);
+            if (!isByeNode)
+                return false;
+
+            var advancingTeamId = node.HomeSourceType == BracketSourceType.Bye
+                ? node.AwayTournamentTeamId
+                : node.HomeTournamentTeamId;
+
+            if (!advancingTeamId.HasValue || !node.WinnerGoesToNodeId.HasValue || !node.WinnerGoesToSlot.HasValue)
+                return false;
+
+            return await AdvanceIntoAsync(
+                node.WinnerGoesToNodeId.Value, node.WinnerGoesToSlot.Value, advancingTeamId.Value,
+                tournamentId, categoryId, cancellationToken);
+        }
+
         public async Task ResolveGroupPositionSourcesAsync(BracketNode node, CancellationToken cancellationToken)
         {
             if (node.HomeSourceType == BracketSourceType.GroupPosition && !node.HomeTournamentTeamId.HasValue)

@@ -73,5 +73,39 @@ namespace Turniejo.Standings.UnitTests.Standings
             // Assert
             await sender.DidNotReceive().Send(Arg.Any<RecalculateStandingsCommand>(), Arg.Any<CancellationToken>());
         }
+
+        [Fact]
+        public async Task MatchScoreCorrectedHandler_ShouldTriggerRecalculation_WhenGroupIdPresent()
+        {
+            // Zamyka lukę z audytu: korekta wyniku po zakończeniu meczu (CorrectFinishedMatchScoreCommand)
+            // ma odświeżać tabelę tak samo jak zwykła zmiana wyniku czy zakończenie meczu.
+            var sender = Substitute.For<ISender>();
+            var handler = new MatchScoreCorrectedHandler(sender);
+            var groupId = Guid.NewGuid();
+            var notification = new MatchScoreCorrected(Guid.NewGuid(), Guid.NewGuid(), groupId, 3, 2, Guid.NewGuid());
+
+            // Act
+            await handler.Handle(notification, CancellationToken.None);
+
+            // Assert
+            await sender.Received(1).Send(
+                Arg.Is<RecalculateStandingsCommand>(c => c.GroupId == groupId),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task MatchScoreCorrectedHandler_ShouldDoNothing_WhenGroupIdMissing()
+        {
+            // Arrange
+            var sender = Substitute.For<ISender>();
+            var handler = new MatchScoreCorrectedHandler(sender);
+            var notification = new MatchScoreCorrected(Guid.NewGuid(), Guid.NewGuid(), null, 3, 2, Guid.NewGuid());
+
+            // Act
+            await handler.Handle(notification, CancellationToken.None);
+
+            // Assert
+            await sender.DidNotReceive().Send(Arg.Any<RecalculateStandingsCommand>(), Arg.Any<CancellationToken>());
+        }
     }
 }

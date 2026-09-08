@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.Matches.Domain.Events;
@@ -12,6 +13,7 @@ namespace Turniejo.Matches.Application.Matches.AddAssist
 {
     internal sealed class AddAssistCommandHandler(
         IMatchesDbContext dbContext,
+        MatchEventRosterGuard rosterGuard,
         ICurrentUserContext currentUserContext) : ICommandHandler<AddAssistCommand, AddAssistResponse>
     {
         public async Task<Result<AddAssistResponse>> Handle(AddAssistCommand request, CancellationToken cancellationToken)
@@ -26,6 +28,14 @@ namespace Turniejo.Matches.Application.Matches.AddAssist
 
             if (request.TournamentTeamId != match.HomeTournamentTeamId && request.TournamentTeamId != match.AwayTournamentTeamId)
                 return Result.Failure<AddAssistResponse>(Error.Validation("TournamentTeamId", "Team is not playing in this match"));
+
+            var assistCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.PlayerId, "PlayerId", cancellationToken);
+            if (assistCheck.IsFailure)
+                return Result.Failure<AddAssistResponse>(assistCheck.Error);
+
+            var scorerCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.ScorerPlayerId, "ScorerPlayerId", cancellationToken);
+            if (scorerCheck.IsFailure)
+                return Result.Failure<AddAssistResponse>(scorerCheck.Error);
 
             var eventResult = MatchEvent.Create(
                 Guid.NewGuid(), match.Id, MatchEventType.Assist, request.Minute, currentUserContext.UserId,

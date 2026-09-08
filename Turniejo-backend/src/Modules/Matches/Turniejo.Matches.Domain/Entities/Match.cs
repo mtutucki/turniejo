@@ -76,6 +76,7 @@ namespace Turniejo.Matches.Domain.Entities
         {
             PitchId = pitchId;
             ScheduledAt = scheduledAt;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchScheduleChanged(Id, TournamentId, pitchId, scheduledAt, changedByUserId));
@@ -86,6 +87,7 @@ namespace Turniejo.Matches.Domain.Entities
         public Result AssignPitch(Guid? pitchId, Guid changedByUserId)
         {
             PitchId = pitchId;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchPitchChanged(Id, TournamentId, pitchId, changedByUserId));
@@ -96,6 +98,7 @@ namespace Turniejo.Matches.Domain.Entities
         public Result Reschedule(DateTimeOffset scheduledAt, Guid changedByUserId)
         {
             ScheduledAt = scheduledAt;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchTimeChanged(Id, TournamentId, scheduledAt, changedByUserId));
@@ -109,6 +112,7 @@ namespace Turniejo.Matches.Domain.Entities
                 return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match is live or finished"));
 
             RefereeId = refereeId;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, changedByUserId));
@@ -123,6 +127,7 @@ namespace Turniejo.Matches.Domain.Entities
 
             Status = MatchStatus.Live;
             StartedAt = DateTimeOffset.UtcNow;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchStarted(Id, TournamentId, StartedAt.Value, changedByUserId));
@@ -137,6 +142,7 @@ namespace Turniejo.Matches.Domain.Entities
 
             Status = MatchStatus.Paused;
             PausedAt = DateTimeOffset.UtcNow;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchPaused(Id, TournamentId, PausedAt.Value, changedByUserId));
@@ -152,6 +158,7 @@ namespace Turniejo.Matches.Domain.Entities
             TotalPausedSeconds += (int)(DateTimeOffset.UtcNow - PausedAt.Value).TotalSeconds;
             PausedAt = null;
             Status = MatchStatus.Live;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchResumed(Id, TournamentId, changedByUserId));
@@ -159,7 +166,9 @@ namespace Turniejo.Matches.Domain.Entities
             return Result.Success();
         }
 
-        public Result Finish(MatchResultType resultType, Guid? winnerTournamentTeamId, int refereeEditWindowMinutes, Guid changedByUserId)
+        public Result Finish(
+            MatchResultType resultType, Guid? winnerTournamentTeamId, int refereeEditWindowMinutes, Guid changedByUserId,
+            int? walkoverWinnerScore = null, int? walkoverLoserScore = null)
         {
             if (Status is not (MatchStatus.Live or MatchStatus.Paused))
                 return Result.Failure(Error.Conflict("Status", "Match can only be finished from Live or Paused status"));
@@ -172,11 +181,36 @@ namespace Turniejo.Matches.Domain.Entities
                 winnerTournamentTeamId.Value != AwayTournamentTeamId)
                 return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be one of the two teams playing"));
 
+            if (resultType == MatchResultType.Walkover)
+            {
+                if (!winnerTournamentTeamId.HasValue)
+                    return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Walkover requires a winner"));
+
+                if (!walkoverWinnerScore.HasValue || !walkoverLoserScore.HasValue)
+                    return Result.Failure(Error.Validation("ResultType", "Walkover requires the tournament's walkover scores"));
+
+                // WalkoverHomeScore/WalkoverAwayScore w ustawieniach turnieju to wynik zwycięzcy/przegranego
+                // walkoweru, nie dosłownie gospodarza/gościa — drużyna, która nie stawiła się na mecz, może
+                // równie dobrze być stroną "domową" w terminarzu. Bez tego HomeScore/AwayScore zostawałoby
+                // 0:0 i tabela liczyłaby walkower jako remis, ignorując WinnerTournamentTeamId.
+                if (winnerTournamentTeamId.Value == HomeTournamentTeamId)
+                {
+                    HomeScore = walkoverWinnerScore.Value;
+                    AwayScore = walkoverLoserScore.Value;
+                }
+                else
+                {
+                    HomeScore = walkoverLoserScore.Value;
+                    AwayScore = walkoverWinnerScore.Value;
+                }
+            }
+
             Status = MatchStatus.Finished;
             FinishedAt = DateTimeOffset.UtcNow;
             ResultType = resultType;
             WinnerTournamentTeamId = winnerTournamentTeamId;
             EditLockedAt = FinishedAt.Value.AddMinutes(refereeEditWindowMinutes);
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchFinished(Id, TournamentId, GroupId, resultType.ToString(), winnerTournamentTeamId, FinishedAt.Value, changedByUserId, HomeScore, AwayScore));
@@ -213,6 +247,7 @@ namespace Turniejo.Matches.Domain.Entities
 
             HomeScore = homeScore;
             AwayScore = awayScore;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchScoreChanged(Id, TournamentId, GroupId, homeScore, awayScore));
@@ -231,6 +266,7 @@ namespace Turniejo.Matches.Domain.Entities
             HomeScore = homeScore;
             AwayScore = awayScore;
             ResultType = MatchResultType.ManualDecision;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchScoreChanged(Id, TournamentId, GroupId, homeScore, awayScore));
@@ -251,6 +287,7 @@ namespace Turniejo.Matches.Domain.Entities
 
             HomeScore = homeScore;
             AwayScore = awayScore;
+            Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchScoreCorrected(Id, TournamentId, GroupId, homeScore, awayScore, changedByUserId));

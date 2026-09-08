@@ -40,7 +40,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             var winnerId = match.HomeTournamentTeamId;
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false));
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
             _currentUserContext.UserId.Returns(Guid.NewGuid());
             var command = new FinishMatchCommand(tournamentId, match.Id, MatchResultType.Regular, winnerId);
 
@@ -100,7 +100,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             var match = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false));
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
             var command = new FinishMatchCommand(tournamentId, match.Id, MatchResultType.Regular, null);
 
             // Act
@@ -109,6 +109,70 @@ namespace Turniejo.Matches.UnitTests.Matches
             // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        // --- Walkower ---
+        // Zamyka lukę z audytu: Walkower nie ustawiał HomeScore/AwayScore, więc tabela liczyła go
+        // jako remis 0:0 mimo ustawionego WinnerTournamentTeamId.
+
+        [Fact]
+        public async Task Handle_ShouldSetWalkoverScores_WhenHomeTeamWinsByWalkover()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
+            var command = new FinishMatchCommand(tournamentId, match.Id, MatchResultType.Walkover, match.HomeTournamentTeamId);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.HomeScore.Should().Be(3);
+            match.AwayScore.Should().Be(0);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSetWalkoverScores_WhenAwayTeamWinsByWalkover()
+        {
+            // Kluczowy przypadek z audytu: zwycięzca walkoweru dostaje wynik zwycięzcy niezależnie
+            // od tego, czy jest drużyną gospodarzy czy gości w terminarzu.
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
+            var command = new FinishMatchCommand(tournamentId, match.Id, MatchResultType.Walkover, match.AwayTournamentTeamId);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.HomeScore.Should().Be(0);
+            match.AwayScore.Should().Be(3);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenWalkoverHasNoWinner()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
+            var command = new FinishMatchCommand(tournamentId, match.Id, MatchResultType.Walkover, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.WinnerTournamentTeamId");
+            match.Status.Should().Be(MatchStatus.Live);
         }
     }
 }

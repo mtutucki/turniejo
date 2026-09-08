@@ -28,7 +28,7 @@ namespace Turniejo.Matches.UnitTests.Schedule
             new(tournamentId, "Turniej", "RegistrationClosed", format, Guid.NewGuid(), 16);
 
         private static TournamentSettingsSummaryDto FakeSettings(Guid tournamentId) =>
-            new(tournamentId, 30, 10, 60, 3, 1, 0, false, false);
+            new(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0);
 
         private void SetupHappyPath(Guid tournamentId, Guid pitchId, Guid groupId, Guid categoryId, List<Guid> acceptedTeamIds)
         {

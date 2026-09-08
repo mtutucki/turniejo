@@ -60,7 +60,10 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
             tournamentId, tournament.Settings.MatchDurationMinutes, tournament.Settings.BreakDurationMinutes,
             tournament.Settings.RefereeEditWindowMinutes, tournament.Settings.PointsForWin,
             tournament.Settings.PointsForDraw, tournament.Settings.PointsForLoss,
-            tournament.Settings.IsThirdPlaceMatchEnabled, tournament.Settings.CanCoachEditSquadAfterStart);
+            tournament.Settings.IsThirdPlaceMatchEnabled, tournament.Settings.CanCoachEditSquadAfterStart,
+            // Nazwy pól w encji (Home/Away) są mylące — WalkoverHomeScore to wynik zwycięzcy walkoweru,
+            // nie dosłownie gospodarza; DTO cross-module nazywa to wprost, żeby moduł Matches się nie pomylił.
+            tournament.Settings.WalkoverHomeScore, tournament.Settings.WalkoverAwayScore);
     }
 
     public async Task<IReadOnlyList<TieBreakerRuleDto>> GetTieBreakerRulesAsync(Guid tournamentId, CancellationToken cancellationToken = default)

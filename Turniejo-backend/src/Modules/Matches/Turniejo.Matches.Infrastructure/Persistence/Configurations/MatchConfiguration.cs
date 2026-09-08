@@ -21,6 +21,13 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Configurations
             builder.Property(x => x.ResultType)
                 .HasConversion<int>();
 
+            // Optimistic concurrency: Version jest inkrementowany w każdej mutującej metodzie domenowej
+            // (Match.cs) przed zapisem. EF użyje wartości sprzed zmiany w klauzuli WHERE — jeśli sędzia
+            // i organizator zapiszą ten sam mecz równolegle, druga operacja dostanie
+            // DbUpdateConcurrencyException zamiast cichego last-write-wins.
+            builder.Property(x => x.Version)
+                .IsConcurrencyToken();
+
             builder.HasIndex(x => new { x.TournamentId, x.ScheduledAt });
             builder.HasIndex(x => new { x.PitchId, x.ScheduledAt });
             builder.HasIndex(x => new { x.RefereeId, x.ScheduledAt });

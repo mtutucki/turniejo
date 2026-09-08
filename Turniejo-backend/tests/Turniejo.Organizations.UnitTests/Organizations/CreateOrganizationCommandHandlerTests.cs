@@ -2,6 +2,7 @@
 using NSubstitute;
 using Turniejo.Organizations.Application.Abstractions;
 using Turniejo.Organizations.Application.Organizations.CreateOrganization;
+using Turniejo.Organizations.Application.Services;
 using Turniejo.Organizations.Domain.Entities;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Enums;
@@ -19,7 +20,8 @@ public sealed class CreateOrganizationCommandHandlerTests
     {
         _dbContext = Substitute.For<IOrganizationsDbContext>();
         _userModule = Substitute.For<IUserModule>();
-        _handler = new CreateOrganizationCommandHandler(_dbContext, _userModule);
+        var provisioner = new OrganizationProvisioner(_dbContext);
+        _handler = new CreateOrganizationCommandHandler(_dbContext, provisioner, _userModule);
     }
 
     [Fact]
