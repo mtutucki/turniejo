@@ -93,5 +93,39 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Match.NotFound");
         }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenMatchIsNotEditable()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new SelectMatchMvpCommand(tournamentId, match.Id, match.HomeTournamentTeamId, Guid.NewGuid());
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenTeamIsNotPlayingInThisMatch()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new SelectMatchMvpCommand(tournamentId, match.Id, Guid.NewGuid(), Guid.NewGuid());
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.TournamentTeamId");
+        }
     }
 }

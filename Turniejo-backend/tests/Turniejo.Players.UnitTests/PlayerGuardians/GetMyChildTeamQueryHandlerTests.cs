@@ -77,4 +77,28 @@ public sealed class GetMyChildTeamQueryHandlerTests
         result.Value[0].TournamentName.Should().Be("Cup");
         result.Value[0].ShirtNumber.Should().Be(7);
     }
+
+    [Fact]
+    public async Task Handle_ShouldSkipMembership_WhenTournamentTeamLookupMisses()
+    {
+        // Dziecko może mieć TournamentPlayer wskazujący na drużynę, która już nie istnieje/nie jest
+        // dostępna (np. usunięta z turnieju) — handler ma go pominąć, nie zwrócić błędnego wpisu.
+        var playerId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        _currentUserContext.UserId.Returns(userId);
+        var guardian = PlayerGuardian.Create(Guid.NewGuid(), playerId, userId, RelationshipType.Parent, false, true, Guid.NewGuid()).Value;
+        _dbContext.GetPlayerGuardiansByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<PlayerGuardian> { guardian });
+
+        var orphanedTournamentPlayer = TournamentPlayer.Create(Guid.NewGuid(), Guid.NewGuid(), playerId, null, null, Guid.NewGuid()).Value;
+        _dbContext.GetTournamentPlayersByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<TournamentPlayer> { orphanedTournamentPlayer });
+        _teamModule.GetTournamentTeamAsync(orphanedTournamentPlayer.TournamentTeamId, Arg.Any<CancellationToken>())
+            .Returns((TournamentTeamDto?)null);
+
+        // Act
+        var result = await _handler.Handle(new GetMyChildTeamQuery(playerId), CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEmpty();
+    }
 }

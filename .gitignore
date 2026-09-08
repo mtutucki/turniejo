@@ -16,7 +16,10 @@ artifacts/
 # Secrets backend
 **/appsettings.Development.json
 **/appsettings.Local.json
+**/appsettings.Staging.json
+**/appsettings.Production.json
 **/secrets.json
+**/*.env
 
 # Test results
 TestResults/

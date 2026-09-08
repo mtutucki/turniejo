@@ -134,6 +134,40 @@ namespace Turniejo.Matches.UnitTests.Matches
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenMatchIsNotEditable()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new AddAssistCommand(tournamentId, match.Id, match.HomeTournamentTeamId, Guid.NewGuid(), Guid.NewGuid(), 10, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenTeamIsNotPlayingInThisMatch()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var command = new AddAssistCommand(tournamentId, match.Id, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 10, null);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.TournamentTeamId");
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenAssistingPlayerIsNotOnTeamRoster()
         {
             // Zamyka lukę z audytu: asystę dało się przypisać dowolnemu PlayerId.

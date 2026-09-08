@@ -171,6 +171,24 @@ namespace Turniejo.Brackets.UnitTests.Brackets
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenTournamentNotFound()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns((TournamentDto?)null);
+
+            var command = new GenerateBracketCommand(tournamentId, Guid.NewGuid(), [FixedPairing()]);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Tournament.NotFound");
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenTournamentFormatIsNotKnockout()
         {
             // Arrange
@@ -186,6 +204,53 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Validation.Format");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenTournamentSettingsNotFound()
+        {
+            // Zamyka lukę z audytu testów: gałąź "settings == null" (TournamentSettings.NotFound)
+            // nie miała żadnego pokrycia.
+            var tournamentId = Guid.NewGuid();
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "Cup", "InProgress", "Knockout", Guid.NewGuid(), 4));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns((TournamentSettingsSummaryDto?)null);
+
+            var command = new GenerateBracketCommand(tournamentId, Guid.NewGuid(), [FixedPairing()]);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("TournamentSettings.NotFound");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldCreateSingleFinalMatch_WhenOnlyOnePairingIsSupplied()
+        {
+            // Zamyka lukę z audytu testów: drabinka na 2 drużyny (1 para = totalRounds==1) nigdy nie
+            // wchodzi w pętlę Rund 2..N, więc Runda 1 sama musi dostać StageType "Final".
+            var tournamentId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "Cup", "InProgress", "Knockout", Guid.NewGuid(), 2));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
+
+            var command = new GenerateBracketCommand(tournamentId, categoryId, [FixedPairing()]);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            result.Value.RoundCount.Should().Be(1);
+            await _dbContext.Received(1).AddBracketRoundAsync(Arg.Any<BracketRound>(), Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).AddBracketNodeAsync(Arg.Any<BracketNode>(), Arg.Any<CancellationToken>());
+            await _matchModule.Received(1).CreateBracketMatchAsync(
+                tournamentId, categoryId, Arg.Any<Guid>(), Arg.Any<Guid>(), "Final", Arg.Any<CancellationToken>());
         }
 
         [Fact]

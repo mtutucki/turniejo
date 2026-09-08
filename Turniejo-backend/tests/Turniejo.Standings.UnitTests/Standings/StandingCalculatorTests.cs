@@ -78,6 +78,23 @@ namespace Turniejo.Standings.UnitTests.Standings
         }
 
         [Fact]
+        public void SortTeams_ShouldApplyWinsTiebreaker_WhenPointsEqual()
+        {
+            // Zamyka lukę z audytu testów: reguła "Wins" nigdy nie była testowana jako faktycznie
+            // rozstrzygająca remis. A ma tyle samo punktów co B, ale więcej zwycięstw (1 vs 0).
+            var stats = new List<StandingCalculator.TeamStats>
+            {
+                new(TeamA, 3, 1, 2, 0, 4, 2, 5),
+                new(TeamB, 5, 0, 5, 0, 4, 2, 5)
+            };
+            var rules = new List<TieBreakerRuleDto> { new(1, "Wins") };
+
+            var sorted = StandingCalculator.SortTeams(stats, [], rules, 3, 1, 0);
+
+            sorted.Should().ContainInOrder(TeamA, TeamB);
+        }
+
+        [Fact]
         public void SortTeams_ShouldApplyHeadToHeadPoints_WhenPointsAndGoalDiffEqual()
         {
             // A beat B head-to-head; both tied on aggregate points/goal difference for the purpose of this rule test.

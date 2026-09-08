@@ -43,5 +43,34 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             result.Value.Should().ContainSingle();
             result.Value[0].HomeScore.Should().Be(2);
         }
+
+        [Fact]
+        public async Task Handle_ShouldResolveTeamNames_WhenTeamsExist()
+        {
+            // TeamMatchResolver nie ma własnego pliku testowego — jest testowany tylko pośrednio przez
+            // handlery, które go używają, ale żaden istniejący test nie asertował nazw drużyn (w
+            // konstruktorze GetTournamentTeamByIdAsync jest zamockowane na null, więc rozwiązywanie
+            // nazwy nigdy nie było faktycznie sprawdzone, tylko przypadkiem trafiało w fallback "Unknown").
+            var tournamentTeamId = Guid.NewGuid();
+            var awayTeamId = Guid.NewGuid();
+            var match = new TournamentMatchDto(Guid.NewGuid(), Guid.NewGuid(), "Finished", DateTimeOffset.UtcNow.AddDays(-1), tournamentTeamId, awayTeamId, 3, 1);
+            _matchModule.GetMatchesByTournamentTeamIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([match]);
+
+            var homeTeam = Turniejo.Teams.Domain.Entities.TournamentTeam.Create(tournamentTeamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()).Value;
+            var awayTournamentTeam = Turniejo.Teams.Domain.Entities.TournamentTeam.Create(awayTeamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()).Value;
+            _dbContext.GetTournamentTeamByIdAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(homeTeam);
+            _dbContext.GetTournamentTeamByIdAsync(awayTeamId, Arg.Any<CancellationToken>()).Returns(awayTournamentTeam);
+            _dbContext.GetTeamByIdAsync(homeTeam.TeamId, Arg.Any<CancellationToken>())
+                .Returns(Turniejo.Teams.Domain.Entities.Team.Create(homeTeam.TeamId, Guid.NewGuid(), Guid.NewGuid(), "Lions", "LIO", null).Value);
+            _dbContext.GetTeamByIdAsync(awayTournamentTeam.TeamId, Arg.Any<CancellationToken>())
+                .Returns(Turniejo.Teams.Domain.Entities.Team.Create(awayTournamentTeam.TeamId, Guid.NewGuid(), Guid.NewGuid(), "Tigers", "TIG", null).Value);
+
+            // Act
+            var result = await _handler.Handle(new GetTeamResultsQuery(tournamentTeamId), CancellationToken.None);
+
+            // Assert
+            result.Value[0].HomeTeamName.Should().Be("Lions");
+            result.Value[0].AwayTeamName.Should().Be("Tigers");
+        }
     }
 }

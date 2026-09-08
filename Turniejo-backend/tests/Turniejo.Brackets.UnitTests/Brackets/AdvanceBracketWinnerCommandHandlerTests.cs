@@ -81,6 +81,54 @@ namespace Turniejo.Brackets.UnitTests.Brackets
         }
 
         [Fact]
+        public async Task Handle_ShouldAdvanceLoser_ToThirdPlaceMatch_WhenLoserGoesToNodeIdIsWired()
+        {
+            // Zamyka lukę z audytu testów: generowanie drabinki z meczem o 3. miejsce jest testowane,
+            // ale nikt nie sprawdzał, że przegrany półfinalista faktycznie LĄDUJE w tym meczu po
+            // rzeczywistym zakończeniu półfinału — tylko ścieżka zwycięzcy miała pokrycie.
+            var bracketId = Guid.NewGuid();
+            var roundId = Guid.NewGuid();
+            var bracket = Bracket.Create(bracketId, Guid.NewGuid(), Guid.NewGuid()).Value;
+            var winnerId = Guid.NewGuid();
+            var loserId = Guid.NewGuid();
+            var sourceNode = CreateResolvedNode(winnerId, loserId, roundId);
+
+            var thirdPlaceRoundId = Guid.NewGuid();
+            var thirdPlaceRound = BracketRound.Create(Guid.NewGuid(), bracketId, 2, BracketRoundType.ThirdPlace, "3. miejsce").Value;
+            var otherLoserId = Guid.NewGuid();
+            var thirdPlaceNode = BracketNode.Create(
+                Guid.NewGuid(), thirdPlaceRoundId,
+                BracketSourceType.MatchLoser, null, null, sourceNode.Id, null,
+                BracketSourceType.Fixed, null, null, null, otherLoserId).Value;
+
+            // Tylko ścieżka przegranego jest wpięta — WinnerGoesToNodeId zostaje null, żeby test
+            // był izolowany dokładnie na LoserGoesToNodeId.
+            sourceNode.WireAdvancement(null, null, thirdPlaceNode.Id, BracketSlot.Home);
+
+            _dbContext.GetBracketNodeByMatchIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(sourceNode);
+            _dbContext.GetBracketRoundByIdAsync(roundId, Arg.Any<CancellationToken>()).Returns(
+                BracketRound.Create(Guid.NewGuid(), bracketId, 1, BracketRoundType.Standard, "Półfinał").Value);
+            _dbContext.GetBracketByIdAsync(bracketId, Arg.Any<CancellationToken>()).Returns(bracket);
+            _dbContext.GetBracketNodeByIdAsync(thirdPlaceNode.Id, Arg.Any<CancellationToken>()).Returns(thirdPlaceNode);
+            _dbContext.GetBracketRoundByIdAsync(thirdPlaceRoundId, Arg.Any<CancellationToken>()).Returns(thirdPlaceRound);
+            _matchModule.CreateBracketMatchAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Guid.NewGuid());
+
+            var command = new AdvanceBracketWinnerCommand(Guid.NewGuid(), winnerId);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Advanced.Should().BeTrue();
+            thirdPlaceNode.HomeTournamentTeamId.Should().Be(loserId);
+            await _matchModule.Received(1).CreateBracketMatchAsync(
+                bracket.TournamentId, bracket.CategoryId, loserId, otherLoserId, "ThirdPlace", Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldReturnNotAdvanced_WhenMatchIsNotABracketMatch()
         {
             // Arrange

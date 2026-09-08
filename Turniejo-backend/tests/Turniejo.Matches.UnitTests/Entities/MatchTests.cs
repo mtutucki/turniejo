@@ -560,6 +560,18 @@ namespace Turniejo.Matches.UnitTests.Entities
         }
 
         [Fact]
+        public void SetManualScore_ShouldFail_WhenNegative()
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+
+            var result = match.SetManualScore(-1, 0, ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Score");
+        }
+
+        [Fact]
         public void SetManualScore_ShouldFail_WhenMatchIsScheduled()
         {
             // Zamyka lukę z audytu: blokada obejmowała tylko Finished, więc dało się ustawić wynik
@@ -640,6 +652,19 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.HomeScore.Should().Be(3);
             match.AwayScore.Should().Be(2);
             match.DomainEvents.Should().ContainSingle(e => e is MatchScoreCorrected);
+        }
+
+        [Fact]
+        public void CorrectFinishedScore_ShouldFail_WhenNegative()
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.Finish(MatchResultType.Regular, null, 60, ValidUserId);
+
+            var result = match.CorrectFinishedScore(-1, 0, null, ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Score");
         }
 
         [Fact]

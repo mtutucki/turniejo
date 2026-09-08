@@ -84,4 +84,46 @@ public sealed class CreateMatchReminderNotificationsCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.CreatedCount.Should().Be(0);
     }
+
+    [Fact]
+    public async Task Handle_ShouldAggregateCreatedCount_AcrossMultipleQualifyingMatches()
+    {
+        // Zamyka lukę z audytu testów: handler był testowany tylko dla pojedynczego meczu na
+        // wywołanie — nikt nie sprawdzał, że createdCount faktycznie sumuje się po całej paczce,
+        // ani że SaveChangesAsync leci raz na koniec, nie raz na mecz.
+        var matchA = CreateMatch(refereeId: Guid.NewGuid());
+        var matchB = CreateMatch(refereeId: Guid.NewGuid());
+        _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([matchA, matchB]);
+        _dbContext.MatchReminderExistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        // Act
+        var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.CreatedCount.Should().Be(2);
+        await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _dbContext.Received(2).AddNotificationAsync(Arg.Any<Turniejo.Notifications.Domain.Entities.Notification>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldFallBackToUnknown_WhenTeamLookupMisses()
+    {
+        // _teamModule.GetTournamentTeamAsync jest w konstruktorze zamockowane na null dla każdego
+        // ID — to właśnie ścieżka fallbacku na "Unknown" nazwę drużyny w treści przypomnienia.
+        var match = CreateMatch(refereeId: Guid.NewGuid());
+        _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([match]);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(false);
+
+        // Act
+        var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        await _dbContext.Received(1).AddNotificationAsync(
+            Arg.Is<Turniejo.Notifications.Domain.Entities.Notification>(n => n.Message.Contains("Unknown")),
+            Arg.Any<CancellationToken>());
+    }
 }

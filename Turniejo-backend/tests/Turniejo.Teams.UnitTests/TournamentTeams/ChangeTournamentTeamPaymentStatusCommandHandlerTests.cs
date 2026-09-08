@@ -64,6 +64,24 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenTournamentTeamBelongsToDifferentTournament()
+        {
+            // Ten sam branch co "not found" (TournamentTeam.TournamentId musi się zgadzać z
+            // TournamentId z route'a), ale osobny scenariusz — bez tego request mógłby wskazać
+            // TournamentTeamId z zupełnie innego turnieju i wciąż trafić w istniejący rekord.
+            var tournamentTeam = CreateFakeTournamentTeam(Guid.NewGuid());
+            _dbContext.GetTournamentTeamByIdAsync(tournamentTeam.Id, Arg.Any<CancellationToken>()).Returns(tournamentTeam);
+            var command = new ChangeTournamentTeamPaymentStatusCommand(Guid.NewGuid(), tournamentTeam.Id, PaymentStatus.Paid);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("TournamentTeam.NotFound");
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenStatusIsSame()
         {
             // Arrange

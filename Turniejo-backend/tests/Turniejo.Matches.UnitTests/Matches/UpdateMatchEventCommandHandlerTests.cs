@@ -113,5 +113,46 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
         }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenNewMinuteIsNegative()
+        {
+            // Gałąź walidacji domenowej (MatchEvent.UpdateDetails) — nietestowana wcześniej, handler
+            // musi poprawnie propagować Result.Failure z encji, nie tylko z własnych sprawdzeń NotFound/Status.
+            var match = CreateLiveMatch();
+            var matchEvent = MatchEvent.Create(Guid.NewGuid(), match.Id, MatchEventType.Goal, 10, Guid.NewGuid(), match.HomeTournamentTeamId).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _dbContext.GetMatchEventByIdAsync(matchEvent.Id, Arg.Any<CancellationToken>()).Returns(matchEvent);
+            var command = new UpdateMatchEventCommand(match.TournamentId, match.Id, matchEvent.Id, MatchEventType.Goal, -1, null, null, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Minute");
+            await _dbContext.DidNotReceive().AddAuditLogAsync(Arg.Any<AuditLog>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenRecalculationFails()
+        {
+            // Event i tak zostaje zaktualizowany i zapisany zanim recalc się odpali — handler musi
+            // mimo to zwrócić Failure, gdy przeliczenie wyniku nie powiedzie się.
+            var match = CreateLiveMatch();
+            var matchEvent = MatchEvent.Create(Guid.NewGuid(), match.Id, MatchEventType.Goal, 10, Guid.NewGuid(), match.HomeTournamentTeamId).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _dbContext.GetMatchEventByIdAsync(matchEvent.Id, Arg.Any<CancellationToken>()).Returns(matchEvent);
+            _sender.Send(Arg.Any<RecalculateMatchScoreCommand>(), Arg.Any<CancellationToken>())
+                .Returns(Result.Failure<RecalculateMatchScoreResponse>(Error.NotFound("Match", match.Id)));
+            var command = new UpdateMatchEventCommand(match.TournamentId, match.Id, matchEvent.Id, MatchEventType.Goal, 10, null, null, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Match.NotFound");
+        }
     }
 }

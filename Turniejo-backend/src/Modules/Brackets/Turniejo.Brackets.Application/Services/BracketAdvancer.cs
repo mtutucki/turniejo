@@ -46,11 +46,15 @@ namespace Turniejo.Brackets.Application.Services
 
         private async Task<string> ResolveStageTypeAsync(BracketNode node, CancellationToken cancellationToken)
         {
-            if (node.WinnerGoesToNodeId is null)
-                return "Final";
-
+            // Węzeł o 3. miejsce NIGDY nie ma WinnerGoesToNodeId (zwycięzca nikąd dalej nie awansuje) —
+            // dokładnie tak samo jak węzeł Finału. Samo sprawdzenie "WinnerGoesToNodeId == null" nie
+            // odróżnia tych dwóch przypadków, więc RoundType musi być sprawdzony najpierw i
+            // bezwarunkowo, inaczej mecz o 3. miejsce dostawał StageType "Final".
             var round = await dbContext.GetBracketRoundByIdAsync(node.BracketRoundId, cancellationToken);
-            return round?.RoundType == BracketRoundType.ThirdPlace ? "ThirdPlace" : "Knockout";
+            if (round?.RoundType == BracketRoundType.ThirdPlace)
+                return "ThirdPlace";
+
+            return node.WinnerGoesToNodeId is null ? "Final" : "Knockout";
         }
 
         // Węzeł z Bye z jednej strony nigdy nie dostaje meczu (IsFullyResolved zawsze false), więc

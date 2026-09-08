@@ -411,5 +411,25 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             result.IsSuccess.Should().BeTrue();
             tournament.DomainEvents.Should().ContainSingle(t => t is TournamentSettingsUpdated);
         }
+
+        [Fact]
+        public void UpdatePublicSettings_ShouldUpdateAllFlags_WhenValid()
+        {
+            // Zamyka lukę z audytu testów: UpdatePublicSettings (delegujący do
+            // TournamentPublicSettings.Update) nie miał żadnego testu na poziomie aggregate roota,
+            // tylko pośrednio przez test handlera komendy.
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+
+            var result = tournament.UpdatePublicSettings(true, false, false, true, false, true, false);
+
+            result.IsSuccess.Should().BeTrue();
+            tournament.PublicSettings.IsPublic.Should().BeTrue();
+            tournament.PublicSettings.ShowTeams.Should().BeFalse();
+            tournament.PublicSettings.ShowPlayers.Should().BeFalse();
+            tournament.PublicSettings.ShowSchedule.Should().BeTrue();
+            tournament.PublicSettings.ShowStandings.Should().BeFalse();
+            tournament.PublicSettings.ShowBracket.Should().BeTrue();
+            tournament.PublicSettings.ShowLiveMatches.Should().BeFalse();
+        }
     }
 }

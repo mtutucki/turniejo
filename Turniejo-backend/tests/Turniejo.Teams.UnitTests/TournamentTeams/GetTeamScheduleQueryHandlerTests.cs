@@ -45,5 +45,23 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             result.Value[0].Status.Should().Be("Ready");
             result.Value[1].Status.Should().Be("Scheduled");
         }
+
+        [Fact]
+        public async Task Handle_ShouldFallBackToUnknown_WhenTeamLookupMisses()
+        {
+            // TeamMatchResolver nie ma własnego pliku testowego. Konstruktor mockuje
+            // GetTournamentTeamByIdAsync na null dla każdego ID, więc to jest ścieżka fallbacku, nie
+            // "domyślne" zachowanie — dotąd żaden test tego jawnie nie asertował.
+            var tournamentTeamId = Guid.NewGuid();
+            var match = new TournamentMatchDto(Guid.NewGuid(), Guid.NewGuid(), "Scheduled", DateTimeOffset.UtcNow.AddDays(1), tournamentTeamId, Guid.NewGuid(), 0, 0);
+            _matchModule.GetMatchesByTournamentTeamIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([match]);
+
+            // Act
+            var result = await _handler.Handle(new GetTeamScheduleQuery(tournamentTeamId), CancellationToken.None);
+
+            // Assert
+            result.Value[0].HomeTeamName.Should().Be("Unknown");
+            result.Value[0].AwayTeamName.Should().Be("Unknown");
+        }
     }
 }

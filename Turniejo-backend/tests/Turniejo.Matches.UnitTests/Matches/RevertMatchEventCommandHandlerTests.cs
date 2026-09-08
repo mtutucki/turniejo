@@ -129,5 +129,27 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
         }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenRecalculationFails()
+        {
+            // Event zostaje oznaczony jako usunięty i zapisany zanim recalc się odpali — handler musi
+            // mimo to zwrócić Failure, gdy przeliczenie wyniku nie powiedzie się.
+            var match = CreateLiveMatch();
+            var matchEvent = MatchEvent.Create(Guid.NewGuid(), match.Id, MatchEventType.Goal, 10, Guid.NewGuid(), match.HomeTournamentTeamId).Value;
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _dbContext.GetMatchEventByIdAsync(matchEvent.Id, Arg.Any<CancellationToken>()).Returns(matchEvent);
+            _sender.Send(Arg.Any<RecalculateMatchScoreCommand>(), Arg.Any<CancellationToken>())
+                .Returns(Result.Failure<RecalculateMatchScoreResponse>(Error.NotFound("Match", match.Id)));
+            var command = new RevertMatchEventCommand(match.TournamentId, match.Id, matchEvent.Id);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Match.NotFound");
+            matchEvent.IsDeleted.Should().BeTrue();
+        }
     }
 }
