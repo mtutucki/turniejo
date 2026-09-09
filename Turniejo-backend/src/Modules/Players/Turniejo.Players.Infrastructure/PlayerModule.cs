@@ -59,4 +59,19 @@ internal sealed class PlayerModule(IPlayersDbContext dbContext) : IPlayerModule
 
         return false;
     }
+
+    public async Task<IReadOnlyList<Guid>> GetNotifiableGuardianUserIdsForPlayersAsync(
+        IReadOnlyCollection<Guid> playerIds, CancellationToken cancellationToken = default)
+    {
+        if (playerIds.Count == 0)
+            return [];
+
+        var guardianships = await dbContext.GetPlayerGuardiansByPlayerIdsAsync(playerIds, cancellationToken);
+
+        return guardianships
+            .Where(g => g.CanReceiveNotifications)
+            .Select(g => g.UserId)
+            .Distinct()
+            .ToList();
+    }
 }

@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\src\Modules\Players\Turniejo.Players.Application\Turniejo.Players.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Standings\Turniejo.Standings.Application\Turniejo.Standings.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Brackets\Turniejo.Brackets.Application\Turniejo.Brackets.Application.csproj" />
+    <ProjectReference Include="..\..\src\Turniejo.Api\Turniejo.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<NotificationPublisher>();
         services.AddScoped<MatchNotificationRecipientResolver>();
+        services.AddScoped<TournamentParticipantResolver>();
 
         return services;
     }

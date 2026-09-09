@@ -28,6 +28,9 @@ namespace Turniejo.Matches.Application.Stats.GetTopScorers
                 .GroupBy(e => e.PlayerId!.Value)
                 .Select(g => new { PlayerId = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
+                // ThenBy deterministyczny — bez drugiego klucza kolejność remisujących na granicy Top
+                // zależałaby od niegwarantowanej kolejności materializacji z bazy.
+                .ThenBy(x => x.PlayerId)
                 .Take(request.Top)
                 .ToList();
 

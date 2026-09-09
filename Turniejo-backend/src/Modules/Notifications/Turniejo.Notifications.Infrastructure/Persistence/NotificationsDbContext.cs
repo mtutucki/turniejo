@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Turniejo.Notifications.Application.Abstractions;
 using Turniejo.Notifications.Domain.Entities;
+using Turniejo.Notifications.Domain.Enums;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Notifications.Infrastructure.Persistence;
@@ -18,8 +19,13 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
     public async Task<Notification?> GetNotificationByIdAsync(Guid notificationId, CancellationToken cancellationToken = default) =>
         await Notifications.AsNoTracking().FirstOrDefaultAsync(n => n.Id == notificationId, cancellationToken);
 
+    // Filtr po Type jest tu krytyczny: bez niego JAKAKOLWIEK notyfikacja o tym meczu (np.
+    // MatchTimeChanged po zwykłej zmianie godziny) sprawiała, że to zapytanie myślało, że
+    // przypomnienie już wysłano, i mecz nigdy go nie dostawał.
     public async Task<bool> MatchReminderExistsAsync(Guid matchId, CancellationToken cancellationToken = default) =>
-        await Notifications.AnyAsync(n => n.MatchId == matchId, cancellationToken);
+        await Notifications.AnyAsync(
+            n => n.MatchId == matchId && n.Type == NotificationType.MatchReminder,
+            cancellationToken);
 
     public async Task AddNotificationRecipientAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>
         await NotificationRecipients.AddAsync(recipient, cancellationToken);

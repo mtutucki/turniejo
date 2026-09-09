@@ -24,7 +24,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
         private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showTeams) =>
             new(tournamentId, "Cup", "cup-slug", "InProgress", "Group",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1), null,
-                new TournamentPublicSettingsDto(tournamentId, true, showTeams, true, true, true, true, true));
+                new TournamentPublicSettingsDto(tournamentId, true, showTeams, true, true, true, true, true, true));
 
         [Fact]
         public async Task Handle_ShouldFail_WhenTournamentNotFoundOrNotPublic()

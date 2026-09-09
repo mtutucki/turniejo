@@ -34,7 +34,7 @@ namespace Turniejo.Matches.UnitTests.Services
         {
             var tournamentId = Guid.NewGuid();
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true, true));
 
             var result = await _guard.CanJoinTournamentGroupAsync(tournamentId, userId: null, CancellationToken.None);
 
@@ -47,7 +47,7 @@ namespace Turniejo.Matches.UnitTests.Services
             // Zamyka lukę z audytu: niezalogowany klient nie może dołączyć do grupy prywatnego turnieju.
             var tournamentId = Guid.NewGuid();
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
 
             var result = await _guard.CanJoinTournamentGroupAsync(tournamentId, userId: null, CancellationToken.None);
 
@@ -60,7 +60,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var tournamentId = Guid.NewGuid();
             var userId = Guid.NewGuid();
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Tournament), tournamentId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
                 .Returns(true);
 
@@ -75,7 +75,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var tournamentId = Guid.NewGuid();
             var userId = Guid.NewGuid();
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Tournament), tournamentId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
                 .Returns(false);
 
@@ -104,7 +104,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var match = CreateMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true, true));
 
             var result = await _guard.CanJoinMatchGroupAsync(match.Id, userId: null, CancellationToken.None);
 
@@ -118,7 +118,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var match = CreateMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, false));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, false, true));
 
             var result = await _guard.CanJoinMatchGroupAsync(match.Id, userId: null, CancellationToken.None);
 
@@ -134,7 +134,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var match = CreateMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
 
             var result = await _guard.CanJoinMatchGroupAsync(match.Id, userId: null, CancellationToken.None);
 
@@ -149,7 +149,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var match = CreateMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Tournament), tournamentId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
                 .Returns(true);
 
@@ -166,7 +166,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var match = CreateMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Tournament), tournamentId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
                 .Returns(false);
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Match), match.Id, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
@@ -185,7 +185,7 @@ namespace Turniejo.Matches.UnitTests.Services
             var match = CreateMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Tournament), tournamentId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
                 .Returns(false);
             _authorizationService.HasAnyRoleAsync(userId, nameof(RoleScopeType.Match), match.Id, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())

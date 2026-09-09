@@ -32,6 +32,7 @@ namespace Turniejo.Matches.Application.Stats.GetTopAssists
                 .GroupBy(id => id)
                 .Select(g => new { PlayerId = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.PlayerId)
                 .Take(request.Top)
                 .ToList();
 

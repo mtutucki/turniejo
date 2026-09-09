@@ -10,13 +10,12 @@ namespace Turniejo.Notifications.Application.Notifications.CreateOrganizerAnnoun
     internal sealed class CreateOrganizerAnnouncementCommandHandler(
         INotificationsDbContext dbContext,
         NotificationPublisher publisher,
-        IUserModule userModule,
+        TournamentParticipantResolver participantResolver,
         ICurrentUserContext currentUserContext) : ICommandHandler<CreateOrganizerAnnouncementCommand, CreateOrganizerAnnouncementResponse>
     {
         public async Task<Result<CreateOrganizerAnnouncementResponse>> Handle(CreateOrganizerAnnouncementCommand request, CancellationToken cancellationToken)
         {
-            var recipientUserIds = await userModule.GetUserIdsByScopeAsync(
-                nameof(SharedKernel.Enums.RoleScopeType.Tournament), request.TournamentId, cancellationToken);
+            var recipientUserIds = await participantResolver.ResolveAsync(request.TournamentId, cancellationToken);
 
             var publishResult = await publisher.PublishAsync(
                 request.TournamentId, NotificationType.OrganizerAnnouncement, request.Title, request.Message,

@@ -24,7 +24,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
         private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showBracket) =>
             new(tournamentId, "Cup", "cup-slug", "InProgress", "Knockout",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1), null,
-                new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, showBracket, true));
+                new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, showBracket, true, true));
 
         [Fact]
         public async Task Handle_ShouldFail_WhenTournamentNotFoundOrNotPublic()

@@ -32,19 +32,35 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournamentDashboard
 
             var scheduleStatus = GetScheduleStatus(matches.Count, finishedCount);
 
+            // Bez ScheduledAt >= now zaległy mecz utknięty w Scheduled/Ready (np. organizator
+            // spóźniony, sędzia nigdy nie wystartował meczu) wypływał na górę listy przed
+            // realnie przyszłymi meczami, bo sortowanie samo w sobie tego nie odróżnia.
+            var now = DateTimeOffset.UtcNow;
+            var upcomingCount = Math.Clamp(request.UpcomingMatchesCount, 1, 50);
             var upcomingMatches = matches
-                .Where(m => m.Status is "Scheduled" or "Ready")
+                .Where(m => m.Status is "Scheduled" or "Ready" && m.ScheduledAt >= now)
                 .OrderBy(m => m.ScheduledAt)
-                .Take(request.UpcomingMatchesCount)
+                .Take(upcomingCount)
                 .ToList();
 
-            var upcomingMatchDtos = new List<UpcomingMatchDto>();
-            foreach (var match in upcomingMatches)
-            {
-                var homeTeamName = await GetTeamNameAsync(match.HomeTournamentTeamId, cancellationToken);
-                var awayTeamName = await GetTeamNameAsync(match.AwayTournamentTeamId, cancellationToken);
-                upcomingMatchDtos.Add(new UpcomingMatchDto(match.Id, match.ScheduledAt, match.Status, homeTeamName, awayTeamName));
-            }
+            // Nazwy drużyn rozwiązane z już pobranej listy tournamentTeams + JEDNO zbiorcze zapytanie
+            // o Teamy, zamiast 4 sekwencyjnych zapytań per mecz (GetTournamentTeamAsync+GetTeamAsync
+            // x2) — przy nieograniczonym wcześniej UpcomingMatchesCount to było realne ryzyko DoS.
+            var tournamentTeamsById = tournamentTeams.ToDictionary(t => t.Id);
+            var teamIds = upcomingMatches
+                .SelectMany(m => new[] { m.HomeTournamentTeamId, m.AwayTournamentTeamId })
+                .Where(tournamentTeamsById.ContainsKey)
+                .Select(id => tournamentTeamsById[id].TeamId)
+                .Distinct()
+                .ToList();
+            var teamsById = (await teamModule.GetTeamsAsync(teamIds, cancellationToken)).ToDictionary(t => t.Id);
+
+            var upcomingMatchDtos = upcomingMatches
+                .Select(match => new UpcomingMatchDto(
+                    match.Id, match.ScheduledAt, match.Status,
+                    GetTeamName(match.HomeTournamentTeamId, tournamentTeamsById, teamsById),
+                    GetTeamName(match.AwayTournamentTeamId, tournamentTeamsById, teamsById)))
+                .ToList();
 
             var dashboard = new TournamentDashboardDto(
                 tournament.Id,
@@ -72,14 +88,15 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournamentDashboard
             return "Generated";
         }
 
-        private async Task<string> GetTeamNameAsync(Guid tournamentTeamId, CancellationToken cancellationToken)
+        private static string GetTeamName(
+            Guid tournamentTeamId,
+            IReadOnlyDictionary<Guid, TournamentTeamDto> tournamentTeamsById,
+            IReadOnlyDictionary<Guid, TeamDto> teamsById)
         {
-            var tournamentTeam = await teamModule.GetTournamentTeamAsync(tournamentTeamId, cancellationToken);
-            if (tournamentTeam == null)
+            if (!tournamentTeamsById.TryGetValue(tournamentTeamId, out var tournamentTeam))
                 return "Unknown";
 
-            var team = await teamModule.GetTeamAsync(tournamentTeam.TeamId, cancellationToken);
-            return team?.Name ?? "Unknown";
+            return teamsById.TryGetValue(tournamentTeam.TeamId, out var team) ? team.Name : "Unknown";
         }
     }
 }

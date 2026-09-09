@@ -17,7 +17,8 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetPublicTournamentPage
             var settings = new PublicTournamentSettingsDto(
                 tournament.PublicSettings.ShowTeams, tournament.PublicSettings.ShowPlayers,
                 tournament.PublicSettings.ShowSchedule, tournament.PublicSettings.ShowStandings,
-                tournament.PublicSettings.ShowBracket, tournament.PublicSettings.ShowLiveMatches);
+                tournament.PublicSettings.ShowBracket, tournament.PublicSettings.ShowLiveMatches,
+                tournament.PublicSettings.ShowStats);
 
             var dto = new PublicTournamentPageDto(
                 tournament.Id, tournament.Name, tournament.Slug, tournament.Status.ToString(), tournament.Format?.ToString(),

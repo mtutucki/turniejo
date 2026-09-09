@@ -30,6 +30,17 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
     public async Task<Team?> GetTeamByIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
         await Teams.FirstOrDefaultAsync(t => t.Id == teamId, cancellationToken);
 
+    public async Task<IReadOnlyList<Team>> GetTeamsByIdsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default)
+    {
+        if (teamIds.Count == 0)
+            return [];
+
+        return await Teams
+            .AsNoTracking()
+            .Where(t => teamIds.Contains(t.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default) =>
         await TournamentTeams.AddAsync(tournamentTeam, cancellationToken);
 

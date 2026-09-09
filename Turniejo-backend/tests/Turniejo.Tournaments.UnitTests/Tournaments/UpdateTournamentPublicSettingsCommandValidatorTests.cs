@@ -10,7 +10,7 @@ namespace Turniejo.Tournaments.UnitTests.Tournaments
         [Fact]
         public void Validate_ShouldSucceed_WhenTournamentIdIsProvided()
         {
-            var command = new UpdateTournamentPublicSettingsCommand(Guid.NewGuid(), true, true, true, true, true, true, true);
+            var command = new UpdateTournamentPublicSettingsCommand(Guid.NewGuid(), true, true, true, true, true, true, true, true);
 
             var result = _validator.Validate(command);
 
@@ -20,7 +20,7 @@ namespace Turniejo.Tournaments.UnitTests.Tournaments
         [Fact]
         public void Validate_ShouldFail_WhenTournamentIdIsEmpty()
         {
-            var command = new UpdateTournamentPublicSettingsCommand(Guid.Empty, true, true, true, true, true, true, true);
+            var command = new UpdateTournamentPublicSettingsCommand(Guid.Empty, true, true, true, true, true, true, true, true);
 
             var result = _validator.Validate(command);
 

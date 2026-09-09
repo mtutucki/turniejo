@@ -108,5 +108,5 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         tournament.Id, tournament.PublicSettings.IsPublic, tournament.PublicSettings.ShowTeams,
         tournament.PublicSettings.ShowPlayers, tournament.PublicSettings.ShowSchedule,
         tournament.PublicSettings.ShowStandings, tournament.PublicSettings.ShowBracket,
-        tournament.PublicSettings.ShowLiveMatches);
+        tournament.PublicSettings.ShowLiveMatches, tournament.PublicSettings.ShowStats);
 }

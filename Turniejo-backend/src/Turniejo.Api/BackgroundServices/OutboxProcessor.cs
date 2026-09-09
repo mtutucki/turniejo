@@ -22,7 +22,10 @@ public sealed class OutboxProcessor(
         }
     }
 
-    private async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken)
+    // Publiczne, żeby testy integracyjne mogły ręcznie "przepompować" outbox po HTTP-callu
+    // zamiast czekać na 10-sekundowy interwał tła (który w hoście testowym jest wyłączony,
+    // bo start przed migracjami wywala IServiceProvider).
+    public async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var repositories = scope.ServiceProvider

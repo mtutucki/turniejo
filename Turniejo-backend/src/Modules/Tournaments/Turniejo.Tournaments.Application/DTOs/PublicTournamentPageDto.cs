@@ -6,7 +6,8 @@ namespace Turniejo.Tournaments.Application.DTOs
         bool ShowSchedule,
         bool ShowStandings,
         bool ShowBracket,
-        bool ShowLiveMatches);
+        bool ShowLiveMatches,
+        bool ShowStats);
 
     public sealed record PublicTournamentPageDto(
         Guid Id,

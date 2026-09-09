@@ -15,6 +15,16 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         return new TeamDto(team.Id, team.Name, team.ShortName);
     }
 
+    public async Task<IReadOnlyList<TeamDto>> GetTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default)
+    {
+        if (teamIds.Count == 0)
+            return [];
+
+        var teams = await dbContext.GetTeamsByIdsAsync(teamIds, cancellationToken);
+
+        return teams.Select(t => new TeamDto(t.Id, t.Name, t.ShortName)).ToList();
+    }
+
     public async Task<TournamentTeamDto?> GetTournamentTeamAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default)
     {
         var tournamentTeam = await dbContext.GetTournamentTeamByIdAsync(tournamentTeamId, cancellationToken);

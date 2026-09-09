@@ -420,7 +420,7 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             // tylko pośrednio przez test handlera komendy.
             var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
 
-            var result = tournament.UpdatePublicSettings(true, false, false, true, false, true, false);
+            var result = tournament.UpdatePublicSettings(true, false, false, true, false, true, false, true);
 
             result.IsSuccess.Should().BeTrue();
             tournament.PublicSettings.IsPublic.Should().BeTrue();
@@ -430,6 +430,7 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             tournament.PublicSettings.ShowStandings.Should().BeFalse();
             tournament.PublicSettings.ShowBracket.Should().BeTrue();
             tournament.PublicSettings.ShowLiveMatches.Should().BeFalse();
+            tournament.PublicSettings.ShowStats.Should().BeTrue();
         }
     }
 }

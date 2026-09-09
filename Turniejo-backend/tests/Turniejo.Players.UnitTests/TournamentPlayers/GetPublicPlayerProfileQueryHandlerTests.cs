@@ -49,7 +49,7 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentTeamDto(tournamentTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Accepted"));
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, false, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, false, true, true, true, true, true));
 
             // Act
             var result = await _handler.Handle(new GetPublicPlayerProfileQuery(tournamentPlayer.Id), CancellationToken.None);
@@ -71,7 +71,7 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentTeamDto(tournamentTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Accepted"));
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, false, true, true, true, true, true, true, true));
 
             // Act
             var result = await _handler.Handle(new GetPublicPlayerProfileQuery(tournamentPlayer.Id), CancellationToken.None);
@@ -100,6 +100,27 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenTeamRegistrationStatusIsNotAccepted()
+        {
+            // Audyt: zawodnik drużyny w statusie Pending/Rejected — niewidocznej na publicznej liście
+            // drużyn (patrz GetPublicTeamProfileQueryHandler) — był i tak dostępny pod bezpośrednim
+            // linkiem do jego profilu.
+            var tournamentTeamId = Guid.NewGuid();
+            var tournamentId = Guid.NewGuid();
+            var tournamentPlayer = TournamentPlayer.Create(Guid.NewGuid(), tournamentTeamId, Guid.NewGuid(), 9, PlayerPosition.Forward, Guid.NewGuid()).Value;
+            _dbContext.GetTournamentPlayerByIdAsync(tournamentPlayer.Id, Arg.Any<CancellationToken>()).Returns(tournamentPlayer);
+            _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentTeamDto(tournamentTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Pending"));
+
+            // Act
+            var result = await _handler.Handle(new GetPublicPlayerProfileQuery(tournamentPlayer.Id), CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("TournamentPlayer.NotFound");
+        }
+
+        [Fact]
         public async Task Handle_ShouldReturnProfile_WhenTournamentIsPublicAndShowPlayersIsTrue()
         {
             // Arrange
@@ -114,7 +135,7 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentTeamDto(tournamentTeamId, tournamentId, teamId, Guid.NewGuid(), null, "Accepted"));
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true, true));
 
             var player = Player.Create(playerId, "Jan", "Kowalski", new DateTime(2010, 1, 1), PlayerPosition.Forward, null, null, Guid.NewGuid()).Value;
             _dbContext.GetPlayerByIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(player);

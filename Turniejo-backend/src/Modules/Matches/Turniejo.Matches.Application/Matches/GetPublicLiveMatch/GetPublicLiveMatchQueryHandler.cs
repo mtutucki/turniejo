@@ -23,8 +23,14 @@ namespace Turniejo.Matches.Application.Matches.GetPublicLiveMatch
             if (settings == null || !settings.IsPublic || !settings.ShowLiveMatches)
                 return Result.Failure<MatchLivePanelDto>(Error.NotFound("Match", request.MatchId));
 
-            var homeTeam = await BuildTeamDtoAsync(match.HomeTournamentTeamId, cancellationToken);
-            var awayTeam = await BuildTeamDtoAsync(match.AwayTournamentTeamId, cancellationToken);
+            // ShowLiveMatches włącza sam podgląd meczu — ShowTeams/ShowPlayers rządzą OSOBNO tym, czy
+            // wolno ujawnić tożsamość drużyn i pełne składy (imiona, numery, pozycje zawodników).
+            // Wcześniej sprawdzane było wyłącznie ShowLiveMatches, więc organizator wyłączający
+            // ShowPlayers wciąż publicznie ujawniał pełne składy na żywo.
+            var homeTeam = await BuildTeamDtoAsync(
+                match.HomeTournamentTeamId, "Drużyna gospodarzy", settings.ShowTeams, settings.ShowPlayers, cancellationToken);
+            var awayTeam = await BuildTeamDtoAsync(
+                match.AwayTournamentTeamId, "Drużyna gości", settings.ShowTeams, settings.ShowPlayers, cancellationToken);
 
             var events = await dbContext.GetMatchEventsByMatchIdAsync(match.Id, cancellationToken);
             var eventDtos = events
@@ -42,17 +48,25 @@ namespace Turniejo.Matches.Application.Matches.GetPublicLiveMatch
             return Result.Success(dto);
         }
 
-        private async Task<MatchTeamDto> BuildTeamDtoAsync(Guid tournamentTeamId, CancellationToken cancellationToken)
+        private async Task<MatchTeamDto> BuildTeamDtoAsync(
+            Guid tournamentTeamId, string fallbackName, bool showTeams, bool showPlayers, CancellationToken cancellationToken)
         {
+            var playerDtos = new List<MatchPlayerDto>();
+            if (showPlayers)
+            {
+                var players = await playerModule.GetTournamentTeamPlayersAsync(tournamentTeamId, cancellationToken);
+                playerDtos = players
+                    .Select(p => new MatchPlayerDto(p.Id, p.PlayerId, p.FirstName, p.LastName, p.ShirtNumber, p.Position, p.Status))
+                    .ToList();
+            }
+
+            if (!showTeams)
+                return new MatchTeamDto(tournamentTeamId, Guid.Empty, fallbackName, null, playerDtos);
+
             var tournamentTeam = await teamModule.GetTournamentTeamAsync(tournamentTeamId, cancellationToken);
             var team = tournamentTeam != null
                 ? await teamModule.GetTeamAsync(tournamentTeam.TeamId, cancellationToken)
                 : null;
-            var players = await playerModule.GetTournamentTeamPlayersAsync(tournamentTeamId, cancellationToken);
-
-            var playerDtos = players
-                .Select(p => new MatchPlayerDto(p.Id, p.PlayerId, p.FirstName, p.LastName, p.ShirtNumber, p.Position, p.Status))
-                .ToList();
 
             return new MatchTeamDto(
                 tournamentTeamId,

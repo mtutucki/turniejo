@@ -277,6 +277,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                             b1.Property<bool>("ShowStandings")
                                 .HasColumnType("boolean");
 
+                            b1.Property<bool>("ShowStats")
+                                .HasColumnType("boolean");
+
                             b1.Property<bool>("ShowTeams")
                                 .HasColumnType("boolean");
 

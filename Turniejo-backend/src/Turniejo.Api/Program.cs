@@ -83,3 +83,7 @@ app.MapGet("/api/me", (Turniejo.SharedKernel.Contracts.ICurrentUserContext ctx) 
 }).RequireAuthorization();
 
 app.Run();
+
+// Top-level statements generują domyślnie internal partial class Program — WebApplicationFactory<Program>
+// z testów integracyjnych potrzebuje go publicznego, żeby w ogóle się do niego odwołać.
+public partial class Program;

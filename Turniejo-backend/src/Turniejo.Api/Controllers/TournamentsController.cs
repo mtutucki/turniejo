@@ -203,7 +203,7 @@ namespace Turniejo.Api.Controllers
         {
             var command = new UpdateTournamentPublicSettingsCommand(
                 tournamentId, request.IsPublic, request.ShowTeams, request.ShowPlayers,
-                request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches);
+                request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats);
 
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
@@ -321,7 +321,7 @@ namespace Turniejo.Api.Controllers
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
         public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart);
-        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches);
+        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats);
         public sealed record AddTeamToTournamentRequest(Guid TeamId, Guid CategoryId);
         public sealed record ChangeTournamentTeamRegistrationStatusRequest(RegistrationStatus RegistrationStatus);
         public sealed record ChangeTournamentTeamPaymentStatusRequest(PaymentStatus PaymentStatus);

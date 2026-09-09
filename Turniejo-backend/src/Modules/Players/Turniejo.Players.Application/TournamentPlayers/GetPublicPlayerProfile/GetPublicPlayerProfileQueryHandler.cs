@@ -18,7 +18,10 @@ namespace Turniejo.Players.Application.TournamentPlayers.GetPublicPlayerProfile
                 return Result.Failure<PublicPlayerProfileDto>(Error.NotFound("TournamentPlayer", request.TournamentPlayerId));
 
             var tournamentTeam = await teamModule.GetTournamentTeamAsync(tournamentPlayer.TournamentTeamId, cancellationToken);
-            if (tournamentTeam == null)
+            // Zamyka lukę z audytu: bez tego zawodnik drużyny w statusie Pending/Rejected (a więc
+            // niewidocznej na publicznej liście drużyn — patrz GetPublicTeamProfileQueryHandler) był
+            // i tak dostępny publicznie pod bezpośrednim linkiem do jego profilu.
+            if (tournamentTeam == null || tournamentTeam.RegistrationStatus != "Accepted")
                 return Result.Failure<PublicPlayerProfileDto>(Error.NotFound("TournamentPlayer", request.TournamentPlayerId));
 
             var settings = await tournamentModule.GetTournamentPublicSettingsAsync(tournamentTeam.TournamentId, cancellationToken);

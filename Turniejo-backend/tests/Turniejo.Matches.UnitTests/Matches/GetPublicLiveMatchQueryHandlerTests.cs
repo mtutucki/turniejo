@@ -78,7 +78,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             var match = CreateLiveMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, false));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, false, true));
 
             // Act
             var result = await _handler.Handle(new GetPublicLiveMatchQuery(match.Id), CancellationToken.None);
@@ -96,7 +96,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             var match = CreateLiveMatch(tournamentId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true));
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true, true));
 
             // Act
             var result = await _handler.Handle(new GetPublicLiveMatchQuery(match.Id), CancellationToken.None);
@@ -104,6 +104,43 @@ namespace Turniejo.Matches.UnitTests.Matches
             // Assert
             result.IsSuccess.Should().BeTrue();
             result.Value.Status.Should().Be("Live");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldHideRosters_WhenShowPlayersIsFalse_EvenIfLiveMatchesAreShown()
+        {
+            // Audyt: wcześniej sprawdzane było wyłącznie ShowLiveMatches — organizator wyłączający
+            // ShowPlayers wciąż publicznie ujawniał pełne składy (imiona, numery, pozycje).
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, true, false, true, true, true, true, true));
+            _playerModule.GetTournamentTeamPlayersAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamPlayerDto> { new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Jan", "Kowalski", 9, "Forward", "Active") });
+
+            var result = await _handler.Handle(new GetPublicLiveMatchQuery(match.Id), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.HomeTeam.Players.Should().BeEmpty();
+            result.Value.AwayTeam.Players.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task Handle_ShouldHideTeamIdentity_WhenShowTeamsIsFalse()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _tournamentModule.GetTournamentPublicSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentPublicSettingsDto(tournamentId, true, false, true, true, true, true, true, true));
+
+            var result = await _handler.Handle(new GetPublicLiveMatchQuery(match.Id), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.HomeTeam.TeamId.Should().Be(Guid.Empty);
+            result.Value.HomeTeam.Name.Should().NotBe("Unknown");
+            await _teamModule.DidNotReceive().GetTournamentTeamAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         }
     }
 }

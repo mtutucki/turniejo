@@ -24,7 +24,7 @@ namespace Turniejo.Matches.UnitTests.Schedule
         private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showSchedule) =>
             new(tournamentId, "Cup", "cup-slug", "InProgress", "Group",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1), null,
-                new TournamentPublicSettingsDto(tournamentId, true, true, true, showSchedule, true, true, true));
+                new TournamentPublicSettingsDto(tournamentId, true, true, true, showSchedule, true, true, true, true));
 
         [Fact]
         public async Task Handle_ShouldReturnOnlyFinishedMatches()
@@ -50,6 +50,27 @@ namespace Turniejo.Matches.UnitTests.Schedule
             result.Value.Should().ContainSingle();
             result.Value[0].Id.Should().Be(finishedMatch.Id);
             result.Value[0].Status.Should().Be("Finished");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNeverExposeRefereeId_EvenWhenMatchHasOne()
+        {
+            // Audyt: kto sędziuje to wewnętrzna informacja organizacyjna, nie coś do publicznego
+            // ujawnienia przez stronę turnieju.
+            var tournamentId = Guid.NewGuid();
+            _tournamentModule.GetPublicTournamentBySlugAsync("cup-slug", Arg.Any<CancellationToken>())
+                .Returns(CreatePublicTournamentDto(tournamentId, showSchedule: true));
+
+            var finishedMatch = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(-1), StageType.Group).Value;
+            finishedMatch.AssignReferee(Guid.NewGuid(), Guid.NewGuid());
+            finishedMatch.Start(Guid.NewGuid());
+            finishedMatch.Finish(MatchResultType.Regular, finishedMatch.HomeTournamentTeamId, 60, Guid.NewGuid());
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns([finishedMatch]);
+
+            var result = await _handler.Handle(new GetPublicResultsQuery("cup-slug"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().ContainSingle().Which.RefereeId.Should().BeNull();
         }
 
         [Fact]

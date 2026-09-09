@@ -12,6 +12,7 @@ namespace Turniejo.Teams.Application.Abstractions
         // Team
         Task AddTeamAsync(Team team, CancellationToken cancellationToken = default);
         Task<Team?> GetTeamByIdAsync(Guid teamId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Team>> GetTeamsByIdsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
 
         // TournamentTeam
         Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default);

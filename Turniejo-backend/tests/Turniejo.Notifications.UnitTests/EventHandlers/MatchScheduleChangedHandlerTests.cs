@@ -13,6 +13,7 @@ public sealed class MatchScheduleChangedHandlerTests
     private readonly INotificationsDbContext _dbContext;
     private readonly IMatchModule _matchModule;
     private readonly ITeamModule _teamModule;
+    private readonly IPlayerModule _playerModule;
     private readonly MatchScheduleChangedHandler _handler;
 
     public MatchScheduleChangedHandlerTests()
@@ -20,9 +21,11 @@ public sealed class MatchScheduleChangedHandlerTests
         _dbContext = Substitute.For<INotificationsDbContext>();
         _matchModule = Substitute.For<IMatchModule>();
         _teamModule = Substitute.For<ITeamModule>();
+        _playerModule = Substitute.For<IPlayerModule>();
+        _playerModule.GetTournamentTeamPlayersAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
 
         var publisher = new NotificationPublisher(_dbContext);
-        var resolver = new MatchNotificationRecipientResolver(_teamModule);
+        var resolver = new MatchNotificationRecipientResolver(_teamModule, _playerModule);
 
         _handler = new MatchScheduleChangedHandler(publisher, resolver, _matchModule, _dbContext);
     }

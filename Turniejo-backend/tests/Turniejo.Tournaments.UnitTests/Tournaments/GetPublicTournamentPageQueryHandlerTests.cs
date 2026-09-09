@@ -58,7 +58,7 @@ public sealed class GetPublicTournamentPageQueryHandlerTests
     {
         // Arrange
         var tournament = CreateFakeTournament();
-        tournament.UpdatePublicSettings(true, true, true, true, true, true, true);
+        tournament.UpdatePublicSettings(true, true, true, true, true, true, true, true);
         _dbContext.GetTournamentBySlugAsync(tournament.Slug, Arg.Any<CancellationToken>()).Returns(tournament);
 
         // Act

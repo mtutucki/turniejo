@@ -12,6 +12,7 @@ public sealed class TournamentPublicSettings
     public bool ShowStandings { get; private set; } = true;
     public bool ShowBracket { get; private set; } = true;
     public bool ShowLiveMatches { get; private set; } = true;
+    public bool ShowStats { get; private set; } = true;
 
     private TournamentPublicSettings() { }
 
@@ -26,7 +27,7 @@ public sealed class TournamentPublicSettings
 
     public Result Update(
         bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
-        bool showStandings, bool showBracket, bool showLiveMatches)
+        bool showStandings, bool showBracket, bool showLiveMatches, bool showStats)
     {
         IsPublic = isPublic;
         ShowTeams = showTeams;
@@ -35,6 +36,7 @@ public sealed class TournamentPublicSettings
         ShowStandings = showStandings;
         ShowBracket = showBracket;
         ShowLiveMatches = showLiveMatches;
+        ShowStats = showStats;
 
         return Result.Success();
     }

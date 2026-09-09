@@ -33,7 +33,7 @@ public sealed class UpdateTournamentPublicSettingsCommandHandlerTests
 
         var command = new UpdateTournamentPublicSettingsCommand(
             tournament.Id, IsPublic: true, ShowTeams: false, ShowPlayers: true,
-            ShowSchedule: true, ShowStandings: false, ShowBracket: true, ShowLiveMatches: false);
+            ShowSchedule: true, ShowStandings: false, ShowBracket: true, ShowLiveMatches: false, ShowStats: false);
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -44,6 +44,7 @@ public sealed class UpdateTournamentPublicSettingsCommandHandlerTests
         tournament.PublicSettings.ShowTeams.Should().BeFalse();
         tournament.PublicSettings.ShowStandings.Should().BeFalse();
         tournament.PublicSettings.ShowLiveMatches.Should().BeFalse();
+        tournament.PublicSettings.ShowStats.Should().BeFalse();
         await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -53,7 +54,7 @@ public sealed class UpdateTournamentPublicSettingsCommandHandlerTests
         // Arrange
         var tournamentId = Guid.NewGuid();
         _dbContext.GetTournamentByIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns((Tournament?)null);
-        var command = new UpdateTournamentPublicSettingsCommand(tournamentId, true, true, true, true, true, true, true);
+        var command = new UpdateTournamentPublicSettingsCommand(tournamentId, true, true, true, true, true, true, true, true);
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);

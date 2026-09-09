@@ -164,9 +164,9 @@ public sealed class Tournament : BaseEntity
 
     public Result UpdatePublicSettings(
         bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
-        bool showStandings, bool showBracket, bool showLiveMatches)
+        bool showStandings, bool showBracket, bool showLiveMatches, bool showStats)
     {
-        var result = PublicSettings.Update(isPublic, showTeams, showPlayers, showSchedule, showStandings, showBracket, showLiveMatches);
+        var result = PublicSettings.Update(isPublic, showTeams, showPlayers, showSchedule, showStandings, showBracket, showLiveMatches, showStats);
         if (result.IsFailure)
             return result;
 

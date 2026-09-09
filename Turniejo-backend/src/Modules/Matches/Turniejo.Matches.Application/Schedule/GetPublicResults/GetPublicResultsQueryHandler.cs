@@ -25,9 +25,11 @@ namespace Turniejo.Matches.Application.Schedule.GetPublicResults
             var dtos = matches
                 .Where(m => m.Status == MatchStatus.Finished)
                 .OrderByDescending(m => m.FinishedAt)
+                // RefereeId celowo null — kto sędziuje to wewnętrzna informacja organizacyjna, nie
+                // coś do publicznego ujawnienia przez stronę turnieju.
                 .Select(m => new MatchDto(
                     m.Id, m.TournamentId, m.CategoryId, m.GroupId, m.PitchId,
-                    m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.RefereeId, m.ScheduledAt,
+                    m.HomeTournamentTeamId, m.AwayTournamentTeamId, RefereeId: null, m.ScheduledAt,
                     m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString()))
                 .ToList();
 
