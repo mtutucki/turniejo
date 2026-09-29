@@ -68,3 +68,8 @@ plan_dump.txt
 plan_header.txt
 plan_status.txt
 plan_wdrozenia_frontend.txt
+Turniejo-backend/src/Turniejo.Api/Extensions/SwaggerExtensions.cs
+Turniejo_V2_Dokumentacja_Backendu.pdf
+Turniejo_V2_swagger.json
+docs_gen/
+turniejo_frontend_plan.md

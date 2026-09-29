@@ -18,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHealthChecks();
 builder.Services.AddControllers();
 builder.Services.AddApiRateLimiting();
+builder.Services.AddSwaggerDocumentation();
 
 // Auth
 builder.Services.AddAuthModule(builder.Configuration, builder.Environment);
@@ -60,6 +61,11 @@ builder.Services.AddHostedService<Turniejo.Api.BackgroundServices.MatchReminderB
 
 var app = builder.Build();
 
+// Dostępny tylko w Development — przed produkcyjnym wdrożeniem odsłania pełną mapę API
+// (włącznie z tym, co wymaga autoryzacji), więc świadomie nie wystawiamy go publicznie domyślnie.
+if (app.Environment.IsDevelopment())
+    app.UseSwaggerDocumentation();
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
@@ -80,7 +86,18 @@ app.MapGet("/api/me", (Turniejo.SharedKernel.Contracts.ICurrentUserContext ctx) 
         Email = ctx.Email,
         IsAuthenticated = ctx.IsAuthenticated
     });
-}).RequireAuthorization();
+}).RequireAuthorization().WithTags("Me");
+
+// Frontend ukrywa akcje na podstawie ról usera w konkretnym zasobie (rola + ScopeType + ScopeId),
+// więc potrzebuje pełnej listy przypisań zalogowanego usera — tej samej, którą sprawdza AuthorizationBehavior.
+app.MapGet("/api/me/roles", async (
+    Turniejo.SharedKernel.Contracts.ICurrentUserContext ctx,
+    Turniejo.SharedKernel.Contracts.IUserModule userModule,
+    CancellationToken cancellationToken) =>
+{
+    var roles = await userModule.GetUserRolesAsync(ctx.UserId, cancellationToken);
+    return Results.Ok(roles.Select(r => new { r.Role, r.ScopeType, r.ScopeId }));
+}).RequireAuthorization().WithTags("Me");
 
 app.Run();
 
