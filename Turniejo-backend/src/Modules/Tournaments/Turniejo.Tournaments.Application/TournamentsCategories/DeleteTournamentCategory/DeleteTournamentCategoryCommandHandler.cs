@@ -25,6 +25,12 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.DeleteTournamen
             if (await matchModule.AnyMatchesForCategoryAsync(request.CategoryId, cancellationToken))
                 return Result.Failure(Error.Conflict("CategoryId", "Cannot delete a category that still has matches scheduled in it"));
 
+            // Grupy należą do kategorii (FK Restrict), a skoro nie ma w niej drużyn ani meczów, to i w jej
+            // grupach ich nie ma — kasujemy je razem z kategorią w jednej transakcji SaveChanges.
+            var groups = await tournamentsDbContext.GetTournamentGroupsByCategoryIdAsync(category.Id, cancellationToken);
+            foreach (var group in groups)
+                await tournamentsDbContext.RemoveTournamentGroupAsync(group, cancellationToken);
+
             await tournamentsDbContext.RemoveTournamentCategoryAsync(category, cancellationToken);
             await tournamentsDbContext.SaveChangesAsync(cancellationToken);
 

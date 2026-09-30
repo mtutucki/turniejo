@@ -432,5 +432,33 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             tournament.PublicSettings.ShowLiveMatches.Should().BeFalse();
             tournament.PublicSettings.ShowStats.Should().BeTrue();
         }
+
+        [Fact]
+        public void RevertScheduleGeneration_ShouldReturnToRegistrationClosed_AndRaiseStatusChanged()
+        {
+            var tournament = CreateTournamentWithStatus(TournamentStatus.ScheduleGenerated);
+            tournament.ClearDomainEvents();
+
+            var result = tournament.RevertScheduleGeneration(ValidUserId);
+
+            result.IsSuccess.Should().BeTrue();
+            tournament.Status.Should().Be(TournamentStatus.RegistrationClosed);
+            tournament.DomainEvents.OfType<TournamentStatusChanged>().Should().ContainSingle(e =>
+                e.OldStatus == TournamentStatus.ScheduleGenerated && e.NewStatus == TournamentStatus.RegistrationClosed);
+        }
+
+        [Theory]
+        [InlineData(TournamentStatus.RegistrationClosed)]
+        [InlineData(TournamentStatus.InProgress)]
+        [InlineData(TournamentStatus.Finished)]
+        public void RevertScheduleGeneration_ShouldFail_OutsideScheduleGenerated(TournamentStatus status)
+        {
+            var tournament = CreateTournamentWithStatus(status);
+
+            var result = tournament.RevertScheduleGeneration(ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            tournament.Status.Should().Be(status);
+        }
     }
 }

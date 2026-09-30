@@ -1,4 +1,4 @@
-﻿using Turniejo.SharedKernel.Helpers;
+using Turniejo.SharedKernel.Helpers;
 using Turniejo.SharedKernel.Primitives;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Domain.Enums;
@@ -25,6 +25,8 @@ public sealed class Tournament : BaseEntity
     public string ViewerCode { get; private set; } = string.Empty;
     public TournamentSettings Settings { get; private set; } = null!;
     public TournamentPublicSettings PublicSettings { get; private set; } = null!;
+    /// <summary>Miękkie usunięcie — turniej znika z list, szczegółów i portalu (globalny filtr EF).</summary>
+    public DateTimeOffset? DeletedAt { get; private set; }
 
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -111,6 +113,20 @@ public sealed class Tournament : BaseEntity
         return Result.Success();
     }
 
+    // Jedyne przejście wstecz w maszynie stanów: po wyczyszczeniu terminarza (żaden mecz się nie rozpoczął)
+    // turniej wraca do zamkniętych zapisów, żeby organizator mógł poprawić drużyny/grupy i wygenerować ponownie.
+    public Result RevertScheduleGeneration(Guid changedByUserId)
+    {
+        if (Status != TournamentStatus.ScheduleGenerated)
+            return Result.Failure(Error.Validation("Status", "Schedule can only be cleared before the tournament starts"));
+
+        _domainEvents.Add(new TournamentStatusChanged(Id, OrganizationId, changedByUserId, Status, TournamentStatus.RegistrationClosed));
+        Status = TournamentStatus.RegistrationClosed;
+        SetUpdatedAt();
+
+        return Result.Success();
+    }
+
     public Result UpdateDetails(string name, DateTimeOffset startAt, DateTimeOffset endAt, int teamLimit, string? description)
     {
         if (Status == TournamentStatus.Cancelled)
@@ -131,6 +147,23 @@ public sealed class Tournament : BaseEntity
         TeamLimit = teamLimit;
         Description = description;
         _domainEvents.Add(new TournamentUpdated(Id, OrganizationId, name, startAt, endAt, teamLimit, description));
+        SetUpdatedAt();
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Usunięcie z list organizatora. Tylko anulowany turniej: trwający czy zakończony ma wyniki, tabele
+    /// i historię zawodników. Dane w innych modułach zostają (miękkie usunięcie), ale bez turnieju nigdzie
+    /// ich nie widać.
+    /// </summary>
+    public Result Delete()
+    {
+        if (Status != TournamentStatus.Cancelled)
+            return Result.Failure(Error.Validation("Status", "Only a cancelled tournament can be deleted."));
+        if (DeletedAt != null)
+            return Result.Success();
+
+        DeletedAt = DateTimeOffset.UtcNow;
         SetUpdatedAt();
         return Result.Success();
     }
@@ -164,9 +197,10 @@ public sealed class Tournament : BaseEntity
 
     public Result UpdatePublicSettings(
         bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
-        bool showStandings, bool showBracket, bool showLiveMatches, bool showStats)
+        bool showStandings, bool showBracket, bool showLiveMatches, bool showStats,
+        bool abbreviatePlayerNames = true)
     {
-        var result = PublicSettings.Update(isPublic, showTeams, showPlayers, showSchedule, showStandings, showBracket, showLiveMatches, showStats);
+        var result = PublicSettings.Update(isPublic, showTeams, showPlayers, showSchedule, showStandings, showBracket, showLiveMatches, showStats, abbreviatePlayerNames);
         if (result.IsFailure)
             return result;
 

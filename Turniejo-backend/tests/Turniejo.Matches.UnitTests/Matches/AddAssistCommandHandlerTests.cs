@@ -22,7 +22,10 @@ namespace Turniejo.Matches.UnitTests.Matches
             _playerModule = Substitute.For<IPlayerModule>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             var rosterGuard = new MatchEventRosterGuard(_playerModule);
-            _handler = new AddAssistCommandHandler(_dbContext, rosterGuard, _currentUserContext);
+            _handler = new AddAssistCommandHandler(_dbContext, rosterGuard, new SendOffRules(_dbContext), _currentUserContext);
+            // domyślnie: brak kartek w meczu (SendOffRules)
+            _dbContext.GetActiveMatchEventsByTypeAsync(default, default, default)
+                .ReturnsForAnyArgs(new List<MatchEvent>());
         }
 
         private static Match CreateLiveMatch(Guid tournamentId)

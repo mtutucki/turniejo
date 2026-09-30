@@ -16,6 +16,7 @@ namespace Turniejo.Matches.Application.Matches.AddAssist
     internal sealed class AddAssistCommandHandler(
         IMatchesDbContext dbContext,
         MatchEventRosterGuard rosterGuard,
+        SendOffRules sendOffRules,
         ICurrentUserContext currentUserContext) : ICommandHandler<AddAssistCommand, AddAssistResponse>
     {
         public async Task<Result<AddAssistResponse>> Handle(AddAssistCommand request, CancellationToken cancellationToken)
@@ -38,6 +39,10 @@ namespace Turniejo.Matches.Application.Matches.AddAssist
             var scorerCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.ScorerPlayerId, "ScorerPlayerId", cancellationToken);
             if (scorerCheck.IsFailure)
                 return Result.Failure<AddAssistResponse>(scorerCheck.Error);
+
+            var assistSentOff = await sendOffRules.EnsureNotSentOffAsync(match.Id, request.PlayerId, "PlayerId", cancellationToken);
+            if (assistSentOff != null)
+                return Result.Failure<AddAssistResponse>(assistSentOff);
 
             var events = await dbContext.GetMatchEventsByMatchIdAsync(match.Id, cancellationToken);
             var goalEvent = events.FirstOrDefault(e =>

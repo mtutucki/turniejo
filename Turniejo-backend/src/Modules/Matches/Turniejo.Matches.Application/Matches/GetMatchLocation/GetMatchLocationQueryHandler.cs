@@ -27,7 +27,7 @@ namespace Turniejo.Matches.Application.Matches.GetMatchLocation
                 ? await dbContext.GetPitchByIdAsync(match.PitchId.Value, cancellationToken)
                 : null;
 
-            var dto = new MatchLocationDto(match.Id, match.ScheduledAt, match.PitchId, pitch?.Name, pitch?.Description);
+            var dto = new MatchLocationDto(match.Id, match.ScheduledAt, match.PitchId, pitch?.Name, pitch?.Description, match.TournamentId);
 
             return Result.Success(dto);
         }

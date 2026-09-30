@@ -30,7 +30,8 @@ namespace Turniejo.Matches.Application.Schedule.GetPublicResults
                 .Select(m => new MatchDto(
                     m.Id, m.TournamentId, m.CategoryId, m.GroupId, m.PitchId,
                     m.HomeTournamentTeamId, m.AwayTournamentTeamId, RefereeId: null, m.ScheduledAt,
-                    m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString()))
+                    m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString(),
+                    m.HomePenaltyScore, m.AwayPenaltyScore))
                 .ToList();
 
             return Result.Success<IReadOnlyList<MatchDto>>(dtos);

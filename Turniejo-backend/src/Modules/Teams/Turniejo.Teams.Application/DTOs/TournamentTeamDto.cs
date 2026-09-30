@@ -8,5 +8,9 @@ namespace Turniejo.Teams.Application.DTOs
         Guid? GroupId,
         string RegistrationStatus,
         string PaymentStatus,
-        int? SeedNumber);
+        int? SeedNumber,
+        // Dane globalnej drużyny — bez nich UI musiałby dociągać każdą drużynę osobnym zapytaniem.
+        string TeamName,
+        string? TeamShortName,
+        string? TeamLogoUrl);
 }

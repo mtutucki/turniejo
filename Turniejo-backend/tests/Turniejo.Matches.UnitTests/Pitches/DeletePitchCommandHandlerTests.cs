@@ -36,6 +36,21 @@ namespace Turniejo.Matches.UnitTests.Pitches
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenMatchesAreScheduledOnPitch()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitch = Pitch.Create(Guid.NewGuid(), tournamentId, "Boisko 1", null, Guid.NewGuid()).Value;
+            _dbContext.GetPitchByIdAsync(pitch.Id, Arg.Any<CancellationToken>()).Returns(pitch);
+            _dbContext.AnyMatchesByPitchIdAsync(pitch.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+            var result = await _handler.Handle(new DeletePitchCommand(tournamentId, pitch.Id), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Pitch");
+            await _dbContext.DidNotReceive().RemovePitchAsync(Arg.Any<Pitch>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenPitchNotFound()
         {
             // Arrange

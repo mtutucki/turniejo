@@ -88,6 +88,40 @@ namespace Turniejo.Brackets.UnitTests.Brackets
         }
 
         [Fact]
+        public async Task Handle_ShouldExposeWinnerSlot_SoClientCanOrderPairs()
+        {
+            var tournamentId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            _tournamentModule.GetPublicTournamentBySlugAsync("cup-slug", Arg.Any<CancellationToken>())
+                .Returns(CreatePublicTournamentDto(tournamentId, showBracket: true));
+
+            var bracket = Bracket.Create(Guid.NewGuid(), tournamentId, categoryId).Value;
+            var semis = BracketRound.Create(Guid.NewGuid(), bracket.Id, 1, BracketRoundType.Standard, "Round 1").Value;
+            var final = BracketRound.Create(Guid.NewGuid(), bracket.Id, 2, BracketRoundType.Standard, "Final").Value;
+            var semi = BracketNode.Create(
+                Guid.NewGuid(), semis.Id,
+                BracketSourceType.Fixed, null, null, null, Guid.NewGuid(),
+                BracketSourceType.Fixed, null, null, null, Guid.NewGuid()).Value;
+            var otherSemiId = Guid.NewGuid();
+            var finalNode = BracketNode.Create(
+                Guid.NewGuid(), final.Id,
+                BracketSourceType.MatchWinner, null, null, otherSemiId, null,
+                BracketSourceType.MatchWinner, null, null, semi.Id, null).Value;
+            semi.WireAdvancement(finalNode.Id, BracketSlot.Away, null, null);
+
+            _dbContext.GetBracketByTournamentAndCategoryAsync(tournamentId, categoryId, Arg.Any<CancellationToken>()).Returns(bracket);
+            _dbContext.GetBracketRoundsByBracketIdAsync(bracket.Id, Arg.Any<CancellationToken>()).Returns([semis, final]);
+            _dbContext.GetBracketNodesByRoundIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([semi, finalNode]);
+
+            var result = await _handler.Handle(new GetPublicBracketQuery("cup-slug", categoryId), CancellationToken.None);
+
+            var semiDto = result.Value.Rounds[0].Nodes.Single();
+            semiDto.WinnerGoesToNodeId.Should().Be(finalNode.Id);
+            semiDto.WinnerGoesToSlot.Should().Be("Away");
+            result.Value.Rounds[1].Nodes.Single().WinnerGoesToSlot.Should().BeNull();
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenBracketDoesNotExist()
         {
             // Arrange

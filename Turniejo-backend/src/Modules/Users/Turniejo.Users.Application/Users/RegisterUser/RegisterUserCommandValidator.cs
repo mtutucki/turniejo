@@ -24,6 +24,9 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
             .NotEmpty().WithMessage("Last name is required.")
             .MaximumLength(100);
 
+        RuleFor(x => x.AcceptTerms)
+            .Equal(true).WithMessage("You must accept the terms and privacy policy.");
+
         RuleFor(x => x.PhoneNumber)
             .MaximumLength(20)
             .When(x => x.PhoneNumber is not null);

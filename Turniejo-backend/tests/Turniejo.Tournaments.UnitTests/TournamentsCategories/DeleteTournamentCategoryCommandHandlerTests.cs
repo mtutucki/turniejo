@@ -51,6 +51,29 @@ namespace Turniejo.Tournaments.UnitTests.TournamentsCategories
         }
 
         [Fact]
+        public async Task Handle_ShouldRemoveCategoryGroups_WhenDeletingCategory()
+        {
+            // Arrange
+            var category = CreateFakeTournamentCategory();
+            var groupA = TournamentGroup.Create(Guid.NewGuid(), Guid.NewGuid(), category.TournamentId, Guid.NewGuid(), category.Id, "Grupa A", 1).Value;
+            var groupB = TournamentGroup.Create(Guid.NewGuid(), Guid.NewGuid(), category.TournamentId, Guid.NewGuid(), category.Id, "Grupa B", 2).Value;
+            _dbContext.GetTournamentCategoryByIdAsync(category.Id, Arg.Any<CancellationToken>()).Returns(category);
+            _dbContext.GetTournamentGroupsByCategoryIdAsync(category.Id, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentGroup> { groupA, groupB });
+            var command = new DeleteTournamentCategoryCommand(category.TournamentId, category.Id);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            await _dbContext.Received(1).RemoveTournamentGroupAsync(groupA, Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).RemoveTournamentGroupAsync(groupB, Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).RemoveTournamentCategoryAsync(category, Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenCategoryNotFound()
         {
             //Arrange

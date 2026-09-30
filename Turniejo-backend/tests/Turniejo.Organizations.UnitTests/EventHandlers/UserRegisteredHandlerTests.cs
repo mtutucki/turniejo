@@ -104,4 +104,28 @@ public sealed class UserRegisteredHandlerTests
         await _userModule.DidNotReceive().AssignRoleAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_ShouldSkipOrganizationAndRole_WhenUserRegisteredAsParticipant()
+    {
+        // Rodzic/trener/sędzia wybrał przy rejestracji "Dołączam do turnieju" — nie zostaje organizatorem.
+        var notification = new UserRegistered(Guid.NewGuid(), "rodzic@example.com", "Anna", "Nowak", CreateOrganization: false);
+
+        await _handler.Handle(notification, CancellationToken.None);
+
+        await _dbContext.DidNotReceive().AddOrganizationAsync(Arg.Any<Organization>(), Arg.Any<CancellationToken>());
+        await _userModule.DidNotReceive().AssignRoleAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void UserRegistered_ShouldDefaultToCreatingOrganization_ForOutboxMessagesWithoutTheFlag()
+    {
+        // Wiadomości zapisane w Outboxie przed dodaniem flagi nie mają tego pola.
+        var json = """{"UserId":"6f1c2c9e-4c55-4d0f-9d1e-2a3b4c5d6e7f","Email":"jan@example.com","FirstName":"Jan","LastName":"Kowalski"}""";
+
+        var notification = System.Text.Json.JsonSerializer.Deserialize<UserRegistered>(json)!;
+
+        notification.CreateOrganization.Should().BeTrue();
+    }
 }

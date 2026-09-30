@@ -3,6 +3,7 @@ using Turniejo.Matches.Application.DTOs;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Helpers;
 using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Matches.Application.Stats.GetPublicTopAssists
@@ -27,11 +28,11 @@ namespace Turniejo.Matches.Application.Stats.GetPublicTopAssists
 
             var assisterIds = events
                 .Where(e => e.RelatedPlayerId.HasValue)
-                .Select(e => e.RelatedPlayerId!.Value);
+                .Select(e => (PlayerId: e.RelatedPlayerId!.Value, TeamId: e.TournamentTeamId));
 
             var assistCounts = assisterIds
-                .GroupBy(id => id)
-                .Select(g => new { PlayerId = g.Key, Count = g.Count() })
+                .GroupBy(x => x.PlayerId)
+                .Select(g => new { PlayerId = g.Key, Count = g.Count(), TeamId = g.Select(x => x.TeamId).FirstOrDefault(t => t.HasValue) })
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.PlayerId)
                 .Take(request.Top)
@@ -42,8 +43,9 @@ namespace Turniejo.Matches.Application.Stats.GetPublicTopAssists
 
             var ranking = assistCounts
                 .Select(x => playersById.TryGetValue(x.PlayerId, out var player)
-                    ? new PlayerRankingEntryDto(x.PlayerId, player.FirstName, player.LastName, x.Count)
-                    : new PlayerRankingEntryDto(x.PlayerId, "Unknown", "Unknown", x.Count))
+                    ? new PlayerRankingEntryDto(x.PlayerId, player.FirstName,
+                        PublicPlayerName.LastName(player.LastName, tournament.Settings.AbbreviatePlayerNames), x.Count, x.TeamId)
+                    : new PlayerRankingEntryDto(x.PlayerId, "Unknown", "Unknown", x.Count, x.TeamId))
                 .ToList();
 
             return Result.Success<IReadOnlyList<PlayerRankingEntryDto>>(ranking);

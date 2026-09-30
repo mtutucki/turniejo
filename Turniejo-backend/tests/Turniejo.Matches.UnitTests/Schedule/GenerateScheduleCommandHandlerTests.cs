@@ -3,6 +3,7 @@ using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Schedule.GenerateSchedule;
 using Turniejo.Matches.Domain.Entities;
+using Turniejo.Matches.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
 
 namespace Turniejo.Matches.UnitTests.Schedule
@@ -47,9 +48,16 @@ namespace Turniejo.Matches.UnitTests.Schedule
             _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(teamDtos);
 
             _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(new List<Match>());
-            _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>()).Returns(true);
+            _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    _saveCountWhenStatusChanged = _dbContext.ReceivedCalls().Count(c => c.GetMethodInfo().Name == "SaveChangesAsync");
+                    return true;
+                });
             _currentUserContext.UserId.Returns(Guid.NewGuid());
         }
+
+        private int _saveCountWhenStatusChanged = -1;
 
         [Fact]
         public async Task Handle_ShouldSucceed_AndCreateRoundRobinMatches_WhenDataIsValid()
@@ -74,7 +82,8 @@ namespace Turniejo.Matches.UnitTests.Schedule
             await _dbContext.Received(1).AddMatchesAsync(
                 Arg.Is<IReadOnlyCollection<Match>>(m => m.Count == 3), Arg.Any<CancellationToken>());
             await _tournamentModule.Received(1).ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>());
-            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+            // Najpierw mecze, potem (po zmianie etapu) zdarzenie ScheduleGenerated w outboxie.
+            await _dbContext.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -93,20 +102,85 @@ namespace Turniejo.Matches.UnitTests.Schedule
             result.Error.Code.Should().Be("Tournament.NotFound");
         }
 
+        private List<Match> SetupKnockout(Guid tournamentId, Guid pitchId, int firstRoundMatches)
+        {
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeTournament(tournamentId, "Knockout"));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeSettings(tournamentId));
+            var pitch = Pitch.Create(pitchId, tournamentId, "Boisko 1", null, Guid.NewGuid()).Value;
+            _dbContext.GetPitchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(new List<Pitch> { pitch });
+
+            // Mecze 1. rundy utworzone przez drabinkę — z terminem "na teraz" i bez boiska.
+            var created = DateTimeOffset.UtcNow;
+            var matches = Enumerable.Range(0, firstRoundMatches)
+                .Select(i => Match.Create(Guid.NewGuid(), tournamentId, Guid.NewGuid(), null,
+                    Guid.NewGuid(), Guid.NewGuid(), null, created.AddSeconds(i), StageType.Knockout).Value)
+                .ToList();
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(matches);
+            _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>()).Returns(true);
+            _currentUserContext.UserId.Returns(Guid.NewGuid());
+            return matches;
+        }
+
         [Fact]
-        public async Task Handle_ShouldFail_WhenFormatIsKnockout()
+        public async Task Handle_ShouldScheduleBracketFirstRound_WhenFormatIsKnockout()
+        {
+            // Arrange — ćwierćfinały: 4 mecze, jedno boisko, slot 30 + 10 min
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var matches = SetupKnockout(tournamentId, pitchId, 4);
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var command = new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(4), new[] { pitchId });
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert — bez nowych meczów: istniejące dostają kolejne sloty na boisku i etap się zmienia.
+            result.IsSuccess.Should().BeTrue();
+            result.Value.MatchesCreated.Should().Be(4);
+            await _dbContext.DidNotReceive().AddMatchesAsync(Arg.Any<IReadOnlyCollection<Match>>(), Arg.Any<CancellationToken>());
+            matches.Select(m => m.ScheduledAt).Should().Equal(
+                startAt, startAt.AddMinutes(40), startAt.AddMinutes(80), startAt.AddMinutes(120));
+            matches.Should().OnlyContain(m => m.PitchId == pitchId);
+            await _tournamentModule.Received(1).ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenKnockoutHasNoBracketYet()
         {
             // Arrange
             var tournamentId = Guid.NewGuid();
-            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeTournament(tournamentId, "Knockout"));
-            var command = new GenerateScheduleCommand(tournamentId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), new[] { Guid.NewGuid() });
+            var pitchId = Guid.NewGuid();
+            SetupKnockout(tournamentId, pitchId, 0);
+            var command = new GenerateScheduleCommand(tournamentId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), new[] { pitchId });
 
             // Act
             var result = await _handler.Handle(command, CancellationToken.None);
 
             // Assert
             result.IsFailure.Should().BeTrue();
-            result.Error.Code.Should().Be("Validation.Format");
+            result.Error.Code.Should().Be("Validation.Bracket");
+            await _tournamentModule.DidNotReceive().ChangeTournamentStatusAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldRestoreKnockoutTimes_WhenStageCannotBeChanged()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var matches = SetupKnockout(tournamentId, pitchId, 2);
+            var before = matches.Select(m => (m.PitchId, m.ScheduledAt)).ToList();
+            _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>()).Returns(false);
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var command = new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(4), new[] { pitchId });
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            matches.Select(m => (m.PitchId, m.ScheduledAt)).Should().Equal(before);
         }
 
         [Fact]
@@ -231,8 +305,151 @@ namespace Turniejo.Matches.UnitTests.Schedule
             // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
+            // Mecze zapisane przed zmianą etapu są wycofywane, a zdarzenie ScheduleGenerated nie trafia do outboxa.
+            await _dbContext.Received(1).RemoveMatchesAsync(
+                Arg.Is<IReadOnlyCollection<Match>>(m => m.Count == 1), Arg.Any<CancellationToken>());
+            await _dbContext.DidNotReceive().AddOutboxMessageAsync(Arg.Any<Turniejo.SharedKernel.Outbox.OutboxMessage>(), Arg.Any<CancellationToken>());
+        }
+
+        [Theory]
+        [InlineData("Draft")]
+        [InlineData("RegistrationOpen")]
+        [InlineData("ScheduleGenerated")]
+        public async Task Handle_ShouldFail_WhenRegistrationIsNotClosed(string status)
+        {
+            var tournamentId = Guid.NewGuid();
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "Turniej", status, "Group", Guid.NewGuid(), 16));
+            var command = new GenerateScheduleCommand(tournamentId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), new[] { Guid.NewGuid() });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Status");
+            await _tournamentModule.DidNotReceive().ChangeTournamentStatusAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNeverScheduleTeamTwiceInTheSameSlot_WhenMultiplePitches()
+        {
+            // 4 drużyny, 2 boiska — naiwne przydzielanie par po kolei dawało (A-B) i (A-C) w tym samym slocie.
+            var tournamentId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            var teamIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+            SetupHappyPath(tournamentId, Guid.NewGuid(), groupId, categoryId, teamIds);
+            var pitches = new List<Pitch>
+            {
+                Pitch.Create(Guid.NewGuid(), tournamentId, "Boisko 1", null, Guid.NewGuid()).Value,
+                Pitch.Create(Guid.NewGuid(), tournamentId, "Boisko 2", null, Guid.NewGuid()).Value
+            };
+            _dbContext.GetPitchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(pitches);
+            IReadOnlyCollection<Match>? created = null;
+            await _dbContext.AddMatchesAsync(Arg.Do<IReadOnlyCollection<Match>>(m => created = m), Arg.Any<CancellationToken>());
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var command = new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), pitches.Select(p => p.Id).ToArray());
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            created.Should().HaveCount(6);
+            foreach (var slot in created!.GroupBy(m => m.ScheduledAt))
+            {
+                var teamsInSlot = slot.SelectMany(m => new[] { m.HomeTournamentTeamId, m.AwayTournamentTeamId }).ToList();
+                teamsInSlot.Should().OnlyHaveUniqueItems();
+                slot.Select(m => m.PitchId).Should().OnlyHaveUniqueItems();
+            }
+
+            // Każda para dokładnie raz.
+            created.Select(m => string.Join("|", new[] { m.HomeTournamentTeamId, m.AwayTournamentTeamId }.OrderBy(x => x)))
+                .Should().OnlyHaveUniqueItems();
+            // Metoda kołowa na 2 boiskach: 3 kolejki po 2 mecze.
+            created.Select(m => m.ScheduledAt).Distinct().Should().HaveCount(3);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenLastMatchWouldEndAfterEndAt()
+        {
+            // 3 drużyny, 1 boisko, sloty 10:00 / 10:40 / 11:20 (30 min meczu + 10 przerwy).
+            // Okno do 11:30: trzeci mecz zaczynałby się przed końcem, ale kończył o 11:50.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(), new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var command = new GenerateScheduleCommand(tournamentId, startAt, startAt.AddMinutes(90), new[] { pitchId });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Contain("1 match(es) could not be placed");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSucceed_WhenLastMatchEndsExactlyAtEndAt()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(), new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var command = new GenerateScheduleCommand(tournamentId, startAt, startAt.AddMinutes(110), new[] { pitchId });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.MatchesCreated.Should().Be(3);
+        }
+        [Fact]
+        public async Task Handle_ShouldFail_WhenGroupMatchesAlreadyExist()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(), new List<Guid> { Guid.NewGuid(), Guid.NewGuid() });
+            var leftover = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), pitchId, DateTimeOffset.UtcNow, Turniejo.Matches.Domain.Enums.StageType.Group).Value;
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(new List<Match> { leftover });
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var result = await _handler.Handle(new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), new[] { pitchId }), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Contain("clear the schedule first");
             await _dbContext.DidNotReceive().AddMatchesAsync(Arg.Any<IReadOnlyCollection<Match>>(), Arg.Any<CancellationToken>());
-            await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenWindowIsOutsideTournamentDates()
+        {
+            var tournamentId = Guid.NewGuid();
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "T", "RegistrationClosed", "Group", Guid.NewGuid(), 16, startAt, startAt.AddHours(4)));
+
+            var result = await _handler.Handle(new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), new[] { Guid.NewGuid() }), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.StartAt");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSaveMatchesBeforeChangingStage_AndPublishEventAfterwards()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(), new List<Guid> { Guid.NewGuid(), Guid.NewGuid() });
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            await _handler.Handle(new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), new[] { pitchId }), CancellationToken.None);
+
+            var calls = _dbContext.ReceivedCalls().Concat(_tournamentModule.ReceivedCalls())
+                .Select(c => c.GetMethodInfo().Name)
+                .Where(n => n is "AddMatchesAsync" or "SaveChangesAsync" or "ChangeTournamentStatusAsync" or "AddOutboxMessageAsync")
+                .ToList();
+            // ReceivedCalls() dwóch substytutów nie da się scalić chronologicznie, więc sprawdzamy kolejność
+            // w bazie meczów, a zmianę etapu — względem niej przez licznik zapisów w chwili wywołania.
+            calls.Take(4).Should().Equal("AddMatchesAsync", "SaveChangesAsync", "AddOutboxMessageAsync", "SaveChangesAsync");
+            _saveCountWhenStatusChanged.Should().Be(1);
         }
     }
 }

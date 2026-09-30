@@ -126,8 +126,21 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
             .OrderBy(g => g.Order)
             .ToListAsync(cancellationToken);
 
+    // Śledzone (bez AsNoTracking) — UpdateTournamentGroupCommandHandler zapisuje zmiany przez SaveChangesAsync.
     public async Task<TournamentGroup?> GetTournamentGroupByIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
-        await TournamentGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == groupId, cancellationToken);
+        await TournamentGroups.FirstOrDefaultAsync(g => g.Id == groupId, cancellationToken);
+
+    // Śledzone — DeleteTournamentCategoryCommandHandler kasuje je razem z kategorią (FK Restrict).
+    public async Task<IReadOnlyList<TournamentGroup>> GetTournamentGroupsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentGroups
+            .Where(g => g.CategoryId == categoryId)
+            .ToListAsync(cancellationToken);
+
+    public Task RemoveTournamentGroupAsync(TournamentGroup group, CancellationToken cancellationToken = default)
+    {
+        TournamentGroups.Remove(group);
+        return Task.CompletedTask;
+    }
 
     public async Task<IReadOnlyList<TieBreakerRule>> GetTieBreakerRulesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TieBreakerRules

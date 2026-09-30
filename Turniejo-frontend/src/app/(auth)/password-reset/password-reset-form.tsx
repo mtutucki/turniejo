@@ -28,7 +28,7 @@ export function PasswordResetForm() {
     mutationFn: (values: PasswordResetValues) =>
       apiFetch("/api/auth/password-reset/request", { method: "POST", body: values }),
     meta: { handlesValidation: true },
-    onError: (error) => applyFieldErrors(error, form.setError),
+    onError: (error) => applyFieldErrors(error, form),
   })
 
   // Backend zawsze odpowiada 200 — nie zdradzamy, czy konto o tym emailu istnieje.

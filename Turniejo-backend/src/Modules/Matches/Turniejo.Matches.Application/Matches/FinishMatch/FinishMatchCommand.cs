@@ -9,7 +9,9 @@ namespace Turniejo.Matches.Application.Matches.FinishMatch
         Guid TournamentId,
         Guid MatchId,
         MatchResultType ResultType,
-        Guid? WinnerTournamentTeamId) : ICommand<FinishMatchResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
+        Guid? WinnerTournamentTeamId,
+        int? HomePenaltyScore = null,
+        int? AwayPenaltyScore = null) : ICommand<FinishMatchResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

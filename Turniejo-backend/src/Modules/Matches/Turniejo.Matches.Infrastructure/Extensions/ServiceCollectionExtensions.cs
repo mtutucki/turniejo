@@ -39,8 +39,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RealtimeAccessGuard>();
         services.AddScoped<MatchEventRosterGuard>();
         services.AddScoped<MatchAccessGuard>();
+        services.AddScoped<ScheduleConflictChecker>();
+        services.AddScoped<SendOffRules>();
+        services.AddScoped<RefereeIdVisibility>();
 
         services.AddSignalR();
+        services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, SubUserIdProvider>();
         services.AddSingleton<IRealtimeService, SignalRRealtimeService>();
 
         return services;

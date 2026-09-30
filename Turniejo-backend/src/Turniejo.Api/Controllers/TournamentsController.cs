@@ -1,8 +1,9 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
 using Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamentTeam;
+using Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayers;
 using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
 using Turniejo.Players.Domain.Enums;
@@ -15,10 +16,14 @@ using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistratio
 using Turniejo.Teams.Application.TournamentTeams.GetTeamStaff;
 using Turniejo.Teams.Application.TournamentTeams.GetTournamentTeams;
 using Turniejo.Teams.Domain.Enums;
+using Turniejo.Tournaments.Application.TieBreakerRules.GetTieBreakerRules;
 using Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules;
 using Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup;
+using Turniejo.Tournaments.Application.TournamentGroups.DeleteTournamentGroup;
 using Turniejo.Tournaments.Application.TournamentGroups.GetTournamentGroups;
+using Turniejo.Tournaments.Application.TournamentGroups.UpdateTournamentGroup;
 using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
+using Turniejo.Tournaments.Application.Tournaments.DeleteTournament;
 using Turniejo.Tournaments.Application.Tournaments.CreateTournament;
 using Turniejo.Tournaments.Application.Tournaments.GetTournamentById;
 using Turniejo.Tournaments.Application.Tournaments.GetTournamentDashboard;
@@ -27,6 +32,7 @@ using Turniejo.Tournaments.Application.Tournaments.JoinTournament;
 using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
 using Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateTournamentSettings;
 using Turniejo.Tournaments.Application.Tournaments.UpdateTournament;
+using Turniejo.Tournaments.Application.Tournaments.GetTournamentPublicSettings;
 using Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSettings;
 using Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory;
 using Turniejo.Tournaments.Application.TournamentsCategories.DeleteTournamentCategory;
@@ -34,6 +40,7 @@ using Turniejo.Tournaments.Application.TournamentsCategories.GetTournamentCatego
 using Turniejo.Tournaments.Application.TournamentsCategories.UpdateTournamentCategory;
 using Turniejo.Tournaments.Application.TournamentSetting.GetTournamentSettings;
 using Turniejo.Tournaments.Domain.Enums;
+using Turniejo.Users.Application.Users.GetTournamentMembers;
 
 namespace Turniejo.Api.Controllers
 {
@@ -74,6 +81,13 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpGet("{tournamentId}/members")]
+        public async Task<IActionResult> GetTournamentMembers([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetTournamentMembersQuery(tournamentId), cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpGet("{tournamentId}/dashboard")]
         public async Task<IActionResult> GetTournamentDashboard([FromRoute] Guid tournamentId, [FromQuery] int upcomingMatchesCount = 5, CancellationToken cancellationToken = default)
         {
@@ -88,6 +102,14 @@ namespace Turniejo.Api.Controllers
             var command = new ChangeTournamentStatusCommand(tournamentId, request.TournamentStatus);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
+        }
+
+        // Tylko anulowany turniej (miękkie usunięcie — znika z list i portalu).
+        [HttpDelete("{tournamentId}")]
+        public async Task<IActionResult> DeleteTournament([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new DeleteTournamentCommand(tournamentId), cancellationToken);
+            return result.IsFailure ? result.ToActionResult() : NoContent();
         }
 
         [HttpPatch("{tournamentId}/format")]
@@ -162,6 +184,30 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpPut("{tournamentId}/groups/{groupId}")]
+        public async Task<IActionResult> UpdateTournamentGroup([FromRoute] Guid tournamentId, [FromRoute] Guid groupId, [FromBody] UpdateTournamentGroupRequest request, CancellationToken cancellationToken)
+        {
+            var command = new UpdateTournamentGroupCommand(tournamentId, groupId, request.Name, request.Order);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpDelete("{tournamentId}/groups/{groupId}")]
+        public async Task<IActionResult> DeleteTournamentGroup([FromRoute] Guid tournamentId, [FromRoute] Guid groupId, CancellationToken cancellationToken)
+        {
+            var command = new DeleteTournamentGroupCommand(tournamentId, groupId);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{tournamentId}/tiebreaker-rules")]
+        public async Task<IActionResult> GetTieBreakerRules([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        {
+            var query = new GetTieBreakerRulesQuery(tournamentId);
+            var result = await sender.Send(query, cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpPut("{tournamentId}/tiebreaker-rules")]
         public async Task<IActionResult> SetTieBreakerRules([FromRoute] Guid tournamentId, [FromBody] SetTieBreakerRulesRequest request, CancellationToken cancellationToken)
         {
@@ -198,12 +244,20 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpGet("{tournamentId}/public-settings")]
+        public async Task<IActionResult> GetTournamentPublicSettings([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetTournamentPublicSettingsQuery(tournamentId), cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpPut("{tournamentId}/public-settings")]
         public async Task<IActionResult> UpdateTournamentPublicSettings([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentPublicSettingsRequest request, CancellationToken cancellationToken)
         {
             var command = new UpdateTournamentPublicSettingsCommand(
                 tournamentId, request.IsPublic, request.ShowTeams, request.ShowPlayers,
-                request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats);
+                request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats,
+                request.AbbreviatePlayerNames);
 
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
@@ -297,6 +351,20 @@ namespace Turniejo.Api.Controllers
             return Created($"api/tournaments/{tournamentId}/tournament-teams/{tournamentTeamId}/players/{result.Value.TournamentPlayerId}", result.Value);
         }
 
+        [HttpPost("{tournamentId}/tournament-teams/{tournamentTeamId}/players/new")]
+        public async Task<IActionResult> CreatePlayerInTournamentTeam([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromBody] CreatePlayerInTournamentTeamRequest request, CancellationToken cancellationToken)
+        {
+            var command = new CreatePlayerInTournamentTeamCommand(
+                tournamentId, tournamentTeamId, request.FirstName, request.LastName, request.BirthDate,
+                request.DefaultPosition, request.PhotoUrl, request.ShirtNumber, request.Position);
+            var result = await sender.Send(command, cancellationToken);
+
+            if (result.IsFailure)
+                return result.ToActionResult();
+
+            return Created($"api/tournaments/{tournamentId}/tournament-teams/{tournamentTeamId}/players/{result.Value.TournamentPlayerId}", result.Value);
+        }
+
         [HttpPatch("{tournamentId}/tournament-teams/{tournamentTeamId}/players/{tournamentPlayerId}")]
         public async Task<IActionResult> UpdateTournamentPlayer([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromRoute] Guid tournamentPlayerId, [FromBody] UpdateTournamentPlayerRequest request, CancellationToken cancellationToken)
         {
@@ -319,9 +387,10 @@ namespace Turniejo.Api.Controllers
         public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
         public sealed record UpdateTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
+        public sealed record UpdateTournamentGroupRequest(string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
         public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart);
-        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats);
+        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats, bool AbbreviatePlayerNames = true);
         public sealed record AddTeamToTournamentRequest(Guid TeamId, Guid CategoryId);
         public sealed record ChangeTournamentTeamRegistrationStatusRequest(RegistrationStatus RegistrationStatus);
         public sealed record ChangeTournamentTeamPaymentStatusRequest(PaymentStatus PaymentStatus);
@@ -329,6 +398,7 @@ namespace Turniejo.Api.Controllers
         public sealed record AssignUserToTournamentTeamRequest(Guid UserId, TeamStaffRole Role);
         public sealed record AssignCoachToTeamRequest(Guid UserId);
         public sealed record AssignPlayerToTournamentTeamRequest(Guid PlayerId, int? ShirtNumber, PlayerPosition? Position);
+        public sealed record CreatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position);
         public sealed record UpdateTournamentPlayerRequest(int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status);
     }
 }

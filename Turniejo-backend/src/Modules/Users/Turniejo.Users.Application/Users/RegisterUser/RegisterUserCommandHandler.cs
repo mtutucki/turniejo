@@ -1,9 +1,10 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Users.Application.Abstractions;
+using Turniejo.Users.Application.Legal;
 using Turniejo.Users.Domain.Entities;
 
 namespace Turniejo.Users.Application.Users.RegisterUser;
@@ -37,7 +38,9 @@ internal sealed class RegisterUserCommandHandler(
             request.Email,
             request.FirstName,
             request.LastName,
-            request.PhoneNumber);
+            request.PhoneNumber,
+            request.CreateOrganization,
+            LegalDocuments.CurrentVersion);
 
         if (userResult.IsFailure)
             return Result.Failure<RegisterUserResponse>(userResult.Error);

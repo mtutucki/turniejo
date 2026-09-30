@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -9,6 +10,7 @@ namespace Turniejo.Matches.Application.Matches.RescheduleMatch
 {
     internal sealed class RescheduleMatchCommandHandler(
         IMatchesDbContext dbContext,
+        ScheduleConflictChecker conflictChecker,
         ICurrentUserContext currentUserContext) : ICommandHandler<RescheduleMatchCommand, RescheduleMatchResponse>
     {
         public async Task<Result<RescheduleMatchResponse>> Handle(RescheduleMatchCommand request, CancellationToken cancellationToken)
@@ -17,12 +19,9 @@ namespace Turniejo.Matches.Application.Matches.RescheduleMatch
             if (match == null || match.TournamentId != request.TournamentId)
                 return Result.Failure<RescheduleMatchResponse>(Error.NotFound("Match", request.MatchId));
 
-            if (match.PitchId.HasValue)
-            {
-                var conflict = await dbContext.MatchExistsAtPitchAndTimeAsync(match.PitchId.Value, request.ScheduledAt, match.Id, cancellationToken);
-                if (conflict)
-                    return Result.Failure<RescheduleMatchResponse>(Error.Validation("ScheduledAt", "Another match is already scheduled on this pitch at this time"));
-            }
+            var conflict = await conflictChecker.FindConflictAsync(match, match.PitchId, request.ScheduledAt, "ScheduledAt", cancellationToken);
+            if (conflict != null)
+                return Result.Failure<RescheduleMatchResponse>(conflict);
 
             var result = match.Reschedule(request.ScheduledAt, currentUserContext.UserId);
             if (result.IsFailure)

@@ -15,6 +15,7 @@ namespace Turniejo.Matches.Application.Matches.AddGoal
     internal sealed class AddGoalCommandHandler(
         IMatchesDbContext dbContext,
         MatchEventRosterGuard rosterGuard,
+        SendOffRules sendOffRules,
         ISender sender,
         ICurrentUserContext currentUserContext) : ICommandHandler<AddGoalCommand, AddGoalResponse>
     {
@@ -38,6 +39,14 @@ namespace Turniejo.Matches.Application.Matches.AddGoal
             var assistCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.AssistPlayerId, "AssistPlayerId", cancellationToken);
             if (assistCheck.IsFailure)
                 return Result.Failure<AddGoalResponse>(assistCheck.Error);
+
+            var scorerSentOff = await sendOffRules.EnsureNotSentOffAsync(match.Id, request.PlayerId, "PlayerId", cancellationToken);
+            if (scorerSentOff != null)
+                return Result.Failure<AddGoalResponse>(scorerSentOff);
+
+            var assistSentOff = await sendOffRules.EnsureNotSentOffAsync(match.Id, request.AssistPlayerId, "AssistPlayerId", cancellationToken);
+            if (assistSentOff != null)
+                return Result.Failure<AddGoalResponse>(assistSentOff);
 
             var eventResult = MatchEvent.Create(
                 Guid.NewGuid(), match.Id, request.GoalType, request.Minute, currentUserContext.UserId,

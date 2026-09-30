@@ -30,6 +30,13 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
     public async Task<Team?> GetTeamByIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
         await Teams.FirstOrDefaultAsync(t => t.Id == teamId, cancellationToken);
 
+    public async Task<IReadOnlyList<Team>> GetTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        await Teams
+            .AsNoTracking()
+            .Where(t => t.OrganizationId == organizationId)
+            .OrderBy(t => t.Name)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Team>> GetTeamsByIdsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default)
     {
         if (teamIds.Count == 0)
@@ -53,6 +60,16 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .Where(t => t.TournamentId == tournamentId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<TournamentTeam>> GetUngroupedTournamentTeamsForUpdateAsync(Guid tournamentId, Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .Where(t => t.TournamentId == tournamentId && t.CategoryId == categoryId && t.GroupId == null)
+            .ToListAsync(cancellationToken);
+
+    public async Task<TournamentTeam?> GetTournamentTeamForUpdateAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.FirstOrDefaultAsync(t =>
+            t.TournamentId == tournamentId && t.TeamId == teamId && t.CategoryId == categoryId,
+            cancellationToken);
+
     public async Task<bool> TournamentTeamExistsAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.AnyAsync(t =>
             t.TournamentId == tournamentId && t.TeamId == teamId && t.CategoryId == categoryId,
@@ -60,6 +77,9 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
 
     public async Task<bool> AnyTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.AnyAsync(t => t.CategoryId == categoryId, cancellationToken);
+
+    public async Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AnyAsync(t => t.GroupId == groupId, cancellationToken);
 
     public async Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.CountAsync(t =>

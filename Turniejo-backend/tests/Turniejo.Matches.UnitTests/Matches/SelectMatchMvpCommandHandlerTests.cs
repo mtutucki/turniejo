@@ -12,13 +12,15 @@ namespace Turniejo.Matches.UnitTests.Matches
     {
         private readonly IMatchesDbContext _dbContext;
         private readonly ICurrentUserContext _currentUserContext;
+        private readonly IAuthorizationService _authorizationService;
         private readonly SelectMatchMvpCommandHandler _handler;
 
         public SelectMatchMvpCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new SelectMatchMvpCommandHandler(_dbContext, _currentUserContext);
+            _authorizationService = Substitute.For<IAuthorizationService>();
+            _handler = new SelectMatchMvpCommandHandler(_dbContext, _currentUserContext, _authorizationService);
 
             _dbContext.GetActiveMatchEventsByTypeAsync(Arg.Any<Guid>(), MatchEventType.MvpSelected, Arg.Any<CancellationToken>())
                 .Returns(new List<MatchEvent>());
@@ -30,6 +32,57 @@ namespace Turniejo.Matches.UnitTests.Matches
             match.Start(Guid.NewGuid());
             match.ClearDomainEvents();
             return match;
+        }
+
+        private static Match CreateFinishedMatchPastEditWindow(Guid tournamentId)
+        {
+            var match = CreateLiveMatch(tournamentId);
+            // Ujemne okno — EditLockedAt w przeszłości, sędzia nie może już nic zmienić.
+            match.Finish(MatchResultType.Regular, null, -1, Guid.NewGuid());
+            match.ClearDomainEvents();
+            return match;
+        }
+
+        private void GivenOrganizer(bool isOrganizer) =>
+            _authorizationService.HasAnyRoleAsync(
+                    Arg.Any<Guid>(), "Tournament", Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+                .Returns(isOrganizer);
+
+        [Fact]
+        public async Task Handle_ShouldSucceed_WhenOrganizerSelectsMvpAfterEditWindow()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFinishedMatchPastEditWindow(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _currentUserContext.UserId.Returns(Guid.NewGuid());
+            GivenOrganizer(true);
+            var command = new SelectMatchMvpCommand(tournamentId, match.Id, match.AwayTournamentTeamId, Guid.NewGuid());
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenRefereeSelectsMvpAfterEditWindow()
+        {
+            // Arrange
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFinishedMatchPastEditWindow(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            _currentUserContext.UserId.Returns(Guid.NewGuid());
+            GivenOrganizer(false);
+            var command = new SelectMatchMvpCommand(tournamentId, match.Id, match.HomeTournamentTeamId, Guid.NewGuid());
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
         }
 
         [Fact]

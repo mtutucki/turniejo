@@ -20,7 +20,7 @@ namespace Turniejo.Matches.Application.Stats.GetMvpRanking
             var mvpCounts = events
                 .Where(e => e.PlayerId.HasValue)
                 .GroupBy(e => e.PlayerId!.Value)
-                .Select(g => new { PlayerId = g.Key, Count = g.Count() })
+                .Select(g => new { PlayerId = g.Key, Count = g.Count(), TeamId = g.Select(e => e.TournamentTeamId).FirstOrDefault(t => t.HasValue) })
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.PlayerId)
                 .Take(request.Top)
@@ -31,8 +31,8 @@ namespace Turniejo.Matches.Application.Stats.GetMvpRanking
 
             var ranking = mvpCounts
                 .Select(x => playersById.TryGetValue(x.PlayerId, out var player)
-                    ? new PlayerRankingEntryDto(x.PlayerId, player.FirstName, player.LastName, x.Count)
-                    : new PlayerRankingEntryDto(x.PlayerId, "Unknown", "Unknown", x.Count))
+                    ? new PlayerRankingEntryDto(x.PlayerId, player.FirstName, player.LastName, x.Count, x.TeamId)
+                    : new PlayerRankingEntryDto(x.PlayerId, "Unknown", "Unknown", x.Count, x.TeamId))
                 .ToList();
 
             return Result.Success<IReadOnlyList<PlayerRankingEntryDto>>(ranking);

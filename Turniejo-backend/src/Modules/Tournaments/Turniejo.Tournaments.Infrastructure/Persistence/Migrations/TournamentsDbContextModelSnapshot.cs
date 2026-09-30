@@ -109,6 +109,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -258,6 +261,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                         {
                             b1.Property<Guid>("TournamentId")
                                 .HasColumnType("uuid");
+
+                            b1.Property<bool>("AbbreviatePlayerNames")
+                                .HasColumnType("boolean");
 
                             b1.Property<bool>("IsPublic")
                                 .HasColumnType("boolean");

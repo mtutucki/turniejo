@@ -8,5 +8,7 @@ namespace Turniejo.Teams.Application.DTOs
         string TeamName,
         Guid CategoryId,
         Guid? GroupId,
-        string Role);
+        string Role,
+        string TournamentStatus = "",
+        bool CanEditSquad = true);
 }

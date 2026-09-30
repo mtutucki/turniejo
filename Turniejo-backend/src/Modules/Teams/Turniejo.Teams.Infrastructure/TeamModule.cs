@@ -1,6 +1,7 @@
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.Teams.Application.Abstractions;
 using Turniejo.Teams.Domain.Entities;
+using Turniejo.Teams.Domain.Enums;
 
 namespace Turniejo.Teams.Infrastructure;
 
@@ -50,6 +51,23 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
 
     public async Task<bool> AnyTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
         await dbContext.AnyTournamentTeamsByCategoryIdAsync(categoryId, cancellationToken);
+
+    public async Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyTournamentTeamsByGroupIdAsync(groupId, cancellationToken);
+
+    public async Task<int> AssignUngroupedTeamsToGroupAsync(Guid tournamentId, Guid categoryId, Guid groupId, CancellationToken cancellationToken = default)
+    {
+        // Zapytanie śledzone — AssignToGroup ma trafić do bazy przy SaveChanges.
+        var teams = (await dbContext.GetUngroupedTournamentTeamsForUpdateAsync(tournamentId, categoryId, cancellationToken))
+            .Where(t => t.RegistrationStatus is not (RegistrationStatus.Rejected or RegistrationStatus.Withdrawn))
+            .ToList();
+        foreach (var team in teams)
+            team.AssignToGroup(groupId);
+
+        if (teams.Count > 0)
+            await dbContext.SaveChangesAsync(cancellationToken);
+        return teams.Count;
+    }
 
     private static TournamentTeamDto ToDto(TournamentTeam tournamentTeam) =>
         new(tournamentTeam.Id, tournamentTeam.TournamentId, tournamentTeam.TeamId,

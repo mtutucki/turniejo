@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Teams.Application.Teams.CreateTeam;
 using Turniejo.Teams.Application.Teams.GetTeamById;
+using Turniejo.Teams.Application.Teams.GetTeams;
 using Turniejo.Teams.Application.Teams.UpdateTeam;
 using Turniejo.Teams.Application.Teams.UpdateTeamLogo;
 
@@ -37,6 +38,14 @@ namespace Turniejo.Api.Controllers
         {
             var command = new UpdateTeamLogoCommand(organizationId, teamId, request.LogoUrl);
             var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTeams([FromRoute] Guid organizationId, CancellationToken cancellationToken)
+        {
+            var query = new GetTeamsQuery(organizationId);
+            var result = await sender.Send(query, cancellationToken);
             return result.ToActionResult();
         }
 

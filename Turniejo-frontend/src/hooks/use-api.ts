@@ -38,5 +38,10 @@ export function useApi() {
     [getToken],
   )
 
-  return { request, isAuthenticated: status === "authenticated" }
+  // getToken też dla SignalR (accessTokenFactory) — hub dostaje token w query stringu.
+  // Sesja z błędem odświeżenia (np. po restarcie Keycloaka) ma nieważny token — zapytania wysłane z nim
+  // kończyły się 401 i przekierowaniem na logowanie w kółko. Traktujemy ją jak brak zalogowania,
+  // a SessionExpiryWatcher ją czyści.
+  const isAuthenticated = status === "authenticated" && !session?.error && !!session?.accessToken
+  return { request, getToken, isAuthenticated }
 }

@@ -9,11 +9,20 @@ public interface ITournamentModule
     Task<TournamentSettingsSummaryDto?> GetTournamentSettingsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TieBreakerRuleDto>> GetTieBreakerRulesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task<bool> ChangeTournamentStatusAsync(Guid tournamentId, string newStatus, CancellationToken cancellationToken = default);
+    /// <summary>ScheduleGenerated -> RegistrationClosed po wyczyszczeniu terminarza (poza zwykłą maszyną stanów).</summary>
+    Task<bool> RevertScheduleGenerationAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// ScheduleGenerated -> InProgress przy starcie pierwszego meczu. Bez autoryzacji organizatora, bo mecz
+    /// startuje sędzia — zmiana wynika z faktu (mecz trwa), a nie z decyzji użytkownika.
+    /// </summary>
+    Task<bool> MarkTournamentStartedAsync(Guid tournamentId, Guid changedByUserId, CancellationToken cancellationToken = default);
     Task<PublicTournamentDto?> GetPublicTournamentBySlugAsync(string slug, CancellationToken cancellationToken = default);
     Task<TournamentPublicSettingsDto?> GetTournamentPublicSettingsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
 }
 
-public record TournamentDto(Guid Id, string Name, string Status, string? Format, Guid OrganizationId, int TeamLimit);
+// StartAt/EndAt opcjonalne w konstruktorze, żeby nie przepisywać wszystkich istniejących wywołań.
+public record TournamentDto(Guid Id, string Name, string Status, string? Format, Guid OrganizationId, int TeamLimit,
+    DateTimeOffset? StartAt = null, DateTimeOffset? EndAt = null);
 public record TournamentCategoryDto(Guid Id, Guid TournamentId, string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate);
 public record TournamentGroupDto(Guid Id, Guid TournamentId, Guid CategoryId, string Name);
 public record TournamentSettingsSummaryDto(
@@ -23,7 +32,8 @@ public record TournamentSettingsSummaryDto(
 public record TieBreakerRuleDto(int Order, string Type);
 public record TournamentPublicSettingsDto(
     Guid TournamentId, bool IsPublic, bool ShowTeams, bool ShowPlayers,
-    bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats);
+    bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats,
+    bool AbbreviatePlayerNames = true);
 public record PublicTournamentDto(
     Guid Id, string Name, string Slug, string Status, string? Format,
     DateTimeOffset StartAt, DateTimeOffset EndAt, string? Description,

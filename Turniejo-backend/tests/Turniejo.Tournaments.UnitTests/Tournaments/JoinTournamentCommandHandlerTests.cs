@@ -50,7 +50,7 @@ public sealed class JoinTournamentCommandHandlerTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("404");
+        result.Error.Code.Should().Be("Validation.Code");
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class JoinTournamentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ShouldReturnSlug_WhenCodeIsValid()
+    public async Task Handle_ShouldReturnTournamentAndRole_WhenCodeIsValid()
     {
         // Arrange
         var tournament = CreateFakeTournament();
@@ -148,5 +148,8 @@ public sealed class JoinTournamentCommandHandlerTests
 
         // Assert
         result.Value.Slug.Should().Be(tournament.Slug);
+        result.Value.TournamentId.Should().Be(tournament.Id);
+        result.Value.TournamentName.Should().Be(tournament.Name);
+        result.Value.Role.Should().Be("Coach");
     }
 }

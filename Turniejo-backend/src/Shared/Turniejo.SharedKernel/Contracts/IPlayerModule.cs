@@ -13,6 +13,10 @@ public interface IPlayerModule
     // turnieju) — zwraca tylko opiekunów z CanReceiveNotifications=true, więc wywołujący nie musi
     // znać/filtrować tej flagi samodzielnie.
     Task<IReadOnlyList<Guid>> GetNotifiableGuardianUserIdsForPlayersAsync(IReadOnlyCollection<Guid> playerIds, CancellationToken cancellationToken = default);
+
+    // Dla modułu Users (eksport danych i usunięcie konta rodzica) — dzieci, których user jest opiekunem.
+    Task<IReadOnlyList<PlayerDto>> GetPlayersByGuardianAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task RemoveGuardianshipsAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public record PlayerDto(Guid Id, string FirstName, string LastName);

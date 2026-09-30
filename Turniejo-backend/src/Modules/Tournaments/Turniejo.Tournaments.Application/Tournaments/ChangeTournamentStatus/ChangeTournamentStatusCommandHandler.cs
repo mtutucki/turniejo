@@ -1,9 +1,10 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus
 {
@@ -14,6 +15,11 @@ namespace Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus
             var result = await tournamentsDbContext.GetTournamentByIdAsync(request.TournamentId, cancellationToken);
             if (result == null)
                 return Result.Failure<ChangeTournamentStatusResponse>(Error.NotFound("Tournament", request.TournamentId));
+
+            // Ręczne ustawienie ScheduleGenerated zostawiało turniej z etapem "harmonogram gotowy" i zerem meczów,
+            // a generator odmawia pracy poza RegistrationClosed — martwy punkt bez wyjścia.
+            if (request.TournamentStatus == TournamentStatus.ScheduleGenerated && !request.IsScheduleTransition)
+                return Result.Failure<ChangeTournamentStatusResponse>(Error.Validation("TournamentStatus", "Schedule status is set automatically by generating the schedule"));
 
             var changeStatusResult = result.ChangeStatus(request.TournamentStatus, currentUserContext.UserId);
 

@@ -1,4 +1,5 @@
 using Turniejo.Api.Extensions;
+using Turniejo.Api.Json;
 using Turniejo.Api.Middleware;
 using Turniejo.Auth.Infrastructure.Extensions;
 using Turniejo.Brackets.Infrastructure.Extensions;
@@ -16,7 +17,12 @@ using Turniejo.Users.Infrastructure.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
+    options.JsonSerializerOptions.Converters.Add(new UtcDateTimeOffsetConverter());
+});
+builder.Services.AddTrustedProxyForwarding(builder.Configuration);
 builder.Services.AddApiRateLimiting();
 builder.Services.AddSwaggerDocumentation();
 
@@ -61,6 +67,9 @@ builder.Services.AddHostedService<Turniejo.Api.BackgroundServices.MatchReminderB
 
 var app = builder.Build();
 
+// Pierwsze w pipeline — wszystko dalej (rate limiter, logi) ma widzieć adres klienta, nie proxy.
+app.UseForwardedHeaders();
+
 // Dostępny tylko w Development — przed produkcyjnym wdrożeniem odsłania pełną mapę API
 // (włącznie z tym, co wymaga autoryzacji), więc świadomie nie wystawiamy go publicznie domyślnie.
 if (app.Environment.IsDevelopment())
@@ -77,6 +86,7 @@ app.MapHealthChecks("/health");
 app.MapControllers();
 app.MapHub<MatchHub>("/hubs/matches");
 app.MapHub<TournamentHub>("/hubs/tournaments");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.MapGet("/api/me", (Turniejo.SharedKernel.Contracts.ICurrentUserContext ctx) =>
 {

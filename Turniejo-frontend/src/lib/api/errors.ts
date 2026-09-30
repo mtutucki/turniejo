@@ -1,3 +1,5 @@
+import { translateApiMessage } from "./messages"
+
 export type FieldError = { field: string; message: string }
 
 /**
@@ -42,15 +44,22 @@ export class ApiError extends Error {
   readonly fieldErrors: FieldError[]
   /** Sekundy z nagłówka Retry-After (429). */
   readonly retryAfter?: number
+  /** Kod z Result.Error backendu (np. "Conflict.Status", "Validation.Name") — brak dla ProblemDetails. */
+  readonly code?: string
 
   constructor(status: number, problem: ProblemDetails, retryAfter?: number) {
-    super(problem.detail ?? problem.title ?? `HTTP ${status}`)
+    const detail = translateApiMessage(problem.detail)
+    super(detail ?? problem.title ?? `HTTP ${status}`)
     this.name = "ApiError"
     this.status = status
     this.title = problem.title
-    this.detail = problem.detail
-    this.fieldErrors = normalizeFieldErrors(problem.errors)
+    this.detail = detail
+    this.fieldErrors = normalizeFieldErrors(problem.errors).map((e) => ({
+      ...e,
+      message: translateApiMessage(e.message),
+    }))
     this.retryAfter = retryAfter
+    this.code = problem.code
   }
 
   static async fromResponse(response: Response) {

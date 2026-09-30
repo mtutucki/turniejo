@@ -17,7 +17,7 @@ public sealed class RegistrationHttpFlowTests(IntegrationTestWebApplicationFacto
         var anonymous = CreateClient();
 
         var registerResponse = await anonymous.PostAsJsonAsync("/api/auth/register",
-            new RegisterUserCommand("http-flow@integration.test", "Sup3rSecret!", "Http", "Flow"));
+            new RegisterUserCommand("http-flow@integration.test", "Sup3rSecret!", "Http", "Flow", AcceptTerms: true));
         registerResponse.IsSuccessStatusCode.Should().BeTrue();
 
         var userId = (await registerResponse.ReadJsonAsync()).GetGuid("userId");
@@ -34,12 +34,24 @@ public sealed class RegistrationHttpFlowTests(IntegrationTestWebApplicationFacto
     public async Task Register_Fails_WhenEmailAlreadyRegistered()
     {
         var anonymous = CreateClient();
-        var command = new RegisterUserCommand("duplicate@integration.test", "Sup3rSecret!", "First", "Attempt");
+        var command = new RegisterUserCommand("duplicate@integration.test", "Sup3rSecret!", "First", "Attempt", AcceptTerms: true);
 
         (await anonymous.PostAsJsonAsync("/api/auth/register", command)).IsSuccessStatusCode.Should().BeTrue();
 
         var secondAttempt = await anonymous.PostAsJsonAsync("/api/auth/register", command with { FirstName = "Second" });
 
         secondAttempt.IsSuccessStatusCode.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Register_Fails_WhenTermsNotAccepted()
+    {
+        var anonymous = CreateClient();
+
+        var response = await anonymous.PostAsJsonAsync("/api/auth/register",
+            new RegisterUserCommand("no-terms@integration.test", "Sup3rSecret!", "No", "Terms"));
+
+        // Walidacja (ValidationBehavior) odrzuca przed handlerem — konto w Keycloaku nie powstaje.
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.UnprocessableEntity);
     }
 }

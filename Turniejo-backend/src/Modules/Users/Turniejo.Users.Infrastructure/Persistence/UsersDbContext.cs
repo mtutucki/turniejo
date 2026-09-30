@@ -69,6 +69,9 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
             UserRoleAssignments.Remove(assignment);
     }
 
+    public void RemoveUserRoleAssignments(IEnumerable<UserRoleAssignment> assignments) =>
+        UserRoleAssignments.RemoveRange(assignments);
+
     public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => await Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

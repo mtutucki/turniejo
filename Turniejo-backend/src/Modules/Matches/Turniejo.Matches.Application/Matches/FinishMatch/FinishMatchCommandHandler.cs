@@ -26,7 +26,8 @@ namespace Turniejo.Matches.Application.Matches.FinishMatch
 
             var result = match.Finish(
                 request.ResultType, request.WinnerTournamentTeamId, settings.RefereeEditWindowMinutes, currentUserContext.UserId,
-                settings.WalkoverWinnerScore, settings.WalkoverLoserScore);
+                settings.WalkoverWinnerScore, settings.WalkoverLoserScore,
+                request.HomePenaltyScore, request.AwayPenaltyScore);
             if (result.IsFailure)
                 return Result.Failure<FinishMatchResponse>(result.Error);
 

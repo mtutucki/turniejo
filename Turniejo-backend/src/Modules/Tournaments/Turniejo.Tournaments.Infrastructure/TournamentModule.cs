@@ -1,7 +1,10 @@
+using System.Text.Json;
 using MediatR;
 using Turniejo.SharedKernel.Contracts;
+using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
+using Turniejo.Tournaments.Application.Tournaments.RevertScheduleGeneration;
 using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Infrastructure;
@@ -20,7 +23,9 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
             tournament.Status.ToString(),
             tournament.Format?.ToString(),
             tournament.OrganizationId,
-            tournament.TeamLimit);
+            tournament.TeamLimit,
+            tournament.StartAt,
+            tournament.EndAt);
     }
 
     public async Task<TournamentCategoryDto?> GetTournamentCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default)
@@ -79,8 +84,36 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
     public async Task<bool> ChangeTournamentStatusAsync(Guid tournamentId, string newStatus, CancellationToken cancellationToken = default)
     {
         var status = Enum.Parse<TournamentStatus>(newStatus);
-        var result = await sender.Send(new ChangeTournamentStatusCommand(tournamentId, status), cancellationToken);
+        // IsScheduleTransition: ScheduleGenerated wolno ustawić tylko generatorowi terminarza, nie ręcznie przez API.
+        var result = await sender.Send(new ChangeTournamentStatusCommand(tournamentId, status, IsScheduleTransition: true), cancellationToken);
 
+        return result.IsSuccess;
+    }
+
+    public async Task<bool> MarkTournamentStartedAsync(Guid tournamentId, Guid changedByUserId, CancellationToken cancellationToken = default)
+    {
+        var tournament = await dbContext.GetTournamentByIdAsync(tournamentId, cancellationToken);
+        if (tournament is null || tournament.Status != TournamentStatus.ScheduleGenerated)
+            return false;
+
+        if (tournament.ChangeStatus(TournamentStatus.InProgress, changedByUserId).IsFailure)
+            return false;
+
+        foreach (var domainEvent in tournament.DomainEvents)
+        {
+            await dbContext.AddOutboxMessageAsync(
+                OutboxMessage.Create(domainEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(domainEvent, domainEvent.GetType())),
+                cancellationToken);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        tournament.ClearDomainEvents();
+        return true;
+    }
+
+    public async Task<bool> RevertScheduleGenerationAsync(Guid tournamentId, CancellationToken cancellationToken = default)
+    {
+        var result = await sender.Send(new RevertScheduleGenerationCommand(tournamentId), cancellationToken);
         return result.IsSuccess;
     }
 
@@ -108,5 +141,6 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         tournament.Id, tournament.PublicSettings.IsPublic, tournament.PublicSettings.ShowTeams,
         tournament.PublicSettings.ShowPlayers, tournament.PublicSettings.ShowSchedule,
         tournament.PublicSettings.ShowStandings, tournament.PublicSettings.ShowBracket,
-        tournament.PublicSettings.ShowLiveMatches, tournament.PublicSettings.ShowStats);
+        tournament.PublicSettings.ShowLiveMatches, tournament.PublicSettings.ShowStats,
+        tournament.PublicSettings.AbbreviatePlayerNames);
 }

@@ -2,6 +2,7 @@ using Turniejo.Players.Application.Abstractions;
 using Turniejo.Players.Application.DTOs;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.Helpers;
 using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Players.Application.TournamentPlayers.GetPublicPlayerProfile
@@ -35,7 +36,8 @@ namespace Turniejo.Players.Application.TournamentPlayers.GetPublicPlayerProfile
             var team = await teamModule.GetTeamAsync(tournamentTeam.TeamId, cancellationToken);
 
             var dto = new PublicPlayerProfileDto(
-                tournamentPlayer.Id, player.FirstName, player.LastName, player.PhotoUrl,
+                tournamentPlayer.Id, player.FirstName,
+                PublicPlayerName.LastName(player.LastName, settings.AbbreviatePlayerNames), player.PhotoUrl,
                 tournamentPlayer.ShirtNumber, tournamentPlayer.Position?.ToString(),
                 tournamentTeam.Id, team?.Name ?? "Unknown");
 

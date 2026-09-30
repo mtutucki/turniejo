@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using NSubstitute;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
@@ -74,5 +74,25 @@ public sealed class RegisterUserCommandHandlerTests
         await _dbContext.Received(1).AddUserAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _dbContext.Received(1).AddOutboxMessageAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
         await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Handle_ShouldPassOrganizerChoiceToUserRegisteredEvent(bool createOrganization)
+    {
+        // Arrange
+        _keycloakAdminService.CreateUserAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Guid.NewGuid());
+        OutboxMessage? outbox = null;
+        await _dbContext.AddOutboxMessageAsync(Arg.Do<OutboxMessage>(m => outbox = m), Arg.Any<CancellationToken>());
+
+        // Act
+        await _handler.Handle(ValidCommand() with { CreateOrganization = createOrganization }, CancellationToken.None);
+
+        // Assert
+        outbox.Should().NotBeNull();
+        outbox!.Payload.Should().Contain($"\"CreateOrganization\":{createOrganization.ToString().ToLowerInvariant()}");
     }
 }

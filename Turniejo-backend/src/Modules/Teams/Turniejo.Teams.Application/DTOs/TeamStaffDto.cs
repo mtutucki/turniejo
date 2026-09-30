@@ -4,5 +4,8 @@ namespace Turniejo.Teams.Application.DTOs
         Guid Id,
         Guid TournamentTeamId,
         Guid UserId,
-        string Role);
+        string Role,
+        string? Email,
+        string? FirstName,
+        string? LastName);
 }

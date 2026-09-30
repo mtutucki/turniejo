@@ -13,7 +13,8 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSet
         bool ShowStandings,
         bool ShowBracket,
         bool ShowLiveMatches,
-        bool ShowStats) : ICommand<UpdateTournamentPublicSettingsResponse>, IAuthorizedRequest
+        bool ShowStats,
+        bool AbbreviatePlayerNames = true) : ICommand<UpdateTournamentPublicSettingsResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

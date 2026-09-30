@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using System.Text.Json;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Primitives;
@@ -9,7 +9,9 @@ public sealed class OutboxProcessor(
     IServiceScopeFactory scopeFactory,
     ILogger<OutboxProcessor> logger) : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
+    // Zdarzenia live (gol, kartka, start/koniec meczu) idą do SignalR przez outbox — przy 10 s widzowie
+    // dostawali wynik z wyraźnym opóźnieniem. Zapytanie o puste outboxy co sekundę jest tanie.
+    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -17,7 +19,17 @@ public sealed class OutboxProcessor(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await ProcessPendingMessagesAsync(stoppingToken);
+            try
+            {
+                await ProcessPendingMessagesAsync(stoppingToken);
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                // Wyjątek z BackgroundService zatrzymuje cały host (BackgroundServiceExceptionBehavior.StopHost) —
+                // chwilowo niedostępna baza wyłączała więc całe API. Logujemy i próbujemy w następnym cyklu.
+                logger.LogError(ex, "Outbox processing cycle failed — retrying in the next cycle");
+            }
+
             await Task.Delay(Interval, stoppingToken);
         }
     }

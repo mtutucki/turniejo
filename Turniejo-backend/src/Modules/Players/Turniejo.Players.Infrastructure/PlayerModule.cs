@@ -74,4 +74,17 @@ internal sealed class PlayerModule(IPlayersDbContext dbContext) : IPlayerModule
             .Distinct()
             .ToList();
     }
+
+    public async Task<IReadOnlyList<PlayerDto>> GetPlayersByGuardianAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var guardianships = await dbContext.GetGuardianshipsByUserIdAsync(userId, cancellationToken);
+        if (guardianships.Count == 0)
+            return [];
+
+        var players = await dbContext.GetPlayersByIdsAsync(guardianships.Select(g => g.PlayerId).Distinct().ToList(), cancellationToken);
+        return players.Select(p => new PlayerDto(p.Id, p.FirstName, p.LastName)).ToList();
+    }
+
+    public Task RemoveGuardianshipsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        dbContext.RemoveGuardianshipsByUserIdAsync(userId, cancellationToken);
 }

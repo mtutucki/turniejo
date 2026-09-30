@@ -51,6 +51,23 @@ internal sealed class KeycloakAdminService(
         return Guid.Parse(userId);
     }
 
+    public async Task DeleteUserAsync(
+        Guid keycloakUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var realm = configuration["Keycloak:Realm"];
+        var response = await httpClient.DeleteAsync(
+            $"/admin/realms/{realm}/users/{keycloakUserId}",
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Keycloak user deletion failed: {response.StatusCode} - {error}");
+        }
+    }
+
     public async Task SendPasswordResetEmailAsync(
     Guid keycloakUserId,
     CancellationToken cancellationToken = default)

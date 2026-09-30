@@ -47,6 +47,21 @@ public static class TournamentFlow
         return userId;
     }
 
+    // Sędzię można przypisać do meczu tylko, gdy ma rolę Referee w turnieju — tak jak w aplikacji
+    // dostaje ją przez dołączenie kodem sędziego.
+    public static async Task JoinAsRefereeAsync(IntegrationTestWebApplicationFactory factory, HttpClient organizer, Guid tournamentId, Guid refereeUserId)
+    {
+        var tournament = await (await organizer.GetAsync($"/api/tournaments/{tournamentId}")).ReadJsonAsync();
+        var refereeCode = tournament.GetProperty("refereeCode").GetString();
+
+        var referee = factory.CreateClient();
+        referee.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, refereeUserId.ToString());
+        referee.DefaultRequestHeaders.Add(TestAuthHandler.EmailHeader, $"{refereeUserId}@integration.test");
+
+        var response = await referee.PostAsJsonAsync("/api/tournaments/join", new { code = refereeCode });
+        response.IsSuccessStatusCode.Should().BeTrue();
+    }
+
     public static async Task<Guid> CreateOrganizationAsync(HttpClient client, string name)
     {
         var response = await client.PostAsJsonAsync("/api/organizations", new CreateOrganizationRequest(name));

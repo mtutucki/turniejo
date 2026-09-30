@@ -10,6 +10,13 @@ declare module "next-auth" {
     error?: AuthError
     user: { id: string } & DefaultSession["user"]
   }
+
+  /** Zwracany przez authorize() w CredentialsProvider — tokeny trafiają do JWT sesji. */
+  interface User {
+    accessToken: string
+    refreshToken: string
+    expiresAt: number
+  }
 }
 
 declare module "next-auth/jwt" {

@@ -1,4 +1,7 @@
-import { Trophy } from "lucide-react"
+import { CircleHelp, Trophy } from "lucide-react"
+import Link from "next/link"
+
+import { LegalLinks } from "@/components/layout/legal-links"
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
@@ -10,6 +13,14 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
         Turniejo
       </div>
       <div className="w-full max-w-sm">{children}</div>
+      <Link
+        href="/help"
+        className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm"
+      >
+        <CircleHelp className="size-4" />
+        Czym jest Turniejo? Pomoc i FAQ
+      </Link>
+      <LegalLinks className="justify-center" withHelp={false} />
     </main>
   )
 }

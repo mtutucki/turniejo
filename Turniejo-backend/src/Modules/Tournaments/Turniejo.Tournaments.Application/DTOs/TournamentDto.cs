@@ -10,10 +10,13 @@
     DateTimeOffset EndAt,
     int TeamLimit,
     bool IsPaid,
-    string OrganizerCode,
-    string RefereeCode,
-    string CoachCode,
-    string ViewerCode,
-    string? Description
+    // Kody dają rolę w turnieju (JoinTournament) — null dla każdego, kto nie jest jego organizatorem.
+    // Tournament.OrganizerCode celowo nie jest wystawiany: JoinTournament go nie obsługuje.
+    string? RefereeCode,
+    string? CoachCode,
+    string? ViewerCode,
+    string? Description,
+    // Czy portal kibica (/t/{slug}) jest włączony — bez tego link prowadzi na 404.
+    bool IsPublic
     );
 }

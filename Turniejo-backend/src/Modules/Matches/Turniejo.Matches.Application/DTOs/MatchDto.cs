@@ -14,5 +14,7 @@ namespace Turniejo.Matches.Application.DTOs
         string StageType,
         int HomeScore,
         int AwayScore,
-        string ResultType);
+        string ResultType,
+        int? HomePenaltyScore = null,
+        int? AwayPenaltyScore = null);
 }

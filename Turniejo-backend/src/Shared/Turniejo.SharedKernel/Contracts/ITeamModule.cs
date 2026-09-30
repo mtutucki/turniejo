@@ -11,6 +11,10 @@ public interface ITeamModule
     // Cross-module istnienie-check dla blokad kasowania (np. kategorii turnieju) — TournamentTeam.CategoryId
     // nie ma FK, więc bez tego usunięcie kategorii cicho osierocało zarejestrowane drużyny.
     Task<bool> AnyTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    // Jak wyżej, dla TournamentTeam.GroupId — blokada kasowania grupy turnieju.
+    Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    /// <summary>Drużyny kategorii bez grupy (poza odrzuconymi/wycofanymi) trafiają do wskazanej grupy.</summary>
+    Task<int> AssignUngroupedTeamsToGroupAsync(Guid tournamentId, Guid categoryId, Guid groupId, CancellationToken cancellationToken = default);
 }
 
 public record TeamDto(Guid Id, string Name, string? ShortName);

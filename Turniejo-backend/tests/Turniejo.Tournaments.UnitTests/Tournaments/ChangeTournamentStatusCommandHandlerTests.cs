@@ -118,7 +118,7 @@ public sealed class ChangeTournamentStatusCommandHandlerTests
         _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>())
             .Returns(tournament);
         _currentUserContext.UserId.Returns(tournament.CreatedByUserId);
-        var command = new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.ScheduleGenerated);
+        var command = new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.ScheduleGenerated, IsScheduleTransition: true);
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -127,5 +127,29 @@ public sealed class ChangeTournamentStatusCommandHandlerTests
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Validation.Format");
         await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldRejectManualScheduleGenerated_EvenWhenTransitionIsOtherwiseLegal()
+    {
+        // Ręczne ustawienie zostawiłoby "harmonogram gotowy" bez meczów, a generator nie działa poza RegistrationClosed.
+        var tournament = CreateFakeTournament();
+        tournament.SetFormat(TournamentFormat.Group);
+        tournament.ChangeStatus(TournamentStatus.RegistrationOpen, tournament.CreatedByUserId);
+        tournament.ChangeStatus(TournamentStatus.RegistrationClosed, tournament.CreatedByUserId);
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        _currentUserContext.UserId.Returns(tournament.CreatedByUserId);
+
+        var manual = await _handler.Handle(new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.ScheduleGenerated), CancellationToken.None);
+
+        manual.IsFailure.Should().BeTrue();
+        manual.Error.Code.Should().Be("Validation.TournamentStatus");
+        tournament.Status.Should().Be(TournamentStatus.RegistrationClosed);
+
+        var fromGenerator = await _handler.Handle(
+            new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.ScheduleGenerated, IsScheduleTransition: true), CancellationToken.None);
+
+        fromGenerator.IsSuccess.Should().BeTrue();
+        tournament.Status.Should().Be(TournamentStatus.ScheduleGenerated);
     }
 }

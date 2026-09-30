@@ -70,6 +70,12 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
     public async Task AddMatchesAsync(IReadOnlyCollection<Match> matches, CancellationToken cancellationToken = default) =>
         await Matches.AddRangeAsync(matches, cancellationToken);
 
+    public Task RemoveMatchesAsync(IReadOnlyCollection<Match> matches, CancellationToken cancellationToken = default)
+    {
+        Matches.RemoveRange(matches);
+        return Task.CompletedTask;
+    }
+
     public async Task<Match?> GetMatchByIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
         await Matches.FirstOrDefaultAsync(m => m.Id == matchId, cancellationToken);
 
@@ -98,6 +104,12 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
 
     public async Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
         await Matches.AnyAsync(m => m.CategoryId == categoryId, cancellationToken);
+
+    public async Task<bool> AnyMatchesByPitchIdAsync(Guid pitchId, CancellationToken cancellationToken = default) =>
+        await Matches.AnyAsync(m => m.PitchId == pitchId, cancellationToken);
+
+    public async Task<bool> AnyMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await Matches.AnyAsync(m => m.GroupId == groupId, cancellationToken);
 
     private static readonly MatchStatus[] CancellableStatuses = [MatchStatus.Scheduled, MatchStatus.Ready, MatchStatus.Postponed];
 

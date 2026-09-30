@@ -112,5 +112,34 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             result.Error.Message.Should().Be("TournamentGroup name cannot be empty");
         }
 
+        [Fact]
+        public void UpdateDetails_ShouldChangeNameAndOrder_WhenDataIsValid()
+        {
+            // Arrange
+            var group = CreateValidTournamentGroup().Value;
+
+            // Act
+            var result = group.UpdateDetails("Grupa B", 3);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            group.Name.Should().Be("Grupa B");
+            group.Order.Should().Be(3);
+        }
+
+        [Fact]
+        public void UpdateDetails_ShouldFail_WhenNameIsEmpty()
+        {
+            // Arrange
+            var group = CreateValidTournamentGroup().Value;
+
+            // Act
+            var result = group.UpdateDetails(" ", 3);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.Name");
+            group.Name.Should().Be(validName);
+        }
     }
 }

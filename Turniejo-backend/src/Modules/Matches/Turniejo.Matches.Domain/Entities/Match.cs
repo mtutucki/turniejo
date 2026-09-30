@@ -72,8 +72,14 @@ namespace Turniejo.Matches.Domain.Entities
             return Result.Success(match);
         }
 
+        // Termin, boisko i sędziego zmieniamy tylko przed rozpoczęciem meczu.
+        private bool IsSchedulable => Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed;
+
         public Result UpdateSchedule(Guid? pitchId, DateTimeOffset scheduledAt, Guid changedByUserId)
         {
+            if (!IsSchedulable)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the schedule once the match has started, finished or been cancelled"));
+
             PitchId = pitchId;
             ScheduledAt = scheduledAt;
             Version++;
@@ -86,6 +92,9 @@ namespace Turniejo.Matches.Domain.Entities
 
         public Result AssignPitch(Guid? pitchId, Guid changedByUserId)
         {
+            if (!IsSchedulable)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the schedule once the match has started, finished or been cancelled"));
+
             PitchId = pitchId;
             Version++;
             SetUpdatedAt();
@@ -97,6 +106,9 @@ namespace Turniejo.Matches.Domain.Entities
 
         public Result Reschedule(DateTimeOffset scheduledAt, Guid changedByUserId)
         {
+            if (!IsSchedulable)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the schedule once the match has started, finished or been cancelled"));
+
             ScheduledAt = scheduledAt;
             Version++;
             SetUpdatedAt();
@@ -108,8 +120,9 @@ namespace Turniejo.Matches.Domain.Entities
 
         public Result AssignReferee(Guid? refereeId, Guid changedByUserId)
         {
-            if (Status is MatchStatus.Live or MatchStatus.Finished)
-                return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match is live or finished"));
+            // Paused to wciąż trwający mecz — zmiana sędziego w przerwie odebrałaby prowadzącemu panel.
+            if (!IsSchedulable)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has started, finished or been cancelled"));
 
             RefereeId = refereeId;
             Version++;
@@ -168,13 +181,47 @@ namespace Turniejo.Matches.Domain.Entities
 
         public Result Finish(
             MatchResultType resultType, Guid? winnerTournamentTeamId, int refereeEditWindowMinutes, Guid changedByUserId,
-            int? walkoverWinnerScore = null, int? walkoverLoserScore = null)
+            int? walkoverWinnerScore = null, int? walkoverLoserScore = null,
+            int? homePenaltyScore = null, int? awayPenaltyScore = null)
         {
             if (Status is not (MatchStatus.Live or MatchStatus.Paused))
                 return Result.Failure(Error.Conflict("Status", "Match can only be finished from Live or Paused status"));
 
             if (resultType == MatchResultType.NotPlayed)
                 return Result.Failure(Error.Validation("ResultType", "ResultType must indicate how the match was decided"));
+
+            if (resultType == MatchResultType.Penalties)
+            {
+                // Karne rozstrzygają tylko remis; zwycięzca wynika z karnych (wyliczany, jeśli nie podano).
+                if (HomeScore != AwayScore)
+                    return Result.Failure(Error.Validation("ResultType", "Penalties can only decide a drawn match"));
+                if (!homePenaltyScore.HasValue || !awayPenaltyScore.HasValue || homePenaltyScore < 0 || awayPenaltyScore < 0)
+                    return Result.Failure(Error.Validation("HomePenaltyScore", "Penalty shootout score is required"));
+                if (homePenaltyScore == awayPenaltyScore)
+                    return Result.Failure(Error.Validation("HomePenaltyScore", "Penalty shootout cannot end in a draw"));
+
+                var penaltyWinner = homePenaltyScore > awayPenaltyScore ? HomeTournamentTeamId : AwayTournamentTeamId;
+                if (winnerTournamentTeamId.HasValue && winnerTournamentTeamId != penaltyWinner)
+                    return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be the team that won the penalty shootout"));
+
+                winnerTournamentTeamId = penaltyWinner;
+                HomePenaltyScore = homePenaltyScore;
+                AwayPenaltyScore = awayPenaltyScore;
+            }
+
+            // Mecz pucharowy musi mieć zwycięzcę (awans w drabince), a w zwykłym czasie i dogrywce
+            // zwycięzcą jest drużyna z większą liczbą goli — remis rozstrzygają karne.
+            if (StageType != StageType.Group && resultType is MatchResultType.Regular or MatchResultType.ExtraTime)
+            {
+                if (HomeScore == AwayScore)
+                    return Result.Failure(Error.Validation("ResultType", "A knockout match cannot end in a draw — decide it by penalties"));
+
+                var scoreWinner = HomeScore > AwayScore ? HomeTournamentTeamId : AwayTournamentTeamId;
+                if (winnerTournamentTeamId.HasValue && winnerTournamentTeamId != scoreWinner)
+                    return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be the team with more goals"));
+
+                winnerTournamentTeamId = scoreWinner;
+            }
 
             if (winnerTournamentTeamId.HasValue &&
                 winnerTournamentTeamId.Value != HomeTournamentTeamId &&

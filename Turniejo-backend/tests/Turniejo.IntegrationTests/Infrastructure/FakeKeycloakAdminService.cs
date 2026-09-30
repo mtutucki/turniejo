@@ -10,6 +10,7 @@ public sealed class FakeKeycloakAdminService : IKeycloakAdminService
 {
     private readonly ConcurrentDictionary<string, Guid> _usersByEmail = new(StringComparer.OrdinalIgnoreCase);
     public ConcurrentBag<Guid> PasswordResetRequests { get; } = [];
+    public ConcurrentBag<Guid> DeletedUsers { get; } = [];
 
     public Task<Guid> CreateUserAsync(
         string email, string password, string firstName, string lastName, CancellationToken cancellationToken = default)
@@ -28,9 +29,22 @@ public sealed class FakeKeycloakAdminService : IKeycloakAdminService
         return Task.CompletedTask;
     }
 
+    public Task DeleteUserAsync(Guid keycloakUserId, CancellationToken cancellationToken = default)
+    {
+        foreach (var (email, id) in _usersByEmail)
+        {
+            if (id == keycloakUserId)
+                _usersByEmail.TryRemove(email, out _);
+        }
+
+        DeletedUsers.Add(keycloakUserId);
+        return Task.CompletedTask;
+    }
+
     public void Reset()
     {
         _usersByEmail.Clear();
         PasswordResetRequests.Clear();
+        DeletedUsers.Clear();
     }
 }

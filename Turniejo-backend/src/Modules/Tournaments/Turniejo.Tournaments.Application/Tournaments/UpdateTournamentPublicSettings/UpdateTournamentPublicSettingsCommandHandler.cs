@@ -15,7 +15,8 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSet
 
             var updateResult = tournament.UpdatePublicSettings(
                 request.IsPublic, request.ShowTeams, request.ShowPlayers, request.ShowSchedule,
-                request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats);
+                request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats,
+                request.AbbreviatePlayerNames);
 
             if (updateResult.IsFailure)
                 return Result.Failure<UpdateTournamentPublicSettingsResponse>(updateResult.Error);

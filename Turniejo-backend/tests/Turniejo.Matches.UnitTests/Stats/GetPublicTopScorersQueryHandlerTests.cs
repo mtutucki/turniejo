@@ -28,10 +28,10 @@ namespace Turniejo.Matches.UnitTests.Stats
             _handler = new GetPublicTopScorersQueryHandler(_dbContext, _playerModule, _tournamentModule);
         }
 
-        private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showStats) =>
+        private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showStats, bool abbreviateNames = true) =>
             new(tournamentId, "Cup", "cup-slug", "InProgress", "Group",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1), null,
-                new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true, showStats));
+                new TournamentPublicSettingsDto(tournamentId, true, true, true, true, true, true, true, showStats, abbreviateNames));
 
         [Fact]
         public async Task Handle_ShouldFail_WhenTournamentNotFoundOrNotPublic()
@@ -81,6 +81,29 @@ namespace Turniejo.Matches.UnitTests.Stats
             result.Value.Should().ContainSingle();
             result.Value[0].PlayerId.Should().Be(scorerId);
             result.Value[0].Count.Should().Be(1);
+        }
+    
+        [Theory]
+        [InlineData(true, "K.")]
+        [InlineData(false, "Kowalski")]
+        public async Task Handle_ShouldAbbreviateLastName_WhenPortalHidesFullNames(bool abbreviate, string expectedLastName)
+        {
+            var tournamentId = Guid.NewGuid();
+            var scorerId = Guid.NewGuid();
+            _tournamentModule.GetPublicTournamentBySlugAsync("cup-slug", Arg.Any<CancellationToken>())
+                .Returns(CreatePublicTournamentDto(tournamentId, showStats: true, abbreviateNames: abbreviate));
+
+            var goalEvent = MatchEvent.Create(Guid.NewGuid(), Guid.NewGuid(), MatchEventType.Goal, 10, Guid.NewGuid(), Guid.NewGuid(), scorerId).Value;
+            _dbContext.GetMatchEventsByTournamentIdAndTypesAsync(
+                tournamentId, Arg.Any<IReadOnlyCollection<MatchEventType>>(), Arg.Any<CancellationToken>())
+                .Returns([goalEvent]);
+            _playerModule.GetPlayersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns([new PlayerDto(scorerId, "Jan", "Kowalski")]);
+
+            var result = await _handler.Handle(new GetPublicTopScorersQuery("cup-slug"), CancellationToken.None);
+
+            result.Value[0].FirstName.Should().Be("Jan");
+            result.Value[0].LastName.Should().Be(expectedLastName);
         }
     }
 }

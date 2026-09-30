@@ -62,6 +62,7 @@ public sealed class MatchReminderIntegrationTests(IntegrationTestWebApplicationF
 
         // Bez odbiorcy (sędzia/staff/opiekun) CreateMatchReminderNotificationsCommandHandler pomija
         // mecz (recipients.Count == 0 -> continue) — przypisanie sędziego daje mu jednego odbiorcę.
+        await TournamentFlow.JoinAsRefereeAsync(Factory, organizer, tournamentId, refereeUserId);
         var refereeAssignResponse = await organizer.PatchAsJsonAsync($"/api/tournaments/{tournamentId}/matches/{matchId}/referee",
             new MatchesController.AssignRefereeToMatchRequest(refereeUserId));
         refereeAssignResponse.IsSuccessStatusCode.Should().BeTrue();

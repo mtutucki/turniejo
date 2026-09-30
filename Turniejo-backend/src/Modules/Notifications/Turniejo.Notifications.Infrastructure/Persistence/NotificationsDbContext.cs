@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Turniejo.Notifications.Application.Abstractions;
 using Turniejo.Notifications.Domain.Entities;
 using Turniejo.Notifications.Domain.Enums;
@@ -35,6 +35,12 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
 
     public async Task<NotificationRecipient?> GetNotificationRecipientByIdAsync(Guid notificationRecipientId, CancellationToken cancellationToken = default) =>
         await NotificationRecipients.FirstOrDefaultAsync(r => r.Id == notificationRecipientId, cancellationToken);
+
+    public async Task<IReadOnlyList<NotificationRecipient>> GetNotificationRecipientsByNotificationIdAsync(Guid notificationId, CancellationToken cancellationToken = default) =>
+        await NotificationRecipients
+            .AsNoTracking()
+            .Where(r => r.NotificationId == notificationId)
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<NotificationRecipient>> GetNotificationRecipientsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         await NotificationRecipients

@@ -56,5 +56,39 @@ services:
       postgres:
         condition: service_healthy
 
+  # Statystyki odwiedzin bez ciasteczek (frontend: NEXT_PUBLIC_UMAMI_*). Opcjonalne — startuje tylko z
+  # `docker compose --profile analytics up -d`. Panel: http://localhost:3001, domyślnie admin/umami.
+  umami-db:
+    image: postgres:16
+    container_name: turniejo-umami-db
+    profiles: ["analytics"]
+    environment:
+      # Hasło dev — patrz ostrzeżenie na górze pliku.
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: umami
+      POSTGRES_DB: umami
+    volumes:
+      - umami_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: turniejo-umami
+    profiles: ["analytics"]
+    environment:
+      DATABASE_URL: postgresql://umami:umami@umami-db:5432/umami
+      # Sekret dev — patrz ostrzeżenie na górze pliku.
+      APP_SECRET: turniejo-umami-dev-secret
+    ports:
+      - "3001:3000"
+    depends_on:
+      umami-db:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  umami_data:

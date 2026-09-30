@@ -1,0 +1,162 @@
+// Kontrakty modułów Teams i Players. Jak w tournaments.ts: DTO zwracają nazwy enumów,
+// body requestów przyjmuje wartości liczbowe.
+
+// 1:1 z Turniejo.Teams.Domain.Enums.RegistrationStatus
+export const RegistrationStatus = { Pending: 1, Accepted: 2, Rejected: 3, Withdrawn: 4 } as const
+export type RegistrationStatus = keyof typeof RegistrationStatus
+
+export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
+  Pending: "Oczekuje",
+  Accepted: "Zaakceptowana",
+  Rejected: "Odrzucona",
+  Withdrawn: "Wycofana",
+}
+
+/** Lustro TournamentTeam.AllowedTransitions w domenie backendu. */
+export const REGISTRATION_TRANSITIONS: Record<RegistrationStatus, RegistrationStatus[]> = {
+  Pending: ["Accepted", "Rejected"],
+  Accepted: ["Withdrawn"],
+  Rejected: [],
+  Withdrawn: [],
+}
+
+// 1:1 z Turniejo.Teams.Domain.Enums.PaymentStatus
+export const PaymentStatus = { NotRequired: 1, Unpaid: 2, Paid: 3, Refunded: 4 } as const
+export type PaymentStatus = keyof typeof PaymentStatus
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  NotRequired: "Nie dotyczy",
+  Unpaid: "Nieopłacona",
+  Paid: "Opłacona",
+  Refunded: "Zwrócona",
+}
+
+// 1:1 z Turniejo.Teams.Domain.Enums.TeamStaffRole
+export const TeamStaffRole = { Coach: 1, AssistantCoach: 2, Manager: 3 } as const
+export type TeamStaffRole = keyof typeof TeamStaffRole
+
+export const TEAM_STAFF_ROLE_LABELS: Record<TeamStaffRole, string> = {
+  Coach: "Trener",
+  AssistantCoach: "Asystent trenera",
+  Manager: "Kierownik",
+}
+
+// 1:1 z Turniejo.Players.Domain.Enums.PlayerPosition
+export const PlayerPosition = {
+  Goalkeeper: 1,
+  Defender: 2,
+  Midfielder: 3,
+  Forward: 4,
+  Universal: 5,
+  Unknown: 6,
+} as const
+export type PlayerPosition = keyof typeof PlayerPosition
+
+export const PLAYER_POSITION_LABELS: Record<PlayerPosition, string> = {
+  Goalkeeper: "Bramkarz",
+  Defender: "Obrońca",
+  Midfielder: "Pomocnik",
+  Forward: "Napastnik",
+  Universal: "Uniwersalny",
+  Unknown: "Nieokreślona",
+}
+
+// 1:1 z Turniejo.Players.Domain.Enums.TournamentPlayerStatus
+export type TournamentPlayerStatus = "Active" | "Injured" | "Suspended" | "Removed"
+
+export const PLAYER_STATUS_LABELS: Record<TournamentPlayerStatus, string> = {
+  Active: "Aktywny",
+  Injured: "Kontuzjowany",
+  Suspended: "Zawieszony",
+  Removed: "Usunięty",
+}
+
+/** Role nadawane przez /join (JoinTournamentCommandHandler). */
+export const JOIN_ROLE_LABELS: Record<string, string> = {
+  Referee: "Sędzia",
+  Coach: "Trener",
+  Viewer: "Kibic / rodzic",
+}
+
+/** TeamDto — globalna drużyna organizacji. */
+export type Team = {
+  id: string
+  organizationId: string
+  name: string
+  shortName: string | null
+  logoUrl: string | null
+}
+
+/** TournamentTeamDto — zgłoszenie drużyny do turnieju. */
+export type TournamentTeam = {
+  id: string
+  tournamentId: string
+  teamId: string
+  categoryId: string
+  groupId: string | null
+  registrationStatus: RegistrationStatus
+  paymentStatus: PaymentStatus
+  seedNumber: number | null
+  teamName: string
+  teamShortName: string | null
+  teamLogoUrl: string | null
+}
+
+/** TournamentPlayerDto — zawodnik w składzie drużyny turniejowej. */
+export type TournamentPlayer = {
+  id: string
+  tournamentTeamId: string
+  playerId: string
+  shirtNumber: number | null
+  position: PlayerPosition | null
+  status: TournamentPlayerStatus
+  firstName: string
+  lastName: string
+  birthDate: string | null
+  photoUrl: string | null
+}
+
+/** TeamStaffDto */
+export type TeamStaffMember = {
+  id: string
+  tournamentTeamId: string
+  userId: string
+  role: TeamStaffRole
+  email: string | null
+  firstName: string | null
+  lastName: string | null
+}
+
+/** TournamentMemberDto — osoba z rolą w turnieju (GET /members, tylko organizator). */
+export type TournamentMember = {
+  userId: string
+  email: string
+  firstName: string
+  lastName: string
+  roles: string[]
+}
+
+/** JoinTournamentResponse */
+export type JoinResult = {
+  tournamentId: string
+  tournamentName: string
+  slug: string
+  role: string
+  isPublic: boolean
+}
+
+export type TeamInput = {
+  name: string
+  shortName: string | null
+  logoUrl: string | null
+}
+
+export type NewPlayerInput = {
+  firstName: string
+  lastName: string
+  /** ISO z północą UTC — kolumna BirthDate to timestamptz. */
+  birthDate: string
+  position: PlayerPosition
+  shirtNumber: number | null
+  photoUrl: string | null
+}

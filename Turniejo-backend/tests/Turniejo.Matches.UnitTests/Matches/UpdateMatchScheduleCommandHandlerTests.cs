@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Application.Matches.UpdateMatchSchedule;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
@@ -18,7 +19,7 @@ namespace Turniejo.Matches.UnitTests.Matches
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new UpdateMatchScheduleCommandHandler(_dbContext, _currentUserContext);
+            _handler = new UpdateMatchScheduleCommandHandler(_dbContext, new ScheduleConflictChecker(_dbContext, Substitute.For<ITournamentModule>()), _currentUserContext);
         }
 
         private static Match CreateFakeMatch(Guid tournamentId)
@@ -26,6 +27,13 @@ namespace Turniejo.Matches.UnitTests.Matches
             var match = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
             match.ClearDomainEvents();
             return match;
+        }
+
+        private static Match OtherMatch(Guid tournamentId, Guid? pitchId, DateTimeOffset scheduledAt)
+        {
+            var other = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), pitchId, scheduledAt, StageType.Group).Value;
+            other.ClearDomainEvents();
+            return other;
         }
 
         [Fact]
@@ -37,7 +45,8 @@ namespace Turniejo.Matches.UnitTests.Matches
             var newPitchId = Guid.NewGuid();
             var newTime = DateTimeOffset.UtcNow.AddDays(2);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
-            _dbContext.MatchExistsAtPitchAndTimeAsync(newPitchId, newTime, match.Id, Arg.Any<CancellationToken>()).Returns(false);
+            _dbContext.GetPitchByIdAsync(newPitchId, Arg.Any<CancellationToken>())
+                .Returns(Pitch.Create(newPitchId, tournamentId, "Boisko 2", null, Guid.NewGuid()).Value);
             _currentUserContext.UserId.Returns(Guid.NewGuid());
             var command = new UpdateMatchScheduleCommand(tournamentId, match.Id, newPitchId, newTime);
 
@@ -76,7 +85,8 @@ namespace Turniejo.Matches.UnitTests.Matches
             var newPitchId = Guid.NewGuid();
             var newTime = DateTimeOffset.UtcNow.AddDays(2);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
-            _dbContext.MatchExistsAtPitchAndTimeAsync(newPitchId, newTime, match.Id, Arg.Any<CancellationToken>()).Returns(true);
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<Match> { match, OtherMatch(tournamentId, newPitchId, newTime) });
             var command = new UpdateMatchScheduleCommand(tournamentId, match.Id, newPitchId, newTime);
 
             // Act

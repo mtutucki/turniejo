@@ -12,9 +12,17 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
 # next.js
 /.next/
+/.next-e2e/
+# Inne katalogi buildu (np. osobny dev server do testów) — Tailwind skanuje nieignorowane pliki
+# i binaria z builda potrafią wygenerować błędne klasy CSS.
+/.next-*/
 /out/
 
 # production

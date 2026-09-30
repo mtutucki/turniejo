@@ -19,6 +19,10 @@ namespace Turniejo.Organizations.Application.EventHandlers
     {
         public async Task Handle(UserRegistered notification, CancellationToken cancellationToken)
         {
+            // Konto rodzica/trenera/sędziego — bez organizacji i bez roli Organizer.
+            if (!notification.CreateOrganization)
+                return;
+
             var organization = await dbContext.GetOrganizationByOwnerUserIdAsync(notification.UserId, cancellationToken);
 
             if (organization is null)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Enums;
@@ -11,6 +12,8 @@ namespace Turniejo.Matches.Application.Matches.AssignRefereeToMatch
     internal sealed class AssignRefereeToMatchCommandHandler(
         IMatchesDbContext dbContext,
         IUserModule userModule,
+        IAuthorizationService authorizationService,
+        ScheduleConflictChecker conflictChecker,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignRefereeToMatchCommand, AssignRefereeToMatchResponse>
     {
         public async Task<Result<AssignRefereeToMatchResponse>> Handle(AssignRefereeToMatchCommand request, CancellationToken cancellationToken)
@@ -18,6 +21,27 @@ namespace Turniejo.Matches.Application.Matches.AssignRefereeToMatch
             var match = await dbContext.GetMatchByIdAsync(request.MatchId, cancellationToken);
             if (match == null || match.TournamentId != request.TournamentId)
                 return Result.Failure<AssignRefereeToMatchResponse>(Error.NotFound("Match", request.MatchId));
+
+            // Bez tego organizator mógł wskazać dowolne konto, a AssignRoleAsync nadawało mu rolę Referee
+            // w meczu — czyli dostęp do panelu sędziego komuś, kto nie dołączył do turnieju kodem sędziego.
+            if (request.RefereeId.HasValue)
+            {
+                var isTournamentReferee = await authorizationService.HasAnyRoleAsync(
+                    request.RefereeId.Value,
+                    nameof(RoleScopeType.Tournament),
+                    request.TournamentId,
+                    [nameof(UserRole.Referee)],
+                    cancellationToken);
+                if (!isTournamentReferee)
+                    return Result.Failure<AssignRefereeToMatchResponse>(Error.Validation("RefereeId", "User is not a referee in this tournament"));
+
+                if (request.RefereeId != match.RefereeId)
+                {
+                    var conflict = await conflictChecker.FindRefereeConflictAsync(match, request.RefereeId.Value, cancellationToken);
+                    if (conflict != null)
+                        return Result.Failure<AssignRefereeToMatchResponse>(conflict);
+                }
+            }
 
             var previousRefereeId = match.RefereeId;
 

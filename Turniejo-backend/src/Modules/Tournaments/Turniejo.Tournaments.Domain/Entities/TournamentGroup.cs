@@ -70,5 +70,19 @@ namespace Turniejo.Tournaments.Domain.Entities
             return Result.Success(group);
         }
 
+        public Result UpdateDetails(string name, int order)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Result.Failure(Error.Validation("Name", "TournamentGroup name cannot be empty"));
+            }
+
+            Name = name;
+            Order = order;
+            return Result.Success();
+        }
+
+        public void ClearDomainEvents() => _domainEvents.Clear();
+
     }
 }

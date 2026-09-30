@@ -1,10 +1,11 @@
-﻿using FluentValidation;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
+using Turniejo.Tournaments.Application.Services;
 using Turniejo.Tournaments.Application.Tournaments.CreateTournament;
 using Turniejo.Tournaments.Infrastructure.Persistence;
 
@@ -29,6 +30,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<TournamentsDbContext>());
 
         services.AddScoped<ITournamentModule, TournamentModule>();
+        services.AddScoped<DefaultGroupProvisioner>();
 
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 

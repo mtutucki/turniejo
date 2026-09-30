@@ -8,6 +8,7 @@ public interface IMatchModule
         string stageType, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TournamentMatchDto>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task<MatchInfoDto?> GetMatchAsync(Guid matchId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PitchInfoDto>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TournamentMatchDto>> GetMatchesByTournamentTeamIdsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TeamMatchEventDto>> GetMatchEventsByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MatchInfoDto>> GetMatchesScheduledBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
@@ -15,6 +16,8 @@ public interface IMatchModule
     // Cross-module istnienie-check dla blokad kasowania (np. kategorii turnieju) — Match.CategoryId
     // nie ma FK, więc bez tego usunięcie kategorii cicho osierocało mecze.
     Task<bool> AnyMatchesForCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    // Jak wyżej, dla Match.GroupId — blokada kasowania grupy turnieju.
+    Task<bool> AnyMatchesForGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
 }
 
 public record GroupMatchDto(
@@ -50,3 +53,5 @@ public record TeamMatchEventDto(
     string Type,
     Guid? PlayerId,
     Guid? RelatedPlayerId);
+
+public record PitchInfoDto(Guid Id, string Name, bool IsActive);

@@ -11,7 +11,9 @@ internal sealed class StandingModule(IStandingsDbContext dbContext) : IStandingM
 
         return standings
             .OrderBy(s => s.Position)
-            .Select(s => new GroupStandingDto(s.TournamentTeamId, s.Position, s.Points))
+            .Select(s => new GroupStandingDto(
+                s.TournamentTeamId, s.Position, s.Points,
+                s.MatchesPlayed, s.Wins, s.Draws, s.Losses, s.GoalsFor, s.GoalsAgainst))
             .ToList();
     }
 }

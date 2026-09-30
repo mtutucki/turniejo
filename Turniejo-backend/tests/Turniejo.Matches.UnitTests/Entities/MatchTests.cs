@@ -182,6 +182,52 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.RefereeId.Should().BeNull();
         }
 
+        public static TheoryData<string> StartedStates => new() { "Live", "Paused", "Cancelled" };
+
+        private static Match CreateMatchIn(string state)
+        {
+            var match = CreateValidMatch();
+            if (state is "Live" or "Paused")
+                match.Start(ValidUserId);
+            if (state == "Paused")
+                match.Pause(ValidUserId);
+            if (state == "Cancelled")
+                match.Cancel("deszcz", ValidUserId);
+            match.ClearDomainEvents();
+            return match;
+        }
+
+        [Theory]
+        [MemberData(nameof(StartedStates))]
+        public void AssignReferee_ShouldFail_OnceMatchHasStartedOrWasCancelled(string state)
+        {
+            var match = CreateMatchIn(state);
+            var refereeBefore = match.RefereeId;
+
+            var result = match.AssignReferee(Guid.NewGuid(), ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+            match.RefereeId.Should().Be(refereeBefore);
+        }
+
+        [Theory]
+        [MemberData(nameof(StartedStates))]
+        public void ScheduleChanges_ShouldFail_OnceMatchHasStartedOrWasCancelled(string state)
+        {
+            var match = CreateMatchIn(state);
+            var pitchBefore = match.PitchId;
+            var timeBefore = match.ScheduledAt;
+
+            match.UpdateSchedule(Guid.NewGuid(), timeBefore.AddHours(1), ValidUserId).IsFailure.Should().BeTrue();
+            match.AssignPitch(Guid.NewGuid(), ValidUserId).IsFailure.Should().BeTrue();
+            match.Reschedule(timeBefore.AddHours(1), ValidUserId).IsFailure.Should().BeTrue();
+
+            match.PitchId.Should().Be(pitchBefore);
+            match.ScheduledAt.Should().Be(timeBefore);
+            match.DomainEvents.Should().BeEmpty();
+        }
+
         [Fact]
         public void Start_ShouldSetStatusLiveAndStartedAt_WhenScheduled()
         {
@@ -883,6 +929,59 @@ namespace Turniejo.Matches.UnitTests.Entities
             // Assert
             result.IsSuccess.Should().BeTrue();
             match.Version.Should().Be(versionAfterFirstUpdate);
+        }
+        private static Match LiveKnockout(int home, int away)
+        {
+            var match = Match.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow, StageType.Knockout).Value;
+            match.Start(Guid.NewGuid());
+            match.UpdateScore(home, away);
+            return match;
+        }
+
+        [Fact]
+        public void Finish_Knockout_ShouldRejectDrawInRegularTime()
+        {
+            var match = LiveKnockout(1, 1);
+
+            var result = match.Finish(MatchResultType.Regular, null, 10, ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            match.Status.Should().Be(MatchStatus.Live);
+        }
+
+        [Fact]
+        public void Finish_Knockout_ShouldDeriveWinnerFromScore_AndRejectWrongWinner()
+        {
+            var match = LiveKnockout(2, 1);
+            match.Finish(MatchResultType.ExtraTime, match.AwayTournamentTeamId, 10, ValidUserId).IsFailure.Should().BeTrue();
+
+            match.Finish(MatchResultType.ExtraTime, null, 10, ValidUserId).IsSuccess.Should().BeTrue();
+            match.WinnerTournamentTeamId.Should().Be(match.HomeTournamentTeamId);
+        }
+
+        [Fact]
+        public void Finish_Penalties_ShouldStoreShootoutAndPickWinner()
+        {
+            var match = LiveKnockout(1, 1);
+
+            var result = match.Finish(MatchResultType.Penalties, null, 10, ValidUserId, homePenaltyScore: 3, awayPenaltyScore: 4);
+
+            result.IsSuccess.Should().BeTrue();
+            match.HomePenaltyScore.Should().Be(3);
+            match.AwayPenaltyScore.Should().Be(4);
+            match.WinnerTournamentTeamId.Should().Be(match.AwayTournamentTeamId);
+        }
+
+        [Theory]
+        [InlineData(2, 1, 4, 3)]   // karne tylko przy remisie
+        [InlineData(1, 1, 3, 3)]   // karne bez rozstrzygnięcia
+        [InlineData(1, 1, null, 3)] // brak wyniku karnych
+        public void Finish_Penalties_ShouldRejectInvalidShootout(int home, int away, int? homePens, int? awayPens)
+        {
+            var match = LiveKnockout(home, away);
+
+            match.Finish(MatchResultType.Penalties, null, 10, ValidUserId, homePenaltyScore: homePens, awayPenaltyScore: awayPens)
+                .IsFailure.Should().BeTrue();
         }
     }
 }

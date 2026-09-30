@@ -13,6 +13,7 @@ namespace Turniejo.Matches.Application.Matches.AddCard
     internal sealed class AddCardCommandHandler(
         IMatchesDbContext dbContext,
         MatchEventRosterGuard rosterGuard,
+        SendOffRules sendOffRules,
         ICurrentUserContext currentUserContext) : ICommandHandler<AddCardCommand, AddCardResponse>
     {
         public async Task<Result<AddCardResponse>> Handle(AddCardCommand request, CancellationToken cancellationToken)
@@ -32,22 +33,28 @@ namespace Turniejo.Matches.Application.Matches.AddCard
             if (playerCheck.IsFailure)
                 return Result.Failure<AddCardResponse>(playerCheck.Error);
 
+            var sentOff = await sendOffRules.EnsureNotSentOffAsync(match.Id, request.PlayerId, "PlayerId", cancellationToken);
+            if (sentOff != null)
+                return Result.Failure<AddCardResponse>(sentOff);
+
+            var cardType = await sendOffRules.ResolveCardTypeAsync(match.Id, request.PlayerId, request.CardType, cancellationToken);
+
             var eventResult = MatchEvent.Create(
-                Guid.NewGuid(), match.Id, request.CardType, request.Minute, currentUserContext.UserId,
+                Guid.NewGuid(), match.Id, cardType, request.Minute, currentUserContext.UserId,
                 request.TournamentTeamId, request.PlayerId, second: request.Second);
             if (eventResult.IsFailure)
                 return Result.Failure<AddCardResponse>(eventResult.Error);
 
             await dbContext.AddMatchEventAsync(eventResult.Value, cancellationToken);
 
-            var addedEvent = new MatchEventAdded(eventResult.Value.Id, match.Id, match.TournamentId, request.CardType.ToString());
+            var addedEvent = new MatchEventAdded(eventResult.Value.Id, match.Id, match.TournamentId, cardType.ToString());
             await dbContext.AddOutboxMessageAsync(
                 OutboxMessage.Create(addedEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(addedEvent, addedEvent.GetType())),
                 cancellationToken);
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            return Result.Success(new AddCardResponse(eventResult.Value.Id));
+            return Result.Success(new AddCardResponse(eventResult.Value.Id, cardType.ToString()));
         }
     }
 }

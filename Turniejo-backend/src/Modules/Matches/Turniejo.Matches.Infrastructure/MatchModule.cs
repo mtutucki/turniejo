@@ -8,6 +8,12 @@ namespace Turniejo.Matches.Infrastructure;
 
 internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender) : IMatchModule
 {
+    public async Task<IReadOnlyList<PitchInfoDto>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
+    {
+        var pitches = await dbContext.GetPitchesByTournamentIdAsync(tournamentId, cancellationToken);
+        return pitches.Select(p => new PitchInfoDto(p.Id, p.Name, p.IsActive)).ToList();
+    }
+
     public async Task<IReadOnlyList<GroupMatchDto>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default)
     {
         var matches = await dbContext.GetFinishedMatchesByGroupIdAsync(groupId, cancellationToken);
@@ -76,6 +82,9 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender) :
 
     public async Task<bool> AnyMatchesForCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
         await dbContext.AnyMatchesByCategoryIdAsync(categoryId, cancellationToken);
+
+    public async Task<bool> AnyMatchesForGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyMatchesByGroupIdAsync(groupId, cancellationToken);
 
     private static TournamentMatchDto ToTournamentMatchDto(Turniejo.Matches.Domain.Entities.Match m) =>
         new(m.Id, m.TournamentId, m.Status.ToString(), m.ScheduledAt, m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.HomeScore, m.AwayScore);

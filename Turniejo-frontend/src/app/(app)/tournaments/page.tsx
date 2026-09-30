@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 
-import { ComingSoon } from "@/components/layout/coming-soon"
+import { TournamentList } from "./tournament-list"
 
-export const metadata: Metadata = { title: "Turnieje" }
+export const metadata: Metadata = { title: "Moje turnieje" }
 
 export default function TournamentsPage() {
-  return <ComingSoon title="Turnieje" phase={2} />
+  return <TournamentList />
 }

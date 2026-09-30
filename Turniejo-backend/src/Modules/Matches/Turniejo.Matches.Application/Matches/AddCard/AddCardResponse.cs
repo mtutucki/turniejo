@@ -1,4 +1,5 @@
 namespace Turniejo.Matches.Application.Matches.AddCard
 {
-    public sealed record AddCardResponse(Guid MatchEventId);
+    // CardType: faktycznie zapisana kartka — druga żółta wraca jako "RedCard".
+    public sealed record AddCardResponse(Guid MatchEventId, string CardType = "");
 }

@@ -166,4 +166,30 @@ public sealed class UserTests
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Validation.LastName");
     }
+
+    [Fact]
+    public void Create_ShouldRecordTermsAcceptance_WhenVersionGiven()
+    {
+        var user = User.Create(ValidId, ValidEmail, ValidFirstName, ValidLastName, acceptedTermsVersion: "2026-09-30").Value;
+
+        user.TermsVersion.Should().Be("2026-09-30");
+        user.TermsAcceptedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Anonymize_ShouldRemovePersonalData_AndMarkDeleted()
+    {
+        var user = User.Create(ValidId, ValidEmail, ValidFirstName, ValidLastName, "+48123456789", acceptedTermsVersion: "2026-09-30").Value;
+
+        user.Anonymize();
+
+        user.Status.Should().Be(UserStatus.Deleted);
+        user.DeletedAt.Should().NotBeNull();
+        user.Email.Should().NotContain("kowalski");
+        user.FirstName.Should().NotBe(ValidFirstName);
+        user.LastName.Should().NotBe(ValidLastName);
+        user.PhoneNumber.Should().BeNull();
+        // Dowód akceptacji regulaminu zostaje (rozliczalność).
+        user.TermsVersion.Should().Be("2026-09-30");
+    }
 }

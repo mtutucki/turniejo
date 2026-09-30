@@ -31,7 +31,9 @@ namespace Turniejo.Matches.Application.Matches.GetMatchLivePanel
                 match.Id, match.TournamentId, match.Status.ToString(), match.StageType.ToString(), match.ScheduledAt,
                 match.StartedAt, match.PausedAt, match.FinishedAt, match.TotalPausedSeconds,
                 match.HomeScore, match.AwayScore, match.ResultType.ToString(), match.WinnerTournamentTeamId,
-                homeTeam, awayTeam, eventDtos);
+                homeTeam, awayTeam, eventDtos, match.EditLockedAt,
+                match.GetElapsedSeconds(match.FinishedAt ?? match.PausedAt ?? DateTimeOffset.UtcNow),
+                match.HomePenaltyScore, match.AwayPenaltyScore);
 
             return Result.Success(dto);
         }

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
+import { Analytics } from "@/components/analytics"
+
 import "./globals.css"
 import { Providers } from "./providers"
 
@@ -20,19 +22,20 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#121417",
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // suppressHydrationWarning: next-themes ustawia klasę motywu przed hydracją.
     <html
       lang="pl"
-      suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
+      {/* Rozszerzenia przeglądarki (np. ColorZilla: cz-shortcut-listen) dopisują atrybuty do <body>
+          przed hydratacją — wyciszamy tylko różnice atrybutów tego jednego elementu. */}
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   )

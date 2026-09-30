@@ -27,7 +27,10 @@ namespace Turniejo.Matches.UnitTests.Matches
             _sender = Substitute.For<ISender>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             var rosterGuard = new MatchEventRosterGuard(_playerModule);
-            _handler = new AddGoalCommandHandler(_dbContext, rosterGuard, _sender, _currentUserContext);
+            _handler = new AddGoalCommandHandler(_dbContext, rosterGuard, new SendOffRules(_dbContext), _sender, _currentUserContext);
+            // domyślnie: brak kartek w meczu (SendOffRules)
+            _dbContext.GetActiveMatchEventsByTypeAsync(default, default, default)
+                .ReturnsForAnyArgs(new List<MatchEvent>());
         }
 
         private static Match CreateLiveMatch(Guid tournamentId)
@@ -202,6 +205,30 @@ namespace Turniejo.Matches.UnitTests.Matches
 
             // Assert
             result.IsSuccess.Should().BeTrue();
+        }
+        [Fact]
+        public async Task Handle_ShouldFail_WhenScorerOrAssistantWasSentOff()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var sentOff = Guid.NewGuid();
+            var teammate = Guid.NewGuid();
+            SetUpRoster(match.HomeTournamentTeamId, sentOff, teammate);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var red = MatchEvent.Create(Guid.NewGuid(), match.Id, MatchEventType.RedCard, 20, Guid.NewGuid(), match.HomeTournamentTeamId, sentOff).Value;
+            _dbContext.GetActiveMatchEventsByTypeAsync(match.Id, MatchEventType.RedCard, Arg.Any<CancellationToken>())
+                .Returns(new List<MatchEvent> { red });
+
+            var asScorer = await _handler.Handle(
+                new AddGoalCommand(tournamentId, match.Id, match.HomeTournamentTeamId, sentOff, null, MatchEventType.Goal, 30, null),
+                CancellationToken.None);
+            var asAssist = await _handler.Handle(
+                new AddGoalCommand(tournamentId, match.Id, match.HomeTournamentTeamId, teammate, sentOff, MatchEventType.Goal, 31, null),
+                CancellationToken.None);
+
+            asScorer.Error.Code.Should().Be("Validation.PlayerId");
+            asAssist.Error.Code.Should().Be("Validation.AssistPlayerId");
+            await _dbContext.DidNotReceive().AddMatchEventAsync(Arg.Any<MatchEvent>(), Arg.Any<CancellationToken>());
         }
     }
 }

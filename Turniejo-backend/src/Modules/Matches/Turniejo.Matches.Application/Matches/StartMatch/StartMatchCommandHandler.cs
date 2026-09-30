@@ -11,6 +11,7 @@ namespace Turniejo.Matches.Application.Matches.StartMatch
 {
     internal sealed class StartMatchCommandHandler(
         IMatchesDbContext dbContext,
+        ITournamentModule tournamentModule,
         ICurrentUserContext currentUserContext) : ICommandHandler<StartMatchCommand, StartMatchResponse>
     {
         public async Task<Result<StartMatchResponse>> Handle(StartMatchCommand request, CancellationToken cancellationToken)
@@ -39,6 +40,10 @@ namespace Turniejo.Matches.Application.Matches.StartMatch
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            // Pierwszy rozpoczęty mecz przełącza turniej na "W trakcie" — organizator nie musi pamiętać o tym
+            // w dniu turnieju. Dla kolejnych meczów (turniej już trwa) to no-op; porażka nie cofa startu meczu.
+            await tournamentModule.MarkTournamentStartedAsync(match.TournamentId, currentUserContext.UserId, cancellationToken);
 
             return Result.Success(new StartMatchResponse(match.Id));
         }
