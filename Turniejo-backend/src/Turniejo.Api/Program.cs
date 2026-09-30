@@ -16,7 +16,8 @@ using Turniejo.Users.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
@@ -108,6 +109,8 @@ app.MapGet("/api/me/roles", async (
     var roles = await userModule.GetUserRolesAsync(ctx.UserId, cancellationToken);
     return Results.Ok(roles.Select(r => new { r.Role, r.ScopeType, r.ScopeId }));
 }).RequireAuthorization().WithTags("Me");
+
+await app.MigrateDatabaseIfEnabledAsync();
 
 app.Run();
 

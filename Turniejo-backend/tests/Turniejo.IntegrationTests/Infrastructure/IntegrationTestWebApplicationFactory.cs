@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,16 +9,8 @@ using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Turniejo.Api.BackgroundServices;
-using Turniejo.Brackets.Infrastructure.Persistence;
-using Turniejo.Matches.Infrastructure.Persistence;
-using Turniejo.Notifications.Infrastructure.Persistence;
-using Turniejo.Organizations.Infrastructure.Persistence;
-using Turniejo.Players.Infrastructure.Persistence;
+using Turniejo.Api.Extensions;
 using Turniejo.SharedKernel.Contracts;
-using Turniejo.Standings.Infrastructure.Persistence;
-using Turniejo.Teams.Infrastructure.Persistence;
-using Turniejo.Tournaments.Infrastructure.Persistence;
-using Turniejo.Users.Infrastructure.Persistence;
 
 namespace Turniejo.IntegrationTests.Infrastructure;
 
@@ -86,17 +77,7 @@ public sealed class IntegrationTestWebApplicationFactory : WebApplicationFactory
         // zutylizowany — CreateClient wymusza pełne, stabilne uruchomienie TestServera.
         using var _ = CreateClient();
         using var scope = Services.CreateScope();
-        var sp = scope.ServiceProvider;
-
-        await sp.GetRequiredService<UsersDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<OrganizationsDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<TournamentsDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<TeamsDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<PlayersDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<MatchesDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<StandingsDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<BracketsDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<NotificationsDbContext>().Database.MigrateAsync();
+        await scope.ServiceProvider.MigrateAllModulesAsync();
     }
 
     // Truncate zamiast osobnego kontenera per test — kilka rzędów wielkości szybsze, a przy jednym,

@@ -52,11 +52,16 @@ public static class ServiceCollectionExtensions
 
         services.AddAuthorization();
 
-        // Keycloak Admin
+        // Keycloak Admin — BaseUrl to adres wewnętrzny (np. http://keycloak:8080 w sieci dockerowej),
+        // niezależny od publicznego Authority, z którego pochodzi issuer tokenów userów.
+        var keycloakBaseUrl = new Uri(configuration["Keycloak:BaseUrl"]!);
+
+        services.AddHttpClient(KeycloakAdminTokenProvider.HttpClientName, client => client.BaseAddress = keycloakBaseUrl);
+        services.AddSingleton<KeycloakAdminTokenProvider>();
         services.AddTransient<KeycloakAdminTokenHandler>();
         services.AddHttpClient<IKeycloakAdminService, KeycloakAdminService>(client =>
         {
-            client.BaseAddress = new Uri(configuration["Keycloak:BaseUrl"]!);
+            client.BaseAddress = keycloakBaseUrl;
         })
         .AddHttpMessageHandler<KeycloakAdminTokenHandler>();
 

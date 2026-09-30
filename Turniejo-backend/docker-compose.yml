@@ -1,8 +1,7 @@
 # ⚠️ DEV ONLY — NIE UŻYWAĆ NA PRODUKCJI.
 # Wszystkie hasła poniżej (turniejo/turniejo, admin/admin) są celowo trywialne i jawnie wpisane —
-# to lokalne środowisko developerskie, nie ma tu żadnych prawdziwych sekretów. Na produkcji dane
-# logowania i connection stringi muszą pochodzić z appsettings.Production.json/zmiennych
-# środowiskowych/vaulta (patrz .gitignore), nigdy z tego pliku ani z niczego do niego podobnego.
+# to lokalne środowisko developerskie, nie ma tu żadnych prawdziwych sekretów. Produkcja:
+# deploy/docker-compose.prod.yml + deploy/.env (patrz deploy/README.md).
 services:
   postgres:
     image: postgres:16
@@ -34,6 +33,9 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/turniejo
       KC_DB_USERNAME: turniejo
       KC_DB_PASSWORD: turniejo
+      # Wstawiane w "secret" klienta turniejo-backend-admin przy imporcie realmu (placeholder w JSON).
+      # Musi się zgadzać z Keycloak:AdminClientSecret w appsettings.Development.json.
+      TURNIEJO_BACKEND_ADMIN_SECRET: dev-backend-admin-secret
     ports:
       - "8080:8080"
     command: start-dev --import-realm

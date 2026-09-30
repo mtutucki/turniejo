@@ -1,0 +1,18 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+tests/
+Turniejo-backend/
+infra/
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Lokalne sekrety — nigdy do obrazu.
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.Staging.json
+**/appsettings.Production.json
+**/secrets.json
+**/*.env
