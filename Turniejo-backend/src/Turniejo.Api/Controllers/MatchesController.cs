@@ -80,7 +80,9 @@ namespace Turniejo.Api.Controllers
         [HttpPost("schedule/generate")]
         public async Task<IActionResult> GenerateSchedule([FromRoute] Guid tournamentId, [FromBody] GenerateScheduleRequest request, CancellationToken cancellationToken)
         {
-            var command = new GenerateScheduleCommand(tournamentId, request.StartAt, request.EndAt, request.PitchIds);
+            var command = new GenerateScheduleCommand(
+                tournamentId, request.StartAt, request.EndAt, request.PitchIds,
+                request.Windows?.Select(w => new ScheduleWindow(w.StartAt, w.EndAt)).ToList());
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -307,7 +309,12 @@ namespace Turniejo.Api.Controllers
 
         public sealed record AddPitchRequest(string Name, string? Description);
         public sealed record UpdatePitchRequest(string Name, string? Description, bool IsActive);
-        public sealed record GenerateScheduleRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, IReadOnlyList<Guid> PitchIds);
+        public sealed record ScheduleWindowRequest(DateTimeOffset StartAt, DateTimeOffset EndAt);
+        public sealed record GenerateScheduleRequest(
+            DateTimeOffset StartAt,
+            DateTimeOffset EndAt,
+            IReadOnlyList<Guid> PitchIds,
+            IReadOnlyList<ScheduleWindowRequest>? Windows = null);
         public sealed record UpdateMatchScheduleRequest(Guid? PitchId, DateTimeOffset ScheduledAt);
         public sealed record AssignMatchPitchRequest(Guid? PitchId);
         public sealed record RescheduleMatchRequest(DateTimeOffset ScheduledAt);

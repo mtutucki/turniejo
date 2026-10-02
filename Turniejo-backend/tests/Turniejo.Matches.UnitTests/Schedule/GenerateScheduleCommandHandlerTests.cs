@@ -442,6 +442,53 @@ namespace Turniejo.Matches.UnitTests.Schedule
         }
 
         [Fact]
+        public async Task Handle_ShouldSpreadMatchesAcrossDays_WhenWindowsAreGiven()
+        {
+            // 4 drużyny = 6 meczów, 1 boisko. Każdy dzień 10:00–12:00 mieści 3 mecze (10:00 / 10:40 / 11:20),
+            // więc druga połowa trafia na kolejny dzień — nic nie ląduje w nocy między oknami.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(),
+                new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var day2 = day1.AddDays(1);
+            var command = new GenerateScheduleCommand(tournamentId, day1, day2.AddHours(2), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(2)), new ScheduleWindow(day2, day2.AddHours(2)) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            DateTimeOffset[] expected =
+            [
+                day1, day1.AddMinutes(40), day1.AddMinutes(80),
+                day2, day2.AddMinutes(40), day2.AddMinutes(80),
+            ];
+            await _dbContext.Received(1).AddMatchesAsync(
+                Arg.Is<IReadOnlyCollection<Match>>(m => m.Select(x => x.ScheduledAt).OrderBy(x => x).SequenceEqual(expected)),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenAWindowIsOutsideTheTournamentDates()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(), new List<Guid> { Guid.NewGuid(), Guid.NewGuid() });
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(FakeTournament(tournamentId) with { StartAt = day1, EndAt = day1.AddHours(8) });
+
+            var command = new GenerateScheduleCommand(tournamentId, day1, day1.AddHours(8), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(2)), new ScheduleWindow(day1.AddDays(1), day1.AddDays(1).AddHours(2)) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.StartAt");
+        }
+
+        [Fact]
         public async Task Handle_ShouldSucceed_WhenLastMatchEndsExactlyAtEndAt()
         {
             var tournamentId = Guid.NewGuid();

@@ -49,6 +49,7 @@ import { useTournamentContext } from "@/features/tournaments/use-tournament-cont
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import {
   formatDateTime,
+  formatDayLong,
   formatTime,
   plural,
   toDateTimeLocal,
@@ -69,17 +70,43 @@ import {
 
 const schema = z
   .object({
-    date: z.string().min(1, "Wybierz dzień"),
-    startTime: z.string().min(1, "Podaj godzinę rozpoczęcia"),
-    endTime: z.string().min(1, "Podaj godzinę zakończenia"),
+    // Jeden wiersz na każdy dzień turnieju; wyłączony dzień nie dostaje meczów.
+    days: z.array(
+      z.object({
+        date: z.string(),
+        enabled: z.boolean(),
+        startTime: z.string(),
+        endTime: z.string(),
+      }),
+    ),
     pitchIds: z.array(z.string()).min(1, "Wybierz co najmniej jedno boisko"),
   })
-  .refine((v) => v.endTime > v.startTime, {
-    path: ["endTime"],
-    message: "Koniec musi być po rozpoczęciu",
+  .superRefine((values, ctx) => {
+    values.days.forEach((day, index) => {
+      if (!day.enabled) return
+      if (!day.startTime)
+        ctx.addIssue({
+          code: "custom",
+          path: ["days", index, "startTime"],
+          message: "Podaj godzinę rozpoczęcia",
+        })
+      else if (!day.endTime)
+        ctx.addIssue({
+          code: "custom",
+          path: ["days", index, "endTime"],
+          message: "Podaj godzinę zakończenia",
+        })
+      else if (day.endTime <= day.startTime)
+        ctx.addIssue({
+          code: "custom",
+          path: ["days", index, "endTime"],
+          message: "Koniec musi być po rozpoczęciu",
+        })
+    })
   })
 
 type GenerateValues = z.infer<typeof schema>
+type DayValues = GenerateValues["days"][number]
 
 /** Szkic formularza w sessionStorage — knownPitchIds odróżnia boisko odznaczone od dodanego później. */
 type GenerateDraft = GenerateValues & { knownPitchIds: string[] }
@@ -108,9 +135,7 @@ function readDraft(tournamentId: string): GenerateDraft | null {
     const draft = JSON.parse(sessionStorage.getItem(draftKey(tournamentId)) ?? "null")
     const valid =
       draft &&
-      typeof draft.date === "string" &&
-      typeof draft.startTime === "string" &&
-      typeof draft.endTime === "string" &&
+      Array.isArray(draft.days) &&
       Array.isArray(draft.pitchIds) &&
       Array.isArray(draft.knownPitchIds)
     return valid ? draft : null
@@ -118,6 +143,71 @@ function readDraft(tournamentId: string): GenerateDraft | null {
     return null
   }
 }
+
+/** Formularz ma wiersz na dzień — bardzo długi turniej dostaje tylko pierwsze dni. */
+const MAX_DAYS = 31
+
+/** Kolejne dni turnieju ("RRRR-MM-DD", strefa turnieju) od pierwszego do ostatniego. */
+function tournamentDays(minDate: string, maxDate: string) {
+  const days: string[] = []
+  const cursor = new Date(`${minDate}T12:00:00Z`)
+  while (days.length < MAX_DAYS) {
+    const day = cursor.toISOString().slice(0, 10)
+    if (day > maxDate) break
+    days.push(day)
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return days
+}
+
+type DayEstimate = { matches: number; end: Date }
+
+/** Ile slotów (mecz + przerwa) mieści się w godzinach dnia — mecz musi się zmieścić w całości. */
+function dayCapacity(day: DayValues, settings: TournamentSettings) {
+  if (!day.enabled || !day.startTime || day.endTime <= day.startTime) return 0
+  const start = new Date(zonedToIso(day.date, day.startTime)).getTime()
+  const end = new Date(zonedToIso(day.date, day.endTime)).getTime()
+  const slotMs = (settings.matchDurationMinutes + settings.breakDurationMinutes) * 60_000
+  return Math.max(
+    0,
+    Math.floor((end - start - settings.matchDurationMinutes * 60_000) / slotMs) + 1,
+  )
+}
+
+/**
+ * Tak samo jak generator w backendzie: sloty wypełniają kolejne dni po kolei. Zwraca szacunek dla
+ * każdego dnia (null = dzień bez meczów) i liczbę slotów, na które zabrakło godzin.
+ */
+function estimateDays(
+  days: DayValues[],
+  slots: number,
+  totalMatches: number,
+  settings: TournamentSettings,
+) {
+  const matchMs = settings.matchDurationMinutes * 60_000
+  const slotMs = (settings.matchDurationMinutes + settings.breakDurationMinutes) * 60_000
+  let placed = 0
+  let matchesSoFar = 0
+  const perDay = days.map((day): DayEstimate | null => {
+    const used = Math.min(slots - placed, dayCapacity(day, settings))
+    if (used <= 0) return null
+    placed += used
+    // Mecze rozłożone proporcjonalnie do slotów — ostatni slot dnia bywa niepełny.
+    const matchesUntilNow = Math.round((totalMatches * placed) / slots)
+    const matches = matchesUntilNow - matchesSoFar
+    matchesSoFar = matchesUntilNow
+    const start = new Date(zonedToIso(day.date, day.startTime)).getTime()
+    return { matches, end: new Date(start + (used - 1) * slotMs + matchMs) }
+  })
+  return { perDay, missingSlots: slots - placed }
+}
+
+const toMinutes = (time: string) => {
+  const [h, m] = time.split(":").map(Number) as [number, number]
+  return h * 60 + m
+}
+const toTime = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
 
 type GroupPlan = { group: TournamentGroup; teams: number; matches: number; rounds: number }
 
@@ -511,50 +601,44 @@ function GenerateForm({
   const generate = useGenerateSchedule(tournament.id)
   // Szkic przeżywa przejście do innej sekcji (np. "zmień" czas meczu w ustawieniach) i powrót.
   const [draft] = useState(() => readDraft(tournament.id))
-  const minDate = toZonedDateInput(tournament.startAt)
-  const maxDate = toZonedDateInput(tournament.endAt)
-  // Daty turnieju mogły się zmienić od zapisania szkicu.
-  const defaultDate = draft && draft.date >= minDate && draft.date <= maxDate ? draft.date : minDate
-  // Godziny wyliczone z turnieju: start o godzinie rozpoczęcia, koniec o godzinie zakończenia
-  // (turniej jednodniowy) albo szacowany koniec meczów na wszystkich boiskach (wielodniowy).
-  const [suggested] = useState(() => {
-    const startTime = toDateTimeLocal(tournament.startAt).slice(11)
-    if (minDate === maxDate) return { startTime, endTime: toDateTimeLocal(tournament.endAt).slice(11) }
-    const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
-    const slots = pitches.length
-      ? Math.max(Math.ceil(workload.totalMatches / pitches.length), workload.maxRounds)
-      : 0
-    if (!slots) return { startTime, endTime: "18:00" > startTime ? "18:00" : "23:59" }
-    const [h, m] = startTime.split(":").map(Number) as [number, number]
-    // Zapas jednego slotu (generator może potrzebować więcej), zaokrąglone w górę do pół godziny.
-    const end = Math.min(
-      Math.ceil((h * 60 + m + slots * slotMinutes + settings.matchDurationMinutes) / 30) * 30,
-      23 * 60 + 59,
+  // Godziny wyliczone z turnieju: pierwszy dzień od godziny rozpoczęcia, ostatni do godziny zakończenia,
+  // dni pomiędzy w tych samych godzinach. Szkic wygrywa, o ile mieści się w datach turnieju
+  // (mogły się zmienić od jego zapisania).
+  const [initialDays] = useState(() => {
+    const dates = tournamentDays(
+      toZonedDateInput(tournament.startAt),
+      toZonedDateInput(tournament.endAt),
     )
-    const pad = (n: number) => String(n).padStart(2, "0")
-    return { startTime, endTime: `${pad(Math.floor(end / 60))}:${pad(end % 60)}` }
+    const firstStart = toDateTimeLocal(tournament.startAt).slice(11)
+    const lastEnd = toDateTimeLocal(tournament.endAt).slice(11)
+    return dates.map((date, index): DayValues => {
+      const isFirst = index === 0
+      const isLast = index === dates.length - 1
+      const saved = draft?.days.find((day) => day.date === date)
+      if (
+        saved &&
+        (!isFirst || saved.startTime >= firstStart) &&
+        (!isLast || saved.endTime <= lastEnd)
+      )
+        return saved
+      const startTime = isFirst || !isLast || firstStart < lastEnd ? firstStart : "00:00"
+      const endTime =
+        isLast || lastEnd > startTime ? lastEnd : "18:00" > startTime ? "18:00" : "23:59"
+      return { date, enabled: saved?.enabled ?? true, startTime, endTime }
+    })
   })
-  // Szkic z godzinami spoza turnieju (np. stare domyślne 09:00) ustępuje wyliczonym.
-  const draftStartOk = !!draft && (defaultDate !== minDate || draft.startTime >= suggested.startTime)
-  const draftEndOk =
-    !!draft &&
-    (defaultDate !== maxDate || draft.endTime <= toDateTimeLocal(tournament.endAt).slice(11))
+  const multiDay = initialDays.length > 1
   const form = useForm<GenerateValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: defaultDate,
-      startTime: draftStartOk ? draft.startTime : suggested.startTime,
-      endTime: draftEndOk ? draft.endTime : suggested.endTime,
+      days: initialDays,
       pitchIds: draft
         ? draft.pitchIds.filter((id) => pitches.some((p) => p.id === id))
         : pitches.map((p) => p.id),
     },
   })
   const { errors } = form.formState
-  const [date, startTime, endTime, pitchIds] = useWatch({
-    control: form.control,
-    name: ["date", "startTime", "endTime", "pitchIds"],
-  })
+  const [days, pitchIds] = useWatch({ control: form.control, name: ["days", "pitchIds"] })
 
   // Boisko dodane już po otwarciu strony (np. przyciskiem "Dodaj Boisko 1" w warunkach) ma być od
   // razu zaznaczone — defaultValues zapamiętały listę z chwili montowania formularza.
@@ -568,9 +652,7 @@ function GenerateForm({
       sessionStorage.setItem(
         draftKey(tournament.id),
         JSON.stringify({
-          date,
-          startTime,
-          endTime,
+          days,
           pitchIds,
           knownPitchIds: pitchKey ? pitchKey.split(",") : [],
         } satisfies GenerateDraft),
@@ -578,7 +660,7 @@ function GenerateForm({
     } catch {
       // Brak sessionStorage (tryb prywatny) — formularz działa bez szkicu.
     }
-  }, [tournament.id, date, startTime, endTime, pitchIds, pitchKey])
+  }, [tournament.id, days, pitchIds, pitchKey])
   useEffect(() => {
     const added = pitches.filter((p) => !knownPitches.current.has(p.id)).map((p) => p.id)
     if (added.length === 0) return
@@ -587,32 +669,62 @@ function GenerateForm({
   }, [pitches, form])
 
   const { totalMatches, maxRounds } = workload
-  const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
   // Szacunek: tyle slotów, ile wymaga liczba boisk, ale nie mniej niż kolejek w największej grupie
   // (drużyna nie gra dwóch meczów naraz). Generator może potrzebować trochę więcej.
   const slots = pitchIds.length ? Math.max(Math.ceil(totalMatches / pitchIds.length), maxRounds) : 0
-  const estimatedEnd =
-    date && startTime && slots
-      ? new Date(
-          new Date(zonedToIso(date, startTime)).getTime() +
-            ((slots - 1) * slotMinutes + settings.matchDurationMinutes) * 60_000,
-        )
-      : null
-  const fitsWindow =
-    estimatedEnd && endTime ? estimatedEnd <= new Date(zonedToIso(date, endTime)) : true
+  const estimate = estimateDays(days, slots, totalMatches, settings)
+  const fits = estimate.missingSlots === 0
+  const usedDays = estimate.perDay.filter(Boolean).length
+  const lastEnd = estimate.perDay.findLast(Boolean)?.end
+  const enabledDays = days.filter((day) => day.enabled).length
+
+  // Podpowiedź: tyle samo slotów każdego włączonego dnia, koniec dnia zaraz po ostatnim meczu.
+  // Godziny rozpoczęcia zostają; dzień nie wychodzi poza północ ani poza koniec turnieju.
+  function spreadEvenly() {
+    const current = form.getValues("days")
+    const active = current.filter((day) => day.enabled && day.startTime)
+    if (active.length === 0 || slots === 0) return
+    const perDaySlots = Math.ceil(slots / active.length)
+    const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
+    const tournamentEnd = toDateTimeLocal(tournament.endAt)
+    current.forEach((day, index) => {
+      if (!day.enabled || !day.startTime) return
+      const wanted =
+        toMinutes(day.startTime) + (perDaySlots - 1) * slotMinutes + settings.matchDurationMinutes
+      const limit =
+        day.date === tournamentEnd.slice(0, 10) ? toMinutes(tournamentEnd.slice(11)) : 23 * 60 + 59
+      form.setValue(`days.${index}.endTime`, toTime(Math.min(wanted, limit)), {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    })
+  }
 
   function submit(values: GenerateValues) {
-    const startAt = zonedToIso(values.date, values.startTime)
-    const endAt = zonedToIso(values.date, values.endTime)
+    const playDays = values.days
+      .map((day, index) => ({ day, index }))
+      .filter(({ day }) => day.enabled)
+    const first = playDays[0]
+    const last = playDays.at(-1)
+    if (!first || !last) {
+      form.setError("root", { message: "Wybierz co najmniej jeden dzień gry" })
+      return
+    }
+    const windows = playDays.map(({ day }) => ({
+      startAt: zonedToIso(day.date, day.startTime),
+      endAt: zonedToIso(day.date, day.endTime),
+    }))
+    const startAt = windows[0]!.startAt
+    const endAt = windows.at(-1)!.endAt
     // Backend sprawdza to samo — tu tylko po to, żeby błąd pojawił się przy polach.
     if (startAt < new Date(tournament.startAt).toISOString()) {
-      form.setError("startTime", {
+      form.setError(`days.${first.index}.startTime`, {
         message: `Turniej zaczyna się ${formatDateTime(tournament.startAt)}`,
       })
       return
     }
     if (endAt > new Date(tournament.endAt).toISOString()) {
-      form.setError("endTime", {
+      form.setError(`days.${last.index}.endTime`, {
         message: `Turniej kończy się ${formatDateTime(tournament.endAt)}`,
       })
       return
@@ -621,6 +733,7 @@ function GenerateForm({
       {
         startAt,
         endAt,
+        windows,
         pitchIds: values.pitchIds,
       },
       {
@@ -641,37 +754,87 @@ function GenerateForm({
   return (
     <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <TextField
-            id="schedule-date"
-            label="Dzień"
-            type="date"
-            min={toZonedDateInput(tournament.startAt)}
-            max={toZonedDateInput(tournament.endAt)}
-            error={errors.date}
-            {...form.register("date")}
-          />
-          <TextField
-            id="schedule-start"
-            label="Pierwszy mecz"
-            type="time"
-            className="font-mono tabular-nums"
-            error={errors.startTime}
-            {...form.register("startTime")}
-          />
-          <TextField
-            id="schedule-end"
-            label="Koniec"
-            type="time"
-            className="font-mono tabular-nums"
-            error={errors.endTime}
-            {...form.register("endTime")}
-          />
-        </div>
+        <FieldSet>
+          <FieldLegend variant="label">{multiDay ? "Dni gry" : "Godziny gry"}</FieldLegend>
+          <div className="space-y-4">
+            {initialDays.map(({ date }, index) => {
+              const enabled = days[index]?.enabled ?? true
+              const dayLabel = formatDayLong(`${date}T12:00:00Z`)
+              return (
+                <div key={date} className="grid gap-3 sm:grid-cols-3 sm:items-start">
+                  {multiDay ? (
+                    <Controller
+                      control={form.control}
+                      name={`days.${index}.enabled`}
+                      render={({ field }) => (
+                        <Field orientation="horizontal" className="sm:pt-8">
+                          <Checkbox
+                            id={`schedule-day-${index}`}
+                            checked={field.value}
+                            onCheckedChange={(next) => field.onChange(next === true)}
+                          />
+                          <FieldLabel htmlFor={`schedule-day-${index}`} className="font-normal">
+                            {dayLabel}
+                          </FieldLabel>
+                        </Field>
+                      )}
+                    />
+                  ) : (
+                    <p className="text-sm sm:pt-8">{dayLabel}</p>
+                  )}
+                  {enabled ? (
+                    <>
+                      <TextField
+                        id={`schedule-start-${index}`}
+                        label="Pierwszy mecz"
+                        type="time"
+                        className="font-mono tabular-nums"
+                        error={errors.days?.[index]?.startTime}
+                        {...form.register(`days.${index}.startTime`)}
+                      />
+                      <TextField
+                        id={`schedule-end-${index}`}
+                        label="Koniec"
+                        type="time"
+                        className="font-mono tabular-nums"
+                        error={errors.days?.[index]?.endTime}
+                        {...form.register(`days.${index}.endTime`)}
+                      />
+                      {multiDay && slots > 0 && (
+                        <p className="text-muted-foreground -mt-1 text-xs sm:col-span-2 sm:col-start-2">
+                          {estimate.perDay[index] ? (
+                            <>
+                              ok.{" "}
+                              {plural(estimate.perDay[index].matches, ["mecz", "mecze", "meczów"])},
+                              koniec ok.{" "}
+                              <span className="font-mono tabular-nums">
+                                {formatTime(estimate.perDay[index].end)}
+                              </span>
+                            </>
+                          ) : fits ? (
+                            "Wolny — wszystkie mecze zmieszczą się wcześniej"
+                          ) : (
+                            "Za krótki, żeby zmieścić mecz"
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground text-sm sm:col-span-2 sm:pt-8">
+                      Bez meczów tego dnia
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </FieldSet>
         <FieldDescription className="-mt-4">
           Godziny wyliczone z dat turnieju ({formatDateTime(tournament.startAt)} –{" "}
-          {formatDateTime(tournament.endAt)}) — możesz je dostosować. Ostatni mecz musi się
+          {formatDateTime(tournament.endAt)}) — możesz je dostosować. Ostatni mecz dnia musi się
           skończyć przed godziną końca.
+          {multiDay &&
+            " Mecze wypełniają kolejne dni po kolei — pod każdym dniem widać, ile ich wypadnie."}
         </FieldDescription>
 
         <Controller
@@ -722,13 +885,35 @@ function GenerateForm({
               zmień
             </Link>
           </p>
-          {estimatedEnd && (
-            <p className={cn("text-muted-foreground", !fitsWindow && "text-destructive")}>
-              Szacowany koniec ok.{" "}
-              <span className="font-mono tabular-nums">{formatTime(estimatedEnd)}</span>
-              {!fitsWindow &&
-                " — nie zmieści się w wybranych godzinach. Dodaj boisko albo wydłuż dzień."}
+          {slots > 0 && (
+            <p className={cn("text-muted-foreground", !fits && "text-destructive")}>
+              {fits && lastEnd ? (
+                <>
+                  {multiDay &&
+                    `Mecze zajmą ${usedDays} z ${plural(initialDays.length, ["dnia", "dni", "dni"])} turnieju. `}
+                  Szacowany koniec ok.{" "}
+                  <span className="font-mono tabular-nums">
+                    {multiDay ? formatDateTime(lastEnd) : formatTime(lastEnd)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Zabraknie czasu na ok.{" "}
+                  {plural(Math.min(totalMatches, estimate.missingSlots * pitchIds.length), [
+                    "mecz",
+                    "mecze",
+                    "meczów",
+                  ])}
+                  . Dodaj boisko
+                  {multiDay ? ", wydłuż dzień albo włącz kolejny" : " albo wydłuż dzień"}.
+                </>
+              )}
             </p>
+          )}
+          {multiDay && slots > 0 && enabledDays > 1 && (
+            <Button type="button" size="sm" variant="outline" onClick={spreadEvenly}>
+              Rozłóż równo na {plural(enabledDays, ["dzień", "dni", "dni"])}
+            </Button>
           )}
           <FieldDescription>
             Godziny w czasie polskim. Drużyna nigdy nie gra dwóch meczów jednocześnie. Terminy można

@@ -39,8 +39,9 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             if (tournament.Status != "RegistrationClosed")
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("Status", "Schedule can only be generated when registration is closed"));
 
+            var windows = request.EffectiveWindows;
             if (tournament.StartAt is { } tournamentStart && tournament.EndAt is { } tournamentEnd &&
-                (request.StartAt < tournamentStart || request.EndAt > tournamentEnd))
+                windows.Any(w => w.StartAt < tournamentStart || w.EndAt > tournamentEnd))
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("StartAt", "Schedule must fit within the tournament dates"));
 
             if (tournament.Format is not ("Group" or "GroupAndKnockout" or "Knockout"))
@@ -58,12 +59,13 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             var existingMatches = await dbContext.GetMatchesByTournamentIdAsync(request.TournamentId, cancellationToken);
 
             return tournament.Format == "Knockout"
-                ? await ScheduleKnockoutAsync(request, settings, pitches, existingMatches, cancellationToken)
-                : await ScheduleGroupStageAsync(request, settings, pitches, existingMatches, cancellationToken);
+                ? await ScheduleKnockoutAsync(request, windows, settings, pitches, existingMatches, cancellationToken)
+                : await ScheduleGroupStageAsync(request, windows, settings, pitches, existingMatches, cancellationToken);
         }
 
         private async Task<Result<GenerateScheduleResponse>> ScheduleGroupStageAsync(
             GenerateScheduleCommand request,
+            IReadOnlyList<ScheduleWindow> windows,
             TournamentSettingsSummaryDto settings,
             List<Pitch> pitches,
             IReadOnlyList<Match> existingMatches,
@@ -110,7 +112,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .ToHashSet();
 
             var (placements, unplaced) = PlaceInSlots(
-                pairs, p => (p.HomeTournamentTeamId, p.AwayTournamentTeamId), pitches, occupiedSlots, request, settings);
+                pairs, p => (p.HomeTournamentTeamId, p.AwayTournamentTeamId), pitches, occupiedSlots, windows, settings);
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
 
@@ -147,6 +149,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
 
         private async Task<Result<GenerateScheduleResponse>> ScheduleKnockoutAsync(
             GenerateScheduleCommand request,
+            IReadOnlyList<ScheduleWindow> windows,
             TournamentSettingsSummaryDto settings,
             List<Pitch> pitches,
             IReadOnlyList<Match> existingMatches,
@@ -183,12 +186,12 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .ToHashSet();
 
             var (placements, unplaced) = PlaceInSlots(
-                toSchedule, m => (m.HomeTournamentTeamId, m.AwayTournamentTeamId), pitches, occupiedSlots, request, settings);
+                toSchedule, m => (m.HomeTournamentTeamId, m.AwayTournamentTeamId), pitches, occupiedSlots, windows, settings);
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
 
             var (plannedSlots, unplanned) = PlanLaterRounds(
-                request, settings, pitches, nodes, existingMatches, placements, occupiedSlots);
+                windows, settings, pitches, nodes, existingMatches, placements, occupiedSlots);
             if (unplanned > 0)
                 return NotEnoughTime(unplanned);
 
@@ -232,7 +235,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         /// rundzie, każdy najwcześniej po meczach, z których przyjdą drużyny, na pierwszym wolnym boisku.
         /// </summary>
         private static (List<BracketPlannedSlotDto> Planned, int Unplanned) PlanLaterRounds(
-            GenerateScheduleCommand request,
+            IReadOnlyList<ScheduleWindow> windows,
             TournamentSettingsSummaryDto settings,
             List<Pitch> pitches,
             IReadOnlyList<BracketNodeInfoDto> nodes,
@@ -240,8 +243,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             List<Placement<Match>> placements,
             HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots)
         {
-            var matchDuration = TimeSpan.FromMinutes(settings.MatchDurationMinutes);
             var slot = TimeSpan.FromMinutes(settings.MatchDurationMinutes + settings.BreakDurationMinutes);
+            var slotStarts = SlotStarts(windows, settings).Select(s => s.SlotStart).ToList();
 
             // Koniec meczu (z przerwą) każdego węzła, który ma już mecz: nowy termin z tego generowania
             // albo dotychczasowy (mecz, którego generator nie rusza).
@@ -270,11 +273,11 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 var notBefore = new[] { node.HomeSourceNodeId, node.AwaySourceNodeId }
                     .Where(id => id.HasValue && readyAt.ContainsKey(id.Value))
                     .Select(id => readyAt[id!.Value])
-                    .DefaultIfEmpty(request.StartAt)
+                    .DefaultIfEmpty(windows[0].StartAt)
                     .Max();
 
                 BracketPlannedSlotDto? found = null;
-                for (var slotStart = request.StartAt; slotStart + matchDuration <= request.EndAt; slotStart = slotStart.Add(slot))
+                foreach (var slotStart in slotStarts)
                 {
                     if (slotStart < notBefore)
                         continue;
@@ -302,7 +305,24 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         }
 
         /// <summary>
-        /// Rozkłada mecze w slotach (mecz + przerwa) od StartAt do EndAt na wolnych boiskach. Drużyna nigdy
+        /// Początki slotów (mecz + przerwa) we wszystkich oknach po kolei. Mecz musi się zmieścić w oknie
+        /// w całości, nie tylko zacząć przed jego końcem.
+        /// </summary>
+        private static IEnumerable<(DateTimeOffset SlotStart, int WindowIndex)> SlotStarts(
+            IReadOnlyList<ScheduleWindow> windows, TournamentSettingsSummaryDto settings)
+        {
+            var matchDuration = TimeSpan.FromMinutes(settings.MatchDurationMinutes);
+            var slotMinutes = settings.MatchDurationMinutes + settings.BreakDurationMinutes;
+
+            for (var i = 0; i < windows.Count; i++)
+                for (var slotStart = windows[i].StartAt;
+                     slotStart + matchDuration <= windows[i].EndAt;
+                     slotStart = slotStart.AddMinutes(slotMinutes))
+                    yield return (slotStart, i);
+        }
+
+        /// <summary>
+        /// Rozkłada mecze w slotach kolejnych okien (dni gry) na wolnych boiskach. Drużyna nigdy
         /// nie gra dwóch meczów w jednym slocie, a pierwszeństwo mają pary, których drużyny odpoczywały.
         /// </summary>
         private static (List<Placement<T>> Placements, int Unplaced) PlaceInSlots<T>(
@@ -310,20 +330,24 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             Func<T, (Guid Home, Guid Away)> teamsOf,
             List<Pitch> pitches,
             HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots,
-            GenerateScheduleCommand request,
+            IReadOnlyList<ScheduleWindow> windows,
             TournamentSettingsSummaryDto settings)
         {
-            var matchDuration = TimeSpan.FromMinutes(settings.MatchDurationMinutes);
-            var slotMinutes = settings.MatchDurationMinutes + settings.BreakDurationMinutes;
             var placements = new List<Placement<T>>();
             var remaining = new List<T>(items);
             var playedPreviousSlot = new HashSet<Guid>();
+            var previousWindow = 0;
 
-            // Mecz musi się zmieścić w oknie w całości, nie tylko zacząć przed EndAt.
-            for (var slotStart = request.StartAt;
-                 slotStart + matchDuration <= request.EndAt && remaining.Count > 0;
-                 slotStart = slotStart.AddMinutes(slotMinutes))
+            foreach (var (slotStart, windowIndex) in SlotStarts(windows, settings))
             {
+                if (remaining.Count == 0)
+                    break;
+
+                // Nowy dzień — wszyscy są wypoczęci.
+                if (windowIndex != previousWindow)
+                    playedPreviousSlot = [];
+                previousWindow = windowIndex;
+
                 var freePitches = pitches.Where(p => !occupiedSlots.Contains((p.Id, slotStart))).ToList();
                 var playingThisSlot = new HashSet<Guid>();
                 var slotItems = new List<T>();
