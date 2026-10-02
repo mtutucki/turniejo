@@ -289,7 +289,7 @@ function ClearScheduleButton({
         <AlertDialogFooter>
           <AlertDialogCancel>Anuluj</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive hover:bg-destructive/90 text-white"
+            variant="destructive"
             onClick={() =>
               clear.mutate(undefined, {
                 onSuccess: ({ matchesRemoved }) =>

@@ -57,7 +57,7 @@ function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
         <AlertDialogFooter>
           <AlertDialogCancel>Anuluj</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive hover:bg-destructive/90 text-white"
+            variant="destructive"
             onClick={() =>
               remove.mutate(undefined, {
                 onSuccess: () => {

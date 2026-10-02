@@ -68,7 +68,7 @@ function DeleteAccount() {
             <AlertDialogFooter>
               <AlertDialogCancel>Anuluj</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive hover:bg-destructive/90 text-white"
+                variant="destructive"
                 disabled={remove.isPending}
                 onClick={() =>
                   remove.mutate(undefined, {
