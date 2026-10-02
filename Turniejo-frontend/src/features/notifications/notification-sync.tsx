@@ -34,6 +34,20 @@ export function useMarkNotificationRead() {
   })
 }
 
+/** Usuwa przeczytane powiadomienie z listy użytkownika (backend odrzuca nieprzeczytane). */
+export function useDeleteNotification() {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  const remove = useNotificationStore((state) => state.remove)
+  return useMutation({
+    mutationFn: (notificationRecipientId: string) =>
+      request(`/api/notifications/${notificationRecipientId}`, { method: "DELETE" }),
+    // Znika od razu; przy błędzie odświeżenie listy przywróci wpis.
+    onMutate: (id) => remove(id),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
+  })
+}
+
 /** Backend nie ma endpointu zbiorczego — PATCH dla każdego nieprzeczytanego (zwykle kilka sztuk). */
 export function useMarkAllNotificationsRead() {
   const { request } = useApi()

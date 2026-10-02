@@ -29,7 +29,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             _dbContext.GetBracketByTournamentAndCategoryAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns((Bracket?)null);
             _matchModule.CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>())
                 .Returns(_ => Guid.NewGuid());
         }
 
@@ -85,7 +85,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             await _dbContext.Received(7).AddBracketNodeAsync(Arg.Any<BracketNode>(), Arg.Any<CancellationToken>());
             // All 4 round-1 nodes are Fixed (already resolved) -> 4 matches created immediately.
             await _matchModule.Received(4).CreateBracketMatchAsync(
-                tournamentId, categoryId, Arg.Any<Guid>(), Arg.Any<Guid>(), "Knockout", Arg.Any<CancellationToken>());
+                tournamentId, categoryId, Arg.Any<Guid>(), Arg.Any<Guid>(), "Knockout", Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -137,7 +137,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             // Assert
             result.IsSuccess.Should().BeTrue();
             await _matchModule.DidNotReceive().CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -155,6 +155,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
                 .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
             _standingModule.GetGroupStandingsAsync(groupId, Arg.Any<CancellationToken>())
                 .Returns(new List<GroupStandingDto> { new(team1, 1, 9), new(team2, 2, 6) });
+            _matchModule.IsGroupStageFinishedAsync(groupId, Arg.Any<CancellationToken>()).Returns(true);
 
             var pairing = new BracketPairingInput(
                 BracketSourceType.GroupPosition, groupId, 1, null,
@@ -167,7 +168,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             // Assert
             result.IsSuccess.Should().BeTrue();
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                tournamentId, categoryId, team1, team2, "Final", Arg.Any<CancellationToken>());
+                tournamentId, categoryId, team1, team2, "Final", Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -250,7 +251,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             await _dbContext.Received(1).AddBracketRoundAsync(Arg.Any<BracketRound>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).AddBracketNodeAsync(Arg.Any<BracketNode>(), Arg.Any<CancellationToken>());
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                tournamentId, categoryId, Arg.Any<Guid>(), Arg.Any<Guid>(), "Final", Arg.Any<CancellationToken>());
+                tournamentId, categoryId, Arg.Any<Guid>(), Arg.Any<Guid>(), "Final", Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -303,7 +304,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             // Tylko realny mecz Rundy 1 dostaje mecz — węzeł Bye nigdy nie jest w pełni rozwiązany,
             // a Final czeka jeszcze na zwycięzcę tego meczu, więc też nie ma meczu utworzonego od razu.
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
 
             var finalRoundId = rounds.Values.Single(r => r.RoundNumber == 2).Id;
             var finalNode = nodes.Values.Single(n => n.BracketRoundId == finalRoundId);
@@ -337,7 +338,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             // Assert
             result.IsSuccess.Should().BeTrue();
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                tournamentId, categoryId, byeTeamA, byeTeamB, "Final", Arg.Any<CancellationToken>());
+                tournamentId, categoryId, byeTeamA, byeTeamB, "Final", Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
 
             var finalRoundId = rounds.Values.Single(r => r.RoundNumber == 2).Id;
             var finalNode = nodes.Values.Single(n => n.BracketRoundId == finalRoundId);

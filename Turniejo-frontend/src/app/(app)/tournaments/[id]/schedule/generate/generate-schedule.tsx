@@ -47,7 +47,14 @@ import {
 } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { applyFieldErrors } from "@/lib/api/form-errors"
-import { formatDateTime, formatTime, plural, toZonedDateInput, zonedToIso } from "@/lib/format"
+import {
+  formatDateTime,
+  formatTime,
+  plural,
+  toDateTimeLocal,
+  toZonedDateInput,
+  zonedToIso,
+} from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Match, Pitch } from "@/types/matches"
 import type { TournamentTeam } from "@/types/teams"
@@ -73,6 +80,44 @@ const schema = z
   })
 
 type GenerateValues = z.infer<typeof schema>
+
+/** Szkic formularza w sessionStorage — knownPitchIds odróżnia boisko odznaczone od dodanego później. */
+type GenerateDraft = GenerateValues & { knownPitchIds: string[] }
+
+const draftKey = (tournamentId: string) => `turniejo:schedule-draft:${tournamentId}`
+
+/** Organizator otworzył generator i go nie zamknął — sekcja "Mecze" wraca wtedy prosto do formularza. */
+export function hasScheduleDraft(tournamentId: string) {
+  try {
+    return sessionStorage.getItem(draftKey(tournamentId)) !== null
+  } catch {
+    return false
+  }
+}
+
+function clearScheduleDraft(tournamentId: string) {
+  try {
+    sessionStorage.removeItem(draftKey(tournamentId))
+  } catch {
+    // Brak sessionStorage — nie ma czego czyścić.
+  }
+}
+
+function readDraft(tournamentId: string): GenerateDraft | null {
+  try {
+    const draft = JSON.parse(sessionStorage.getItem(draftKey(tournamentId)) ?? "null")
+    const valid =
+      draft &&
+      typeof draft.date === "string" &&
+      typeof draft.startTime === "string" &&
+      typeof draft.endTime === "string" &&
+      Array.isArray(draft.pitchIds) &&
+      Array.isArray(draft.knownPitchIds)
+    return valid ? draft : null
+  } catch {
+    return null
+  }
+}
 
 type GroupPlan = { group: TournamentGroup; teams: number; matches: number; rounds: number }
 
@@ -209,7 +254,8 @@ function RegistrationAction({ tournament }: { tournament: Tournament }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Zamknąć zapisy?</AlertDialogTitle>
           <AlertDialogDescription>
-            Po zamknięciu nie zgłosisz już nowych drużyn. Nie da się cofnąć do poprzedniego etapu.
+            Po zamknięciu nie zgłosisz już nowych drużyn. Do wygenerowania terminarza zapisy można
+            otworzyć ponownie w podsumowaniu turnieju.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -330,18 +376,53 @@ function Requirements({
         {!tournament.format && <FormatAction tournamentId={id} />}
       </Requirement>
       {isKnockout(tournament) ? (
-        <Requirement ok={bracketMatches > 0}>
-          {bracketMatches > 0 ? (
-            `Drabinka gotowa — ${plural(bracketMatches, ["mecz", "mecze", "meczów"])} 1. rundy do rozstawienia`
-          ) : (
-            <>
-              Drabinka z parami 1. rundy{" "}
-              <Link href={`/tournaments/${id}/bracket`} className="text-primary underline">
-                (utwórz drabinkę)
-              </Link>
-            </>
-          )}
-        </Requirement>
+        <>
+          <Requirement ok={accepted.length >= 2}>
+            {accepted.length >= 2
+              ? plural(accepted.length, [
+                  "zaakceptowana drużyna",
+                  "zaakceptowane drużyny",
+                  "zaakceptowanych drużyn",
+                ])
+              : "Co najmniej 2 zaakceptowane drużyny"}
+            {accepted.length < 2 && (
+              <span className="text-muted-foreground block text-xs">
+                {accepted.length === 0
+                  ? "Turniej nie ma jeszcze żadnej zaakceptowanej drużyny"
+                  : "Turniej ma tylko jedną zaakceptowaną drużynę"}{" "}
+                — drabinka nie ma z kogo ułożyć par.{" "}
+                <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
+                  Przejdź do Drużyn
+                </Link>
+              </span>
+            )}
+            {waiting.length > 0 && (
+              <span className="text-muted-foreground block text-xs">
+                {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
+                akceptację zgłoszenia — nie zagra, dopóki jej nie zaakceptujesz.
+              </span>
+            )}
+          </Requirement>
+          <Requirement ok={bracketMatches > 0}>
+            {bracketMatches > 0 ? (
+              `Drabinka gotowa — ${plural(bracketMatches, ["mecz", "mecze", "meczów"])} 1. rundy do rozstawienia`
+            ) : accepted.length >= 2 ? (
+              <>
+                Drabinka z parami 1. rundy{" "}
+                <Link href={`/tournaments/${id}/bracket`} className="text-primary underline">
+                  (utwórz drabinkę)
+                </Link>
+              </>
+            ) : (
+              <>
+                Drabinka z parami 1. rundy
+                <span className="text-muted-foreground block text-xs">
+                  Utworzysz ją, gdy turniej będzie miał co najmniej 2 zaakceptowane drużyny.
+                </span>
+              </>
+            )}
+          </Requirement>
+        </>
       ) : (
         <Requirement ok={playable.length > 0}>
           {playable.length > 0
@@ -428,13 +509,45 @@ function GenerateForm({
 }) {
   const router = useRouter()
   const generate = useGenerateSchedule(tournament.id)
+  // Szkic przeżywa przejście do innej sekcji (np. "zmień" czas meczu w ustawieniach) i powrót.
+  const [draft] = useState(() => readDraft(tournament.id))
+  const minDate = toZonedDateInput(tournament.startAt)
+  const maxDate = toZonedDateInput(tournament.endAt)
+  // Daty turnieju mogły się zmienić od zapisania szkicu.
+  const defaultDate = draft && draft.date >= minDate && draft.date <= maxDate ? draft.date : minDate
+  // Godziny wyliczone z turnieju: start o godzinie rozpoczęcia, koniec o godzinie zakończenia
+  // (turniej jednodniowy) albo szacowany koniec meczów na wszystkich boiskach (wielodniowy).
+  const [suggested] = useState(() => {
+    const startTime = toDateTimeLocal(tournament.startAt).slice(11)
+    if (minDate === maxDate) return { startTime, endTime: toDateTimeLocal(tournament.endAt).slice(11) }
+    const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
+    const slots = pitches.length
+      ? Math.max(Math.ceil(workload.totalMatches / pitches.length), workload.maxRounds)
+      : 0
+    if (!slots) return { startTime, endTime: "18:00" > startTime ? "18:00" : "23:59" }
+    const [h, m] = startTime.split(":").map(Number) as [number, number]
+    // Zapas jednego slotu (generator może potrzebować więcej), zaokrąglone w górę do pół godziny.
+    const end = Math.min(
+      Math.ceil((h * 60 + m + slots * slotMinutes + settings.matchDurationMinutes) / 30) * 30,
+      23 * 60 + 59,
+    )
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return { startTime, endTime: `${pad(Math.floor(end / 60))}:${pad(end % 60)}` }
+  })
+  // Szkic z godzinami spoza turnieju (np. stare domyślne 09:00) ustępuje wyliczonym.
+  const draftStartOk = !!draft && (defaultDate !== minDate || draft.startTime >= suggested.startTime)
+  const draftEndOk =
+    !!draft &&
+    (defaultDate !== maxDate || draft.endTime <= toDateTimeLocal(tournament.endAt).slice(11))
   const form = useForm<GenerateValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: toZonedDateInput(tournament.startAt),
-      startTime: "09:00",
-      endTime: "18:00",
-      pitchIds: pitches.map((p) => p.id),
+      date: defaultDate,
+      startTime: draftStartOk ? draft.startTime : suggested.startTime,
+      endTime: draftEndOk ? draft.endTime : suggested.endTime,
+      pitchIds: draft
+        ? draft.pitchIds.filter((id) => pitches.some((p) => p.id === id))
+        : pitches.map((p) => p.id),
     },
   })
   const { errors } = form.formState
@@ -445,7 +558,27 @@ function GenerateForm({
 
   // Boisko dodane już po otwarciu strony (np. przyciskiem "Dodaj Boisko 1" w warunkach) ma być od
   // razu zaznaczone — defaultValues zapamiętały listę z chwili montowania formularza.
-  const knownPitches = useRef(new Set(pitches.map((p) => p.id)))
+  const knownPitches = useRef(new Set(draft?.knownPitchIds ?? pitches.map((p) => p.id)))
+
+  // Klucz zamiast tablicy: `pitches` to nowa tablica przy każdym renderze, a zapis po "Anuluj"
+  // przywróciłby właśnie usunięty szkic.
+  const pitchKey = pitches.map((p) => p.id).join(",")
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        draftKey(tournament.id),
+        JSON.stringify({
+          date,
+          startTime,
+          endTime,
+          pitchIds,
+          knownPitchIds: pitchKey ? pitchKey.split(",") : [],
+        } satisfies GenerateDraft),
+      )
+    } catch {
+      // Brak sessionStorage (tryb prywatny) — formularz działa bez szkicu.
+    }
+  }, [tournament.id, date, startTime, endTime, pitchIds, pitchKey])
   useEffect(() => {
     const added = pitches.filter((p) => !knownPitches.current.has(p.id)).map((p) => p.id)
     if (added.length === 0) return
@@ -492,6 +625,7 @@ function GenerateForm({
       },
       {
         onSuccess: ({ matchesCreated }) => {
+          clearScheduleDraft(tournament.id)
           toast.success(
             isKnockout(tournament)
               ? `Rozstawiono ${plural(matchesCreated, ["mecz", "mecze", "meczów"])} 1. rundy`
@@ -527,13 +661,18 @@ function GenerateForm({
           />
           <TextField
             id="schedule-end"
-            label="Koniec (ostatni mecz musi się skończyć)"
+            label="Koniec"
             type="time"
             className="font-mono tabular-nums"
             error={errors.endTime}
             {...form.register("endTime")}
           />
         </div>
+        <FieldDescription className="-mt-4">
+          Godziny wyliczone z dat turnieju ({formatDateTime(tournament.startAt)} –{" "}
+          {formatDateTime(tournament.endAt)}) — możesz je dostosować. Ostatni mecz musi się
+          skończyć przed godziną końca.
+        </FieldDescription>
 
         <Controller
           control={form.control}
@@ -605,7 +744,12 @@ function GenerateForm({
             {generate.isPending ? "Generowanie…" : "Generuj terminarz"}
           </Button>
           <Button asChild variant="ghost">
-            <Link href={`/tournaments/${tournament.id}/schedule`}>Anuluj</Link>
+            <Link
+              href={`/tournaments/${tournament.id}/schedule`}
+              onClick={() => clearScheduleDraft(tournament.id)}
+            >
+              Anuluj
+            </Link>
           </Button>
         </div>
       </FieldGroup>
@@ -624,7 +768,7 @@ export function GenerateScheduleView() {
 
   const backLink = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
-      <Link href={`/tournaments/${id}/schedule`}>
+      <Link href={`/tournaments/${id}/schedule`} onClick={() => clearScheduleDraft(id)}>
         <ArrowLeft />
         Terminarz
       </Link>

@@ -48,6 +48,9 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
             .Where(r => r.UserId == userId)
             .ToListAsync(cancellationToken);
 
+    public void RemoveNotificationRecipient(NotificationRecipient recipient) =>
+        NotificationRecipients.Remove(recipient);
+
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
         await OutboxMessages.AddAsync(message, cancellationToken);
 

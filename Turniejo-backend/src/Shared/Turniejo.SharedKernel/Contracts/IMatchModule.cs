@@ -5,7 +5,7 @@ public interface IMatchModule
     Task<IReadOnlyList<GroupMatchDto>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
     Task<Guid> CreateBracketMatchAsync(
         Guid tournamentId, Guid? categoryId, Guid homeTournamentTeamId, Guid awayTournamentTeamId,
-        string stageType, CancellationToken cancellationToken = default);
+        string stageType, Guid? plannedPitchId, DateTimeOffset? plannedAt, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TournamentMatchDto>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task<MatchInfoDto?> GetMatchAsync(Guid matchId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PitchInfoDto>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
@@ -18,6 +18,17 @@ public interface IMatchModule
     Task<bool> AnyMatchesForCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
     // Jak wyżej, dla Match.GroupId — blokada kasowania grupy turnieju.
     Task<bool> AnyMatchesForGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    // Grupa ma mecze i wszystkie (poza odwołanymi) są zakończone — dopiero wtedy miejsca w tabeli są
+    // ostateczne i drabinka (moduł Brackets) może obsadzić sloty "N. miejsce grupy".
+    Task<bool> IsGroupStageFinishedAsync(Guid groupId, CancellationToken cancellationToken = default);
+
+    // Reset drabinki (moduł Brackets): usuwa jej mecze, o ile żaden się jeszcze nie zaczął. Zwraca false
+    // i nic nie usuwa, gdy któryś jest w trakcie albo zakończony.
+    Task<bool> RemoveUnstartedMatchesAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
+
+    // Zamiana par w drabince (moduł Brackets): podmienia drużyny meczu, który się jeszcze nie zaczął —
+    // termin, boisko i sędzia zostają. Zwraca false i nic nie zmienia, gdy meczu nie ma albo już ruszył.
+    Task<bool> ChangeUnstartedMatchTeamsAsync(Guid matchId, Guid homeTournamentTeamId, Guid awayTournamentTeamId, CancellationToken cancellationToken = default);
 }
 
 public record GroupMatchDto(

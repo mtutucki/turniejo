@@ -28,7 +28,8 @@ namespace Turniejo.Brackets.Application.Brackets.GetBracket
                             n.Id, n.BracketRoundId, n.MatchId, n.HomeSourceType.ToString(), n.HomeTournamentTeamId,
                             n.AwaySourceType.ToString(), n.AwayTournamentTeamId, n.WinnerGoesToNodeId, n.LoserGoesToNodeId,
                             n.WinnerGoesToSlot?.ToString(),
-                            n.HomeSourceGroupId, n.HomeSourcePosition, n.AwaySourceGroupId, n.AwaySourcePosition))
+                            n.HomeSourceGroupId, n.HomeSourcePosition, n.AwaySourceGroupId, n.AwaySourcePosition,
+                            n.PlannedPitchId, n.PlannedAt))
                         .ToList()))
                 .ToList();
 

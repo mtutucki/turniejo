@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 
-import { ComingSoon } from "@/components/layout/coming-soon"
+import { TournamentStandingsView } from "./tournament-standings"
 
 export const metadata: Metadata = { title: "Tabela" }
 
 export default function TournamentStandingsPage() {
-  return <ComingSoon title="Tabela" phase={6} />
+  return <TournamentStandingsView />
 }

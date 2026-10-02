@@ -87,6 +87,56 @@ namespace Turniejo.Matches.UnitTests.Entities
         }
 
         [Fact]
+        public void ChangeTeams_ShouldReplaceTeams_AndKeepSchedule_BeforeTheMatchStarts()
+        {
+            // Arrange
+            var match = CreateValidMatch();
+            var pitchBefore = match.PitchId;
+            var timeBefore = match.ScheduledAt;
+            var home = Guid.NewGuid();
+            var away = Guid.NewGuid();
+
+            // Act
+            var result = match.ChangeTeams(home, away);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.HomeTournamentTeamId.Should().Be(home);
+            match.AwayTournamentTeamId.Should().Be(away);
+            match.PitchId.Should().Be(pitchBefore);
+            match.ScheduledAt.Should().Be(timeBefore);
+        }
+
+        [Fact]
+        public void ChangeTeams_ShouldFail_OnceTheMatchHasStarted()
+        {
+            // Arrange
+            var match = CreateValidMatch();
+            var homeBefore = match.HomeTournamentTeamId;
+            match.Start(ValidUserId);
+
+            // Act
+            var result = match.ChangeTeams(Guid.NewGuid(), Guid.NewGuid());
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+            match.HomeTournamentTeamId.Should().Be(homeBefore);
+        }
+
+        [Fact]
+        public void ChangeTeams_ShouldFail_WhenBothTeamsAreTheSame()
+        {
+            var match = CreateValidMatch();
+            var teamId = Guid.NewGuid();
+
+            var result = match.ChangeTeams(teamId, teamId);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.AwayTournamentTeamId");
+        }
+
+        [Fact]
         public void UpdateSchedule_ShouldUpdatePitchAndTime_WhenValid()
         {
             // Arrange

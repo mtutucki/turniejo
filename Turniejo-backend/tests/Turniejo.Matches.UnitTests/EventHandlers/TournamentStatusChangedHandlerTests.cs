@@ -44,7 +44,25 @@ namespace Turniejo.Matches.UnitTests.EventHandlers
         }
 
         [Fact]
-        public async Task Handle_ShouldDoNothing_WhenNewStatusIsNotCancelled()
+        public async Task Handle_ShouldCancelUnplayedMatches_WhenTournamentFinished()
+        {
+            // Nierozpoczęte mecze dało się dalej startować w zakończonym turnieju.
+            var tournamentId = Guid.NewGuid();
+            var match = CreateScheduledMatch();
+            match.ClearDomainEvents();
+            _dbContext.GetCancellableMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns([match]);
+            var notification = new TournamentStatusChanged(tournamentId, Guid.NewGuid(), Guid.NewGuid(), TournamentStatus.InProgress, TournamentStatus.Finished);
+
+            // Act
+            await _handler.Handle(notification, CancellationToken.None);
+
+            // Assert
+            match.Status.Should().Be(MatchStatus.Cancelled);
+            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldDoNothing_WhenNewStatusIsNotCancelledOrFinished()
         {
             var tournamentId = Guid.NewGuid();
             var notification = new TournamentStatusChanged(tournamentId, Guid.NewGuid(), Guid.NewGuid(), TournamentStatus.Draft, TournamentStatus.RegistrationOpen);

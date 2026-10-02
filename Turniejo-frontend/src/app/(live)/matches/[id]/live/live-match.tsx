@@ -49,14 +49,22 @@ import { type MatchLivePanel, type MatchTeam, isGoal } from "@/types/matches"
 import { selectRoles } from "@/stores/auth-store"
 import { type RoleAssignment, UserRole } from "@/types/roles"
 
-const BACK_HREF = "/referee/matches"
-
-function BackLink() {
+/**
+ * Sędzia wraca do swojej listy meczów. Organizator prowadzący mecz bez przypisania jako sędzia nie ma
+ * tam nic — wraca do terminarza turnieju, z którego otworzył panel.
+ */
+function BackLink({ scheduleTournamentId }: { scheduleTournamentId?: string }) {
   return (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
-      <Link href={BACK_HREF}>
+      <Link
+        href={
+          scheduleTournamentId
+            ? `/tournaments/${scheduleTournamentId}/schedule`
+            : "/referee/matches"
+        }
+      >
         <ArrowLeft />
-        Moje mecze
+        {scheduleTournamentId ? "Terminarz" : "Moje mecze"}
       </Link>
     </Button>
   )
@@ -345,8 +353,10 @@ export function LiveMatchView() {
   const isOrganizer = selectRoles(roles.data ?? null, "Tournament", tournamentId).includes(
     UserRole.Organizer,
   )
-  const canOperate =
-    isOrganizer || selectRoles(roles.data ?? null, "Match", matchId).includes(UserRole.Referee)
+  const isMatchReferee = selectRoles(roles.data ?? null, "Match", matchId).includes(
+    UserRole.Referee,
+  )
+  const canOperate = isOrganizer || isMatchReferee
   const rolesLoading = roles.isPending || (roles.isFetching && !canOperate)
 
   const realtime = useMatchRealtime(matchId, canOperate && !!tournamentId)
@@ -358,7 +368,7 @@ export function LiveMatchView() {
 
   const header = (
     <header className="flex items-center justify-between gap-3">
-      <BackLink />
+      <BackLink scheduleTournamentId={isOrganizer && !isMatchReferee ? tournamentId : undefined} />
       {canOperate && <ConnectionBadge state={realtime} />}
     </header>
   )

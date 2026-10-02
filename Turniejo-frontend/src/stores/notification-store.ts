@@ -8,6 +8,7 @@ type NotificationState = {
   live: boolean
   setNotifications: (notifications: AppNotification[]) => void
   markRead: (notificationRecipientId: string) => void
+  remove: (notificationRecipientId: string) => void
   setLive: (live: boolean) => void
   reset: () => void
 }
@@ -27,6 +28,10 @@ export const useNotificationStore = create<NotificationState>((set) => ({
           ? { ...n, status: "Read", readAt: n.readAt ?? new Date().toISOString() }
           : n,
       ),
+    })),
+  remove: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.notificationRecipientId !== id),
     })),
   setLive: (live) => set({ live }),
   reset: () => set({ notifications: [], live: false }),

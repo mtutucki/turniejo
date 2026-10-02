@@ -11,6 +11,7 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
     internal sealed class UpdateMatchScheduleCommandHandler(
         IMatchesDbContext dbContext,
         ScheduleConflictChecker conflictChecker,
+        PlannedSlotShifter plannedSlotShifter,
         ICurrentUserContext currentUserContext) : ICommandHandler<UpdateMatchScheduleCommand, UpdateMatchScheduleResponse>
     {
         public async Task<Result<UpdateMatchScheduleResponse>> Handle(UpdateMatchScheduleCommand request, CancellationToken cancellationToken)
@@ -37,6 +38,7 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            await plannedSlotShifter.ShiftAsync(match.TournamentId, cancellationToken);
 
             return Result.Success(new UpdateMatchScheduleResponse(match.Id));
         }

@@ -19,6 +19,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         IMatchesDbContext dbContext,
         ITournamentModule tournamentModule,
         ITeamModule teamModule,
+        IBracketModule bracketModule,
         ICurrentUserContext currentUserContext) : ICommandHandler<GenerateScheduleCommand, GenerateScheduleResponse>
     {
         private sealed record MatchPair(Guid CategoryId, Guid GroupId, Guid HomeTournamentTeamId, Guid AwayTournamentTeamId);
@@ -153,16 +154,29 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         {
             // Mecze drabinki, które jeszcze się nie zaczęły — w praktyce 1. runda (kolejne rundy powstają
             // dopiero po rozstrzygnięciu meczów). Kolejność z drabinki (termin utworzenia) zostaje.
-            var toSchedule = existingMatches
+            var toScheduleIds = existingMatches
                 .Where(m => BracketStages.Contains(m.StageType) &&
                             m.Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed)
-                .OrderBy(m => m.ScheduledAt)
-                .ToList();
-            if (toSchedule.Count == 0)
+                .Select(m => m.Id)
+                .ToHashSet();
+            if (toScheduleIds.Count == 0)
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation(
                     "Bracket", "Generate the knockout bracket first — the schedule places its first-round matches"));
 
-            var toScheduleIds = toSchedule.Select(m => m.Id).ToHashSet();
+            // existingMatches jest tylko do odczytu (AsNoTracking) — zmiany na nich nie trafiały do bazy:
+            // etap zmieniał się na "harmonogram gotowy", a mecze zostawały bez boiska, wszystkie o tej samej godzinie.
+            // Najpierw wcześniejsze rundy: przy wolnych losach mecz 2. rundy powstaje od razu (przed
+            // meczami 1. rundy) i bez tego dostawałby wcześniejszą godzinę niż one.
+            var nodes = await bracketModule.GetNodesByTournamentIdAsync(request.TournamentId, cancellationToken);
+            var roundByMatchId = nodes
+                .Where(n => n.MatchId.HasValue)
+                .ToDictionary(n => n.MatchId!.Value, n => n.RoundNumber);
+            var toSchedule = (await dbContext.GetTrackedMatchesByIdsAsync(toScheduleIds, cancellationToken))
+                .OrderBy(m => roundByMatchId.GetValueOrDefault(m.Id, int.MaxValue))
+                .ThenBy(m => m.ScheduledAt)
+                .ThenBy(m => m.CreatedAt)
+                .ToList();
+
             var occupiedSlots = existingMatches
                 .Where(m => m.PitchId.HasValue && m.Status != MatchStatus.Cancelled && !toScheduleIds.Contains(m.Id))
                 .Select(m => (m.PitchId!.Value, m.ScheduledAt))
@@ -173,30 +187,118 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
 
+            var (plannedSlots, unplanned) = PlanLaterRounds(
+                request, settings, pitches, nodes, existingMatches, placements, occupiedSlots);
+            if (unplanned > 0)
+                return NotEnoughTime(unplanned);
+
             // Zapamiętane na wypadek wycofania, gdy etap turnieju nie da się zmienić.
             var previous = toSchedule.ToDictionary(m => m.Id, m => (m.PitchId, m.ScheduledAt));
-            foreach (var placement in placements)
-            {
-                var result = placement.Item.UpdateSchedule(placement.PitchId, placement.ScheduledAt, currentUserContext.UserId);
-                if (result.IsFailure)
-                    return Result.Failure<GenerateScheduleResponse>(result.Error);
-            }
             // Bez MatchScheduleChanged w outboxie: terminarz dopiero powstaje, to nie "zmiana terminu"
             // do rozesłania rodzicom (tak samo nowe mecze fazy grupowej nie wysyłają powiadomień).
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await ApplySlotsAsync(
+                placements.Select(p => (p.Item, (Guid?)p.PitchId, p.ScheduledAt)).ToList(), cancellationToken);
 
             if (!await tournamentModule.ChangeTournamentStatusAsync(request.TournamentId, "ScheduleGenerated", cancellationToken))
             {
-                foreach (var match in toSchedule)
-                {
-                    var (pitchId, scheduledAt) = previous[match.Id];
-                    match.UpdateSchedule(pitchId, scheduledAt, currentUserContext.UserId);
-                }
-                await dbContext.SaveChangesAsync(cancellationToken);
+                await ApplySlotsAsync(
+                    toSchedule.Select(m => (m, previous[m.Id].PitchId, previous[m.Id].ScheduledAt)).ToList(), cancellationToken);
                 return StatusConflict();
             }
 
+            await bracketModule.SetPlannedSlotsAsync(plannedSlots, cancellationToken);
+
             return await CompleteAsync(request.TournamentId, toSchedule.Count, cancellationToken);
+        }
+
+        // Dwa zapisy: najpierw mecze schodzą z boisk, dopiero potem dostają nowe terminy. Po wyczyszczeniu
+        // terminarza mecze pucharu zachowują stare boisko i godzinę, więc nowy termin jednego meczu bywa
+        // starym terminem innego — a unikalny indeks (boisko, godzina) sprawdza każdy UPDATE osobno,
+        // więc taka zamiana w jednym zapisie kończyła się "Another match is already scheduled...".
+        private async Task ApplySlotsAsync(
+            List<(Match Match, Guid? PitchId, DateTimeOffset ScheduledAt)> slots, CancellationToken cancellationToken)
+        {
+            foreach (var (match, _, _) in slots)
+                match.UpdateSchedule(null, match.ScheduledAt, currentUserContext.UserId);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            foreach (var (match, pitchId, scheduledAt) in slots)
+                match.UpdateSchedule(pitchId, scheduledAt, currentUserContext.UserId);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Terminy dla meczów kolejnych rund, które jeszcze nie istnieją (czekają na zwycięzców): runda po
+        /// rundzie, każdy najwcześniej po meczach, z których przyjdą drużyny, na pierwszym wolnym boisku.
+        /// </summary>
+        private static (List<BracketPlannedSlotDto> Planned, int Unplanned) PlanLaterRounds(
+            GenerateScheduleCommand request,
+            TournamentSettingsSummaryDto settings,
+            List<Pitch> pitches,
+            IReadOnlyList<BracketNodeInfoDto> nodes,
+            IReadOnlyList<Match> existingMatches,
+            List<Placement<Match>> placements,
+            HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots)
+        {
+            var matchDuration = TimeSpan.FromMinutes(settings.MatchDurationMinutes);
+            var slot = TimeSpan.FromMinutes(settings.MatchDurationMinutes + settings.BreakDurationMinutes);
+
+            // Koniec meczu (z przerwą) każdego węzła, który ma już mecz: nowy termin z tego generowania
+            // albo dotychczasowy (mecz, którego generator nie rusza).
+            var matchStart = existingMatches
+                .Where(m => m.Status != MatchStatus.Cancelled)
+                .ToDictionary(m => m.Id, m => m.ScheduledAt);
+            foreach (var placement in placements)
+                matchStart[placement.Item.Id] = placement.ScheduledAt;
+
+            var readyAt = new Dictionary<Guid, DateTimeOffset>();
+            foreach (var node in nodes)
+            {
+                if (node.MatchId.HasValue && matchStart.TryGetValue(node.MatchId.Value, out var start))
+                    readyAt[node.Id] = start + slot;
+            }
+
+            var planned = new List<BracketPlannedSlotDto>();
+            var unplanned = 0;
+
+            // Mecz o 3. miejsce ma numer rundy finału — idzie przed finałem.
+            foreach (var node in nodes
+                         .Where(n => !n.MatchId.HasValue && !n.HasBye)
+                         .OrderBy(n => n.RoundNumber)
+                         .ThenByDescending(n => n.IsThirdPlace))
+            {
+                var notBefore = new[] { node.HomeSourceNodeId, node.AwaySourceNodeId }
+                    .Where(id => id.HasValue && readyAt.ContainsKey(id.Value))
+                    .Select(id => readyAt[id!.Value])
+                    .DefaultIfEmpty(request.StartAt)
+                    .Max();
+
+                BracketPlannedSlotDto? found = null;
+                for (var slotStart = request.StartAt; slotStart + matchDuration <= request.EndAt; slotStart = slotStart.Add(slot))
+                {
+                    if (slotStart < notBefore)
+                        continue;
+
+                    var pitch = pitches.FirstOrDefault(p => !occupiedSlots.Contains((p.Id, slotStart)));
+                    if (pitch == null)
+                        continue;
+
+                    found = new BracketPlannedSlotDto(node.Id, pitch.Id, slotStart);
+                    break;
+                }
+
+                if (found == null)
+                {
+                    unplanned++;
+                    continue;
+                }
+
+                planned.Add(found);
+                occupiedSlots.Add((found.PitchId, found.ScheduledAt));
+                readyAt[node.Id] = found.ScheduledAt + slot;
+            }
+
+            return (planned, unplanned);
         }
 
         /// <summary>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 
 import { apiFetch } from "@/lib/api/client"
 import type { MatchLivePanel } from "@/types/matches"
@@ -69,6 +69,19 @@ export function usePublicBracket(slug: string, categoryId: string | undefined) {
     enabled: !!categoryId,
     // Brak drabinki (faza grupowa jeszcze trwa) to 404 — nie ponawiamy.
     retry: false,
+  })
+}
+
+/** Drabinki wszystkich kategorii — do zapowiedzi meczów kolejnych rund w terminarzu. */
+export function usePublicBrackets(slug: string, categoryIds: string[], enabled: boolean) {
+  return useQueries({
+    queries: categoryIds.map((categoryId) => ({
+      queryKey: publicKeys.bracket(slug, categoryId),
+      queryFn: () =>
+        apiFetch<Bracket>(`${base(slug)}/bracket?categoryId=${encodeURIComponent(categoryId)}`),
+      enabled,
+      retry: false,
+    })),
   })
 }
 

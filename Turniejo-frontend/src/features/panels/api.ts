@@ -2,9 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { teamKeys } from "@/features/teams/api"
 import { useApi } from "@/hooks/use-api"
-import { PlayerPosition, type TournamentPlayer, type TournamentPlayerStatus } from "@/types/teams"
+import { PlayerPosition, type TournamentPlayer } from "@/types/teams"
 import {
   type MyChild,
   type MyChildMatch,
@@ -13,7 +12,6 @@ import {
   type MyTeam,
   type TeamMatch,
   type TeamPlayerStats,
-  TOURNAMENT_PLAYER_STATUS_VALUES,
 } from "@/types/roles-panels"
 
 export const panelKeys = {
@@ -111,39 +109,6 @@ export const useCoachStats = (tournamentTeamId: string) =>
     panelKeys.team(tournamentTeamId, "stats"),
     `/api/coach/teams/${tournamentTeamId}/player-stats`,
   )
-
-export function useUpdateSquadPlayer(tournamentId: string, tournamentTeamId: string) {
-  const { request } = useApi()
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({
-      tournamentPlayerId,
-      shirtNumber,
-      position,
-      status,
-    }: {
-      tournamentPlayerId: string
-      shirtNumber: number | null
-      position: keyof typeof PlayerPosition | null
-      status: TournamentPlayerStatus
-    }) =>
-      request(`/api/tournament-players/${tournamentPlayerId}`, {
-        method: "PATCH",
-        body: {
-          tournamentId,
-          tournamentTeamId,
-          shirtNumber,
-          position: position ? PlayerPosition[position] : null,
-          status: TOURNAMENT_PLAYER_STATUS_VALUES[status],
-        },
-      }),
-    meta: { handlesValidation: true },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: panelKeys.team(tournamentTeamId, "players") })
-      void queryClient.invalidateQueries({ queryKey: teamKeys.players(tournamentTeamId) })
-    },
-  })
-}
 
 // --- Opiekunowie zawodnika (organizator) ---------------------------------------------------
 

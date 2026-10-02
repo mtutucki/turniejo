@@ -11,6 +11,8 @@ const request = vi.fn()
 vi.mock("@/hooks/use-api", () => ({
   useApi: () => ({ request, isAuthenticated: true, getToken: async () => "token" }),
 }))
+// Stepper pobiera też podsumowanie turnieju (liczba nierozegranych meczów) — liczymy same zmiany statusu.
+const statusChanges = () => request.mock.calls.filter(([path]) => String(path).endsWith("/status"))
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const tournament = (status: TournamentStatus): Tournament => ({
@@ -58,8 +60,9 @@ describe("TournamentStatusStepper", () => {
 
     await user.click(screen.getByRole("button", { name: "Otwórz zapisy" }))
     const dialog = await screen.findByRole("alertdialog")
-    expect(dialog).toHaveTextContent("Nie da się cofnąć")
-    expect(request).not.toHaveBeenCalled()
+    expect(dialog).toHaveTextContent("Zapisy otwarte")
+    expect(dialog).not.toHaveTextContent("Nie da się cofnąć")
+    expect(statusChanges()).toHaveLength(0)
 
     await user.click(within(dialog).getByRole("button", { name: "Otwórz zapisy" }))
     await waitFor(() =>
@@ -77,7 +80,24 @@ describe("TournamentStatusStepper", () => {
     const dialog = await screen.findByRole("alertdialog")
     await user.click(within(dialog).getByRole("button", { name: "Anuluj" }))
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument())
-    expect(request).not.toHaveBeenCalled()
+    expect(statusChanges()).toHaveLength(0)
+  })
+
+  it("zakończenie turnieju ostrzega o meczach, które zostaną anulowane", async () => {
+    request.mockImplementation(async (path: string) =>
+      path.includes("/dashboard")
+        ? { matches: { finished: 4, scheduled: 3, total: 7 } }
+        : undefined,
+    )
+    const user = userEvent.setup()
+    renderWithQuery(<TournamentStatusStepper tournament={tournament("InProgress")} canManage />)
+    await waitFor(() => expect(request).toHaveBeenCalled())
+
+    await user.click(screen.getByRole("button", { name: "Zakończ turniej" }))
+    const dialog = await screen.findByRole("alertdialog")
+    await waitFor(() =>
+      expect(dialog).toHaveTextContent("3 mecze nie zostały rozegrane i zostaną anulowane"),
+    )
   })
 
   it("terminarz nie jest statusem do kliknięcia — prowadzi do generatora", () => {
@@ -88,6 +108,44 @@ describe("TournamentStatusStepper", () => {
       "href",
       "/tournaments/t-1/schedule/generate",
     )
+  })
+
+  it("zamknięte zapisy można otworzyć ponownie", async () => {
+    const user = userEvent.setup()
+    renderWithQuery(
+      <TournamentStatusStepper tournament={tournament("RegistrationClosed")} canManage />,
+    )
+    await user.click(screen.getByRole("button", { name: "Otwórz zapisy ponownie" }))
+    const dialog = await screen.findByRole("alertdialog")
+    await user.click(within(dialog).getByRole("button", { name: "Otwórz zapisy ponownie" }))
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith("/api/tournaments/t-1/status", {
+        method: "PATCH",
+        body: { tournamentStatus: 2 },
+      }),
+    )
+  })
+
+  it("z gotowego harmonogramu cofa wyczyszczenie terminarza, nie zmiana statusu", async () => {
+    const user = userEvent.setup()
+    renderWithQuery(
+      <TournamentStatusStepper tournament={tournament("ScheduleGenerated")} canManage />,
+    )
+    await user.click(screen.getByRole("button", { name: "Wyczyść terminarz" }))
+    const dialog = await screen.findByRole("alertdialog")
+    await user.click(within(dialog).getByRole("button", { name: "Wyczyść terminarz" }))
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith("/api/tournaments/t-1/schedule", { method: "DELETE" }),
+    )
+    expect(statusChanges()).toHaveLength(0)
+  })
+
+  it("po rozpoczęciu turnieju etapu nie da się cofnąć", () => {
+    renderWithQuery(<TournamentStatusStepper tournament={tournament("InProgress")} canManage />)
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Zakończ turniej",
+      "Anuluj turniej",
+    ])
   })
 
   it("status końcowy blokuje dalsze zmiany", () => {

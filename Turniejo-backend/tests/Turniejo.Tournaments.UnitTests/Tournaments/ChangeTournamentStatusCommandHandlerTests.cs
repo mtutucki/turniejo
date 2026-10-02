@@ -13,13 +13,69 @@ public sealed class ChangeTournamentStatusCommandHandlerTests
 {
     private readonly ITournamentsDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly IMatchModule _matchModule;
     private readonly ChangeTournamentStatusCommandHandler _handler;
 
     public ChangeTournamentStatusCommandHandlerTests()
     {
         _dbContext = Substitute.For<ITournamentsDbContext>();
         _currentUserContext = Substitute.For<ICurrentUserContext>();
-        _handler = new ChangeTournamentStatusCommandHandler(_dbContext, _currentUserContext);
+        _matchModule = Substitute.For<IMatchModule>();
+        _handler = new ChangeTournamentStatusCommandHandler(_dbContext, _currentUserContext, _matchModule);
+    }
+
+    private static Tournament CreateTournamentInProgress()
+    {
+        var tournament = CreateFakeTournament();
+        tournament.SetFormat(TournamentFormat.Group);
+        foreach (var status in new[]
+                 {
+                     TournamentStatus.RegistrationOpen, TournamentStatus.RegistrationClosed,
+                     TournamentStatus.ScheduleGenerated, TournamentStatus.InProgress
+                 })
+            tournament.ChangeStatus(status, tournament.CreatedByUserId);
+
+        tournament.ClearDomainEvents();
+        return tournament;
+    }
+
+    private static TournamentMatchDto MatchWithStatus(Guid tournamentId, string status) =>
+        new(Guid.NewGuid(), tournamentId, status, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), 0, 0);
+
+    [Theory]
+    [InlineData("Live")]
+    [InlineData("Paused")]
+    public async Task Handle_ShouldRejectFinishing_WhenMatchIsInProgress(string matchStatus)
+    {
+        // Trwający mecz zmieniłby tabelę i zwycięzcę już po zakończeniu turnieju.
+        var tournament = CreateTournamentInProgress();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        _currentUserContext.UserId.Returns(tournament.CreatedByUserId);
+        _matchModule.GetMatchesByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>())
+            .Returns([MatchWithStatus(tournament.Id, "Finished"), MatchWithStatus(tournament.Id, matchStatus)]);
+
+        var result = await _handler.Handle(new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.Finished), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Conflict.TournamentStatus");
+        tournament.Status.Should().Be(TournamentStatus.InProgress);
+        await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldAllowFinishing_WhenOnlyUnplayedMatchesRemain()
+    {
+        // Nierozpoczęte mecze nie blokują — moduł Matches anuluje je po zmianie statusu.
+        var tournament = CreateTournamentInProgress();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        _currentUserContext.UserId.Returns(tournament.CreatedByUserId);
+        _matchModule.GetMatchesByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>())
+            .Returns([MatchWithStatus(tournament.Id, "Finished"), MatchWithStatus(tournament.Id, "Scheduled")]);
+
+        var result = await _handler.Handle(new ChangeTournamentStatusCommand(tournament.Id, TournamentStatus.Finished), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        tournament.Status.Should().Be(TournamentStatus.Finished);
     }
 
     private static Tournament CreateFakeTournament()

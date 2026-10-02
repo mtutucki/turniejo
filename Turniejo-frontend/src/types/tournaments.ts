@@ -44,6 +44,16 @@ export const TOURNAMENT_STATUS_TRANSITIONS: Record<TournamentStatus, TournamentS
   Cancelled: [],
 }
 
+/**
+ * Cofnięcie o jeden etap. Draft/RegistrationOpen to zwykła zmiana statusu (Tournament.ChangeStatus),
+ * RegistrationClosed z ScheduleGenerated wymaga wyczyszczenia terminarza (DELETE schedule).
+ */
+export const TOURNAMENT_STATUS_REVERT: Partial<Record<TournamentStatus, TournamentStatus>> = {
+  RegistrationOpen: "Draft",
+  RegistrationClosed: "RegistrationOpen",
+  ScheduleGenerated: "RegistrationClosed",
+}
+
 export function statusAtLeast(status: TournamentStatus, threshold: TournamentStatus) {
   return TournamentStatus[status] >= TournamentStatus[threshold]
 }

@@ -75,6 +75,30 @@ namespace Turniejo.Matches.Domain.Entities
         // Termin, boisko i sędziego zmieniamy tylko przed rozpoczęciem meczu.
         private bool IsSchedulable => Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed;
 
+        // Zamiana par w drabince przed startem: mecz zostaje (termin, boisko, sędzia), zmieniają się
+        // tylko drużyny. Po rozpoczęciu drużyny są już nie do ruszenia — mecz ma zdarzenia i wynik.
+        public Result ChangeTeams(Guid homeTournamentTeamId, Guid awayTournamentTeamId)
+        {
+            if (!IsSchedulable)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the teams once the match has started, finished or been cancelled"));
+
+            if (homeTournamentTeamId == Guid.Empty)
+                return Result.Failure(Error.Validation("HomeTournamentTeamId", "Match homeTournamentTeamId cannot be empty"));
+
+            if (awayTournamentTeamId == Guid.Empty)
+                return Result.Failure(Error.Validation("AwayTournamentTeamId", "Match awayTournamentTeamId cannot be empty"));
+
+            if (homeTournamentTeamId == awayTournamentTeamId)
+                return Result.Failure(Error.Validation("AwayTournamentTeamId", "A team cannot play against itself"));
+
+            HomeTournamentTeamId = homeTournamentTeamId;
+            AwayTournamentTeamId = awayTournamentTeamId;
+            Version++;
+            SetUpdatedAt();
+
+            return Result.Success();
+        }
+
         public Result UpdateSchedule(Guid? pitchId, DateTimeOffset scheduledAt, Guid changedByUserId)
         {
             if (!IsSchedulable)
@@ -261,6 +285,33 @@ namespace Turniejo.Matches.Domain.Entities
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchFinished(Id, TournamentId, GroupId, resultType.ToString(), winnerTournamentTeamId, FinishedAt.Value, changedByUserId, HomeScore, AwayScore));
+
+            return Result.Success();
+        }
+
+        // Walkower bez rozegrania meczu: rywal wycofał się z turnieju. Finish() wymaga Live/Paused, a ten
+        // mecz nigdy się nie zacznie — w pucharze samo odwołanie zostawiało parę martwą (nikt nie awansował).
+        // Bez okna na korektę wyniku: nie ma czego poprawiać.
+        public Result AwardWalkover(Guid winnerTournamentTeamId, int winnerScore, int loserScore, Guid changedByUserId)
+        {
+            if (!IsSchedulable)
+                return Result.Failure(Error.Conflict("Status", "A walkover can only be awarded before the match has started"));
+
+            if (winnerTournamentTeamId != HomeTournamentTeamId && winnerTournamentTeamId != AwayTournamentTeamId)
+                return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be one of the two teams playing"));
+
+            var homeWins = winnerTournamentTeamId == HomeTournamentTeamId;
+            HomeScore = homeWins ? winnerScore : loserScore;
+            AwayScore = homeWins ? loserScore : winnerScore;
+            Status = MatchStatus.Finished;
+            FinishedAt = DateTimeOffset.UtcNow;
+            ResultType = MatchResultType.Walkover;
+            WinnerTournamentTeamId = winnerTournamentTeamId;
+            EditLockedAt = FinishedAt;
+            Version++;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new MatchFinished(Id, TournamentId, GroupId, ResultType.ToString(), winnerTournamentTeamId, FinishedAt.Value, changedByUserId, HomeScore, AwayScore));
 
             return Result.Success();
         }

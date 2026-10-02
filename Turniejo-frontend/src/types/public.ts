@@ -83,6 +83,9 @@ export type BracketNode = {
   homeSourcePosition: number | null
   awaySourceGroupId: string | null
   awaySourcePosition: number | null
+  /** Termin zaplanowany dla meczu, który jeszcze nie powstał (czeka na drużyny z poprzedniej rundy). */
+  plannedPitchId: string | null
+  plannedAt: string | null
 }
 
 export type BracketRound = {
@@ -94,6 +97,9 @@ export type BracketRound = {
 }
 
 export type Bracket = { id: string; tournamentId: string; rounds: BracketRound[] }
+
+/** Jeden z dwóch slotów pary w drabince. */
+export type BracketSlotRef = { nodeId: string; slot: "Home" | "Away" }
 
 /** PlayerRankingEntryDto */
 export type RankingEntry = {

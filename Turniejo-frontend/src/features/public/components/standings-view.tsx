@@ -2,12 +2,14 @@
 
 import { ListOrdered } from "lucide-react"
 import { LayoutGroup, motion } from "motion/react"
+import { useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 import { usePublicStandings } from "../api"
+import { readFavoriteTeam } from "../favorite-team"
 import { usePublicContext } from "../public-context"
 
 const COLUMNS =
@@ -26,6 +28,7 @@ function GroupTable({
   const Heading = headingLevel
   const { slug, lookups } = usePublicContext()
   const standings = usePublicStandings(slug, groupId)
+  const [favoriteTeam] = useState(() => readFavoriteTeam(slug))
   const rows = [...(standings.data ?? [])].sort((a, b) => a.position - b.position)
 
   return (
@@ -68,7 +71,13 @@ function GroupTable({
                     initial={{ backgroundColor: "rgba(16, 185, 129, 0.25)" }}
                     animate={{ backgroundColor: "rgba(16, 185, 129, 0)" }}
                     transition={{ duration: 1.6 }}
-                    className={cn(COLUMNS, "rounded-lg px-2 py-2.5 text-sm")}
+                    className={cn(
+                      COLUMNS,
+                      "rounded-lg px-2 py-2.5 text-sm",
+                      // Drużyna wybrana w filtrze meczów — łatwiej znaleźć "swoich" w tabeli.
+                      row.tournamentTeamId === favoriteTeam && "ring-primary/60 ring-1 ring-inset",
+                    )}
+                    data-favorite={row.tournamentTeamId === favoriteTeam || undefined}
                   >
                     <span className="text-muted-foreground font-mono tabular-nums">
                       {row.position}

@@ -10,7 +10,8 @@ namespace Turniejo.Matches.Application.Schedule.ClearSchedule
     internal sealed class ClearScheduleCommandHandler(
         IMatchesDbContext dbContext,
         ITournamentModule tournamentModule,
-        IUserModule userModule) : ICommandHandler<ClearScheduleCommand, ClearScheduleResponse>
+        IUserModule userModule,
+        IBracketModule bracketModule) : ICommandHandler<ClearScheduleCommand, ClearScheduleResponse>
     {
         private static readonly MatchStatus[] StartedStatuses = [MatchStatus.Live, MatchStatus.Paused, MatchStatus.Finished];
 
@@ -36,6 +37,9 @@ namespace Turniejo.Matches.Application.Schedule.ClearSchedule
                 if (tournament.Status == "ScheduleGenerated" &&
                     !await tournamentModule.RevertScheduleGenerationAsync(request.TournamentId, cancellationToken))
                     return Result.Failure<ClearScheduleResponse>(Error.Conflict("Status", "The tournament stage could not be reverted — try again"));
+
+                // Terminy zaplanowane dla kolejnych rund też przestają obowiązywać.
+                await bracketModule.ClearPlannedSlotsAsync(request.TournamentId, cancellationToken);
 
                 return Result.Success(new ClearScheduleResponse(0));
             }

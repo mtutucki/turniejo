@@ -160,3 +160,33 @@ export type NewPlayerInput = {
   shirtNumber: number | null
   photoUrl: string | null
 }
+
+/** Pełna edycja zawodnika w składzie: profil + numer/pozycja/status (PUT …/players/{id}). */
+export type SquadPlayerInput = NewPlayerInput & { status: TournamentPlayerStatus }
+
+/** RosterSourcePlayerDto — flagi liczone względem drużyny, do której kopiujemy. */
+export type RosterSourcePlayer = {
+  playerId: string
+  firstName: string
+  lastName: string
+  birthDate: string
+  shirtNumber: number | null
+  position: PlayerPosition | null
+  alreadyInSquad: boolean
+  ineligibility: "TooOld" | "TooYoung" | null
+}
+
+/** RosterSourceDto — skład tej samej drużyny z innego turnieju. */
+export type RosterSource = {
+  tournamentTeamId: string
+  tournamentId: string
+  tournamentName: string
+  tournamentStartAt: string | null
+  categoryName: string | null
+  players: RosterSourcePlayer[]
+}
+
+export type ImportSquadInput = {
+  sourceTournamentTeamId: string
+  players: { playerId: string; shirtNumber: number | null; position: PlayerPosition | null }[]
+}

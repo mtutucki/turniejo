@@ -1,17 +1,19 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { tournamentKeys } from "@/features/tournaments/api"
 import { useApi } from "@/hooks/use-api"
 import type { GenerateScheduleInput, Match, Pitch, PitchInput } from "@/types/matches"
-import type { Bracket } from "@/types/public"
+import type { Bracket, BracketSlotRef, Standing } from "@/types/public"
 
 export const matchKeys = {
   pitches: (tournamentId: string) => ["tournaments", tournamentId, "pitches"] as const,
   schedule: (tournamentId: string) => ["tournaments", tournamentId, "schedule"] as const,
   bracket: (tournamentId: string, categoryId: string) =>
     ["tournaments", tournamentId, "bracket", categoryId] as const,
+  standings: (tournamentId: string, groupId: string) =>
+    ["tournaments", tournamentId, "standings", groupId] as const,
 }
 
 const base = (tournamentId: string) => `/api/tournaments/${tournamentId}`
@@ -106,6 +108,8 @@ function useInvalidateMatches(tournamentId: string) {
   const queryClient = useQueryClient()
   return () => {
     void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+    // Zmiana terminu meczu odsuwa planowane mecze kolejnych rund pucharu (terminy na węzłach drabinki).
+    void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "bracket"] })
     void queryClient.invalidateQueries({ queryKey: tournamentKeys.dashboard(tournamentId) })
   }
 }
@@ -162,9 +166,102 @@ export function useBracket(tournamentId: string, categoryId: string | undefined)
   })
 }
 
-/** Źródło slotu pierwszej rundy — BracketSourceType: Fixed = 1, GroupPosition = 2. */
+/** Drabinki wszystkich podanych kategorii (te same klucze cache co useBracket). */
+export function useBrackets(tournamentId: string, categoryIds: string[], enabled = true) {
+  const { request, isAuthenticated } = useApi()
+  return useQueries({
+    queries: categoryIds.map((categoryId) => ({
+      queryKey: matchKeys.bracket(tournamentId, categoryId),
+      queryFn: () =>
+        request<Bracket>(
+          `${base(tournamentId)}/bracket?categoryId=${encodeURIComponent(categoryId)}`,
+        ),
+      enabled: isAuthenticated && enabled,
+      retry: false,
+    })),
+  })
+}
+
+/** Usuwa drabinkę razem z jej (nierozpoczętymi) meczami — organizator układa pary od nowa. */
+export function useResetBracket(tournamentId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ categoryId }: { categoryId: string }) =>
+      request<{ matchesRemoved: number }>(
+        `${base(tournamentId)}/bracket?categoryId=${encodeURIComponent(categoryId)}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: (_data, { categoryId }) => {
+      // reset, nie invalidate: po 404 z odświeżenia zostałaby w cache stara drabinka.
+      void queryClient.resetQueries({ queryKey: matchKeys.bracket(tournamentId, categoryId) })
+      void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+      // Puchar: backend cofa etap turnieju do "Zapisy zamknięte".
+      void queryClient.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) })
+      void queryClient.invalidateQueries({ queryKey: tournamentKeys.dashboard(tournamentId) })
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", "list"] })
+    },
+  })
+}
+
+// BracketSlot: Home = 1, Away = 2.
+const slotNumber = (slot: BracketSlotRef["slot"]) => (slot === "Home" ? 1 : 2)
+
+/**
+ * Zamienia miejscami dwa sloty pierwszej rundy (drużynę, miejsce w grupie albo wolny los). Działa,
+ * dopóki żaden mecz drabinki się nie zaczął; terminy i boiska meczów zostają.
+ */
+export function useSwapBracketSlots(tournamentId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      categoryId,
+      first,
+      second,
+    }: {
+      categoryId: string
+      first: BracketSlotRef
+      second: BracketSlotRef
+    }) =>
+      request(`${base(tournamentId)}/bracket/swap-slots`, {
+        method: "POST",
+        body: {
+          categoryId,
+          firstNodeId: first.nodeId,
+          firstSlot: slotNumber(first.slot),
+          secondNodeId: second.nodeId,
+          secondSlot: slotNumber(second.slot),
+        },
+      }),
+    onSuccess: (_data, { categoryId }) => {
+      void queryClient.invalidateQueries({ queryKey: matchKeys.bracket(tournamentId, categoryId) })
+      // Mecze pierwszej rundy dostają inne drużyny, a przy wolnym losie powstają albo znikają.
+      void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+    },
+  })
+}
+
+// --- Tabele --------------------------------------------------------------------------------
+
+export function useStandings(tournamentId: string, groupId: string) {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: matchKeys.standings(tournamentId, groupId),
+    queryFn: () =>
+      request<Standing[]>(`${base(tournamentId)}/standings?groupId=${encodeURIComponent(groupId)}`),
+    enabled: isAuthenticated,
+  })
+}
+
+/**
+ * Źródło slotu pierwszej rundy — BracketSourceType: Fixed = 1, GroupPosition = 2, Bye = 5 (wolny los:
+ * rywal z pary przechodzi dalej bez meczu).
+ */
 export type BracketSlotInput =
-  { kind: "group"; groupId: string; position: number } | { kind: "team"; tournamentTeamId: string }
+  | { kind: "group"; groupId: string; position: number }
+  | { kind: "team"; tournamentTeamId: string }
+  | { kind: "bye" }
 
 const slotBody = (prefix: "home" | "away", slot: BracketSlotInput) =>
   slot.kind === "group"
@@ -175,10 +272,10 @@ const slotBody = (prefix: "home" | "away", slot: BracketSlotInput) =>
         [`${prefix}TournamentTeamId`]: null,
       }
     : {
-        [`${prefix}SourceType`]: 1,
+        [`${prefix}SourceType`]: slot.kind === "bye" ? 5 : 1,
         [`${prefix}GroupId`]: null,
         [`${prefix}Position`]: null,
-        [`${prefix}TournamentTeamId`]: slot.tournamentTeamId,
+        [`${prefix}TournamentTeamId`]: slot.kind === "bye" ? null : slot.tournamentTeamId,
       }
 
 export function useGenerateBracket(tournamentId: string) {

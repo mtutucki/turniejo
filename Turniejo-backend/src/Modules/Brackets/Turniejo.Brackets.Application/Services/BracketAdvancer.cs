@@ -44,7 +44,7 @@ namespace Turniejo.Brackets.Application.Services
             return true;
         }
 
-        private async Task<string> ResolveStageTypeAsync(BracketNode node, CancellationToken cancellationToken)
+        public async Task<string> ResolveStageTypeAsync(BracketNode node, CancellationToken cancellationToken)
         {
             // Węzeł o 3. miejsce NIGDY nie ma WinnerGoesToNodeId (zwycięzca nikąd dalej nie awansuje) —
             // dokładnie tak samo jak węzeł Finału. Samo sprawdzenie "WinnerGoesToNodeId == null" nie
@@ -103,13 +103,19 @@ namespace Turniejo.Brackets.Application.Services
                 return Result.Success();
 
             var matchId = await matchModule.CreateBracketMatchAsync(
-                tournamentId, categoryId, node.HomeTournamentTeamId!.Value, node.AwayTournamentTeamId!.Value, stageType, cancellationToken);
+                tournamentId, categoryId, node.HomeTournamentTeamId!.Value, node.AwayTournamentTeamId!.Value, stageType,
+                node.PlannedPitchId, node.PlannedAt, cancellationToken);
 
             return node.AssignMatch(matchId);
         }
 
         private async Task<Guid?> ResolveGroupPositionAsync(Guid groupId, int position, CancellationToken cancellationToken)
         {
+            // Tabela zmienia się po każdym meczu, a obsadzony slot już się nie przelicza — miejsce z tabeli
+            // w trakcie fazy grupowej wpisywało do pucharu drużyny, które ostatecznie zajęły inne miejsca.
+            if (!await matchModule.IsGroupStageFinishedAsync(groupId, cancellationToken))
+                return null;
+
             var standings = await standingModule.GetGroupStandingsAsync(groupId, cancellationToken);
 
             return standings.FirstOrDefault(s => s.Position == position)?.TournamentTeamId;

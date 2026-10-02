@@ -87,7 +87,7 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
       aria-label={`${home} – ${away}`}
       data-status={match.status}
       className={cn(
-        "bg-card rounded-xl border p-3",
+        "bg-card h-full rounded-xl border p-3",
         isLive && "border-live shadow-[0_0_0_1px_var(--live)]",
       )}
     >
@@ -153,7 +153,7 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
   return hasDetails ? (
     <Link
       href={`/t/${slug}/matches/${match.id}`}
-      className="focus-visible:ring-ring block rounded-xl outline-none hover:opacity-90 focus-visible:ring-2"
+      className="focus-visible:ring-ring block h-full rounded-xl outline-none hover:opacity-90 focus-visible:ring-2"
     >
       {card}
     </Link>

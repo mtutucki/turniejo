@@ -92,8 +92,10 @@ public sealed class Tournament : BaseEntity
         Dictionary<TournamentStatus, List<TournamentStatus>> allowedTransitions = new()
         {
             { TournamentStatus.Draft, new List<TournamentStatus> { TournamentStatus.RegistrationOpen, TournamentStatus.Cancelled } },
-            { TournamentStatus.RegistrationOpen, new List<TournamentStatus> { TournamentStatus.RegistrationClosed, TournamentStatus.Cancelled } },
-            { TournamentStatus.RegistrationClosed, new List<TournamentStatus> { TournamentStatus.ScheduleGenerated, TournamentStatus.Cancelled } },
+            // Przejścia wstecz (Draft <- RegistrationOpen <- RegistrationClosed): organizator może ponownie
+            // otworzyć zapisy, np. żeby dopisać drużynę. Dalej cofa tylko RevertScheduleGeneration.
+            { TournamentStatus.RegistrationOpen, new List<TournamentStatus> { TournamentStatus.RegistrationClosed, TournamentStatus.Draft, TournamentStatus.Cancelled } },
+            { TournamentStatus.RegistrationClosed, new List<TournamentStatus> { TournamentStatus.ScheduleGenerated, TournamentStatus.RegistrationOpen, TournamentStatus.Cancelled } },
             { TournamentStatus.ScheduleGenerated, new List<TournamentStatus> { TournamentStatus.InProgress, TournamentStatus.Cancelled } },
             { TournamentStatus.InProgress, new List<TournamentStatus> { TournamentStatus.Finished, TournamentStatus.Cancelled } },
         };
@@ -113,7 +115,7 @@ public sealed class Tournament : BaseEntity
         return Result.Success();
     }
 
-    // Jedyne przejście wstecz w maszynie stanów: po wyczyszczeniu terminarza (żaden mecz się nie rozpoczął)
+    // Przejście wstecz poza ChangeStatus: po wyczyszczeniu terminarza (żaden mecz się nie rozpoczął)
     // turniej wraca do zamkniętych zapisów, żeby organizator mógł poprawić drużyny/grupy i wygenerować ponownie.
     public Result RevertScheduleGeneration(Guid changedByUserId)
     {

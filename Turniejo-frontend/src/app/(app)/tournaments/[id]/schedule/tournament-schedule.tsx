@@ -5,6 +5,7 @@ import {
   CalendarClock,
   Clock,
   Eraser,
+  Hourglass,
   Lock,
   MapPin,
   Radio,
@@ -12,7 +13,8 @@ import {
   Whistle,
 } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -38,12 +40,16 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useClearSchedule, usePitches, useSchedule } from "@/features/matches/api"
+import { useBrackets, useClearSchedule, usePitches, useSchedule } from "@/features/matches/api"
 import {
   AssignRefereeDialog,
   memberName,
 } from "@/features/matches/components/assign-referee-dialog"
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge"
+import {
+  type PlannedBracketMatch,
+  plannedBracketMatches,
+} from "@/features/matches/planned-bracket-matches"
 import { RescheduleMatchDialog } from "@/features/matches/components/reschedule-match-dialog"
 import { useTournamentMembers, useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
@@ -53,6 +59,8 @@ import { cn } from "@/lib/utils"
 import { type Match, type Pitch, SCHEDULABLE_STATUSES } from "@/types/matches"
 import type { TournamentMember } from "@/types/teams"
 import { UserRole } from "@/types/roles"
+
+import { hasScheduleDraft } from "./generate/generate-schedule"
 
 const ALL = "all"
 
@@ -101,6 +109,7 @@ function MatchRow({
   pitches,
   referees,
   refereeCode,
+  unscheduled = false,
 }: {
   tournamentId: string
   match: Match
@@ -109,6 +118,8 @@ function MatchRow({
   pitches: Pitch[]
   referees: TournamentMember[]
   refereeCode: string | null
+  /** Para z drabinki przed wygenerowaniem terminarza — godzina i boisko w bazie są tylko zaślepką. */
+  unscheduled?: boolean
 }) {
   const home = lookups.teamName(match.homeTournamentTeamId)
   const away = lookups.teamName(match.awayTournamentTeamId)
@@ -124,7 +135,7 @@ function MatchRow({
     <li className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center">
       <div className="flex min-w-0 flex-1 items-start gap-4">
         <span className="w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
-          {formatTime(match.scheduledAt)}
+          {unscheduled ? "–:–" : formatTime(match.scheduledAt)}
         </span>
         <div className="min-w-0 flex-1 space-y-1">
           <p className="flex flex-wrap items-center gap-x-2 font-medium">
@@ -142,7 +153,7 @@ function MatchRow({
             <MatchStatusBadge status={match.status} />
             <span className="flex items-center gap-1">
               <MapPin className="size-3" />
-              {pitch ?? "Bez boiska"}
+              {unscheduled ? "Bez terminu" : (pitch ?? "Bez boiska")}
             </span>
             {group && <span>{group}</span>}
             {isOrganizer && (
@@ -155,7 +166,7 @@ function MatchRow({
         </div>
       </div>
 
-      {isOrganizer && (
+      {isOrganizer && !unscheduled && (
         <div className="flex flex-wrap items-center gap-2 pl-16 lg:pl-0">
           {editable ? (
             <div className="flex gap-2">
@@ -217,12 +228,45 @@ function MatchRow({
   )
 }
 
+/** Zapowiedź meczu kolejnej rundy: termin już jest, pary jeszcze nie (czeka na wcześniejsze mecze). */
+function PlannedRow({ planned, pitch }: { planned: PlannedBracketMatch; pitch: string | null }) {
+  const sideClass = (known: boolean) => cn("truncate", !known && "text-muted-foreground italic")
+  return (
+    <li className="flex items-start gap-4 py-3" data-testid="planned-bracket-match">
+      <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
+        {formatTime(planned.scheduledAt)}
+      </span>
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="flex flex-wrap items-center gap-x-2 font-medium">
+          <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
+          <span className="text-muted-foreground text-sm">vs</span>
+          <span className={sideClass(planned.away.known)}>{planned.away.label}</span>
+        </p>
+        <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5">
+            <Hourglass className="size-3" />
+            Czeka na wynik wcześniejszych meczów
+          </span>
+          <span className="flex items-center gap-1">
+            <MapPin className="size-3" />
+            {pitch ?? "Bez boiska"}
+          </span>
+          <span>{planned.stage}</span>
+        </p>
+      </div>
+    </li>
+  )
+}
+
 function ClearScheduleButton({
   tournamentId,
   matchCount,
+  knockout,
 }: {
   tournamentId: string
   matchCount: number
+  /** Puchar: mecze należą do drabinki, więc zostają — znikają tylko terminy. */
+  knockout: boolean
 }) {
   const clear = useClearSchedule(tournamentId)
   return (
@@ -237,9 +281,9 @@ function ClearScheduleButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Wyczyścić terminarz?</AlertDialogTitle>
           <AlertDialogDescription>
-            Usuniesz {plural(matchCount, ["mecz", "mecze", "meczów"])} razem z przypisaniami
-            sędziów, a turniej wróci do etapu „Zapisy zamknięte”. Potem możesz poprawić drużyny i
-            grupy i wygenerować terminarz od nowa.
+            {knockout
+              ? "Pary z drabinki zostaną, ale stracą godziny i boiska, a turniej wróci do etapu „Zapisy zamknięte”. Terminy nadasz ponownie, generując terminarz."
+              : `Usuniesz ${plural(matchCount, ["mecz", "mecze", "meczów"])} razem z przypisaniami sędziów, a turniej wróci do etapu „Zapisy zamknięte”. Potem możesz poprawić drużyny i grupy i wygenerować terminarz od nowa.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -249,7 +293,11 @@ function ClearScheduleButton({
             onClick={() =>
               clear.mutate(undefined, {
                 onSuccess: ({ matchesRemoved }) =>
-                  toast.success(`Usunięto ${plural(matchesRemoved, ["mecz", "mecze", "meczów"])}`),
+                  toast.success(
+                    knockout
+                      ? "Terminy wyczyszczone — pary czekają na nowy terminarz"
+                      : `Usunięto ${plural(matchesRemoved, ["mecz", "mecze", "meczów"])}`,
+                  ),
               })
             }
           >
@@ -263,12 +311,17 @@ function ClearScheduleButton({
 
 export function TournamentScheduleView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
+  const router = useRouter()
   const schedule = useSchedule(id)
   const pitches = usePitches(id)
   const teams = useTournamentTeams(id)
   const categories = useCategories(id)
   const groups = useGroups(id)
   const members = useTournamentMembers(id, isOrganizer)
+  const hasBracket =
+    tournament.data?.format === "Knockout" || tournament.data?.format === "GroupAndKnockout"
+  const bracketCategoryIds = (categories.data ?? []).map((c) => c.id)
+  const brackets = useBrackets(id, bracketCategoryIds, hasBracket)
 
   const [categoryId, setCategoryId] = useState(ALL)
   const [groupId, setGroupId] = useState(ALL)
@@ -319,13 +372,6 @@ export function TournamentScheduleView() {
           },
         ),
     )
-  // Bez Map.groupBy — brak go w Safari < 17.4.
-  const days = new Map<string, Match[]>()
-  for (const match of filtered) {
-    const key = toZonedDateInput(match.scheduledAt)
-    days.set(key, [...(days.get(key) ?? []), match])
-  }
-
   const anyStarted = (schedule.data ?? []).some(
     (m) => !SCHEDULABLE_STATUSES.includes(m.status) && m.status !== "Cancelled",
   )
@@ -337,8 +383,53 @@ export function TournamentScheduleView() {
     (status === "Draft" || status === "RegistrationOpen" || status === "RegistrationClosed")
   // Puchar: mecze 1. rundy istnieją już po utworzeniu drabinki, ale bez godzin — generator je rozstawia.
   const knockout = tournament.data?.format === "Knockout"
+  // Pary z drabinki przed (ponownym) wygenerowaniem terminarza: godziny i boiska w bazie to zaślepki
+  // albo pozostałość po wyczyszczonym terminarzu — nie pokazujemy ich jak obowiązujących terminów.
+  const awaitingSchedule =
+    knockout &&
+    (status === "Draft" || status === "RegistrationOpen" || status === "RegistrationClosed")
 
-  if (schedule.isPending || teams.isPending) {
+  // Mecze kolejnych rund pucharu, które jeszcze nie istnieją, ale mają zaplanowany termin.
+  const planned = awaitingSchedule
+    ? []
+    : brackets
+        .flatMap((bracket, i) =>
+          bracket.data
+            ? plannedBracketMatches(bracket.data, bracketCategoryIds[i]!, lookups.teamName)
+            : [],
+        )
+        .filter(
+          (p) =>
+            (categoryId === ALL || p.categoryId === categoryId) &&
+            groupId === ALL &&
+            (pitchId === ALL || p.pitchId === pitchId),
+        )
+
+  type Row =
+    | { kind: "match"; at: string; match: Match }
+    | { kind: "planned"; at: string; planned: PlannedBracketMatch }
+  const rows: Row[] = [
+    ...filtered.map((match): Row => ({ kind: "match", at: match.scheduledAt, match })),
+    ...planned.map((p): Row => ({ kind: "planned", at: p.scheduledAt, planned: p })),
+  ]
+  // Stabilne sortowanie: mecze zachowują kolejność z `filtered`, zapowiedzi wchodzą między nie po godzinie.
+  if (!awaitingSchedule) rows.sort((a, b) => a.at.localeCompare(b.at))
+
+  // Bez Map.groupBy — brak go w Safari < 17.4.
+  const days = new Map<string, Row[]>()
+  for (const row of rows) {
+    const key = awaitingSchedule ? "unscheduled" : toZonedDateInput(row.at)
+    days.set(key, [...(days.get(key) ?? []), row])
+  }
+
+  // Organizator jest w trakcie generowania (otworzył formularz i wyszedł np. dodać drużyny) —
+  // wraca prosto do formularza. "Anuluj" i "← Terminarz" kończą ten tryb.
+  const resumeGenerator = canGenerate && hasScheduleDraft(id)
+  useEffect(() => {
+    if (resumeGenerator) router.replace(`/tournaments/${id}/schedule/generate`)
+  }, [resumeGenerator, router, id])
+
+  if (schedule.isPending || teams.isPending || resumeGenerator) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-9 w-full max-w-xl" />
@@ -377,10 +468,14 @@ export function TournamentScheduleView() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Terminarz</h2>
+          <h2 className="text-lg font-semibold">
+            {awaitingSchedule ? "Pary z drabinki" : "Terminarz"}
+          </h2>
           <p className="text-muted-foreground text-sm">
             {plural(filtered.length, ["mecz", "mecze", "meczów"])}
             {filtered.length !== schedule.data.length && ` z ${schedule.data.length}`}
+            {awaitingSchedule &&
+              " · bez terminów — wygeneruj terminarz, żeby nadać godziny i boiska"}
           </p>
         </div>
         {isOrganizer && (
@@ -394,7 +489,11 @@ export function TournamentScheduleView() {
               </Button>
             )}
             {status === "ScheduleGenerated" && !anyStarted && (
-              <ClearScheduleButton tournamentId={id} matchCount={schedule.data.length} />
+              <ClearScheduleButton
+                tournamentId={id}
+                matchCount={schedule.data.length}
+                knockout={knockout}
+              />
             )}
             <Button asChild variant="outline" size="sm">
               <Link href={`/tournaments/${id}/pitches`}>
@@ -433,28 +532,37 @@ export function TournamentScheduleView() {
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState icon={CalendarClock} title="Brak meczów dla wybranych filtrów" />
       ) : (
-        [...days.entries()].map(([day, matches]) => (
+        [...days.entries()].map(([day, dayRows]) => (
           <Card key={day} className="gap-0 py-0">
             <CardContent className="px-4">
               <h3 className="text-muted-foreground border-b py-3 text-sm font-medium first-letter:uppercase">
-                {formatDayLong(matches[0]!.scheduledAt)}
+                {awaitingSchedule ? "Bez terminu" : formatDayLong(dayRows[0]!.at)}
               </h3>
               <ul className="divide-y">
-                {matches.map((match) => (
-                  <MatchRow
-                    key={match.id}
-                    tournamentId={id}
-                    match={match}
-                    lookups={lookups}
-                    isOrganizer={isOrganizer}
-                    pitches={pitches.data ?? []}
-                    referees={referees}
-                    refereeCode={tournament.data?.refereeCode ?? null}
-                  />
-                ))}
+                {dayRows.map((row) =>
+                  row.kind === "planned" ? (
+                    <PlannedRow
+                      key={row.planned.nodeId}
+                      planned={row.planned}
+                      pitch={lookups.pitchName(row.planned.pitchId)}
+                    />
+                  ) : (
+                    <MatchRow
+                      key={row.match.id}
+                      tournamentId={id}
+                      match={row.match}
+                      lookups={lookups}
+                      isOrganizer={isOrganizer}
+                      pitches={pitches.data ?? []}
+                      referees={referees}
+                      refereeCode={tournament.data?.refereeCode ?? null}
+                      unscheduled={awaitingSchedule}
+                    />
+                  ),
+                )}
               </ul>
             </CardContent>
           </Card>

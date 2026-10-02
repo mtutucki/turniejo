@@ -104,7 +104,9 @@ export function TournamentCard({
     <div className="relative">
       <Link
         href={`/tournaments/${tournament.id}/dashboard`}
-        onClick={() => setTournament({ id: tournament.id, name: tournament.name })}
+        onClick={() =>
+          setTournament({ id: tournament.id, name: tournament.name, format: tournament.format })
+        }
         {...prefetchHandlers(warmUp)}
         className="focus-visible:ring-ring group block h-full rounded-xl outline-none focus-visible:ring-2"
       >

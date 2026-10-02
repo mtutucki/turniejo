@@ -98,6 +98,12 @@ namespace Turniejo.Brackets.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("MatchId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("PlannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PlannedPitchId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 

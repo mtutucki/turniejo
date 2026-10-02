@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
+import { selectUnreadCount, useNotificationStore } from "@/stores/notification-store"
 
 import { isNavItemActive, type NavItem } from "./nav-items"
 
@@ -13,10 +14,12 @@ export function NavLink({
   label,
   icon: Icon,
   activePattern,
+  showsUnread = false,
   onNavigate,
   disabled = false,
 }: NavItem & { onNavigate?: () => void; disabled?: boolean }) {
   const pathname = usePathname()
+  const unread = useNotificationStore(selectUnreadCount)
   const active = !disabled && isNavItemActive(pathname, { href, activePattern })
 
   if (disabled) {
@@ -44,6 +47,14 @@ export function NavLink({
     >
       <Icon className="size-4" />
       {label}
+      {showsUnread && unread > 0 && (
+        <span
+          className="bg-live text-live-foreground ml-auto flex min-w-5 items-center justify-center rounded-full px-1 font-mono text-[11px] leading-5 font-semibold tabular-nums"
+          aria-label={`${unread} nieprzeczytane`}
+        >
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
     </Link>
   )
 }

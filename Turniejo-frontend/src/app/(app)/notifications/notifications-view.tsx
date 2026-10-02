@@ -1,6 +1,6 @@
 "use client"
 
-import { BellOff, CheckCheck } from "lucide-react"
+import { BellOff, CheckCheck, Trash2 } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  useDeleteNotification,
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useNotifications,
@@ -26,6 +27,7 @@ export function NotificationsView() {
   const live = useNotificationStore((state) => state.live)
   const markRead = useMarkNotificationRead()
   const markAll = useMarkAllNotificationsRead()
+  const deleteNotification = useDeleteNotification()
 
   const sorted = [...notifications].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const unreadIds = sorted.filter(isUnread).map((n) => n.notificationRecipientId)
@@ -108,6 +110,18 @@ export function NotificationsView() {
                       </Button>
                     )}
                   </div>
+                  {!unread && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      aria-label="Usuń powiadomienie"
+                      title="Usuń powiadomienie"
+                      onClick={() => deleteNotification.mutate(n.notificationRecipientId)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  )}
                 </motion.li>
               )
             })}

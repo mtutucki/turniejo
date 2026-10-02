@@ -28,6 +28,18 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
     public async Task<Bracket?> GetBracketByTournamentAndCategoryAsync(Guid tournamentId, Guid categoryId, CancellationToken cancellationToken = default) =>
         await Brackets.FirstOrDefaultAsync(b => b.TournamentId == tournamentId && b.CategoryId == categoryId, cancellationToken);
 
+    public async Task<IReadOnlyList<Bracket>> GetBracketsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await Brackets
+            .AsNoTracking()
+            .Where(b => b.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+    public Task RemoveBracketAsync(Bracket bracket, CancellationToken cancellationToken = default)
+    {
+        Brackets.Remove(bracket);
+        return Task.CompletedTask;
+    }
+
     public async Task AddBracketRoundAsync(BracketRound round, CancellationToken cancellationToken = default) =>
         await BracketRounds.AddAsync(round, cancellationToken);
 
@@ -50,6 +62,11 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
         await BracketNodes
             .AsNoTracking()
             .Where(n => roundIds.Contains(n.BracketRoundId))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<BracketNode>> GetTrackedBracketNodesByIdsAsync(IReadOnlyCollection<Guid> nodeIds, CancellationToken cancellationToken = default) =>
+        await BracketNodes
+            .Where(n => nodeIds.Contains(n.Id))
             .ToListAsync(cancellationToken);
 
     public async Task<BracketNode?> GetBracketNodeByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>

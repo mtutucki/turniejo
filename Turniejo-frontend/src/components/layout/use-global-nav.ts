@@ -12,7 +12,7 @@ export function useGlobalNavItems() {
 }
 
 /**
- * Czy pokazywać sekcję aktywnego turnieju (Mecze/Tabela/Drużyny). Rodzic czy kibic jej nie
+ * Czy pokazywać sekcję aktywnego turnieju (Mecze/Tabela albo Drabinka/Drużyny). Rodzic czy kibic jej nie
  * potrzebuje. Dopóki role się wczytują — tak, żeby organizatorowi nie migał układ rodzica.
  */
 export function useShowsTournamentSection() {

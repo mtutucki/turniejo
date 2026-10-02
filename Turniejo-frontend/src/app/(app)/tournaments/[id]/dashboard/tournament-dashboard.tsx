@@ -3,6 +3,9 @@
 import {
   CalendarClock,
   CalendarDays,
+  ExternalLink,
+  EyeOff,
+  Globe,
   type LucideIcon,
   Layers,
   Settings,
@@ -20,7 +23,7 @@ import { AccessCodesPanel } from "@/features/tournaments/components/access-codes
 import { TournamentStatusStepper } from "@/features/tournaments/components/status-stepper"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { formatDateTime } from "@/lib/format"
-import type { TournamentDashboard } from "@/types/tournaments"
+import type { Tournament, TournamentDashboard } from "@/types/tournaments"
 
 const SCHEDULE_STATUS_LABELS: Record<TournamentDashboard["scheduleStatus"], string> = {
   NotGenerated: "Brak",
@@ -163,6 +166,57 @@ function QuickActions({ id }: { id: string }) {
   )
 }
 
+function PublicPortalCard({
+  tournament,
+  canManage,
+}: {
+  tournament: Tournament
+  canManage: boolean
+}) {
+  const path = `/t/${tournament.slug}`
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Portal publiczny</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {tournament.isPublic ? (
+          <>
+            <p className="flex items-center gap-2">
+              <Globe className="text-primary size-4 shrink-0" aria-hidden />
+              Turniej jest publiczny — kibice widzą go bez logowania.
+            </p>
+            <Link
+              href={path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary inline-flex items-center gap-1.5 font-medium underline-offset-4 hover:underline"
+            >
+              <code className="font-mono">{path}</code>
+              <ExternalLink className="size-3.5" aria-hidden />
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground flex items-center gap-2">
+              <EyeOff className="size-4 shrink-0" aria-hidden />
+              Turniej nie jest publiczny — portal kibica jest wyłączony.
+            </p>
+            {canManage && (
+              <Link
+                href={`/tournaments/${tournament.id}/settings`}
+                className="text-primary font-medium underline-offset-4 hover:underline"
+              >
+                Włącz w ustawieniach
+              </Link>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function TournamentDashboardView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
   const dashboard = useTournamentDashboard(id)
@@ -194,12 +248,13 @@ export function TournamentDashboardView() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         {dashboard.data && <UpcomingMatches dashboard={dashboard.data} />}
+        {tournament.data && (
+          <PublicPortalCard tournament={tournament.data} canManage={isOrganizer} />
+        )}
+        {isOrganizer && tournament.data && <AccessCodesPanel tournament={tournament.data} />}
+        {isOrganizer && <AnnouncementCard tournamentId={id} />}
         {isOrganizer && <QuickActions id={id} />}
       </div>
-
-      {isOrganizer && <AnnouncementCard tournamentId={id} />}
-
-      {isOrganizer && tournament.data && <AccessCodesPanel tournament={tournament.data} />}
     </div>
   )
 }

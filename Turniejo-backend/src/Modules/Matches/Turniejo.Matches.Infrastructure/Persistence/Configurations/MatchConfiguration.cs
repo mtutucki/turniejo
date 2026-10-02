@@ -33,8 +33,11 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Configurations
             // równoległych żądaniach — to jest ostatnia linia obrony przed podwójną rezerwacją
             // boiska. PitchId jest nullable, a Postgres traktuje NULL-e jako różne od siebie, więc
             // mecze bez przypisanego boiska nigdy się o ten indeks nie potkną.
+            // Odwołany mecz (Status = 7) nie zajmuje boiska: generator terminarza i ScheduleConflictChecker
+            // go pomijają, więc indeks też musi — inaczej slot po odwołanym meczu był nie do ponownego użycia.
             builder.HasIndex(x => new { x.PitchId, x.ScheduledAt })
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("\"Status\" <> 7");
             builder.HasIndex(x => new { x.RefereeId, x.ScheduledAt });
 
             builder.HasOne<Pitch>()

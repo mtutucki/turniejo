@@ -60,6 +60,12 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .Where(t => t.TournamentId == tournamentId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .AsNoTracking()
+            .Where(t => t.TeamId == teamId)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<TournamentTeam>> GetUngroupedTournamentTeamsForUpdateAsync(Guid tournamentId, Guid categoryId, CancellationToken cancellationToken = default) =>
         await TournamentTeams
             .Where(t => t.TournamentId == tournamentId && t.CategoryId == categoryId && t.GroupId == null)

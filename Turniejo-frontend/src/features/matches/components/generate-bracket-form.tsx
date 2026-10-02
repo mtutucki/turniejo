@@ -23,19 +23,24 @@ type Pair = { home: BracketSlotInput | null; away: BracketSlotInput | null }
 
 const SIZES = [
   { pairs: 1, label: "Finał (2 drużyny)" },
-  { pairs: 2, label: "Półfinały (4 drużyny)" },
-  { pairs: 4, label: "Ćwierćfinały (8 drużyn)" },
-  { pairs: 8, label: "1/8 finału (16 drużyn)" },
+  { pairs: 2, label: "Półfinały (3–4 drużyny)" },
+  { pairs: 4, label: "Ćwierćfinały (5–8 drużyn)" },
+  { pairs: 8, label: "1/8 finału (9–16 drużyn)" },
 ]
 
-// Wartość w Select: "g:<groupId>:<pozycja>" albo "t:<tournamentTeamId>".
+const BYE = "bye"
+
+// Wartość w Select: "g:<groupId>:<pozycja>", "t:<tournamentTeamId>" albo "bye" (wolny los).
 const encode = (slot: BracketSlotInput | null) =>
   !slot
     ? ""
-    : slot.kind === "group"
-      ? `g:${slot.groupId}:${slot.position}`
-      : `t:${slot.tournamentTeamId}`
+    : slot.kind === "bye"
+      ? BYE
+      : slot.kind === "group"
+        ? `g:${slot.groupId}:${slot.position}`
+        : `t:${slot.tournamentTeamId}`
 const decode = (value: string): BracketSlotInput | null => {
+  if (value === BYE) return { kind: "bye" }
   const [kind, id, position] = value.split(":")
   if (kind === "g" && id && position)
     return { kind: "group", groupId: id, position: Number(position) }
@@ -53,7 +58,8 @@ function suggestPairs(
   pairCount: number,
 ): Pair[] {
   // Puchar bez grup: drużyny w kolejności rozstawienia (numer rozstawienia, potem nazwa) —
-  // 1. z ostatnią, 2. z przedostatnią. Brakujące miejsca zostają do wybrania.
+  // 1. z ostatnią, 2. z przedostatnią. Gdy drużyn jest mniej niż miejsc (np. 5 w ćwierćfinałach),
+  // najwyżej rozstawione dostają wolny los. Para bez żadnej drużyny zostaje do wybrania.
   if (groups.length === 0) {
     const seeded = [...teams].sort(
       (a, b) =>
@@ -63,10 +69,10 @@ function suggestPairs(
       const team = seeded[i]
       return team ? { kind: "team", tournamentTeamId: team.id } : null
     }
-    return Array.from({ length: pairCount }, (_, i) => ({
-      home: slot(i),
-      away: slot(pairCount * 2 - 1 - i),
-    }))
+    return Array.from({ length: pairCount }, (_, i) => {
+      const home = slot(i)
+      return { home, away: slot(pairCount * 2 - 1 - i) ?? (home ? { kind: "bye" } : null) }
+    })
   }
   const slots: BracketSlotInput[] = []
   if (groups.length === 1) {
@@ -125,6 +131,7 @@ function SlotSelect({
             {t.teamName}
           </SelectItem>
         ))}
+        <SelectItem value={BYE}>Wolny los</SelectItem>
       </SelectContent>
     </Select>
   )
@@ -144,20 +151,25 @@ export function GenerateBracketForm({
   teams: TournamentTeam[]
   thirdPlaceEnabled: boolean
 }) {
-  // Z grupami: tyle par, ile grup (max ćwierćfinały). Bez grup: największa drabinka, którą da się
-  // w pełni obsadzić drużynami (np. 6 drużyn → półfinały).
+  // Z grupami: tyle par, ile grup (max ćwierćfinały). Bez grup: najmniejsza drabinka, w której
+  // mieszczą się wszystkie drużyny (np. 5 drużyn → ćwierćfinały z trzema wolnymi losami).
   const defaultSize =
     groups.length > 0
       ? Math.min(4, Math.max(1, groups.length))
-      : Math.max(1, Math.min(8, 2 ** Math.floor(Math.log2(Math.max(2, teams.length))) / 2))
+      : Math.max(1, Math.min(8, 2 ** Math.ceil(Math.log2(Math.max(2, teams.length))) / 2))
   const [pairCount, setPairCount] = useState(defaultSize)
   const [pairs, setPairs] = useState<Pair[]>(() => suggestPairs(groups, teams, defaultSize))
   const [error, setError] = useState<string | null>(null)
   const generate = useGenerateBracket(tournamentId)
 
   const filled = pairs.every((p) => p.home && p.away)
-  const keys = pairs.flatMap((p) => [encode(p.home), encode(p.away)]).filter(Boolean)
+  // Wolnych losów może być kilka, ale nie po obu stronach jednej pary — nie byłoby komu awansować.
+  const keys = pairs
+    .flatMap((p) => [encode(p.home), encode(p.away)])
+    .filter((key) => key && key !== BYE)
   const duplicates = keys.length !== new Set(keys).size
+  const doubleBye = pairs.some((p) => p.home?.kind === "bye" && p.away?.kind === "bye")
+  const hasBye = pairs.some((p) => p.home?.kind === "bye" || p.away?.kind === "bye")
 
   function setSlot(index: number, side: "home" | "away", slot: BracketSlotInput | null) {
     setPairs((current) => current.map((p, i) => (i === index ? { ...p, [side]: slot } : p)))
@@ -226,14 +238,18 @@ export function GenerateBracketForm({
         Miejsca z grup wypełnią się same, gdy grupa rozegra wszystkie mecze. Mecze pucharowe dostaną
         propozycję terminu po fazie grupowej — możesz je przesunąć w terminarzu.
         {thirdPlaceEnabled && " Mecz o 3. miejsce zostanie dodany (ustawienia sportowe)."}
+        {hasBye && " Drużyna z wolnym losem przechodzi do kolejnej rundy bez meczu."}
       </FieldDescription>
 
       {duplicates && (
         <p className="text-destructive text-sm">To samo miejsce albo drużyna występuje dwa razy.</p>
       )}
+      {doubleBye && (
+        <p className="text-destructive text-sm">Para nie może mieć wolnego losu po obu stronach.</p>
+      )}
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Button onClick={submit} disabled={!filled || duplicates || generate.isPending}>
+      <Button onClick={submit} disabled={!filled || duplicates || doubleBye || generate.isPending}>
         <GitBranch />
         {generate.isPending ? "Tworzenie…" : "Utwórz drabinkę"}
       </Button>

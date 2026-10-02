@@ -63,7 +63,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             _dbContext.GetBracketNodeByIdAsync(targetNode.Id, Arg.Any<CancellationToken>()).Returns(targetNode);
             _dbContext.GetBracketRoundByIdAsync(targetRoundId, Arg.Any<CancellationToken>()).Returns(targetRound);
             _matchModule.CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>())
                 .Returns(Guid.NewGuid());
 
             var command = new AdvanceBracketWinnerCommand(Guid.NewGuid(), winnerId);
@@ -76,7 +76,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             result.Value.Advanced.Should().BeTrue();
             targetNode.HomeTournamentTeamId.Should().Be(winnerId);
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                bracket.TournamentId, bracket.CategoryId, winnerId, otherTeamId, "Final", Arg.Any<CancellationToken>());
+                bracket.TournamentId, bracket.CategoryId, winnerId, otherTeamId, "Final", Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
@@ -112,7 +112,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             _dbContext.GetBracketNodeByIdAsync(thirdPlaceNode.Id, Arg.Any<CancellationToken>()).Returns(thirdPlaceNode);
             _dbContext.GetBracketRoundByIdAsync(thirdPlaceRoundId, Arg.Any<CancellationToken>()).Returns(thirdPlaceRound);
             _matchModule.CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>())
                 .Returns(Guid.NewGuid());
 
             var command = new AdvanceBracketWinnerCommand(Guid.NewGuid(), winnerId);
@@ -125,7 +125,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             result.Value.Advanced.Should().BeTrue();
             thirdPlaceNode.HomeTournamentTeamId.Should().Be(loserId);
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                bracket.TournamentId, bracket.CategoryId, loserId, otherLoserId, "ThirdPlace", Arg.Any<CancellationToken>());
+                bracket.TournamentId, bracket.CategoryId, loserId, otherLoserId, "ThirdPlace", Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]

@@ -40,6 +40,8 @@ const node = (id: string, matchId: string, winnerGoesToNodeId: string | null): B
   homeSourcePosition: null,
   awaySourceGroupId: null,
   awaySourcePosition: null,
+  plannedPitchId: null,
+  plannedAt: null,
 })
 
 describe("matchWinner", () => {

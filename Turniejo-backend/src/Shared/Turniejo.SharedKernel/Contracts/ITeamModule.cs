@@ -6,6 +6,9 @@ public interface ITeamModule
     Task<IReadOnlyList<TeamDto>> GetTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
     Task<TournamentTeamDto?> GetTournamentTeamAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+    // Wszystkie zgłoszenia tej samej drużyny (we wszystkich turniejach) — moduł Players bierze z nich
+    // poprzednie składy do skopiowania; TournamentPlayer zna tylko TournamentTeamId.
+    Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Guid>> GetTeamStaffUserIdsAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
 
     // Cross-module istnienie-check dla blokad kasowania (np. kategorii turnieju) — TournamentTeam.CategoryId

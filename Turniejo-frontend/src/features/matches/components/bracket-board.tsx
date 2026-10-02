@@ -1,12 +1,26 @@
 "use client"
 
+import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Match } from "@/types/matches"
-import type { Bracket, BracketNode, BracketRound, BracketSourceType } from "@/types/public"
+import type {
+  Bracket,
+  BracketNode,
+  BracketRound,
+  BracketSlotRef,
+  BracketSourceType,
+} from "@/types/public"
+
+export type BracketSwap = {
+  selected: BracketSlotRef | null
+  disabled: boolean
+  onSelect: (slot: BracketSlotRef) => void
+}
 
 export type BracketLookups = {
   teamName: (tournamentTeamId: string) => string
   groupName: (groupId: string | null) => string | null
+  pitchName?: (pitchId: string | null) => string | null
 }
 
 /** Nazwy rund od końca: finał, półfinały, ćwierćfinały, 1/8 finału… (backend zwraca "Round N"). */
@@ -63,6 +77,7 @@ function Slot({
   penalties,
   winner,
   decided,
+  swap,
 }: {
   label: string
   known: boolean
@@ -70,19 +85,39 @@ function Slot({
   penalties: number | null
   winner: boolean
   decided: boolean
+  /** Tryb zamiany par: slot jest przyciskiem. */
+  swap?: { selected: boolean; disabled: boolean; onSelect: () => void }
 }) {
+  const className = cn(
+    "flex items-center justify-between gap-2 px-3 py-2 text-sm",
+    winner && "bg-primary/10 font-semibold",
+    decided && !winner && "text-muted-foreground",
+  )
+  const name = (
+    <span className={cn("min-w-0 truncate", !known && "text-muted-foreground italic")}>
+      {label}
+    </span>
+  )
+  if (swap) {
+    return (
+      <button
+        type="button"
+        aria-pressed={swap.selected}
+        disabled={swap.disabled}
+        onClick={swap.onSelect}
+        className={cn(
+          className,
+          "hover:bg-accent focus-visible:ring-ring w-full cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-inset disabled:cursor-wait",
+          swap.selected && "bg-primary text-primary-foreground hover:bg-primary",
+        )}
+      >
+        {name}
+      </button>
+    )
+  }
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-2 px-3 py-2 text-sm",
-        winner && "bg-primary/10 font-semibold",
-        decided && !winner && "text-muted-foreground",
-      )}
-      data-winner={winner || undefined}
-    >
-      <span className={cn("min-w-0 truncate", !known && "text-muted-foreground italic")}>
-        {label}
-      </span>
+    <div className={className} data-winner={winner || undefined}>
+      {name}
       {score != null && (
         <span className="shrink-0 font-mono tabular-nums">
           {score}
@@ -99,14 +134,28 @@ function NodeCard({
   node,
   match,
   lookups,
+  showTimes,
+  swap,
 }: {
   node: BracketNode
   match: Match | undefined
   lookups: BracketLookups
+  showTimes: boolean
+  swap?: BracketSwap
 }) {
+  const swapOf = (slot: BracketSlotRef["slot"]) =>
+    swap && {
+      selected: swap.selected?.nodeId === node.id && swap.selected.slot === slot,
+      disabled: swap.disabled,
+      onSelect: () => swap.onSelect({ nodeId: node.id, slot }),
+    }
   const played = match?.status === "Finished"
   const live = match?.status === "Live" || match?.status === "Paused"
   const showScore = played || live
+  // Termin: istniejącego meczu albo zaplanowany z góry dla meczu, który czeka na drużyny.
+  const scheduledAt = match ? match.scheduledAt : node.plannedAt
+  const pitch = lookups.pitchName?.(match ? match.pitchId : node.plannedPitchId) ?? null
+  const showTime = showTimes && !showScore && match?.status !== "Cancelled" && !!scheduledAt
   // Zwycięzca: przy remisie rozstrzygają karne (albo walkower, gdy wynik ustawił organizator).
   const homeAhead = (m: Match) =>
     m.homeScore > m.awayScore ||
@@ -136,6 +185,7 @@ function NodeCard({
         penalties={showScore ? match!.homePenaltyScore : null}
         winner={played && homeAhead(match!)}
         decided={played}
+        swap={swapOf("Home")}
       />
       <div className="border-t" />
       <Slot
@@ -154,7 +204,17 @@ function NodeCard({
         penalties={showScore ? match!.awayPenaltyScore : null}
         winner={played && awayAhead(match!)}
         decided={played}
+        swap={swapOf("Away")}
       />
+      {showTime && (
+        <p
+          className="text-muted-foreground border-t px-3 py-1 text-xs"
+          data-testid="bracket-node-time"
+        >
+          {formatDateTime(scheduledAt)}
+          {pitch && ` · ${pitch}`}
+        </p>
+      )}
     </div>
   )
 }
@@ -164,10 +224,16 @@ export function BracketBoard({
   bracket,
   matches,
   lookups,
+  showTimes = true,
+  swap,
 }: {
   bracket: Bracket
   matches: Match[]
   lookups: BracketLookups
+  /** false, gdy terminy w bazie to jeszcze zaślepki (puchar przed wygenerowaniem terminarza). */
+  showTimes?: boolean
+  /** Tryb zamiany par: sloty pierwszej rundy da się kliknąć. */
+  swap?: BracketSwap
 }) {
   const matchById = new Map(matches.map((m) => [m.id, m]))
   const standard = orderRounds(bracket.rounds.filter((r) => r.roundType === "Standard"))
@@ -190,7 +256,13 @@ export function BracketBoard({
               <ol className="flex flex-1 flex-col justify-around gap-4">
                 {nodes.map((node) => (
                   <li key={node.id}>
-                    <NodeCard node={node} match={matchOf(node)} lookups={lookups} />
+                    <NodeCard
+                      node={node}
+                      match={matchOf(node)}
+                      lookups={lookups}
+                      showTimes={showTimes}
+                      swap={round.roundNumber === 1 ? swap : undefined}
+                    />
                   </li>
                 ))}
               </ol>
@@ -204,7 +276,13 @@ export function BracketBoard({
             {roundLabel(round, standard.length)}
           </h3>
           {round.nodes.map((node) => (
-            <NodeCard key={node.id} node={node} match={matchOf(node)} lookups={lookups} />
+            <NodeCard
+              key={node.id}
+              node={node}
+              match={matchOf(node)}
+              lookups={lookups}
+              showTimes={showTimes}
+            />
           ))}
         </section>
       ))}

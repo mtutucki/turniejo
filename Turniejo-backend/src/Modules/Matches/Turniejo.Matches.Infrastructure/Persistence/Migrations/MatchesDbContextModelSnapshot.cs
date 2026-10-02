@@ -147,7 +147,8 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PitchId", "ScheduledAt")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Status\" <> 7");
 
                     b.HasIndex("RefereeId", "ScheduledAt");
 

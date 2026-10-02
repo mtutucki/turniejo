@@ -13,6 +13,7 @@ namespace Turniejo.Matches.UnitTests.Schedule
         private readonly IMatchesDbContext _dbContext;
         private readonly ITournamentModule _tournamentModule;
         private readonly ITeamModule _teamModule;
+        private readonly IBracketModule _bracketModule = Substitute.For<IBracketModule>();
         private readonly ICurrentUserContext _currentUserContext;
         private readonly GenerateScheduleCommandHandler _handler;
 
@@ -22,7 +23,8 @@ namespace Turniejo.Matches.UnitTests.Schedule
             _tournamentModule = Substitute.For<ITournamentModule>();
             _teamModule = Substitute.For<ITeamModule>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new GenerateScheduleCommandHandler(_dbContext, _tournamentModule, _teamModule, _currentUserContext);
+            _handler = new GenerateScheduleCommandHandler(_dbContext, _tournamentModule, _teamModule, _bracketModule, _currentUserContext);
+            _bracketModule.GetNodesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<BracketNodeInfoDto>());
         }
 
         private static TournamentDto FakeTournament(Guid tournamentId, string? format = "Group") =>
@@ -117,9 +119,62 @@ namespace Turniejo.Matches.UnitTests.Schedule
                     Guid.NewGuid(), Guid.NewGuid(), null, created.AddSeconds(i), StageType.Knockout).Value)
                 .ToList();
             _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(matches);
+            _dbContext.GetTrackedMatchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(call => matches.Where(m => call.Arg<IReadOnlyCollection<Guid>>().Contains(m.Id)).ToList());
             _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>()).Returns(true);
             _currentUserContext.UserId.Returns(Guid.NewGuid());
             return matches;
+        }
+
+        [Fact]
+        public async Task Handle_ShouldPlanLaterRounds_AfterTheMatchesThatFeedThem()
+        {
+            // Półfinały (2 mecze) + finał, który jeszcze nie ma meczu: finał dostaje termin po obu półfinałach.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var matches = SetupKnockout(tournamentId, pitchId, 2);
+            var semi1 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[0].Id, null, null, false);
+            var semi2 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[1].Id, null, null, false);
+            var final = new BracketNodeInfoDto(Guid.NewGuid(), 2, false, null, semi1.Id, semi2.Id, false);
+            _bracketModule.GetNodesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<BracketNodeInfoDto> { final, semi1, semi2 });
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+
+            // Act
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(4), new[] { pitchId }), CancellationToken.None);
+
+            // Assert — półfinały 10:00 i 10:40, finał w kolejnym slocie 11:20.
+            result.IsSuccess.Should().BeTrue();
+            await _bracketModule.Received(1).SetPlannedSlotsAsync(
+                Arg.Is<IReadOnlyCollection<BracketPlannedSlotDto>>(slots =>
+                    slots.Count == 1 && slots.Single().NodeId == final.Id &&
+                    slots.Single().PitchId == pitchId && slots.Single().ScheduledAt == startAt.AddMinutes(80)),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenLaterRoundsDoNotFitInTheWindow()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var matches = SetupKnockout(tournamentId, pitchId, 2);
+            var semi1 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[0].Id, null, null, false);
+            var semi2 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[1].Id, null, null, false);
+            var final = new BracketNodeInfoDto(Guid.NewGuid(), 2, false, null, semi1.Id, semi2.Id, false);
+            _bracketModule.GetNodesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<BracketNodeInfoDto> { semi1, semi2, final });
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+
+            // Act — okno mieści tylko dwa półfinały
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddMinutes(80), new[] { pitchId }), CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.EndAt");
+            await _bracketModule.DidNotReceive().SetPlannedSlotsAsync(
+                Arg.Any<IReadOnlyCollection<BracketPlannedSlotDto>>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]

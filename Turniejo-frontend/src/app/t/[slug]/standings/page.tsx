@@ -7,6 +7,6 @@ export const metadata: Metadata = { title: "Tabele" }
 
 export default async function PublicStandingsPage({ params }: PageProps<"/t/[slug]/standings">) {
   const { slug } = await params
-  await requireSection(slug, (s) => s.showStandings)
+  await requireSection(slug, (s, t) => s.showStandings && t.format !== "Knockout")
   return <StandingsView />
 }

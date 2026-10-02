@@ -24,12 +24,15 @@ namespace Turniejo.Matches.Application.Abstractions
         Task<Match?> GetMatchByIdAsync(Guid matchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
+        /// <summary>Śledzone przez EF — do modyfikacji; pozostałe zapytania o listy meczów są tylko do odczytu.</summary>
+        Task<IReadOnlyList<Match>> GetTrackedMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<bool> MatchExistsAtPitchAndTimeAsync(Guid pitchId, DateTimeOffset scheduledAt, Guid? excludeMatchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByTournamentTeamIdsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesScheduledBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
         Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
         Task<bool> AnyMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task<bool> AnyUnfinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<bool> AnyMatchesByPitchIdAsync(Guid pitchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetCancellableMatchesByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetCancellableMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);

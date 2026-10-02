@@ -31,7 +31,21 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     <BracketBoard
       bracket={bracket.data}
       matches={schedule.data ?? []}
-      lookups={{ teamName: (id) => lookups.teamName(id), groupName: lookups.groupName }}
+      lookups={{
+        teamName: (id) => lookups.teamName(id),
+        groupName: lookups.groupName,
+        pitchName: lookups.pitchName,
+      }}
+      // Terminy tylko przy widocznym terminarzu; puchar przed terminarzem ma w bazie zaślepki.
+      showTimes={
+        tournament.settings.showSchedule &&
+        !(
+          tournament.format === "Knockout" &&
+          (tournament.status === "Draft" ||
+            tournament.status === "RegistrationOpen" ||
+            tournament.status === "RegistrationClosed")
+        )
+      }
     />
   )
 }

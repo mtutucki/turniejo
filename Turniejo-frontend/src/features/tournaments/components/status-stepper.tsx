@@ -16,17 +16,20 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { useClearSchedule } from "@/features/matches/api"
+import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   TOURNAMENT_STATUS_FLOW,
   TOURNAMENT_STATUS_LABELS,
+  TOURNAMENT_STATUS_REVERT,
   TOURNAMENT_STATUS_TRANSITIONS,
   type Tournament,
   TournamentStatus,
   type TournamentStatus as TournamentStatusName,
 } from "@/types/tournaments"
 
-import { useChangeTournamentStatus } from "../api"
+import { useChangeTournamentStatus, useTournamentDashboard } from "../api"
 
 type StepperProps = {
   tournament: Tournament
@@ -86,6 +89,7 @@ function ConfirmTransition({
   description,
   actionLabel,
   destructive,
+  secondary,
   onConfirm,
   disabled,
 }: {
@@ -93,13 +97,18 @@ function ConfirmTransition({
   description: string
   actionLabel: string
   destructive?: boolean
+  /** Akcja poboczna (cofnięcie etapu) — przycisk bez wypełnienia. */
+  secondary?: boolean
   onConfirm: () => void
   disabled?: boolean
 }) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant={destructive ? "outline" : "default"} disabled={disabled}>
+        <Button
+          variant={secondary ? "ghost" : destructive ? "outline" : "default"}
+          disabled={disabled}
+        >
           {actionLabel}
         </Button>
       </AlertDialogTrigger>
@@ -124,20 +133,64 @@ function ConfirmTransition({
 
 /**
  * Maszyna stanów turnieju. Przyciski pokazują tylko przejścia dozwolone przez domenę backendu;
- * z Finished/Cancelled nie ma wyjścia.
+ * z Finished/Cancelled nie ma wyjścia. Do rozpoczęcia turnieju każdy etap da się cofnąć o jeden krok.
  */
 export function TournamentStatusStepper({ tournament, canManage = false }: StepperProps) {
   const changeStatus = useChangeTournamentStatus(tournament.id)
+  const clearSchedule = useClearSchedule(tournament.id)
+  const previous = TOURNAMENT_STATUS_REVERT[tournament.status]
+  const pending = changeStatus.isPending || clearSchedule.isPending
   const transitions = TOURNAMENT_STATUS_TRANSITIONS[tournament.status]
   const next = transitions.find((s) => s !== "Cancelled")
   const canCancel = transitions.includes("Cancelled")
   const isFinal = transitions.length === 0
+  // Zakończenie turnieju anuluje mecze, które się nie odbyły (trwające blokują je po stronie backendu).
+  const dashboard = useTournamentDashboard(tournament.id)
+  const unplayed = dashboard.data?.matches.scheduled ?? 0
+  const transitionDescription = (status: TournamentStatusName) =>
+    `Status turnieju zmieni się na „${TOURNAMENT_STATUS_LABELS[status]}”.` +
+    // Od rozpoczęcia turnieju nie ma już drogi wstecz; wcześniejsze etapy można cofnąć.
+    (status === "InProgress" || status === "Finished"
+      ? " Nie da się cofnąć do poprzedniego etapu."
+      : "") +
+    (status === "Finished" && unplayed > 0
+      ? ` ${plural(unplayed, ["mecz nie został rozegrany i zostanie anulowany", "mecze nie zostały rozegrane i zostaną anulowane", "meczów nie zostało rozegranych i zostanie anulowanych"])}.`
+      : "")
 
   function change(status: TournamentStatusName) {
     changeStatus.mutate(status, {
       onSuccess: () => toast.success(`Status: ${TOURNAMENT_STATUS_LABELS[status]}`),
     })
   }
+
+  function revert(status: TournamentStatusName) {
+    // Z "Harmonogram gotowy" cofa wyczyszczenie terminarza — backend sam zmienia wtedy etap.
+    if (tournament.status !== "ScheduleGenerated") return change(status)
+    clearSchedule.mutate(undefined, {
+      onSuccess: () => toast.success(`Status: ${TOURNAMENT_STATUS_LABELS[status]}`),
+    })
+  }
+
+  const revertCopy: Partial<Record<TournamentStatusName, { label: string; description: string }>> =
+    {
+      Draft: {
+        label: "Wróć do szkicu",
+        description:
+          "Zapisy zostaną wstrzymane, a turniej wróci do szkicu. Zgłoszone drużyny zostają.",
+      },
+      RegistrationOpen: {
+        label: "Otwórz zapisy ponownie",
+        description:
+          "Znów będzie można zgłaszać drużyny. Zamknij zapisy ponownie przed wygenerowaniem terminarza.",
+      },
+      RegistrationClosed: {
+        label: "Wyczyść terminarz",
+        description:
+          tournament.format === "Knockout"
+            ? "Turniej wróci do etapu „Zapisy zamknięte”. Mecze drabinki zostają — terminy i boiska nadasz im ponownie, generując terminarz."
+            : "Wszystkie mecze zostaną usunięte razem z przypisaniami sędziów, a turniej wróci do etapu „Zapisy zamknięte”. Potem wygenerujesz terminarz od nowa.",
+      },
+    }
 
   return (
     <div className="space-y-4">
@@ -166,10 +219,10 @@ export function TournamentStatusStepper({ tournament, canManage = false }: Stepp
             next && (
               <ConfirmTransition
                 title={`${NEXT_STEP_LABELS[next] ?? TOURNAMENT_STATUS_LABELS[next]}?`}
-                description={`Status turnieju zmieni się na „${TOURNAMENT_STATUS_LABELS[next]}”. Nie da się cofnąć do poprzedniego etapu.`}
+                description={transitionDescription(next)}
                 actionLabel={NEXT_STEP_LABELS[next] ?? TOURNAMENT_STATUS_LABELS[next]}
                 onConfirm={() => change(next)}
-                disabled={changeStatus.isPending}
+                disabled={pending}
               />
             )
           )}
@@ -180,7 +233,18 @@ export function TournamentStatusStepper({ tournament, canManage = false }: Stepp
               actionLabel="Anuluj turniej"
               destructive
               onConfirm={() => change("Cancelled")}
-              disabled={changeStatus.isPending}
+              disabled={pending}
+            />
+          )}
+          {previous && revertCopy[previous] && (
+            <ConfirmTransition
+              title={`${revertCopy[previous].label}?`}
+              description={revertCopy[previous].description}
+              actionLabel={revertCopy[previous].label}
+              secondary
+              destructive={tournament.status === "ScheduleGenerated"}
+              onConfirm={() => revert(previous)}
+              disabled={pending}
             />
           )}
         </div>

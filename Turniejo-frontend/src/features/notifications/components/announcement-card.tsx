@@ -1,7 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Megaphone } from "lucide-react"
+import { Megaphone, Send } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -55,7 +55,7 @@ export function AnnouncementCard({ tournamentId }: { tournamentId: string }) {
       </CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(submit)} noValidate>
-          <FieldGroup>
+          <FieldGroup className="gap-4">
             <TextField
               id="announcement-title"
               label="Tytuł"
@@ -74,7 +74,9 @@ export function AnnouncementCard({ tournamentId }: { tournamentId: string }) {
               <FieldError errors={[errors.message]} />
             </Field>
             <FieldError errors={[errors.root]} />
-            <Button type="submit" className="justify-self-start" disabled={create.isPending}>
+            {/* FieldGroup to kolumna flex — bez self-end przycisk rozciąga się na całą szerokość karty. */}
+            <Button type="submit" className="self-end" disabled={create.isPending}>
+              <Send />
               {create.isPending ? "Wysyłanie…" : "Wyślij ogłoszenie"}
             </Button>
           </FieldGroup>

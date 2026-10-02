@@ -1,9 +1,13 @@
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 
+import type { TournamentFormat } from "@/types/tournaments"
+
 export type ActiveTournament = {
   id: string
   name: string
+  /** Decyduje o sekcji nawigacji: puchar ma drabinkę zamiast tabeli. Brak = jeszcze nieznany. */
+  format?: TournamentFormat | null
 }
 
 type ActiveTournamentState = {
@@ -12,7 +16,7 @@ type ActiveTournamentState = {
 }
 
 /**
- * Turniej, w kontekście którego działa nawigacja (Mecze / Tabela / Drużyny).
+ * Turniej, w kontekście którego działa nawigacja (Mecze / Tabela albo Drabinka / Drużyny).
  * Ustawiany przy wejściu w turniej (Faza 2), pamiętany między wizytami.
  */
 export const useActiveTournamentStore = create<ActiveTournamentState>()(

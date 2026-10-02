@@ -34,7 +34,12 @@ export function publicSections(tournament: PublicTournament) {
     // Strona główna portalu istnieje zawsze — przy ukrytym terminarzu pokazuje komunikat.
     { segment: "", label: "Mecze", visible: true },
     { segment: "schedule", label: "Terminarz", visible: s.showSchedule },
-    { segment: "standings", label: "Tabele", visible: s.showStandings },
+    // Puchar nie ma fazy grupowej — nie ma tabel do pokazania.
+    {
+      segment: "standings",
+      label: "Tabele",
+      visible: s.showStandings && tournament.format !== "Knockout",
+    },
     { segment: "bracket", label: "Drabinka", visible: s.showBracket && hasKnockout },
     { segment: "teams", label: "Drużyny", visible: s.showTeams },
     { segment: "stats", label: "Statystyki", visible: s.showStats },

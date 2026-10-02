@@ -18,6 +18,8 @@ const EXACT: Record<string, string> = {
   "Tournament status cannot be changed after it has finished":
     "Statusu zakończonego turnieju nie można zmienić",
   "Tournament status is already set to the specified value": "Turniej ma już ten status",
+  "Finish the matches in progress before finishing the tournament":
+    "Najpierw zakończ trwające mecze — potem zakończysz turniej",
   "You cannot edit tournament settings after tournament is in progres":
     "Ustawień sportowych nie można zmieniać, gdy turniej trwa",
   "Tournament end date cannot be before start date": "Zakończenie nie może być przed rozpoczęciem",
@@ -45,6 +47,9 @@ const EXACT: Record<string, string> = {
   "User is already a coach for this team": "Ta osoba jest już trenerem tej drużyny",
   // Zawodnicy
   "Player is already assigned to this team": "Ten zawodnik jest już w składzie",
+  "Player is not part of the source squad": "Tego zawodnika nie ma w wybranym składzie",
+  "Shirt numbers must be unique.": "Numery na koszulkach nie mogą się powtarzać",
+  "Select at least one player.": "Zaznacz co najmniej jednego zawodnika",
   "Player is too old for this category": "Zawodnik jest za stary na tę kategorię",
   "Player is too young for this category": "Zawodnik jest za młody na tę kategorię",
   "Shirt number is already taken in this team": "Ten numer jest już zajęty w drużynie",
@@ -95,6 +100,14 @@ const EXACT: Record<string, string> = {
     "Mecz pucharowy nie może zakończyć się remisem — rozstrzygnij go karnymi",
   "Winner must be the team with more goals": "Zwycięzcą jest drużyna z większą liczbą goli",
   "A bracket already exists for this tournament": "Drabinka dla tej kategorii już istnieje",
+  "Cannot reset the bracket after one of its matches has started":
+    "Nie można ułożyć drabinki od nowa — jeden z jej meczów już się rozpoczął",
+  "Cannot change the pairings once a bracket match has started, finished or been cancelled":
+    "Nie można już zmienić par — jeden z meczów drabinki się rozpoczął, zakończył albo został odwołany",
+  "Only first-round slots can be swapped": "Zamieniać można tylko sloty pierwszej rundy",
+  "Choose two different slots to swap": "Wybierz dwa różne sloty",
+  "The bracket was removed, but the tournament stage could not be reverted — clear the schedule":
+    "Drabinka została usunięta, ale etap turnieju się nie cofnął — wyczyść terminarz",
   "Bracket generation requires Knockout or GroupAndKnockout format":
     "Drabinka wymaga formatu z fazą pucharową",
   "Match events can only be recorded while the match is live, paused, or within the post-match edit window":

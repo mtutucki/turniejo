@@ -2,191 +2,25 @@
 
 import { BarChart3, Lock, Pencil, Users } from "lucide-react"
 import { useState } from "react"
-import { Controller, useForm } from "react-hook-form"
-import { toast } from "sonner"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
 
-import { TextField } from "@/components/forms/text-field"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   useCoachPlayers,
   useCoachResults,
   useCoachSchedule,
   useCoachStats,
-  useUpdateSquadPlayer,
 } from "@/features/panels/api"
 import { SimpleMatchList } from "@/features/panels/components/simple-match-list"
 import { AddPlayerDialog } from "@/features/teams/components/add-player-dialog"
-import { applyFieldErrors } from "@/lib/api/form-errors"
+import { EditPlayerDialog } from "@/features/teams/components/edit-player-dialog"
+import { ImportSquadDialog } from "@/features/teams/components/import-squad-dialog"
 import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import {
-  PLAYER_POSITION_LABELS,
-  PLAYER_STATUS_LABELS,
-  type PlayerPosition,
-  type TournamentPlayer,
-  type TournamentPlayerStatus,
-} from "@/types/teams"
+import { PLAYER_POSITION_LABELS, PLAYER_STATUS_LABELS, type TournamentPlayer } from "@/types/teams"
 
 import { useCoachTeam } from "./team-shell"
-
-const POSITIONS = Object.keys(PLAYER_POSITION_LABELS) as PlayerPosition[]
-const STATUSES = Object.keys(PLAYER_STATUS_LABELS) as TournamentPlayerStatus[]
-const NO_POSITION = "none"
-
-// Numer 1–99 jak w UpdateTournamentPlayerCommandValidator; puste pole = bez numeru.
-const squadSchema = z.object({
-  shirtNumber: z
-    .string()
-    .trim()
-    .refine(
-      (v) => v === "" || (/^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 99),
-      "Numer od 1 do 99",
-    ),
-  position: z.string(),
-  status: z.string(),
-})
-type SquadValues = z.infer<typeof squadSchema>
-
-function EditSquadPlayerDialog({
-  player,
-  squad,
-  onClose,
-}: {
-  player: TournamentPlayer
-  squad: TournamentPlayer[]
-  onClose: () => void
-}) {
-  const team = useCoachTeam()
-  const update = useUpdateSquadPlayer(team.tournamentId, team.tournamentTeamId)
-  const form = useForm<SquadValues>({
-    resolver: zodResolver(
-      squadSchema.refine(
-        (v) =>
-          v.shirtNumber === "" ||
-          !squad.some((p) => p.id !== player.id && p.shirtNumber === Number(v.shirtNumber)),
-        { path: ["shirtNumber"], message: "Ten numer ma już inny zawodnik" },
-      ),
-    ),
-    defaultValues: {
-      shirtNumber: player.shirtNumber?.toString() ?? "",
-      position: player.position ?? NO_POSITION,
-      status: player.status,
-    },
-  })
-  const { errors } = form.formState
-
-  function submit(values: SquadValues) {
-    update.mutate(
-      {
-        tournamentPlayerId: player.id,
-        shirtNumber: values.shirtNumber ? Number(values.shirtNumber) : null,
-        position: values.position === NO_POSITION ? null : (values.position as PlayerPosition),
-        status: values.status as TournamentPlayerStatus,
-      },
-      {
-        onSuccess: () => {
-          toast.success("Zapisano zmiany w składzie")
-          onClose()
-        },
-        onError: (error) => applyFieldErrors(error, form),
-      },
-    )
-  }
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {player.firstName} {player.lastName}
-          </DialogTitle>
-        </DialogHeader>
-        <form id="squad-form" onSubmit={form.handleSubmit(submit)} noValidate>
-          <FieldGroup>
-            <TextField
-              id="squad-number"
-              label="Numer na koszulce"
-              inputMode="numeric"
-              error={errors.shirtNumber}
-              {...form.register("shirtNumber")}
-            />
-            <Controller
-              control={form.control}
-              name="position"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="squad-position">Pozycja</FieldLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="squad-position" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_POSITION}>Bez pozycji</SelectItem>
-                      {POSITIONS.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {PLAYER_POSITION_LABELS[p]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            />
-            <Controller
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="squad-status">Status</FieldLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="squad-status" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {PLAYER_STATUS_LABELS[s]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            />
-            <FieldError errors={[errors.root]} />
-          </FieldGroup>
-        </form>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Anuluj
-          </Button>
-          <Button type="submit" form="squad-form" disabled={update.isPending}>
-            {update.isPending ? "Zapisywanie…" : "Zapisz"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 export function CoachPlayersView() {
   const team = useCoachTeam()
@@ -221,12 +55,19 @@ export function CoachPlayersView() {
           {plural(squad.length, ["zawodnik", "zawodników", "zawodników"])}
         </p>
         {canEdit && (
-          <AddPlayerDialog
-            tournamentId={team.tournamentId}
-            tournamentTeamId={team.tournamentTeamId}
-            category={undefined}
-            squad={squad}
-          />
+          <div className="flex flex-wrap justify-end gap-2">
+            <ImportSquadDialog
+              tournamentId={team.tournamentId}
+              tournamentTeamId={team.tournamentTeamId}
+              squad={squad}
+            />
+            <AddPlayerDialog
+              tournamentId={team.tournamentId}
+              tournamentTeamId={team.tournamentTeamId}
+              category={undefined}
+              squad={squad}
+            />
+          </div>
         )}
       </div>
 
@@ -280,7 +121,14 @@ export function CoachPlayersView() {
       )}
 
       {editing && (
-        <EditSquadPlayerDialog player={editing} squad={squad} onClose={() => setEditing(null)} />
+        <EditPlayerDialog
+          tournamentId={team.tournamentId}
+          tournamentTeamId={team.tournamentTeamId}
+          category={undefined}
+          squad={squad}
+          player={editing}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   )

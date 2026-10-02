@@ -19,6 +19,7 @@ namespace Turniejo.Teams.Application.Abstractions
         Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default);
         Task<TournamentTeam?> GetTournamentTeamByIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default);
         /// <summary>Śledzone (do zmiany) drużyny kategorii bez grupy — GetTournamentTeamsByTournamentIdAsync jest AsNoTracking.</summary>
         Task<IReadOnlyList<TournamentTeam>> GetUngroupedTournamentTeamsForUpdateAsync(Guid tournamentId, Guid categoryId, CancellationToken cancellationToken = default);
         Task<bool> TournamentTeamExistsAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default);

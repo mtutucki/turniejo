@@ -82,6 +82,26 @@ namespace Turniejo.Notifications.UnitTests.EventHandlers
         }
 
         [Fact]
+        public async Task Handle_ShouldSkipUserWhoCancelledTheTournament()
+        {
+            // Organizator, który sam anulował turniej, nie dostaje o tym powiadomienia — współorganizator tak.
+            var tournamentId = Guid.NewGuid();
+            var cancellingOrganizerId = Guid.NewGuid();
+            var otherOrganizerId = Guid.NewGuid();
+            _userModule.GetUserIdsByScopeAsync("Tournament", tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<Guid> { cancellingOrganizerId, otherOrganizerId });
+            var notification = new TournamentStatusChanged(tournamentId, Guid.NewGuid(), cancellingOrganizerId, TournamentStatus.InProgress, TournamentStatus.Cancelled);
+
+            // Act
+            await _handler.Handle(notification, CancellationToken.None);
+
+            // Assert
+            await _dbContext.Received(1).AddNotificationRecipientsAsync(
+                Arg.Is<IReadOnlyCollection<Turniejo.Notifications.Domain.Entities.NotificationRecipient>>(r => r.Count == 1 && r.Single().UserId == otherOrganizerId),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldAlsoReachRefereesAssignedToTournamentMatches()
         {
             // Zamyka lukę z audytu: sędziowie mają rolę Match-scoped, nie Tournament-scoped —

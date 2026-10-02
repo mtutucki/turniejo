@@ -51,7 +51,7 @@ export function AppSidebar() {
             <ActiveTournamentCard />
             <div className="flex flex-col gap-1">
               {/* Sekcje turnieju są nieaktywne, dopóki user nie wybierze turnieju (karta wyżej). */}
-              {tournamentNavItems(tournament?.id).map((item) => (
+              {tournamentNavItems(tournament).map((item) => (
                 <NavLink key={item.label} {...item} disabled={!tournament} />
               ))}
             </div>

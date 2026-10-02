@@ -30,12 +30,16 @@ export function MatchFilterPills({
 
   const pills: { key: string; label: string; filter: MatchFilter }[] = [
     { key: "all", label: "Wszystkie", filter: ALL_MATCHES },
-    ...tournament.groups.map((g) => ({
-      key: `g-${g.id}`,
-      // Przy kilku kategoriach "Grupa A" byłaby niejednoznaczna.
-      label: multipleCategories ? `${categoryName(g.categoryId)} · ${g.name}` : g.name,
-      filter: { kind: "group", id: g.id } as MatchFilter,
-    })),
+    // W pucharze mecze nie należą do grup — grupa (np. pozostałość po zmianie formatu) dawałaby
+    // zawsze pusty wynik.
+    ...(tournament.format === "Knockout"
+      ? []
+      : tournament.groups.map((g) => ({
+          key: `g-${g.id}`,
+          // Przy kilku kategoriach "Grupa A" byłaby niejednoznaczna.
+          label: multipleCategories ? `${categoryName(g.categoryId)} · ${g.name}` : g.name,
+          filter: { kind: "group", id: g.id } as MatchFilter,
+        }))),
     ...(tournament.pitches.length > 1
       ? tournament.pitches.map((p) => ({
           key: `p-${p.id}`,

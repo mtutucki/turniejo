@@ -1,8 +1,9 @@
 "use client"
 
-import { ArrowLeft, SearchX, UserPlus, Users } from "lucide-react"
+import { ArrowLeft, Pencil, SearchX, UserPlus, Users } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,8 @@ import { useTeamPlayers, useTeamStaff, useTournamentTeams } from "@/features/tea
 import { AddPlayerDialog } from "@/features/teams/components/add-player-dialog"
 import { AssignGuardianDialog } from "@/features/teams/components/assign-guardian-dialog"
 import { AssignStaffDialog } from "@/features/teams/components/assign-staff-dialog"
+import { EditPlayerDialog } from "@/features/teams/components/edit-player-dialog"
+import { ImportSquadDialog } from "@/features/teams/components/import-squad-dialog"
 import { RegistrationStatusBadge } from "@/features/teams/components/registration-status-badge"
 import { TeamLogo } from "@/features/teams/components/team-logo"
 import { useCategories } from "@/features/tournaments/api"
@@ -36,10 +39,13 @@ import {
 function Squad({
   players,
   isPending,
+  onEdit,
   guardianScope,
 }: {
   players: TournamentPlayer[] | undefined
   isPending: boolean
+  /** Brak = skład tylko do odczytu. */
+  onEdit?: (player: TournamentPlayer) => void
   /** Tylko organizator — lista członków turnieju (wybór rodzica) jest dla niego zarezerwowana. */
   guardianScope?: { tournamentId: string; tournamentTeamId: string }
 }) {
@@ -70,6 +76,17 @@ function Squad({
           {p.status !== "Active" && (
             <span className="text-muted-foreground text-xs">{PLAYER_STATUS_LABELS[p.status]}</span>
           )}
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Edytuj ${p.firstName} ${p.lastName}`}
+              title="Edytuj"
+              onClick={() => onEdit(p)}
+            >
+              <Pencil />
+            </Button>
+          )}
           {guardianScope && <AssignGuardianDialog {...guardianScope} player={p} />}
         </li>
       ))}
@@ -92,6 +109,7 @@ export function TournamentTeamDetails() {
   const canEditSquad = isOrganizer || hasTeamRole([UserRole.Coach])
   const players = useTeamPlayers(id, teamId)
   const staff = useTeamStaff(id, teamId, isOrganizer || isTeamStaff)
+  const [editing, setEditing] = useState<TournamentPlayer | null>(null)
 
   if (teams.isPending) return <Skeleton className="h-64 rounded-xl" />
   if (!team) {
@@ -140,7 +158,12 @@ export function TournamentTeamDetails() {
               {plural(players.data?.length ?? 0, ["zawodnik", "zawodników", "zawodników"])}
             </CardDescription>
             {canEditSquad && (
-              <CardAction>
+              <CardAction className="flex flex-wrap justify-end gap-2">
+                <ImportSquadDialog
+                  tournamentId={id}
+                  tournamentTeamId={teamId}
+                  squad={players.data ?? []}
+                />
                 <AddPlayerDialog
                   tournamentId={id}
                   tournamentTeamId={teamId}
@@ -154,12 +177,23 @@ export function TournamentTeamDetails() {
             <Squad
               players={players.data}
               isPending={players.isPending}
+              onEdit={canEditSquad ? setEditing : undefined}
               guardianScope={
                 isOrganizer ? { tournamentId: id, tournamentTeamId: teamId } : undefined
               }
             />
           </CardContent>
         </Card>
+        {editing && (
+          <EditPlayerDialog
+            tournamentId={id}
+            tournamentTeamId={teamId}
+            category={category}
+            squad={players.data ?? []}
+            player={editing}
+            onClose={() => setEditing(null)}
+          />
+        )}
 
         {(isOrganizer || isTeamStaff) && (
           <Card>

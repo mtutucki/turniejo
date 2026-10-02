@@ -12,16 +12,45 @@ namespace Turniejo.Matches.UnitTests.Matches
     {
         private readonly IMatchesDbContext _dbContext;
         private readonly ITournamentModule _tournamentModule = Substitute.For<ITournamentModule>();
+        private readonly ITeamModule _teamModule = Substitute.For<ITeamModule>();
         private readonly CreateBracketMatchCommandHandler _handler;
 
         public CreateBracketMatchCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
-            _handler = new CreateBracketMatchCommandHandler(_dbContext, _tournamentModule);
+            _handler = new CreateBracketMatchCommandHandler(_dbContext, _tournamentModule, _teamModule);
             _dbContext.GetMatchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<Match>());
             _dbContext.GetPitchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<Pitch>());
             _tournamentModule.GetTournamentSettingsAsync(default, default).ReturnsForAnyArgs(
                 ci => new TournamentSettingsSummaryDto(ci.Arg<Guid>(), 30, 10, 60, 3, 1, 0, false, false, 3, 0));
+        }
+
+        [Fact]
+        public async Task Handle_ShouldAwardWalkoverToOpponent_WhenOneTeamHasWithdrawn()
+        {
+            // Wycofana drużyna czekała w drabince na rywala — nowa para od razu kończy się walkowerem.
+            var tournamentId = Guid.NewGuid();
+            var homeTeamId = Guid.NewGuid();
+            var awayTeamId = Guid.NewGuid();
+            _teamModule.GetTournamentTeamAsync(homeTeamId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentTeamDto(homeTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Withdrawn"));
+            _teamModule.GetTournamentTeamAsync(awayTeamId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentTeamDto(awayTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Accepted"));
+            var command = new CreateBracketMatchCommand(tournamentId, Guid.NewGuid(), homeTeamId, awayTeamId, StageType.Knockout);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            await _dbContext.Received(1).AddMatchAsync(
+                Arg.Is<Match>(m =>
+                    m.Status == MatchStatus.Finished && m.ResultType == MatchResultType.Walkover &&
+                    m.WinnerTournamentTeamId == awayTeamId && m.HomeScore == 0 && m.AwayScore == 3),
+                Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).AddOutboxMessageAsync(
+                Arg.Is<Turniejo.SharedKernel.Outbox.OutboxMessage>(m => m.Type.Contains("MatchFinished")),
+                Arg.Any<CancellationToken>());
         }
 
         [Fact]

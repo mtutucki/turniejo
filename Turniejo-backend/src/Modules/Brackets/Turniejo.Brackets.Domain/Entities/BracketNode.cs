@@ -26,6 +26,11 @@ namespace Turniejo.Brackets.Domain.Entities
         public Guid? LoserGoesToNodeId { get; private set; }
         public BracketSlot? LoserGoesToSlot { get; private set; }
 
+        // Termin zaplanowany przez generator terminarza dla meczu, który jeszcze nie istnieje (drużyny
+        // wyłoni poprzednia runda). Mecz powstaje potem w tym terminie.
+        public Guid? PlannedPitchId { get; private set; }
+        public DateTimeOffset? PlannedAt { get; private set; }
+
         public bool IsFullyResolved => HomeTournamentTeamId.HasValue && AwayTournamentTeamId.HasValue;
 
         private BracketNode() { }
@@ -100,6 +105,65 @@ namespace Turniejo.Brackets.Domain.Entities
             SetUpdatedAt();
 
             return Result.Success();
+        }
+
+        // Źródło slotu pierwszej rundy (drużyna, miejsce w grupie albo wolny los) — do zamiany par
+        // przez organizatora. Sloty kolejnych rund mają jeszcze HomeSourceNodeId/AwaySourceNodeId
+        // i nie podlegają zamianie.
+        public BracketSlotSource GetSlotSource(BracketSlot slot) =>
+            slot == BracketSlot.Home
+                ? new BracketSlotSource(HomeSourceType, HomeSourceGroupId, HomeSourcePosition, HomeTournamentTeamId)
+                : new BracketSlotSource(AwaySourceType, AwaySourceGroupId, AwaySourcePosition, AwayTournamentTeamId);
+
+        public void SetSlotSource(BracketSlot slot, BracketSlotSource source)
+        {
+            if (slot == BracketSlot.Home)
+            {
+                HomeSourceType = source.SourceType;
+                HomeSourceGroupId = source.GroupId;
+                HomeSourcePosition = source.Position;
+                HomeTournamentTeamId = source.TournamentTeamId;
+            }
+            else
+            {
+                AwaySourceType = source.SourceType;
+                AwaySourceGroupId = source.GroupId;
+                AwaySourcePosition = source.Position;
+                AwayTournamentTeamId = source.TournamentTeamId;
+            }
+
+            SetUpdatedAt();
+        }
+
+        // Slot kolejnej rundy wypełniony awansem z wolnego losu, który po zamianie par już nie obowiązuje.
+        public void ClearSlot(BracketSlot slot)
+        {
+            if (slot == BracketSlot.Home)
+                HomeTournamentTeamId = null;
+            else
+                AwayTournamentTeamId = null;
+
+            SetUpdatedAt();
+        }
+
+        public void ClearMatch()
+        {
+            MatchId = null;
+            SetUpdatedAt();
+        }
+
+        public void PlanSlot(Guid pitchId, DateTimeOffset scheduledAt)
+        {
+            PlannedPitchId = pitchId;
+            PlannedAt = scheduledAt;
+            SetUpdatedAt();
+        }
+
+        public void ClearPlannedSlot()
+        {
+            PlannedPitchId = null;
+            PlannedAt = null;
+            SetUpdatedAt();
         }
 
         public Result AssignMatch(Guid matchId)

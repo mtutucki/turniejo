@@ -65,9 +65,10 @@ export function TournamentShell({ children }: { children: ReactNode }) {
 
   // Wejście w turniej (także z linku) ustawia go jako aktywny kontekst nawigacji.
   const name = tournament.data?.name
+  const format = tournament.data?.format
   useEffect(() => {
-    if (name) setActiveTournament({ id, name })
-  }, [id, name, setActiveTournament])
+    if (name) setActiveTournament({ id, name, format })
+  }, [id, name, format, setActiveTournament])
 
   // isPending, nie isLoading: przed załadowaniem sesji zapytanie jest wyłączone (isLoading = false).
   if (tournament.isPending) {

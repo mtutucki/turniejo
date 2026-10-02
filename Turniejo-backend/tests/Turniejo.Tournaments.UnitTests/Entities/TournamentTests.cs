@@ -222,9 +222,9 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         [InlineData(TournamentStatus.Draft, TournamentStatus.Finished)]
         [InlineData(TournamentStatus.Draft, TournamentStatus.RegistrationClosed)]
         [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.InProgress)]
-        [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.Draft)]
         [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.InProgress)]
-        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.RegistrationOpen)]
+        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.Draft)]
+        [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.RegistrationClosed)]
         [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.Finished)]
         [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.Draft)]
         public void ChangeStatus_ShouldFail_WhenTransitionIsNotAllowed(TournamentStatus currentStatus, TournamentStatus newStatus)
@@ -236,6 +236,20 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             var result = tournament.ChangeStatus(newStatus, ValidUserId);
             // Assert
             result.IsFailure.Should().BeTrue();
+        }
+
+        [Theory]
+        [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.Draft)]
+        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.RegistrationOpen)]
+        public void ChangeStatus_ShouldAllowSteppingBack_BeforeScheduleIsGenerated(TournamentStatus currentStatus, TournamentStatus previousStatus)
+        {
+            // Arrange
+            var tournament = CreateTournamentWithStatus(currentStatus);
+            // Act
+            var result = tournament.ChangeStatus(previousStatus, ValidUserId);
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            tournament.Status.Should().Be(previousStatus);
         }
 
         [Fact]

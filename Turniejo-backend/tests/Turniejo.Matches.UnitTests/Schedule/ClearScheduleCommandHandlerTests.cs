@@ -18,7 +18,7 @@ namespace Turniejo.Matches.UnitTests.Schedule
 
         public ClearScheduleCommandHandlerTests()
         {
-            _handler = new ClearScheduleCommandHandler(_dbContext, _tournamentModule, _userModule);
+            _handler = new ClearScheduleCommandHandler(_dbContext, _tournamentModule, _userModule, Substitute.For<IBracketModule>());
             _tournamentModule.RevertScheduleGenerationAsync(_tournamentId, Arg.Any<CancellationToken>()).Returns(true);
         }
 

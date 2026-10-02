@@ -111,7 +111,7 @@ export type TeamPlayerStats = {
 }
 
 // 1:1 z Turniejo.Players.Domain.Enums.TournamentPlayerStatus
-/** Wartości liczbowe enuma do body PATCH /api/tournament-players (typ: TournamentPlayerStatus z types/teams). */
+/** Wartości liczbowe enuma do body PUT …/players/{id} (typ: TournamentPlayerStatus z types/teams). */
 export const TOURNAMENT_PLAYER_STATUS_VALUES = {
   Active: 1,
   Injured: 2,

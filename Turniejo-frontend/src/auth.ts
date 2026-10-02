@@ -35,7 +35,9 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     const refreshed = await refreshGrant(token.refreshToken!)
     return { ...token, ...refreshed, error: undefined }
   } catch (error) {
-    console.error("Keycloak refresh_token failed", error)
+    // invalid_grant = sesja w Keycloaku wygasła lub została zamknięta — zwykłe wylogowanie, nie awaria.
+    const sessionExpired = error instanceof KeycloakAuthError && error.error === "invalid_grant"
+    if (!sessionExpired) console.error("Keycloak refresh_token failed", error)
     return { ...token, error: "RefreshTokenError" }
   }
 }
@@ -86,6 +88,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (token.expiresAt && Date.now() < token.expiresAt - REFRESH_MARGIN_MS) return token
+      // Martwy refresh token nie ożyje — nie odpytujemy Keycloaka przy każdym żądaniu.
+      if (token.error) return token
       if (!token.refreshToken) return { ...token, error: "RefreshTokenError" }
       return refreshAccessToken(token)
     },

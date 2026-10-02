@@ -17,7 +17,10 @@ namespace Turniejo.Brackets.Application.DTOs
         Guid? HomeSourceGroupId = null,
         int? HomeSourcePosition = null,
         Guid? AwaySourceGroupId = null,
-        int? AwaySourcePosition = null);
+        int? AwaySourcePosition = null,
+        // Termin zaplanowany dla meczu, który jeszcze nie powstał (czeka na drużyny z poprzedniej rundy).
+        Guid? PlannedPitchId = null,
+        DateTimeOffset? PlannedAt = null);
 
     public sealed record BracketRoundDto(
         Guid Id,

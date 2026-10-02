@@ -10,7 +10,8 @@ namespace Turniejo.Notifications.Application.EventHandlers
     // Anulowanie turnieju nie generowało żadnego powiadomienia — drużyny i sędziowie dowiadywali
     // się o tym dopiero, gdy próbowali wejść na mecz. Rozsyłamy do każdego uczestnika turnieju
     // (organizator, trenerzy/managerowie drużyn, sędziowie, rodzice) tym samym resolverem co
-    // ręczne ogłoszenie organizatora.
+    // ręczne ogłoszenie organizatora. Pomijamy tylko tego, kto anulował — sam wie, co zrobił;
+    // pozostali organizatorzy dostają powiadomienie normalnie.
     internal sealed class TournamentStatusChangedHandler(
         NotificationPublisher publisher,
         TournamentParticipantResolver participantResolver,
@@ -21,7 +22,8 @@ namespace Turniejo.Notifications.Application.EventHandlers
             if (notification.NewStatus != TournamentStatus.Cancelled)
                 return;
 
-            var recipients = await participantResolver.ResolveAsync(notification.TournamentId, cancellationToken);
+            var participants = await participantResolver.ResolveAsync(notification.TournamentId, cancellationToken);
+            var recipients = participants.Where(userId => userId != notification.ChangedByUserId).ToList();
             if (recipients.Count == 0)
                 return;
 

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Brackets.Application.Brackets.GenerateBracket;
 using Turniejo.Brackets.Application.Brackets.GetBracket;
+using Turniejo.Brackets.Application.Brackets.ResetBracket;
+using Turniejo.Brackets.Application.Brackets.SwapBracketSlots;
 using Turniejo.Brackets.Domain.Enums;
 
 namespace Turniejo.Api.Controllers
@@ -32,6 +34,26 @@ namespace Turniejo.Api.Controllers
             var result = await sender.Send(query, cancellationToken);
             return result.ToActionResult();
         }
+
+        [HttpDelete]
+        public async Task<IActionResult> ResetBracket([FromRoute] Guid tournamentId, [FromQuery] Guid categoryId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ResetBracketCommand(tournamentId, categoryId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpPost("swap-slots")]
+        public async Task<IActionResult> SwapBracketSlots([FromRoute] Guid tournamentId, [FromBody] SwapBracketSlotsRequest request, CancellationToken cancellationToken)
+        {
+            var command = new SwapBracketSlotsCommand(
+                tournamentId, request.CategoryId,
+                request.FirstNodeId, request.FirstSlot, request.SecondNodeId, request.SecondSlot);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        public sealed record SwapBracketSlotsRequest(
+            Guid CategoryId, Guid FirstNodeId, BracketSlot FirstSlot, Guid SecondNodeId, BracketSlot SecondSlot);
 
         public sealed record BracketPairingRequest(
             BracketSourceType HomeSourceType, Guid? HomeGroupId, int? HomePosition, Guid? HomeTournamentTeamId,

@@ -8,7 +8,7 @@ using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus
 {
-    internal sealed class ChangeTournamentStatusCommandHandler(ITournamentsDbContext tournamentsDbContext, ICurrentUserContext currentUserContext) : ICommandHandler<ChangeTournamentStatusCommand, ChangeTournamentStatusResponse>
+    internal sealed class ChangeTournamentStatusCommandHandler(ITournamentsDbContext tournamentsDbContext, ICurrentUserContext currentUserContext, IMatchModule matchModule) : ICommandHandler<ChangeTournamentStatusCommand, ChangeTournamentStatusResponse>
     {
         public async Task<Result<ChangeTournamentStatusResponse>> Handle(ChangeTournamentStatusCommand request, CancellationToken cancellationToken)
         {
@@ -20,6 +20,15 @@ namespace Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus
             // a generator odmawia pracy poza RegistrationClosed — martwy punkt bez wyjścia.
             if (request.TournamentStatus == TournamentStatus.ScheduleGenerated && !request.IsScheduleTransition)
                 return Result.Failure<ChangeTournamentStatusResponse>(Error.Validation("TournamentStatus", "Schedule status is set automatically by generating the schedule"));
+
+            // Zakończenie turnieju z trwającym meczem zmieniałoby tabelę i zwycięzcę już po ogłoszeniu końca.
+            // Mecze jeszcze nierozpoczęte nie blokują — anuluje je TournamentStatusChangedHandler w Matches.
+            if (request.TournamentStatus == TournamentStatus.Finished && result.Status == TournamentStatus.InProgress)
+            {
+                var matches = await matchModule.GetMatchesByTournamentIdAsync(request.TournamentId, cancellationToken);
+                if (matches.Any(m => m.Status is "Live" or "Paused"))
+                    return Result.Failure<ChangeTournamentStatusResponse>(Error.Conflict("TournamentStatus", "Finish the matches in progress before finishing the tournament"));
+            }
 
             var changeStatusResult = result.ChangeStatus(request.TournamentStatus, currentUserContext.UserId);
 

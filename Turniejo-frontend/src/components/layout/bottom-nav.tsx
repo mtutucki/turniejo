@@ -9,8 +9,9 @@ import type { ReactNode } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
+import { selectUnreadCount, useNotificationStore } from "@/stores/notification-store"
 
-import { isNavItemActive, tournamentNavItems } from "./nav-items"
+import { isNavItemActive, type NavItem, tournamentNavItems } from "./nav-items"
 import { NavLink } from "./nav-link"
 import { useGlobalNavItems, useShowsTournamentSection } from "./use-global-nav"
 import { SignOutButton } from "./user-menu"
@@ -18,10 +19,27 @@ import { SignOutButton } from "./user-menu"
 const itemClass =
   "flex h-full w-full flex-col items-center justify-center gap-1 text-xs font-medium transition-colors"
 
-function BottomNavItem({ active, children }: { active: boolean; children: ReactNode }) {
+function BottomNavItem({
+  active,
+  unread = false,
+  children,
+}: {
+  active: boolean
+  /** Kropka nieprzeczytanych powiadomień przy ikonie. */
+  unread?: boolean
+  children: ReactNode
+}) {
   return (
-    <span className={cn(itemClass, active ? "text-primary" : "text-muted-foreground")}>
+    <span className={cn(itemClass, "relative", active ? "text-primary" : "text-muted-foreground")}>
       {children}
+      {unread && (
+        <span
+          className="bg-live ring-card absolute top-2.5 left-1/2 ml-1.5 size-2.5 rounded-full ring-2"
+          data-testid="unread-dot"
+        >
+          <span className="sr-only">Nieprzeczytane powiadomienia</span>
+        </span>
+      )}
     </span>
   )
 }
@@ -35,15 +53,19 @@ export function BottomNav() {
   const tournament = useActiveTournamentStore((state) => state.tournament)
   const globalItems = useGlobalNavItems()
   const showTournament = useShowsTournamentSection()
+  const hasUnread = useNotificationStore(selectUnreadCount) > 0
   const [moreOpen, setMoreOpen] = useState(false)
   const moreActive = globalItems.some((item) => isNavItemActive(pathname, item))
   const primaryItems = showTournament
-    ? tournamentNavItems(tournament?.id).map((item) => ({
+    ? tournamentNavItems(tournament).map((item): NavItem & { active: boolean } => ({
         ...item,
         // Bez turnieju wszystkie sekcje prowadzą do listy — nie podświetlamy ich wtedy.
         active: !!tournament && isNavItemActive(pathname, { href: item.href }),
       }))
     : globalItems.slice(0, 3).map((item) => ({ ...item, active: isNavItemActive(pathname, item) }))
+
+  // Kropka na "Więcej" tylko wtedy, gdy Powiadomienia nie są już widoczne w samym pasku.
+  const moreHasUnread = hasUnread && !primaryItems.some((item) => item.showsUnread)
 
   return (
     <nav
@@ -55,11 +77,11 @@ export function BottomNav() {
         // Rodzic/kibic może mieć mniej niż trzy pozycje — bez pustych kolumn.
         style={{ gridTemplateColumns: `repeat(${primaryItems.length + 1}, minmax(0, 1fr))` }}
       >
-        {primaryItems.map(({ href, label, icon: Icon, active }) => {
+        {primaryItems.map(({ href, label, icon: Icon, active, showsUnread }) => {
           return (
             <li key={label}>
               <Link href={href} aria-current={active ? "page" : undefined}>
-                <BottomNavItem active={active}>
+                <BottomNavItem active={active} unread={showsUnread && hasUnread}>
                   <Icon className="size-5" />
                   {label}
                 </BottomNavItem>
@@ -70,7 +92,7 @@ export function BottomNav() {
         <li>
           <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger className="h-full w-full" aria-label="Więcej opcji">
-              <BottomNavItem active={moreActive}>
+              <BottomNavItem active={moreActive} unread={moreHasUnread}>
                 <Menu className="size-5" />
                 Więcej
               </BottomNavItem>

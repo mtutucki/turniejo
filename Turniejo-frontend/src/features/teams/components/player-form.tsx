@@ -17,20 +17,24 @@ import {
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import { formatBirthDate, fromDateInput, toDateInput } from "@/lib/format"
 import {
-  type NewPlayerInput,
   PLAYER_POSITION_LABELS,
+  PLAYER_STATUS_LABELS,
   type PlayerPosition,
+  type SquadPlayerInput,
   type TournamentPlayer,
+  type TournamentPlayerStatus,
 } from "@/types/teams"
 import type { TournamentCategory } from "@/types/tournaments"
 
 const POSITIONS = Object.keys(PLAYER_POSITION_LABELS) as PlayerPosition[]
+const STATUSES = Object.keys(PLAYER_STATUS_LABELS) as TournamentPlayerStatus[]
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, "Podaj imię").max(100, "Maksymalnie 100 znaków"),
   lastName: z.string().trim().min(1, "Podaj nazwisko").max(100, "Maksymalnie 100 znaków"),
   birthDate: z.string().min(1, "Podaj datę urodzenia"),
   position: z.enum(POSITIONS as [PlayerPosition, ...PlayerPosition[]]),
+  status: z.enum(STATUSES as [TournamentPlayerStatus, ...TournamentPlayerStatus[]]),
   shirtNumber: z
     .string()
     .trim()
@@ -46,10 +50,16 @@ const baseSchema = z.object({
 type PlayerValues = z.infer<typeof baseSchema>
 
 /**
- * Reguły z backendu (CreatePlayerInTournamentTeamCommandValidator + handler) sprawdzane już
+ * Reguły z backendu (Create/UpdatePlayerInTournamentTeam: walidator + handler) sprawdzane już
  * w formularzu, żeby błąd pojawił się od razu przy polu. Backend sprawdza je ponownie.
+ * `editing` — edytowany zawodnik: nie jest własnym dublem ani nie zajmuje sobie numeru.
  */
-function buildSchema(category: TournamentCategory | undefined, squad: TournamentPlayer[]) {
+function buildSchema(
+  category: TournamentCategory | undefined,
+  squad: TournamentPlayer[],
+  editing: TournamentPlayer | undefined,
+) {
+  const others = editing ? squad.filter((p) => p.id !== editing.id) : squad
   const min = toDateInput(category?.minBirthDate ?? null)
   const max = toDateInput(category?.maxBirthDate ?? null)
   const today = new Date().toISOString().slice(0, 10)
@@ -61,6 +71,8 @@ function buildSchema(category: TournamentCategory | undefined, squad: Tournament
         path: ["birthDate"],
         message: "Data urodzenia nie może być z przyszłości",
       })
+    } else if (editing && v.birthDate === toDateInput(editing.birthDate)) {
+      // Jak na backendzie: limit rocznika sprawdzamy tylko przy zmianie daty urodzenia.
     } else if (min && v.birthDate < min) {
       ctx.addIssue({
         code: "custom",
@@ -75,7 +87,7 @@ function buildSchema(category: TournamentCategory | undefined, squad: Tournament
       })
     }
 
-    const duplicate = squad.some(
+    const duplicate = others.some(
       (p) =>
         p.firstName.localeCompare(v.firstName, "pl", { sensitivity: "base" }) === 0 &&
         p.lastName.localeCompare(v.lastName, "pl", { sensitivity: "base" }) === 0 &&
@@ -89,7 +101,7 @@ function buildSchema(category: TournamentCategory | undefined, squad: Tournament
       })
     }
 
-    if (v.shirtNumber && squad.some((p) => p.shirtNumber === Number(v.shirtNumber))) {
+    if (v.shirtNumber && others.some((p) => p.shirtNumber === Number(v.shirtNumber))) {
       ctx.addIssue({
         code: "custom",
         path: ["shirtNumber"],
@@ -102,8 +114,10 @@ function buildSchema(category: TournamentCategory | undefined, squad: Tournament
 type PlayerFormProps = {
   category: TournamentCategory | undefined
   squad: TournamentPlayer[]
+  /** Zawodnik ze składu do edycji — bez niego formularz zakłada nowy profil. */
+  player?: TournamentPlayer
   submitLabel: string
-  onSubmit: (input: NewPlayerInput) => Promise<unknown>
+  onSubmit: (input: SquadPlayerInput) => Promise<unknown>
   /** Przycisk obok "Zapisz" (np. Anuluj w dialogu). */
   secondaryAction?: React.ReactNode
 }
@@ -111,19 +125,21 @@ type PlayerFormProps = {
 export function PlayerForm({
   category,
   squad,
+  player,
   submitLabel,
   onSubmit,
   secondaryAction,
 }: PlayerFormProps) {
   const form = useForm<PlayerValues>({
-    resolver: zodResolver(buildSchema(category, squad)),
+    resolver: zodResolver(buildSchema(category, squad, player)),
     defaultValues: {
-      firstName: "",
-      lastName: "",
-      birthDate: "",
-      position: "Unknown",
-      shirtNumber: "",
-      photoUrl: "",
+      firstName: player?.firstName ?? "",
+      lastName: player?.lastName ?? "",
+      birthDate: toDateInput(player?.birthDate ?? null),
+      position: player?.position ?? "Unknown",
+      status: player?.status ?? "Active",
+      shirtNumber: player?.shirtNumber?.toString() ?? "",
+      photoUrl: player?.photoUrl ?? "",
     },
   })
   const { errors, isSubmitting } = form.formState
@@ -135,6 +151,7 @@ export function PlayerForm({
         lastName: values.lastName,
         birthDate: fromDateInput(values.birthDate)!,
         position: values.position,
+        status: values.status,
         shirtNumber: values.shirtNumber ? Number(values.shirtNumber) : null,
         photoUrl: values.photoUrl || null,
       })
@@ -206,6 +223,29 @@ export function PlayerForm({
             {...form.register("shirtNumber")}
           />
         </div>
+        {player && (
+          <Controller
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <Field>
+                <FieldLabel htmlFor="player-status">Status</FieldLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="player-status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {PLAYER_STATUS_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          />
+        )}
         <TextField
           id="player-photo"
           label="Adres zdjęcia (opcjonalnie)"

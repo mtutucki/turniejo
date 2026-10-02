@@ -23,7 +23,12 @@ namespace Turniejo.Brackets.Application.Brackets.ResolveGroupPositionSlots
                 return Result.Success(new ResolveGroupPositionSlotsResponse(false));
 
             var rounds = await dbContext.GetBracketRoundsByBracketIdAsync(bracket.Id, cancellationToken);
-            var nodes = await dbContext.GetBracketNodesByRoundIdsAsync(rounds.Select(r => r.Id).ToList(), cancellationToken);
+            var nodeIds = (await dbContext.GetBracketNodesByRoundIdsAsync(rounds.Select(r => r.Id).ToList(), cancellationToken))
+                .Select(n => n.Id)
+                .ToList();
+            // GetBracketNodesByRoundIdsAsync jest tylko do odczytu (AsNoTracking) — obsadzone sloty i MatchId
+            // nie trafiały do bazy, więc każda kolejna zmiana tabeli tworzyła mecze tych samych par od nowa.
+            var nodes = await dbContext.GetTrackedBracketNodesByIdsAsync(nodeIds, cancellationToken);
 
             var resolvedAny = false;
 

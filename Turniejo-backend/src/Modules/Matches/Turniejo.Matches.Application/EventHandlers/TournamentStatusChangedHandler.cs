@@ -12,11 +12,19 @@ namespace Turniejo.Matches.Application.EventHandlers
     // turnieju. Zamiast dokładać cross-modułowy lookup do każdej komendy mutującej mecz (Start,
     // Pause, Finish, AddGoal...), Match.Status zostaje jedynym źródłem prawdy: anulowanie kaskaduje
     // na jeszcze nierozegrane mecze, więc Start()/Finish() same odmówią z Conflict.Status.
+    // To samo przy zakończeniu turnieju: nierozpoczęte mecze dało się dalej startować w zakończonym
+    // turnieju (trwające blokują samo zakończenie — ChangeTournamentStatusCommandHandler).
     internal sealed class TournamentStatusChangedHandler(IMatchesDbContext dbContext) : INotificationHandler<TournamentStatusChanged>
     {
         public async Task Handle(TournamentStatusChanged notification, CancellationToken cancellationToken)
         {
-            if (notification.NewStatus != TournamentStatus.Cancelled)
+            var reason = notification.NewStatus switch
+            {
+                TournamentStatus.Cancelled => "Turniej został anulowany.",
+                TournamentStatus.Finished => "Turniej został zakończony.",
+                _ => null
+            };
+            if (reason is null)
                 return;
 
             var matches = await dbContext.GetCancellableMatchesByTournamentIdAsync(notification.TournamentId, cancellationToken);
@@ -25,7 +33,7 @@ namespace Turniejo.Matches.Application.EventHandlers
 
             foreach (var match in matches)
             {
-                var result = match.Cancel("Turniej został anulowany.", notification.ChangedByUserId);
+                var result = match.Cancel(reason,notification.ChangedByUserId);
                 if (result.IsFailure)
                     continue;
 

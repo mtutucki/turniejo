@@ -102,6 +102,11 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
             .Where(m => matchIds.Contains(m.Id))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Match>> GetTrackedMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default) =>
+        await Matches
+            .Where(m => matchIds.Contains(m.Id))
+            .ToListAsync(cancellationToken);
+
     public async Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
         await Matches.AnyAsync(m => m.CategoryId == categoryId, cancellationToken);
 
@@ -110,6 +115,11 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
 
     public async Task<bool> AnyMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
         await Matches.AnyAsync(m => m.GroupId == groupId, cancellationToken);
+
+    public async Task<bool> AnyUnfinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await Matches.AnyAsync(
+            m => m.GroupId == groupId && m.Status != MatchStatus.Finished && m.Status != MatchStatus.Cancelled,
+            cancellationToken);
 
     private static readonly MatchStatus[] CancellableStatuses = [MatchStatus.Scheduled, MatchStatus.Ready, MatchStatus.Postponed];
 

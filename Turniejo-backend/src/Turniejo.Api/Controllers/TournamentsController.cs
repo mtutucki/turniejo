@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
 using Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamentTeam;
+using Turniejo.Players.Application.TournamentPlayers.GetRosterSources;
 using Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayers;
+using Turniejo.Players.Application.TournamentPlayers.ImportSquad;
+using Turniejo.Players.Application.TournamentPlayers.UpdatePlayerInTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
 using Turniejo.Players.Domain.Enums;
 using Turniejo.Teams.Application.TournamentTeams.AddTeamToTournament;
@@ -373,6 +376,31 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpPut("{tournamentId}/tournament-teams/{tournamentTeamId}/players/{tournamentPlayerId}")]
+        public async Task<IActionResult> UpdatePlayerInTournamentTeam([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromRoute] Guid tournamentPlayerId, [FromBody] UpdatePlayerInTournamentTeamRequest request, CancellationToken cancellationToken)
+        {
+            var command = new UpdatePlayerInTournamentTeamCommand(
+                tournamentId, tournamentTeamId, tournamentPlayerId, request.FirstName, request.LastName, request.BirthDate,
+                request.PhotoUrl, request.ShirtNumber, request.Position, request.Status);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{tournamentId}/tournament-teams/{tournamentTeamId}/roster-sources")]
+        public async Task<IActionResult> GetRosterSources([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetRosterSourcesQuery(tournamentId, tournamentTeamId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpPost("{tournamentId}/tournament-teams/{tournamentTeamId}/players/import")]
+        public async Task<IActionResult> ImportSquad([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromBody] ImportSquadRequest request, CancellationToken cancellationToken)
+        {
+            var command = new ImportSquadCommand(tournamentId, tournamentTeamId, request.SourceTournamentTeamId, request.Players ?? []);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpGet("{tournamentId}/tournament-teams/{tournamentTeamId}/players")]
         public async Task<IActionResult> GetTournamentTeamPlayers([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, CancellationToken cancellationToken)
         {
@@ -400,5 +428,7 @@ namespace Turniejo.Api.Controllers
         public sealed record AssignPlayerToTournamentTeamRequest(Guid PlayerId, int? ShirtNumber, PlayerPosition? Position);
         public sealed record CreatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position);
         public sealed record UpdateTournamentPlayerRequest(int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status);
+        public sealed record UpdatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status);
+        public sealed record ImportSquadRequest(Guid SourceTournamentTeamId, IReadOnlyList<ImportSquadPlayer>? Players);
     }
 }

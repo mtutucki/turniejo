@@ -12,6 +12,9 @@ namespace Turniejo.Brackets.Application.Abstractions
         Task AddBracketAsync(Bracket bracket, CancellationToken cancellationToken = default);
         Task<Bracket?> GetBracketByIdAsync(Guid bracketId, CancellationToken cancellationToken = default);
         Task<Bracket?> GetBracketByTournamentAndCategoryAsync(Guid tournamentId, Guid categoryId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Bracket>> GetBracketsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        // Rundy i węzły znikają kaskadowo w bazie (FK ON DELETE CASCADE).
+        Task RemoveBracketAsync(Bracket bracket, CancellationToken cancellationToken = default);
 
         // BracketRound
         Task AddBracketRoundAsync(BracketRound round, CancellationToken cancellationToken = default);
@@ -22,6 +25,7 @@ namespace Turniejo.Brackets.Application.Abstractions
         Task AddBracketNodeAsync(BracketNode node, CancellationToken cancellationToken = default);
         Task<BracketNode?> GetBracketNodeByIdAsync(Guid nodeId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<BracketNode>> GetBracketNodesByRoundIdsAsync(IReadOnlyCollection<Guid> roundIds, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<BracketNode>> GetTrackedBracketNodesByIdsAsync(IReadOnlyCollection<Guid> nodeIds, CancellationToken cancellationToken = default);
         Task<BracketNode?> GetBracketNodeByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default);
     }
 }

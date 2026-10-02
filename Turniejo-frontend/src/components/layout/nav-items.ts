@@ -7,6 +7,7 @@ import {
   type LucideIcon,
   ListOrdered,
   Medal,
+  Network,
   Shield,
   Shirt,
   Ticket,
@@ -22,6 +23,7 @@ import {
   isReferee,
   isTeamStaff,
 } from "@/lib/auth/role-landing"
+import type { ActiveTournament } from "@/stores/active-tournament-store"
 import type { RoleAssignment } from "@/types/roles"
 
 export type NavItem = {
@@ -32,17 +34,22 @@ export type NavItem = {
   activePattern?: RegExp
   /** Pozycja widoczna tylko dla userów z pasującą rolą (np. panel rodzica). */
   requires?: (assignments: RoleAssignment[]) => boolean
+  /** Pozycja pokazuje licznik nieprzeczytanych powiadomień. */
+  showsUnread?: boolean
 }
 
 /**
  * Sekcje aktywnego turnieju. Bez wybranego turnieju prowadzą do listy turniejów,
- * żeby user najpierw go wybrał.
+ * żeby user najpierw go wybrał. Puchar nie ma fazy grupowej, więc zamiast pustej tabeli
+ * dostaje drabinkę (tak samo jak portal publiczny w publicSections).
  */
-export function tournamentNavItems(tournamentId: string | undefined): NavItem[] {
-  const base = tournamentId ? `/tournaments/${tournamentId}` : null
+export function tournamentNavItems(tournament: ActiveTournament | null): NavItem[] {
+  const base = tournament ? `/tournaments/${tournament.id}` : null
   return [
     { href: base ? `${base}/schedule` : "/tournaments", label: "Mecze", icon: CalendarDays },
-    { href: base ? `${base}/standings` : "/tournaments", label: "Tabela", icon: ListOrdered },
+    tournament?.format === "Knockout"
+      ? { href: `${base}/bracket`, label: "Drabinka", icon: Network }
+      : { href: base ? `${base}/standings` : "/tournaments", label: "Tabela", icon: ListOrdered },
     { href: base ? `${base}/teams` : "/tournaments", label: "Drużyny", icon: Shield },
   ]
 }
@@ -83,7 +90,7 @@ export const GLOBAL_NAV_ITEMS: NavItem[] = [
     icon: Baby,
     requires: isParent,
   },
-  { href: "/notifications", label: "Powiadomienia", icon: Bell },
+  { href: "/notifications", label: "Powiadomienia", icon: Bell, showsUnread: true },
   { href: "/join", label: "Dołącz kodem", icon: Ticket },
   { href: "/help", label: "Pomoc", icon: CircleHelp },
 ]
