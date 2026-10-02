@@ -879,7 +879,7 @@ function GenerateForm({
             przerwa{" "}
             <span className="font-mono tabular-nums">{settings.breakDurationMinutes} min</span>{" "}
             <Link
-              href={`/tournaments/${tournament.id}/settings`}
+              href={`/tournaments/${tournament.id}/settings#rules`}
               className="text-muted-foreground text-xs underline"
             >
               zmień

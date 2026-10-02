@@ -15,6 +15,9 @@ test.describe("Tworzenie turnieju → Zmiana statusu", () => {
     await page.getByLabel("Zakończenie — godzina").fill("17:00")
     await page.getByRole("button", { name: "Utwórz turniej" }).click()
 
+    // Po utworzeniu turnieju startuje kreator konfiguracji — każdy krok można pominąć.
+    await expect(page).toHaveURL(/\/tournaments\/[0-9a-f-]+\/setup$/)
+    await page.getByRole("link", { name: "Pomiń konfigurację" }).click()
     await expect(page).toHaveURL(/\/tournaments\/[0-9a-f-]+\/dashboard$/)
     const steps = page.getByRole("list", { name: "Etapy turnieju" })
     await expect(steps.locator("[aria-current=step]")).toHaveText("Szkic")

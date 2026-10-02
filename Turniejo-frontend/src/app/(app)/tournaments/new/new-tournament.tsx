@@ -24,12 +24,16 @@ export function NewTournament() {
     })
     setActiveTournament({ id: tournamentId, name: input.name })
     toast.success("Turniej utworzony")
-    router.push(`/tournaments/${tournamentId}/dashboard`)
+    // Kreator prowadzi przez format, zasady gry i portal kibica — każdy krok da się pominąć.
+    router.push(`/tournaments/${tournamentId}/setup`)
   }
 
   return (
     <>
-      <PageHeader title="Nowy turniej" description="Podstawowe dane — resztę ustawisz później." />
+      <PageHeader
+        title="Nowy turniej"
+        description="Podstawowe dane — w kolejnych krokach ustawisz format i zasady gry."
+      />
       <Card className="max-w-2xl">
         <CardContent>
           {organization.isPending ? (
