@@ -36,6 +36,37 @@ const base = (id: string) => `/api/tournaments/${id}`
 
 // --- Queries ---------------------------------------------------------------------------------
 
+/** Ile razy dopytujemy o organizację, zanim uznamy, że konto jej nie ma (~30 s co 4 s). */
+const ORGANIZATION_POLL_LIMIT = 8
+const PROVISIONING_KEY = "turniejo:organization-provisioning"
+
+/** Rejestracja jako organizator: organizacja dopiero powstaje, więc brak danych ≠ "nie masz organizacji". */
+export function markOrganizationProvisioning() {
+  try {
+    sessionStorage.setItem(PROVISIONING_KEY, "1")
+  } catch {
+    // Brak sessionStorage (tryb prywatny) — najwyżej mignie pusty stan.
+  }
+}
+
+export function clearOrganizationProvisioning() {
+  try {
+    sessionStorage.removeItem(PROVISIONING_KEY)
+  } catch {
+    // Brak sessionStorage — nie ma czego czyścić.
+  }
+}
+
+/** Czy wciąż czekamy na organizację zakładaną po rejestracji (zamiast pokazywać "Zostań organizatorem"). */
+export function isOrganizationProvisioning(dataUpdateCount: number) {
+  if (dataUpdateCount >= ORGANIZATION_POLL_LIMIT) return false
+  try {
+    return sessionStorage.getItem(PROVISIONING_KEY) !== null
+  } catch {
+    return false
+  }
+}
+
 export function useMyOrganization() {
   const { request, isAuthenticated } = useApi()
   return useQuery({
@@ -48,7 +79,9 @@ export function useMyOrganization() {
     // Organizacja organizatora powstaje asynchronicznie po rejestracji (outbox backendu) — tuż po
     // założeniu konta dopytujemy przez ~30 s, zamiast pokazywać "nie masz organizacji" do odświeżenia.
     refetchInterval: (query) =>
-      query.state.data === null && query.state.dataUpdateCount < 8 ? 4_000 : false,
+      query.state.data === null && query.state.dataUpdateCount < ORGANIZATION_POLL_LIMIT
+        ? 4_000
+        : false,
   })
 }
 

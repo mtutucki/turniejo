@@ -14,6 +14,7 @@ import { TextField } from "@/components/forms/text-field"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { markOrganizationProvisioning } from "@/features/tournaments/api"
 import { apiFetch } from "@/lib/api/client"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import { DEFAULT_APP_PATH } from "@/lib/auth/public-paths"
@@ -129,6 +130,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
         return
       }
       toast.success("Witaj w Turniejo!")
+      if (accountType === "organizer") markOrganizationProvisioning()
       // Organizator od razu do listy turniejów (organizacja dojdzie za chwilę z outboxa);
       // uczestnik do celu z zaproszenia albo na stronę startową z instrukcją.
       router.replace(

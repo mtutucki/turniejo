@@ -1,13 +1,21 @@
 "use client"
 
+import { useQueryClient } from "@tanstack/react-query"
 import { Plus, Trophy } from "lucide-react"
 import Link from "next/link"
+import { useEffect } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useMyOrganization, useTournaments } from "@/features/tournaments/api"
+import {
+  clearOrganizationProvisioning,
+  isOrganizationProvisioning,
+  tournamentKeys,
+  useMyOrganization,
+  useTournaments,
+} from "@/features/tournaments/api"
 import { BecomeOrganizerDialog } from "@/features/tournaments/components/become-organizer-dialog"
 import { TournamentCard } from "@/features/tournaments/components/tournament-card"
 
@@ -26,7 +34,19 @@ export function TournamentList() {
   const organization = useMyOrganization()
   const tournaments = useTournaments(organization.data?.id)
   // isPending (nie isLoading): zapytanie czekające na sesję jest wyłączone, a wtedy isLoading = false.
-  const isLoading = organization.isPending || (!!organization.data && tournaments.isPending)
+  // Tuż po rejestracji organizatora organizacja jeszcze powstaje — czekamy, zamiast proponować jej założenie.
+  // Licznik odpytań żyje w cache zapytania; odczyt isFetching gwarantuje re-render po każdym z nich.
+  const pollCount =
+    useQueryClient().getQueryState(tournamentKeys.myOrganization)?.dataUpdateCount ?? 0
+  void organization.isFetching
+  const isProvisioning = organization.data === null && isOrganizationProvisioning(pollCount)
+  const isLoading =
+    organization.isPending || isProvisioning || (!!organization.data && tournaments.isPending)
+
+  const provisioningSettled = organization.isSuccess && !isProvisioning
+  useEffect(() => {
+    if (provisioningSettled) clearOrganizationProvisioning()
+  }, [provisioningSettled])
 
   return (
     <>
