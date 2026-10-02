@@ -59,19 +59,26 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
       isOrganizer && tournamentFormat === "Knockout" && tournamentStatus === "RegistrationClosed"
     const champion =
       tournamentStatus === "Finished" ? bracketChampion(bracket.data, schedule.data ?? []) : null
-    // Wycofana drużyna zostaje w swojej parze na stałe (węzły mają zamrożone drużyny), a slot w kolejnej
-    // rundzie nigdy by się nie wypełnił — jedyne wyjście to ułożyć drabinkę od nowa, póki nic nie zagrano.
+    // Drużyna, która już nie gra (wycofana, odrzucona albo usunięta z turnieju), zostaje w swojej parze
+    // na stałe (węzły mają zamrożone drużyny), a slot w kolejnej rundzie nigdy by się nie wypełnił —
+    // jedyne wyjście to ułożyć drabinkę od nowa, póki nic nie zagrano.
     const nodes = bracket.data.rounds.flatMap((r) => r.nodes)
-    const withdrawnIds = new Set(
-      (teams.data ?? []).filter((t) => t.registrationStatus === "Withdrawn").map((t) => t.id),
+    const acceptedIds = new Set(
+      (teams.data ?? [])
+        .filter((t) => t.categoryId === categoryId && t.registrationStatus === "Accepted")
+        .map((t) => t.id),
     )
-    const withdrawnInBracket = [
-      ...new Set(
-        nodes
-          .flatMap((n) => [n.homeTournamentTeamId, n.awayTournamentTeamId])
-          .filter((teamId): teamId is string => !!teamId && withdrawnIds.has(teamId)),
-      ),
-    ]
+    const bracketTeamIds = new Set(
+      nodes
+        .flatMap((n) => [n.homeTournamentTeamId, n.awayTournamentTeamId])
+        .filter((teamId): teamId is string => !!teamId),
+    )
+    const goneFromBracket = [...bracketTeamIds].filter((teamId) => !acceptedIds.has(teamId))
+    // Puchar układa pary z konkretnych drużyn — zaakceptowana później nie ma w drabince miejsca.
+    const missingFromBracket =
+      tournamentFormat === "Knockout"
+        ? [...acceptedIds].filter((teamId) => !bracketTeamIds.has(teamId))
+        : []
     const bracketMatchIds = new Set(nodes.map((n) => n.matchId).filter(Boolean))
     const anyStarted = (schedule.data ?? []).some(
       (m) =>
@@ -86,7 +93,9 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
         (n) => n.homeSourceType === "GroupPosition" || n.awaySourceType === "GroupPosition",
       )
     const needsRegeneration =
-      isOrganizer && (withdrawnInBracket.length > 0 || groupSourcesInKnockout) && !anyStarted
+      isOrganizer &&
+      (goneFromBracket.length > 0 || missingFromBracket.length > 0 || groupSourcesInKnockout) &&
+      !anyStarted
     // Zamiana par ma sens, dopóki nic nie zagrano — potem trzeba by cofać awanse i wyniki.
     const canEditPairs = isOrganizer && !anyStarted && tournamentStatus !== "Finished"
     const editing = editingPairs && canEditPairs
@@ -132,9 +141,13 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
             <p>
               {groupSourcesInKnockout
                 ? "Ta drabinka powstała z miejsc w grupach, a turniej ma teraz format pucharowy bez grup."
-                : `W drabince jest wycofana drużyna (${withdrawnInBracket
-                    .map((teamId) => teamById.get(teamId) ?? "Drużyna")
-                    .join(", ")}).`}{" "}
+                : goneFromBracket.length > 0
+                  ? `W drabince jest drużyna, która już nie gra w turnieju (${goneFromBracket
+                      .map((teamId) => teamById.get(teamId) ?? "usunięta drużyna")
+                      .join(", ")}).`
+                  : `Drabinka nie obejmuje wszystkich zaakceptowanych drużyn (brakuje: ${missingFromBracket
+                      .map((teamId) => teamById.get(teamId) ?? "Drużyna")
+                      .join(", ")}).`}{" "}
               Drabinka zostanie wygenerowana jeszcze raz — pary ułożysz od nowa.
             </p>
             <Button
@@ -250,6 +263,9 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
       </CardHeader>
       <CardContent>
         <GenerateBracketForm
+          // Propozycja par i wielkość drabinki liczą się przy montowaniu — zmiana składu drużyn albo
+          // grup (np. świeższe dane po usunięciu zgłoszeń) ma je przeliczyć od nowa.
+          key={[...acceptedTeams.map((t) => t.id), ...categoryGroups.map((g) => g.id)].join(",")}
           tournamentId={id}
           categoryId={categoryId}
           groups={categoryGroups}
