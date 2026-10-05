@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Matches.AddCard;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
@@ -11,14 +12,20 @@ namespace Turniejo.Matches.UnitTests.Matches
     public sealed class AddCardCommandHandlerTests
     {
         private readonly IMatchesDbContext _dbContext;
+        private readonly IPlayerModule _playerModule;
         private readonly ICurrentUserContext _currentUserContext;
         private readonly AddCardCommandHandler _handler;
 
         public AddCardCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
+            _playerModule = Substitute.For<IPlayerModule>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new AddCardCommandHandler(_dbContext, _currentUserContext);
+            var rosterGuard = new MatchEventRosterGuard(_playerModule);
+            _handler = new AddCardCommandHandler(_dbContext, rosterGuard, new SendOffRules(_dbContext), _currentUserContext);
+            // domyślnie: brak kartek w meczu (SendOffRules)
+            _dbContext.GetActiveMatchEventsByTypeAsync(default, default, default)
+                .ReturnsForAnyArgs(new List<MatchEvent>());
         }
 
         private static Match CreateLiveMatch(Guid tournamentId)
@@ -29,6 +36,14 @@ namespace Turniejo.Matches.UnitTests.Matches
             return match;
         }
 
+        private void SetUpRoster(Guid tournamentTeamId, params Guid[] playerIds)
+        {
+            _playerModule.GetTournamentTeamPlayersAsync(tournamentTeamId, Arg.Any<CancellationToken>())
+                .Returns(playerIds
+                    .Select(id => new TournamentTeamPlayerDto(Guid.NewGuid(), tournamentTeamId, id, "Jan", "Kowalski", null, null, "Active"))
+                    .ToList());
+        }
+
         [Fact]
         public async Task Handle_ShouldSucceed_WhenDataIsValid()
         {
@@ -36,6 +51,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             var tournamentId = Guid.NewGuid();
             var match = CreateLiveMatch(tournamentId);
             var playerId = Guid.NewGuid();
+            SetUpRoster(match.AwayTournamentTeamId, playerId);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _currentUserContext.UserId.Returns(Guid.NewGuid());
             var command = new AddCardCommand(tournamentId, match.Id, match.AwayTournamentTeamId, playerId, MatchEventType.YellowCard, 55, null);
@@ -85,6 +101,106 @@ namespace Turniejo.Matches.UnitTests.Matches
             // Assert
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Validation.TournamentTeamId");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenPlayerIsNotOnTeamRoster()
+        {
+            // Zamyka lukę z audytu: kartkę dało się przypisać dowolnemu PlayerId.
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            SetUpRoster(match.AwayTournamentTeamId); // pusty skład
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new AddCardCommand(tournamentId, match.Id, match.AwayTournamentTeamId, Guid.NewGuid(), MatchEventType.YellowCard, 10, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.PlayerId");
+            await _dbContext.DidNotReceive().AddMatchEventAsync(Arg.Any<MatchEvent>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenPlayerBelongsToOpposingTeam()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var opposingPlayerId = Guid.NewGuid();
+            SetUpRoster(match.AwayTournamentTeamId);
+            SetUpRoster(match.HomeTournamentTeamId, opposingPlayerId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new AddCardCommand(tournamentId, match.Id, match.AwayTournamentTeamId, opposingPlayerId, MatchEventType.YellowCard, 10, null);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.PlayerId");
+        }
+        private void ExistingCards(Guid matchId, MatchEventType type, Guid teamId, Guid playerId)
+        {
+            var card = MatchEvent.Create(Guid.NewGuid(), matchId, type, 10, Guid.NewGuid(), teamId, playerId).Value;
+            _dbContext.GetActiveMatchEventsByTypeAsync(matchId, type, Arg.Any<CancellationToken>())
+                .Returns(new List<MatchEvent> { card });
+        }
+
+        [Fact]
+        public async Task Handle_ShouldRecordRedCard_WhenPlayerGetsSecondYellow()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var playerId = Guid.NewGuid();
+            SetUpRoster(match.HomeTournamentTeamId, playerId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            ExistingCards(match.Id, MatchEventType.YellowCard, match.HomeTournamentTeamId, playerId);
+
+            var result = await _handler.Handle(
+                new AddCardCommand(tournamentId, match.Id, match.HomeTournamentTeamId, playerId, MatchEventType.YellowCard, 60, null),
+                CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.CardType.Should().Be("RedCard");
+            await _dbContext.Received(1).AddMatchEventAsync(
+                Arg.Is<MatchEvent>(e => e.Type == MatchEventType.RedCard && e.PlayerId == playerId), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldKeepYellow_WhenAnotherPlayerHasYellow()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var playerId = Guid.NewGuid();
+            SetUpRoster(match.HomeTournamentTeamId, playerId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            ExistingCards(match.Id, MatchEventType.YellowCard, match.HomeTournamentTeamId, Guid.NewGuid());
+
+            var result = await _handler.Handle(
+                new AddCardCommand(tournamentId, match.Id, match.HomeTournamentTeamId, playerId, MatchEventType.YellowCard, 60, null),
+                CancellationToken.None);
+
+            result.Value.CardType.Should().Be("YellowCard");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenPlayerAlreadySentOff()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateLiveMatch(tournamentId);
+            var playerId = Guid.NewGuid();
+            SetUpRoster(match.HomeTournamentTeamId, playerId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            ExistingCards(match.Id, MatchEventType.RedCard, match.HomeTournamentTeamId, playerId);
+
+            var result = await _handler.Handle(
+                new AddCardCommand(tournamentId, match.Id, match.HomeTournamentTeamId, playerId, MatchEventType.YellowCard, 70, null),
+                CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Be("Player has been sent off");
+            await _dbContext.DidNotReceive().AddMatchEventAsync(Arg.Any<MatchEvent>(), Arg.Any<CancellationToken>());
         }
     }
 }

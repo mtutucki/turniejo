@@ -3,11 +3,18 @@ using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Matches.CreateBracketMatch;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
+using Turniejo.SharedKernel.Enums;
 
 namespace Turniejo.Matches.Infrastructure;
 
-internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender) : IMatchModule
+internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, IUserModule userModule) : IMatchModule
 {
+    public async Task<IReadOnlyList<PitchInfoDto>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
+    {
+        var pitches = await dbContext.GetPitchesByTournamentIdAsync(tournamentId, cancellationToken);
+        return pitches.Select(p => new PitchInfoDto(p.Id, p.Name, p.IsActive)).ToList();
+    }
+
     public async Task<IReadOnlyList<GroupMatchDto>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default)
     {
         var matches = await dbContext.GetFinishedMatchesByGroupIdAsync(groupId, cancellationToken);
@@ -19,10 +26,11 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender) :
 
     public async Task<Guid> CreateBracketMatchAsync(
         Guid tournamentId, Guid? categoryId, Guid homeTournamentTeamId, Guid awayTournamentTeamId,
-        string stageType, CancellationToken cancellationToken = default)
+        string stageType, Guid? plannedPitchId, DateTimeOffset? plannedAt, CancellationToken cancellationToken = default)
     {
         var command = new CreateBracketMatchCommand(
-            tournamentId, categoryId, homeTournamentTeamId, awayTournamentTeamId, Enum.Parse<StageType>(stageType));
+            tournamentId, categoryId, homeTournamentTeamId, awayTournamentTeamId, Enum.Parse<StageType>(stageType),
+            plannedPitchId, plannedAt);
 
         var result = await sender.Send(command, cancellationToken);
 
@@ -72,6 +80,46 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender) :
                 m.Id, m.TournamentId, m.HomeTournamentTeamId, m.AwayTournamentTeamId,
                 m.RefereeId, m.PitchId, m.ScheduledAt, m.Status.ToString()))
             .ToList();
+    }
+
+    public async Task<bool> AnyMatchesForCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyMatchesByCategoryIdAsync(categoryId, cancellationToken);
+
+    public async Task<bool> AnyMatchesForGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyMatchesByGroupIdAsync(groupId, cancellationToken);
+
+    public async Task<bool> IsGroupStageFinishedAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyMatchesByGroupIdAsync(groupId, cancellationToken) &&
+        !await dbContext.AnyUnfinishedMatchesByGroupIdAsync(groupId, cancellationToken);
+
+    public async Task<bool> RemoveUnstartedMatchesAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default)
+    {
+        var matches = await dbContext.GetTrackedMatchesByIdsAsync(matchIds, cancellationToken);
+        if (matches.Any(m => m.Status is MatchStatus.Live or MatchStatus.Paused or MatchStatus.Finished))
+            return false;
+
+        // Sędzia zachowałby rolę Referee w usuniętym meczu (UserRoleAssignment ze scope Match).
+        foreach (var match in matches.Where(m => m.RefereeId.HasValue))
+        {
+            await userModule.RevokeRoleAsync(
+                match.RefereeId!.Value, nameof(UserRole.Referee), nameof(RoleScopeType.Match), match.Id, cancellationToken);
+        }
+
+        await dbContext.RemoveMatchesAsync(matches, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+
+    public async Task<bool> ChangeUnstartedMatchTeamsAsync(Guid matchId, Guid homeTournamentTeamId, Guid awayTournamentTeamId, CancellationToken cancellationToken = default)
+    {
+        var match = (await dbContext.GetTrackedMatchesByIdsAsync([matchId], cancellationToken)).FirstOrDefault();
+        if (match == null || match.ChangeTeams(homeTournamentTeamId, awayTournamentTeamId).IsFailure)
+            return false;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
     }
 
     private static TournamentMatchDto ToTournamentMatchDto(Turniejo.Matches.Domain.Entities.Match m) =>

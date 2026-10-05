@@ -6,5 +6,6 @@ namespace Turniejo.Teams.Application.DTOs
         string Name,
         string? ShortName,
         Guid CategoryId,
-        Guid? GroupId);
+        Guid? GroupId,
+        string? LogoUrl = null);
 }

@@ -10,6 +10,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer
 {
     internal sealed class UpdateTournamentPlayerCommandHandler(
         IPlayersDbContext dbContext,
+        ITeamModule teamModule,
         SquadEditGuard squadEditGuard,
         ICurrentUserContext currentUserContext) : ICommandHandler<UpdateTournamentPlayerCommand, UpdateTournamentPlayerResponse>
     {
@@ -19,7 +20,16 @@ namespace Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer
             if (tournamentPlayer == null || tournamentPlayer.TournamentTeamId != request.TournamentTeamId)
                 return Result.Failure<UpdateTournamentPlayerResponse>(Error.NotFound("TournamentPlayer", request.TournamentPlayerId));
 
-            await squadEditGuard.EnsureCanEditSquadAsync(request.TournamentId, currentUserContext.UserId, cancellationToken);
+            // request.TournamentId nie jest tu wiarygodny — AuthorizationBehavior przepuszcza Coacha
+            // na samej podstawie AlternateScope (TournamentTeamId), więc pole TournamentId w body nigdy
+            // nie jest przez pipeline zweryfikowane. Prawdziwy turniej bierzemy z relacji po stronie
+            // serwera, żeby SquadEditGuard sprawdzał ustawienia właściwego turnieju, nie dowolnego Id
+            // podstawionego przez wywołującego.
+            var tournamentTeam = await teamModule.GetTournamentTeamAsync(tournamentPlayer.TournamentTeamId, cancellationToken);
+            if (tournamentTeam == null)
+                return Result.Failure<UpdateTournamentPlayerResponse>(Error.NotFound("TournamentTeam", tournamentPlayer.TournamentTeamId));
+
+            await squadEditGuard.EnsureCanEditSquadAsync(tournamentTeam.TournamentId, currentUserContext.UserId, cancellationToken);
 
             if (request.ShirtNumber.HasValue && request.ShirtNumber != tournamentPlayer.ShirtNumber)
             {

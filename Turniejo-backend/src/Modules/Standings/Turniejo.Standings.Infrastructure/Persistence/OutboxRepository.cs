@@ -12,8 +12,11 @@ internal sealed class OutboxRepository(StandingsDbContext dbContext) : IOutboxRe
 
     public async Task<IReadOnlyList<OutboxMessage>> GetPendingAsync(int batchSize = 20, CancellationToken cancellationToken = default)
     {
+        var now = DateTimeOffset.UtcNow;
+
         return await dbContext.OutboxMessages
-            .Where(x => x.ProcessedAt == null && x.RetryCount < 5)
+            .Where(x => x.ProcessedAt == null && x.RetryCount < OutboxMessage.MaxRetryCount &&
+                        (x.NextAttemptAt == null || x.NextAttemptAt <= now))
             .OrderBy(x => x.OccurredAt)
             .Take(batchSize)
             .ToListAsync(cancellationToken);

@@ -1,0 +1,309 @@
+"use client"
+
+import { GitBranch, Trophy } from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+import { toast } from "sonner"
+
+import { EmptyState } from "@/components/layout/empty-state"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  useBracket,
+  usePitches,
+  useResetBracket,
+  useSchedule,
+  useSwapBracketSlots,
+} from "@/features/matches/api"
+import { BracketBoard } from "@/features/matches/components/bracket-board"
+import { GenerateBracketForm } from "@/features/matches/components/generate-bracket-form"
+import { bracketChampion } from "@/features/public/components/champion-banner"
+import { useTournamentTeams } from "@/features/teams/api"
+import { useCategories, useGroups, useTournamentSettings } from "@/features/tournaments/api"
+import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { cn } from "@/lib/utils"
+import type { BracketSlotRef } from "@/types/public"
+
+function CategoryBracket({ categoryId }: { categoryId: string }) {
+  const { id, isOrganizer, tournament } = useTournamentContext()
+  const tournamentFormat = tournament.data?.format
+  const tournamentStatus = tournament.data?.status
+  const bracket = useBracket(id, categoryId)
+  const schedule = useSchedule(id)
+  const pitches = usePitches(id)
+  const groups = useGroups(id)
+  const teams = useTournamentTeams(id)
+  const settings = useTournamentSettings(id)
+  const resetBracket = useResetBracket(id)
+  const swapSlots = useSwapBracketSlots(id)
+  const [editingPairs, setEditingPairs] = useState(false)
+  const [selectedSlot, setSelectedSlot] = useState<BracketSlotRef | null>(null)
+
+  if (bracket.isPending || groups.isPending || teams.isPending) {
+    return <Skeleton className="h-64 w-full rounded-xl" />
+  }
+
+  // Puchar: pary tylko z drużyn — grupy mogą zostać po zmianie formatu, ale tu nie grają.
+  const categoryGroups =
+    tournamentFormat === "Knockout"
+      ? []
+      : (groups.data ?? []).filter((g) => g.categoryId === categoryId)
+  const teamById = new Map((teams.data ?? []).map((t) => [t.id, t.teamName]))
+  const groupById = new Map((groups.data ?? []).map((g) => [g.id, g.name]))
+  const pitchById = new Map((pitches.data ?? []).map((p) => [p.id, p.name]))
+
+  if (bracket.data) {
+    // Puchar: drabinka gotowa, ale mecze 1. rundy nie mają jeszcze godzin — następny krok to terminarz.
+    const needsSchedule =
+      isOrganizer && tournamentFormat === "Knockout" && tournamentStatus === "RegistrationClosed"
+    const champion =
+      tournamentStatus === "Finished" ? bracketChampion(bracket.data, schedule.data ?? []) : null
+    // Wycofana drużyna zostaje w swojej parze na stałe (węzły mają zamrożone drużyny), a slot w kolejnej
+    // rundzie nigdy by się nie wypełnił — jedyne wyjście to ułożyć drabinkę od nowa, póki nic nie zagrano.
+    const nodes = bracket.data.rounds.flatMap((r) => r.nodes)
+    const withdrawnIds = new Set(
+      (teams.data ?? []).filter((t) => t.registrationStatus === "Withdrawn").map((t) => t.id),
+    )
+    const withdrawnInBracket = [
+      ...new Set(
+        nodes
+          .flatMap((n) => [n.homeTournamentTeamId, n.awayTournamentTeamId])
+          .filter((teamId): teamId is string => !!teamId && withdrawnIds.has(teamId)),
+      ),
+    ]
+    const bracketMatchIds = new Set(nodes.map((n) => n.matchId).filter(Boolean))
+    const anyStarted = (schedule.data ?? []).some(
+      (m) =>
+        bracketMatchIds.has(m.id) &&
+        (m.status === "Live" || m.status === "Paused" || m.status === "Finished"),
+    )
+    // Drabinka ułożona z miejsc w grupach, a format zmieniono potem na pucharowy: grup już nikt nie
+    // rozegra, więc pary nigdy nie dostaną drużyn ani meczów, a terminarz nie ma czego rozstawić.
+    const groupSourcesInKnockout =
+      tournamentFormat === "Knockout" &&
+      nodes.some(
+        (n) => n.homeSourceType === "GroupPosition" || n.awaySourceType === "GroupPosition",
+      )
+    const needsRegeneration =
+      isOrganizer && (withdrawnInBracket.length > 0 || groupSourcesInKnockout) && !anyStarted
+    // Zamiana par ma sens, dopóki nic nie zagrano — potem trzeba by cofać awanse i wyniki.
+    const canEditPairs = isOrganizer && !anyStarted && tournamentStatus !== "Finished"
+    const editing = editingPairs && canEditPairs
+
+    function selectSlot(slot: BracketSlotRef) {
+      if (!selectedSlot) return setSelectedSlot(slot)
+      setSelectedSlot(null)
+      // Ponowne kliknięcie tego samego slotu cofa wybór.
+      if (selectedSlot.nodeId === slot.nodeId && selectedSlot.slot === slot.slot) return
+      swapSlots.mutate(
+        { categoryId, first: selectedSlot, second: slot },
+        { onSuccess: () => toast.success("Pary zmienione") },
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {canEditPairs && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="text-muted-foreground" role={editing ? "status" : undefined}>
+              {editing &&
+                (selectedSlot
+                  ? "Teraz kliknij drugi slot — zamienią się miejscami."
+                  : "Kliknij dwa sloty pierwszej rundy, żeby zamienić je miejscami. Terminy meczów zostają.")}
+            </p>
+            <Button
+              size="sm"
+              variant={editing ? "default" : "outline"}
+              onClick={() => {
+                setEditingPairs(!editing)
+                setSelectedSlot(null)
+              }}
+            >
+              {editing ? "Gotowe" : "Edytuj pary"}
+            </Button>
+          </div>
+        )}
+        {needsRegeneration && (
+          <div
+            role="alert"
+            className="border-destructive/40 bg-destructive/10 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm"
+          >
+            <p>
+              {groupSourcesInKnockout
+                ? "Ta drabinka powstała z miejsc w grupach, a turniej ma teraz format pucharowy bez grup."
+                : `W drabince jest wycofana drużyna (${withdrawnInBracket
+                    .map((teamId) => teamById.get(teamId) ?? "Drużyna")
+                    .join(", ")}).`}{" "}
+              Drabinka zostanie wygenerowana jeszcze raz — pary ułożysz od nowa.
+            </p>
+            <Button
+              size="sm"
+              disabled={resetBracket.isPending}
+              onClick={() =>
+                resetBracket.mutate(
+                  { categoryId },
+                  { onSuccess: () => toast.success("Drabinka usunięta — ułóż pary od nowa") },
+                )
+              }
+            >
+              Wygeneruj drabinkę od nowa
+            </Button>
+          </div>
+        )}
+        {needsSchedule && !needsRegeneration && (
+          <div
+            role="status"
+            className="bg-primary/10 border-primary/40 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm"
+          >
+            <p>Pary gotowe. Teraz wygeneruj terminarz — mecze 1. rundy dostaną godziny i boiska.</p>
+            <Button asChild size="sm">
+              <Link href={`/tournaments/${id}/schedule/generate`}>Generuj terminarz</Link>
+            </Button>
+          </div>
+        )}
+        {champion && (
+          <div
+            role="status"
+            className="flex items-center gap-3 rounded-xl border border-yellow-400/40 bg-yellow-400/10 p-4"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-yellow-400/20">
+              <Trophy className="size-5 text-yellow-500" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="text-muted-foreground block text-xs font-medium tracking-wide uppercase">
+                Zwycięzca turnieju
+              </span>
+              <span className="block truncate text-lg font-bold">
+                {teamById.get(champion) ?? "Drużyna"}
+              </span>
+            </span>
+          </div>
+        )}
+        <BracketBoard
+          bracket={bracket.data}
+          matches={schedule.data ?? []}
+          lookups={{
+            teamName: (teamId) => teamById.get(teamId) ?? "Drużyna",
+            groupName: (groupId) => (groupId ? (groupById.get(groupId) ?? null) : null),
+            pitchName: (pitchId) => (pitchId ? (pitchById.get(pitchId) ?? null) : null),
+          }}
+          // Puchar przed terminarzem: godziny meczów z drabinki to zaślepki, nie obowiązujące terminy.
+          showTimes={
+            !(
+              tournamentFormat === "Knockout" &&
+              (tournamentStatus === "Draft" ||
+                tournamentStatus === "RegistrationOpen" ||
+                tournamentStatus === "RegistrationClosed")
+            )
+          }
+          swap={
+            editing
+              ? { selected: selectedSlot, disabled: swapSlots.isPending, onSelect: selectSlot }
+              : undefined
+          }
+        />
+      </div>
+    )
+  }
+
+  if (!isOrganizer) {
+    return (
+      <EmptyState
+        icon={GitBranch}
+        title="Drabinka jeszcze nie powstała"
+        description="Organizator utworzy ją po fazie grupowej."
+      />
+    )
+  }
+
+  const acceptedTeams = (teams.data ?? []).filter(
+    (t) => t.categoryId === categoryId && t.registrationStatus === "Accepted",
+  )
+  // Puchar układa pary z konkretnych drużyn — bez dwóch zaakceptowanych formularz miałby same puste listy.
+  if (tournamentFormat === "Knockout" && acceptedTeams.length < 2) {
+    return (
+      <EmptyState
+        icon={GitBranch}
+        title="Za mało drużyn na drabinkę"
+        description={
+          acceptedTeams.length === 0
+            ? "Ta kategoria nie ma jeszcze żadnej zaakceptowanej drużyny. Do ułożenia par potrzeba co najmniej dwóch."
+            : "Ta kategoria ma tylko jedną zaakceptowaną drużynę. Do ułożenia par potrzeba co najmniej dwóch."
+        }
+        action={
+          <Button asChild size="sm">
+            <Link href={`/tournaments/${id}/teams`}>Przejdź do Drużyn</Link>
+          </Button>
+        }
+      />
+    )
+  }
+
+  return (
+    <Card className="max-w-3xl">
+      <CardHeader>
+        <CardTitle className="text-base">Utwórz drabinkę</CardTitle>
+        <CardDescription>
+          Wybierz pary pierwszej rundy — z miejsc w grupach albo konkretne drużyny.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <GenerateBracketForm
+          tournamentId={id}
+          categoryId={categoryId}
+          groups={categoryGroups}
+          teams={acceptedTeams}
+          thirdPlaceEnabled={settings.data?.isThirdPlaceMatchEnabled ?? false}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
+export function TournamentBracketView() {
+  const { id, tournament } = useTournamentContext()
+  const categories = useCategories(id)
+  const [selected, setSelected] = useState<string | undefined>()
+  const format = tournament.data?.format
+
+  if (format !== "Knockout" && format !== "GroupAndKnockout") {
+    return (
+      <EmptyState
+        icon={GitBranch}
+        title="Ten turniej nie ma fazy pucharowej"
+        description="Drabinka jest dostępna w formatach „Pucharowy” i „Grupy + puchar” (Ustawienia → Format)."
+      />
+    )
+  }
+  if (categories.isPending) return <Skeleton className="h-64 w-full rounded-xl" />
+  const list = categories.data ?? []
+  const categoryId = selected ?? list[0]?.id
+  if (!categoryId) return <EmptyState icon={GitBranch} title="Najpierw dodaj kategorię" />
+
+  return (
+    <div className="space-y-4">
+      {list.length > 1 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Kategoria">
+          {list.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              aria-pressed={c.id === categoryId}
+              onClick={() => setSelected(c.id)}
+              className={cn(
+                "h-9 rounded-full border px-4 text-sm font-medium",
+                c.id === categoryId
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground",
+              )}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <CategoryBracket key={categoryId} categoryId={categoryId} />
+    </div>
+  )
+}

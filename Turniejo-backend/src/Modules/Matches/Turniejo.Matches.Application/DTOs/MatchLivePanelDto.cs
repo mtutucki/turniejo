@@ -32,5 +32,12 @@ namespace Turniejo.Matches.Application.DTOs
         Guid? WinnerTournamentTeamId,
         MatchTeamDto HomeTeam,
         MatchTeamDto AwayTeam,
-        IReadOnlyList<MatchEventDto> Events);
+        IReadOnlyList<MatchEventDto> Events,
+        // Do kiedy po zakończeniu meczu sędzia może poprawiać zdarzenia (RefereeEditWindowMinutes).
+        DateTimeOffset? EditLockedAt = null,
+        // Sekundy gry policzone przez serwer w chwili odpowiedzi — klient dolicza tylko upływ czasu od niej,
+        // więc przestawiony zegar telefonu kibica nie przesuwa minuty meczu.
+        int? ElapsedSeconds = null,
+        int? HomePenaltyScore = null,
+        int? AwayPenaltyScore = null);
 }

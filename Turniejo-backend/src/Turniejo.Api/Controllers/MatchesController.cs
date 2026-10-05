@@ -31,6 +31,7 @@ using Turniejo.Matches.Application.Pitches.AddPitch;
 using Turniejo.Matches.Application.Pitches.DeletePitch;
 using Turniejo.Matches.Application.Pitches.GetTournamentPitches;
 using Turniejo.Matches.Application.Pitches.UpdatePitch;
+using Turniejo.Matches.Application.Schedule.ClearSchedule;
 using Turniejo.Matches.Application.Schedule.GenerateSchedule;
 using Turniejo.Matches.Application.Schedule.GetSchedule;
 
@@ -81,6 +82,13 @@ namespace Turniejo.Api.Controllers
         {
             var command = new GenerateScheduleCommand(tournamentId, request.StartAt, request.EndAt, request.PitchIds);
             var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpDelete("schedule")]
+        public async Task<IActionResult> ClearSchedule([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ClearScheduleCommand(tournamentId), cancellationToken);
             return result.ToActionResult();
         }
 
@@ -173,7 +181,9 @@ namespace Turniejo.Api.Controllers
         [HttpPost("matches/{matchId}/finish")]
         public async Task<IActionResult> FinishMatch([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] FinishMatchRequest request, CancellationToken cancellationToken)
         {
-            var command = new FinishMatchCommand(tournamentId, matchId, request.ResultType, request.WinnerTournamentTeamId);
+            var command = new FinishMatchCommand(
+                tournamentId, matchId, request.ResultType, request.WinnerTournamentTeamId,
+                request.HomePenaltyScore, request.AwayPenaltyScore);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -288,9 +298,9 @@ namespace Turniejo.Api.Controllers
         }
 
         [HttpPatch("matches/{matchId}/correct-score")]
-        public async Task<IActionResult> CorrectFinishedMatchScore([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] SetMatchScoreRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> CorrectFinishedMatchScore([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] CorrectFinishedMatchScoreRequest request, CancellationToken cancellationToken)
         {
-            var command = new CorrectFinishedMatchScoreCommand(tournamentId, matchId, request.HomeScore, request.AwayScore);
+            var command = new CorrectFinishedMatchScoreCommand(tournamentId, matchId, request.HomeScore, request.AwayScore, request.WinnerTournamentTeamId);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -302,12 +312,14 @@ namespace Turniejo.Api.Controllers
         public sealed record AssignMatchPitchRequest(Guid? PitchId);
         public sealed record RescheduleMatchRequest(DateTimeOffset ScheduledAt);
         public sealed record AssignRefereeToMatchRequest(Guid? RefereeId);
-        public sealed record FinishMatchRequest(MatchResultType ResultType, Guid? WinnerTournamentTeamId);
+        public sealed record FinishMatchRequest(
+            MatchResultType ResultType, Guid? WinnerTournamentTeamId, int? HomePenaltyScore = null, int? AwayPenaltyScore = null);
         public sealed record AddGoalRequest(Guid TournamentTeamId, Guid? PlayerId, Guid? AssistPlayerId, MatchEventType GoalType, int Minute, int? Second);
         public sealed record AddCardRequest(Guid TournamentTeamId, Guid PlayerId, MatchEventType CardType, int Minute, int? Second);
         public sealed record AddAssistRequest(Guid TournamentTeamId, Guid PlayerId, Guid? ScorerPlayerId, int Minute, int? Second);
         public sealed record SelectMatchMvpRequest(Guid TournamentTeamId, Guid PlayerId);
         public sealed record UpdateMatchEventRequest(MatchEventType Type, int Minute, int? Second, Guid? PlayerId, Guid? RelatedPlayerId);
         public sealed record SetMatchScoreRequest(int HomeScore, int AwayScore);
+        public sealed record CorrectFinishedMatchScoreRequest(int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId);
     }
 }

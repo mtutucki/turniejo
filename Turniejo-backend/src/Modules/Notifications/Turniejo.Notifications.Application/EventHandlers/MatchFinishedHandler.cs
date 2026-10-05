@@ -30,8 +30,13 @@ namespace Turniejo.Notifications.Application.EventHandlers
                 notification.TournamentId, NotificationType.MatchFinished, "Mecz zakończony",
                 message, createdByUserId: null, recipients, matchId: notification.MatchId, cancellationToken);
 
-            if (publishResult.IsSuccess)
-                await dbContext.SaveChangesAsync(cancellationToken);
+            // Bez tego błąd publikacji (np. walidacja Notification.Create) był cichy — Handle kończył
+            // się bez wyjątku, więc OutboxProcessor uznawał wiadomość za przetworzoną (MarkAsProcessed),
+            // mimo że nic się nie zapisało. Throw uruchamia już istniejący mechanizm retry/dead-letter.
+            if (publishResult.IsFailure)
+                throw new InvalidOperationException($"Failed to publish MatchFinished notification: {publishResult.Error.Message}");
+
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }

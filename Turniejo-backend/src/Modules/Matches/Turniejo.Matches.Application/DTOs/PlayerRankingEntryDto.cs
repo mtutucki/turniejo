@@ -4,5 +4,7 @@ namespace Turniejo.Matches.Application.DTOs
         Guid PlayerId,
         string FirstName,
         string LastName,
-        int Count);
+        int Count,
+        // Drużyna zawodnika w turnieju — portal pokazuje jej nazwę (o ile ShowTeams).
+        Guid? TournamentTeamId = null);
 }

@@ -134,6 +134,16 @@ namespace Turniejo.Brackets.Application.Brackets.GenerateBracket
                     with { LoserNodeId = thirdPlaceNodeResult.Value.Id, LoserSlot = BracketSlot.Away };
             }
 
+            // Zapis pośredni PRZED wpięciem WinnerGoesToNodeId/LoserGoesToNodeId: węzeł Rundy 1 wskazuje
+            // na węzeł Rundy 2 (WinnerGoesToNodeId), a węzeł Rundy 2 już wskazuje na węzeł Rundy 1
+            // (HomeSourceNodeId/AwaySourceNodeId, ustawione przy tworzeniu) — dwa nowe, wzajemnie
+            // powiązane wiersze w JEDNYM SaveChanges to cykl w grafie FK, którego EF Core nie potrafi
+            // topologicznie posortować (nawet przy DeleteBehavior.SetNull na obu końcach), więc rzuca
+            // "circular dependency was detected". Zapisanie węzłów najpierw BEZ tych pól (same wiszą
+            // "w przód": Runda N -> Runda N-1) usuwa cykl; doklejenie WinnerGoesToNodeId/LoserGoesToNodeId
+            // potem to już zwykły UPDATE na istniejących wierszach.
+            await dbContext.SaveChangesAsync(cancellationToken);
+
             foreach (var (nodeId, advancement) in advancements)
             {
                 nodesById[nodeId].WireAdvancement(advancement.WinnerNodeId, advancement.WinnerSlot, advancement.LoserNodeId, advancement.LoserSlot);
@@ -150,6 +160,14 @@ namespace Turniejo.Brackets.Application.Brackets.GenerateBracket
                     if (!wasResolved && node.IsFullyResolved)
                         resolvedAnyGroupPosition = true;
                 }
+            }
+
+            // Bye: węzeł Rundy 1 z jedną stroną Bye nigdy nie dostaje meczu (druga strona sama nie
+            // wystarcza do IsFullyResolved), więc trzeba ręcznie wepchnąć drużynę dalej — inaczej drabinka
+            // zostaje z permanentnie pustym slotem w Rundzie 2, mimo że nikt nie musiał grać.
+            foreach (var node in nodesById.Values.Where(n => n.BracketRoundId == round1Result.Value.Id).ToList())
+            {
+                await bracketAdvancer.TryAdvanceByeAsync(node, request.TournamentId, request.CategoryId, cancellationToken);
             }
 
             var round1StageType = totalRounds == 1 ? "Final" : "Knockout";

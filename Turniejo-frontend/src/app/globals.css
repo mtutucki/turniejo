@@ -1,26 +1,125 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Tokeny marki Turniejo — patrz "Design System" w turniejo_frontend_plan.md */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-live: var(--live);
+  --color-live-foreground: var(--live-foreground);
+  --color-success: var(--success);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * Aplikacja ma tylko ciemny motyw (html ma zawsze klasę "dark"), więc jedna paleta
+ * obsługuje zarówno :root, jak i warianty dark:.
+ */
+:root {
+  --radius: 0.625rem;
+
+  /* Canvas i powierzchnie */
+  --background: #121417;
+  --foreground: #e6e8eb;
+  --card: #1c2026;
+  --card-foreground: #e6e8eb;
+  --popover: #1c2026;
+  --popover-foreground: #e6e8eb;
+  --border: #2d343e;
+  --input: #2d343e;
+
+  /* Zieleń akcentowa — przyciski główne, aktywne zakładki, sukces.
+     Ciemny tekst na #10B981 daje kontrast ~7:1 (biały miałby ~2.5:1). */
+  --primary: #10b981;
+  --primary-foreground: #04150f;
+  --ring: #10b981;
+  --success: #10b981;
+
+  --secondary: #252b33;
+  --secondary-foreground: #e6e8eb;
+  --muted: #252b33;
+  --muted-foreground: #8b95a1;
+  --accent: #252b33;
+  --accent-foreground: #e6e8eb;
+  --destructive: #f25c5c; /* #ef4444 miał 4.3:1 na kartach — poniżej WCAG AA */
+
+  /* Boiskowa zieleń — nagłówki turnieju */
+  --brand: #0a3a2a;
+  --brand-foreground: #e6f4ee;
+
+  /* Bursztyn LIVE — WYŁĄCZNIE indykator, ramka i minuta trwającego meczu */
+  --live: #f59e0b;
+  --live-foreground: #1a1206;
+
+  --chart-1: #10b981;
+  --chart-2: #34d399;
+  --chart-3: #0a3a2a;
+  --chart-4: #8b95a1;
+  --chart-5: #f59e0b;
+
+  --sidebar: #1c2026;
+  --sidebar-foreground: #e6e8eb;
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #04150f;
+  --sidebar-accent: #252b33;
+  --sidebar-accent-foreground: #e6e8eb;
+  --sidebar-border: #2d343e;
+  --sidebar-ring: #10b981;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

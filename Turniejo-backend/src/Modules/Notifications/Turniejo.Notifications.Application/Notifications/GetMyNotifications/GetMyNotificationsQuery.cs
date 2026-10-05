@@ -3,5 +3,6 @@ using Turniejo.SharedKernel.CQRS;
 
 namespace Turniejo.Notifications.Application.Notifications.GetMyNotifications
 {
-    public sealed record GetMyNotificationsQuery : IQuery<IReadOnlyList<NotificationDto>>;
+    // Handler filtruje po NotificationRecipient.UserId == CurrentUserId — brak parametrów wejściowych.
+    public sealed record GetMyNotificationsQuery : IQuery<IReadOnlyList<NotificationDto>>, IAuthenticatedOnlyRequest;
 }

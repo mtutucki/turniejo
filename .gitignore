@@ -16,7 +16,10 @@ artifacts/
 # Secrets backend
 **/appsettings.Development.json
 **/appsettings.Local.json
+**/appsettings.Staging.json
+**/appsettings.Production.json
 **/secrets.json
+**/*.env
 
 # Test results
 TestResults/
@@ -61,3 +64,12 @@ docker-compose.override.yml
 packages/
 
 turniejo_final_v3.xlsx
+plan_dump.txt
+plan_header.txt
+plan_status.txt
+plan_wdrozenia_frontend.txt
+Turniejo-backend/src/Turniejo.Api/Extensions/SwaggerExtensions.cs
+Turniejo_V2_Dokumentacja_Backendu.pdf
+Turniejo_V2_swagger.json
+docs_gen/
+turniejo_frontend_plan.md

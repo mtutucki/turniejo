@@ -75,11 +75,28 @@ public sealed class PlayersDbContext(DbContextOptions<PlayersDbContext> options)
             .Where(g => g.PlayerId == playerId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<PlayerGuardian>> GetPlayerGuardiansByPlayerIdsAsync(IReadOnlyCollection<Guid> playerIds, CancellationToken cancellationToken = default)
+    {
+        if (playerIds.Count == 0)
+            return [];
+
+        return await PlayerGuardians
+            .AsNoTracking()
+            .Where(g => playerIds.Contains(g.PlayerId))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<PlayerGuardian>> GetGuardianshipsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         await PlayerGuardians
             .AsNoTracking()
             .Where(g => g.UserId == userId)
             .ToListAsync(cancellationToken);
+
+    // ExecuteDelete — od razu w bazie, bez SaveChanges (usunięcie konta woła to z innego modułu).
+    public async Task RemoveGuardianshipsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        await PlayerGuardians
+            .Where(g => g.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

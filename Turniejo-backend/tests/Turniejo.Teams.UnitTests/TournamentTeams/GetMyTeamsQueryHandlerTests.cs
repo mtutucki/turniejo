@@ -70,6 +70,39 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             result.Value[0].TeamName.Should().Be("Lions");
             result.Value[0].TournamentName.Should().Be("Cup");
             result.Value[0].Role.Should().Be(TeamStaffRole.Coach.ToString());
+            result.Value[0].TournamentStatus.Should().Be("InProgress");
+            // Brak ustawień turnieju => fail-closed, tak jak SquadEditGuard.
+            result.Value[0].CanEditSquad.Should().BeFalse();
+        }
+
+        [Theory]
+        [InlineData("Draft", false, true)]
+        [InlineData("InProgress", false, false)]
+        [InlineData("InProgress", true, true)]
+        [InlineData("Finished", false, false)]
+        public async Task Handle_ShouldComputeCanEditSquad_FromStatusAndSettings(string status, bool canEditAfterStart, bool expected)
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            var tournamentTeamId = Guid.NewGuid();
+            var tournamentId = Guid.NewGuid();
+            _currentUserContext.UserId.Returns(userId);
+
+            var staff = TeamStaff.CreateCoach(Guid.NewGuid(), tournamentTeamId, userId, Guid.NewGuid()).Value;
+            _dbContext.GetTeamStaffByUserIdAsync(userId, Arg.Any<CancellationToken>()).Returns(new List<TeamStaff> { staff });
+            var tournamentTeam = TournamentTeam.Create(tournamentTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()).Value;
+            _dbContext.GetTournamentTeamByIdAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(tournamentTeam);
+
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "Cup", status, "Group", Guid.NewGuid(), 8));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 20, 5, 10, 3, 1, 0, false, canEditAfterStart, 3, 0));
+
+            // Act
+            var result = await _handler.Handle(new GetMyTeamsQuery(), CancellationToken.None);
+
+            // Assert
+            result.Value[0].CanEditSquad.Should().Be(expected);
         }
     }
 }

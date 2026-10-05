@@ -1,21 +1,28 @@
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Application.Matches.GetMatchById;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
+using Turniejo.SharedKernel.Contracts;
 
 namespace Turniejo.Matches.UnitTests.Matches
 {
     public sealed class GetMatchByIdQueryHandlerTests
     {
         private readonly IMatchesDbContext _dbContext;
+        private readonly IAuthorizationService _authorizationService = Substitute.For<IAuthorizationService>();
+        private readonly ICurrentUserContext _currentUserContext = Substitute.For<ICurrentUserContext>();
         private readonly GetMatchByIdQueryHandler _handler;
 
         public GetMatchByIdQueryHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
-            _handler = new GetMatchByIdQueryHandler(_dbContext);
+            _handler = new GetMatchByIdQueryHandler(_dbContext, new RefereeIdVisibility(_authorizationService, _currentUserContext));
+            // domyślnie organizator — widzi RefereeId
+            _authorizationService.HasAnyRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+                .Returns(true);
         }
 
         private static Match CreateFakeMatch(Guid tournamentId) =>

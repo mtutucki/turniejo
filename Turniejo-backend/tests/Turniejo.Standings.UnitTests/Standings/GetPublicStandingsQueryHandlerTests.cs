@@ -23,7 +23,7 @@ namespace Turniejo.Standings.UnitTests.Standings
         private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showStandings) =>
             new(tournamentId, "Cup", "cup-slug", "InProgress", "Group",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1), null,
-                new TournamentPublicSettingsDto(tournamentId, true, true, true, true, showStandings, true, true));
+                new TournamentPublicSettingsDto(tournamentId, true, true, true, true, showStandings, true, true, true));
 
         [Fact]
         public async Task Handle_ShouldFail_WhenTournamentNotFoundOrNotPublic()
@@ -77,6 +77,27 @@ namespace Turniejo.Standings.UnitTests.Standings
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().ContainSingle();
             result.Value[0].Position.Should().Be(1);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldExcludeStandings_FromADifferentTournament()
+        {
+            // Audyt: GetStandingsByGroupIdAsync filtruje tylko po GroupId — podanie slugu dowolnego
+            // publicznego turnieju razem z GroupId z INNEGO (nawet prywatnego) turnieju wcześniej
+            // zwracało jego tabelę. Handler musi sam odfiltrować po tournament.Id.
+            var publicTournamentId = Guid.NewGuid();
+            var otherTournamentId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+            _tournamentModule.GetPublicTournamentBySlugAsync("cup-slug", Arg.Any<CancellationToken>())
+                .Returns(CreatePublicTournamentDto(publicTournamentId, showStandings: true));
+
+            var foreignStanding = Standing.Create(Guid.NewGuid(), otherTournamentId, Guid.NewGuid(), groupId, Guid.NewGuid()).Value;
+            _dbContext.GetStandingsByGroupIdAsync(groupId, Arg.Any<CancellationToken>()).Returns([foreignStanding]);
+
+            var result = await _handler.Handle(new GetPublicStandingsQuery("cup-slug", groupId), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().BeEmpty();
         }
     }
 }

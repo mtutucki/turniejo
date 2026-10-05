@@ -41,7 +41,7 @@ namespace Turniejo.Standings.UnitTests.Standings
             _tournamentModule.GetTournamentGroupAsync(groupId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentGroupDto(groupId, tournamentId, categoryId, "Group A"));
             _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false));
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
             _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
                 .Returns(new List<TournamentTeamDto>
                 {
@@ -111,7 +111,7 @@ namespace Turniejo.Standings.UnitTests.Standings
             _tournamentModule.GetTournamentGroupAsync(groupId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentGroupDto(groupId, tournamentId, categoryId, "Group A"));
             _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
-                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false));
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
             _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
                 .Returns(new List<TournamentTeamDto> { new(teamA, tournamentId, Guid.NewGuid(), categoryId, groupId, "Accepted") });
             _matchModule.GetFinishedMatchesByGroupIdAsync(groupId, Arg.Any<CancellationToken>())

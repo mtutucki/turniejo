@@ -1,14 +1,18 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
+using Turniejo.Tournaments.Application.Services;
 using Turniejo.Tournaments.Domain.Entities;
 
 namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory
 {
-    internal sealed class AddTournamentCategoryCommandHandler(ITournamentsDbContext tournamentsDbContext, ICurrentUserContext currentUserContext) : ICommandHandler<AddTournamentCategoryCommand, AddTournamentCategoryResponse>
+    internal sealed class AddTournamentCategoryCommandHandler(
+        ITournamentsDbContext tournamentsDbContext,
+        ICurrentUserContext currentUserContext,
+        DefaultGroupProvisioner defaultGroupProvisioner) : ICommandHandler<AddTournamentCategoryCommand, AddTournamentCategoryResponse>
     {
         public async Task<Result<AddTournamentCategoryResponse>> Handle(AddTournamentCategoryCommand request, CancellationToken cancellationToken)
         {
@@ -45,6 +49,10 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCa
             }
 
             await tournamentsDbContext.SaveChangesAsync(cancellationToken);
+
+            // Format z grupami: kategoria od razu dostaje "Grupa A" (jedna pula to najczęstszy przypadek).
+            await defaultGroupProvisioner.EnsureDefaultGroupsAsync(tournament, [result.Value.Id], cancellationToken);
+
             return Result.Success(new AddTournamentCategoryResponse(result.Value.Id));
         }
     }

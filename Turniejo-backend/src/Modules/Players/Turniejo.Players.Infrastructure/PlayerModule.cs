@@ -37,4 +37,54 @@ internal sealed class PlayerModule(IPlayersDbContext dbContext) : IPlayerModule
 
         return players.Select(p => new PlayerDto(p.Id, p.FirstName, p.LastName)).ToList();
     }
+
+    public async Task<bool> IsGuardianOfAnyPlayerOnTeamsAsync(
+        Guid userId, IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentTeamIds.Count == 0)
+            return false;
+
+        var guardianships = await dbContext.GetGuardianshipsByUserIdAsync(userId, cancellationToken);
+        if (guardianships.Count == 0)
+            return false;
+
+        var guardedPlayerIds = guardianships.Select(g => g.PlayerId).ToHashSet();
+
+        foreach (var tournamentTeamId in tournamentTeamIds)
+        {
+            var roster = await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(tournamentTeamId, cancellationToken);
+            if (roster.Any(tp => guardedPlayerIds.Contains(tp.PlayerId)))
+                return true;
+        }
+
+        return false;
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetNotifiableGuardianUserIdsForPlayersAsync(
+        IReadOnlyCollection<Guid> playerIds, CancellationToken cancellationToken = default)
+    {
+        if (playerIds.Count == 0)
+            return [];
+
+        var guardianships = await dbContext.GetPlayerGuardiansByPlayerIdsAsync(playerIds, cancellationToken);
+
+        return guardianships
+            .Where(g => g.CanReceiveNotifications)
+            .Select(g => g.UserId)
+            .Distinct()
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<PlayerDto>> GetPlayersByGuardianAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var guardianships = await dbContext.GetGuardianshipsByUserIdAsync(userId, cancellationToken);
+        if (guardianships.Count == 0)
+            return [];
+
+        var players = await dbContext.GetPlayersByIdsAsync(guardianships.Select(g => g.PlayerId).Distinct().ToList(), cancellationToken);
+        return players.Select(p => new PlayerDto(p.Id, p.FirstName, p.LastName)).ToList();
+    }
+
+    public Task RemoveGuardianshipsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        dbContext.RemoveGuardianshipsByUserIdAsync(userId, cancellationToken);
 }

@@ -8,5 +8,8 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
         Guid? CategoryId,
         Guid HomeTournamentTeamId,
         Guid AwayTournamentTeamId,
-        StageType StageType) : ICommand<CreateBracketMatchResponse>, IPublicRequest;
+        StageType StageType,
+        // Termin zaplanowany wcześniej przez generator terminarza (IBracketModule) — brak = propozycja.
+        Guid? PlannedPitchId = null,
+        DateTimeOffset? PlannedAt = null) : ICommand<CreateBracketMatchResponse>, IPublicRequest;
 }

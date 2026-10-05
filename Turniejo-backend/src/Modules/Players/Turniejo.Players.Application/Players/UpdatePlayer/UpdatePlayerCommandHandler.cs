@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Players.Application.Abstractions;
+using Turniejo.Players.Application.Services;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Exceptions;
@@ -10,6 +11,7 @@ namespace Turniejo.Players.Application.Players.UpdatePlayer
 {
     internal sealed class UpdatePlayerCommandHandler(
         IPlayersDbContext dbContext,
+        PlayerAccessGuard playerAccessGuard,
         ICurrentUserContext currentUserContext) : ICommandHandler<UpdatePlayerCommand, UpdatePlayerResponse>
     {
         public async Task<Result<UpdatePlayerResponse>> Handle(UpdatePlayerCommand request, CancellationToken cancellationToken)
@@ -18,10 +20,9 @@ namespace Turniejo.Players.Application.Players.UpdatePlayer
             if (player == null)
                 return Result.Failure<UpdatePlayerResponse>(Error.NotFound("Player", request.PlayerId));
 
-            // Policy Parent: jeśli zawodnik ma przypisanych opiekunów, edycja dozwolona
-            // tylko temu, kto jest opiekunem z CanEdit=true (Organizer/Coach dojdą w kolejnych ficzerach).
-            var guardians = await dbContext.GetPlayerGuardiansByPlayerIdAsync(request.PlayerId, cancellationToken);
-            if (guardians.Count > 0 && !guardians.Any(g => g.UserId == currentUserContext.UserId && g.CanEdit))
+            // Policy Parent/Coach/Organizer: fail-closed — brak dopasowanej relacji (nawet gdy zawodnik
+            // nie ma jeszcze żadnego opiekuna) oznacza brak dostępu, nie otwartą edycję.
+            if (!await playerAccessGuard.CanEditAsync(player, currentUserContext.UserId, cancellationToken))
                 throw new UnauthorizedException();
 
             var updateResult = player.UpdateDetails(request.FirstName, request.LastName, request.BirthDate, request.DefaultPosition, request.PhotoUrl);

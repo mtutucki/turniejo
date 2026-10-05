@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Turniejo.Tournaments.Domain.Entities;
 
@@ -11,6 +11,10 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Configurations
             builder.ToTable("tournaments");
 
             builder.HasKey(t => t.Id);
+
+            // Usunięte (anulowane) turnieje znikają ze wszystkich zapytań modułu — także z ITournamentModule,
+            // więc inne moduły widzą je jak nieistniejące.
+            builder.HasQueryFilter(t => t.DeletedAt == null);
 
             builder.Property(t => t.Name)
                 .HasMaxLength(200)

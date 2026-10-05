@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Shared\Turniejo.SharedKernel\Turniejo.SharedKernel.csproj" />
     <ProjectReference Include="..\Turniejo.Organizations.Domain\Turniejo.Organizations.Domain.csproj" />
+    <ProjectReference Include="..\..\Users\Turniejo.Users.Domain\Turniejo.Users.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

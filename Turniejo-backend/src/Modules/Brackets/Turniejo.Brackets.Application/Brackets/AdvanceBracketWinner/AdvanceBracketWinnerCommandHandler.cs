@@ -1,8 +1,6 @@
 using System.Text.Json;
 using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Application.Services;
-using Turniejo.Brackets.Domain.Entities;
-using Turniejo.Brackets.Domain.Enums;
 using Turniejo.Brackets.Domain.Events;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -39,14 +37,14 @@ namespace Turniejo.Brackets.Application.Brackets.AdvanceBracketWinner
 
             if (node.WinnerGoesToNodeId.HasValue && node.WinnerGoesToSlot.HasValue)
             {
-                advanced |= await AdvanceIntoAsync(
-                    node.WinnerGoesToNodeId.Value, node.WinnerGoesToSlot.Value, winnerId, bracket, cancellationToken);
+                advanced |= await bracketAdvancer.AdvanceIntoAsync(
+                    node.WinnerGoesToNodeId.Value, node.WinnerGoesToSlot.Value, winnerId, bracket.TournamentId, bracket.CategoryId, cancellationToken);
             }
 
             if (node.LoserGoesToNodeId.HasValue && node.LoserGoesToSlot.HasValue && loserId.HasValue)
             {
-                advanced |= await AdvanceIntoAsync(
-                    node.LoserGoesToNodeId.Value, node.LoserGoesToSlot.Value, loserId.Value, bracket, cancellationToken);
+                advanced |= await bracketAdvancer.AdvanceIntoAsync(
+                    node.LoserGoesToNodeId.Value, node.LoserGoesToSlot.Value, loserId.Value, bracket.TournamentId, bracket.CategoryId, cancellationToken);
             }
 
             if (advanced)
@@ -61,27 +59,6 @@ namespace Turniejo.Brackets.Application.Brackets.AdvanceBracketWinner
             }
 
             return Result.Success(new AdvanceBracketWinnerResponse(advanced));
-        }
-
-        private async Task<bool> AdvanceIntoAsync(
-            Guid targetNodeId, BracketSlot slot, Guid tournamentTeamId, Bracket bracket, CancellationToken cancellationToken)
-        {
-            var targetNode = await dbContext.GetBracketNodeByIdAsync(targetNodeId, cancellationToken);
-            if (targetNode == null)
-                return false;
-
-            var resolveResult = targetNode.ResolveSlot(slot, tournamentTeamId);
-            if (resolveResult.IsFailure)
-                return false;
-
-            var stageType = targetNode.WinnerGoesToNodeId.HasValue ? "Knockout" : "Final";
-            var round = await dbContext.GetBracketRoundByIdAsync(targetNode.BracketRoundId, cancellationToken);
-            if (round?.RoundType == BracketRoundType.ThirdPlace)
-                stageType = "ThirdPlace";
-
-            await bracketAdvancer.TryCreateMatchAsync(targetNode, bracket.TournamentId, bracket.CategoryId, stageType, cancellationToken);
-
-            return true;
         }
     }
 }

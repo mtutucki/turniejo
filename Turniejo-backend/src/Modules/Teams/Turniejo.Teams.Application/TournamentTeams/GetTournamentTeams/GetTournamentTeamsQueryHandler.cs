@@ -11,9 +11,17 @@ namespace Turniejo.Teams.Application.TournamentTeams.GetTournamentTeams
         {
             var tournamentTeams = await dbContext.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken);
 
-            var dtos = tournamentTeams.Select(t => new TournamentTeamDto(
-                t.Id, t.TournamentId, t.TeamId, t.CategoryId, t.GroupId,
-                t.RegistrationStatus.ToString(), t.PaymentStatus.ToString(), t.SeedNumber)).ToList();
+            var teamIds = tournamentTeams.Select(t => t.TeamId).Distinct().ToList();
+            var teamsById = (await dbContext.GetTeamsByIdsAsync(teamIds, cancellationToken)).ToDictionary(t => t.Id);
+
+            var dtos = tournamentTeams.Select(t =>
+            {
+                teamsById.TryGetValue(t.TeamId, out var team);
+                return new TournamentTeamDto(
+                    t.Id, t.TournamentId, t.TeamId, t.CategoryId, t.GroupId,
+                    t.RegistrationStatus.ToString(), t.PaymentStatus.ToString(), t.SeedNumber,
+                    team?.Name ?? "Unknown", team?.ShortName, team?.LogoUrl);
+            }).ToList();
 
             return Result.Success<IReadOnlyList<TournamentTeamDto>>(dtos);
         }

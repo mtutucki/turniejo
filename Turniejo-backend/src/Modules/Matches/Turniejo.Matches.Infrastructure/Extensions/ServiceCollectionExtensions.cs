@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Pitches.AddPitch;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Infrastructure.Persistence;
 using Turniejo.Matches.Infrastructure.Realtime;
 using Turniejo.SharedKernel.Contracts;
@@ -35,7 +36,16 @@ public static class ServiceCollectionExtensions
 
         services.AddValidatorsFromAssemblyContaining<AddPitchCommandValidator>();
 
+        services.AddScoped<RealtimeAccessGuard>();
+        services.AddScoped<MatchEventRosterGuard>();
+        services.AddScoped<MatchAccessGuard>();
+        services.AddScoped<ScheduleConflictChecker>();
+        services.AddScoped<PlannedSlotShifter>();
+        services.AddScoped<SendOffRules>();
+        services.AddScoped<RefereeIdVisibility>();
+
         services.AddSignalR();
+        services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, SubUserIdProvider>();
         services.AddSingleton<IRealtimeService, SignalRRealtimeService>();
 
         return services;

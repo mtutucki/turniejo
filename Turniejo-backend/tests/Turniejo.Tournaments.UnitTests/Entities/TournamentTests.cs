@@ -222,9 +222,9 @@ namespace Turniejo.Tournaments.UnitTests.Entities
         [InlineData(TournamentStatus.Draft, TournamentStatus.Finished)]
         [InlineData(TournamentStatus.Draft, TournamentStatus.RegistrationClosed)]
         [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.InProgress)]
-        [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.Draft)]
         [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.InProgress)]
-        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.RegistrationOpen)]
+        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.Draft)]
+        [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.RegistrationClosed)]
         [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.Finished)]
         [InlineData(TournamentStatus.ScheduleGenerated, TournamentStatus.Draft)]
         public void ChangeStatus_ShouldFail_WhenTransitionIsNotAllowed(TournamentStatus currentStatus, TournamentStatus newStatus)
@@ -236,6 +236,20 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             var result = tournament.ChangeStatus(newStatus, ValidUserId);
             // Assert
             result.IsFailure.Should().BeTrue();
+        }
+
+        [Theory]
+        [InlineData(TournamentStatus.RegistrationOpen, TournamentStatus.Draft)]
+        [InlineData(TournamentStatus.RegistrationClosed, TournamentStatus.RegistrationOpen)]
+        public void ChangeStatus_ShouldAllowSteppingBack_BeforeScheduleIsGenerated(TournamentStatus currentStatus, TournamentStatus previousStatus)
+        {
+            // Arrange
+            var tournament = CreateTournamentWithStatus(currentStatus);
+            // Act
+            var result = tournament.ChangeStatus(previousStatus, ValidUserId);
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            tournament.Status.Should().Be(previousStatus);
         }
 
         [Fact]
@@ -410,6 +424,55 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             // Assert
             result.IsSuccess.Should().BeTrue();
             tournament.DomainEvents.Should().ContainSingle(t => t is TournamentSettingsUpdated);
+        }
+
+        [Fact]
+        public void UpdatePublicSettings_ShouldUpdateAllFlags_WhenValid()
+        {
+            // Zamyka lukę z audytu testów: UpdatePublicSettings (delegujący do
+            // TournamentPublicSettings.Update) nie miał żadnego testu na poziomie aggregate roota,
+            // tylko pośrednio przez test handlera komendy.
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, ValidName, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+
+            var result = tournament.UpdatePublicSettings(true, false, false, true, false, true, false, true);
+
+            result.IsSuccess.Should().BeTrue();
+            tournament.PublicSettings.IsPublic.Should().BeTrue();
+            tournament.PublicSettings.ShowTeams.Should().BeFalse();
+            tournament.PublicSettings.ShowPlayers.Should().BeFalse();
+            tournament.PublicSettings.ShowSchedule.Should().BeTrue();
+            tournament.PublicSettings.ShowStandings.Should().BeFalse();
+            tournament.PublicSettings.ShowBracket.Should().BeTrue();
+            tournament.PublicSettings.ShowLiveMatches.Should().BeFalse();
+            tournament.PublicSettings.ShowStats.Should().BeTrue();
+        }
+
+        [Fact]
+        public void RevertScheduleGeneration_ShouldReturnToRegistrationClosed_AndRaiseStatusChanged()
+        {
+            var tournament = CreateTournamentWithStatus(TournamentStatus.ScheduleGenerated);
+            tournament.ClearDomainEvents();
+
+            var result = tournament.RevertScheduleGeneration(ValidUserId);
+
+            result.IsSuccess.Should().BeTrue();
+            tournament.Status.Should().Be(TournamentStatus.RegistrationClosed);
+            tournament.DomainEvents.OfType<TournamentStatusChanged>().Should().ContainSingle(e =>
+                e.OldStatus == TournamentStatus.ScheduleGenerated && e.NewStatus == TournamentStatus.RegistrationClosed);
+        }
+
+        [Theory]
+        [InlineData(TournamentStatus.RegistrationClosed)]
+        [InlineData(TournamentStatus.InProgress)]
+        [InlineData(TournamentStatus.Finished)]
+        public void RevertScheduleGeneration_ShouldFail_OutsideScheduleGenerated(TournamentStatus status)
+        {
+            var tournament = CreateTournamentWithStatus(status);
+
+            var result = tournament.RevertScheduleGeneration(ValidUserId);
+
+            result.IsFailure.Should().BeTrue();
+            tournament.Status.Should().Be(status);
         }
     }
 }

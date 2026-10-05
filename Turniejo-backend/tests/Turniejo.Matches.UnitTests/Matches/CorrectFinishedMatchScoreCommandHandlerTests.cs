@@ -37,7 +37,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             var match = CreateFinishedMatch();
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
             _currentUserContext.UserId.Returns(Guid.NewGuid());
-            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 2, 2);
+            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 2, 2, null);
 
             // Act
             var result = await _handler.Handle(command, CancellationToken.None);
@@ -52,12 +52,47 @@ namespace Turniejo.Matches.UnitTests.Matches
         }
 
         [Fact]
+        public async Task Handle_ShouldUpdateWinnerAndPublishMatchScoreCorrected_WhenCorrectionFlipsTheResult()
+        {
+            // Zamyka lukę z audytu: korekta zmieniała wynik, ale nie WinnerTournamentTeamId, więc
+            // moduł Brackets (subskrybujący MatchScoreCorrected) nie miał czym się kierować.
+            var match = CreateFinishedMatch();
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 1, 3, match.AwayTournamentTeamId);
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            match.WinnerTournamentTeamId.Should().Be(match.AwayTournamentTeamId);
+            await _dbContext.Received(1).AddOutboxMessageAsync(
+                Arg.Is<Turniejo.SharedKernel.Outbox.OutboxMessage>(m => m.Type.Contains("MatchScoreCorrected")),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenWinnerIsNeitherTeam()
+        {
+            var match = CreateFinishedMatch();
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 1, 1, Guid.NewGuid());
+
+            // Act
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.WinnerTournamentTeamId");
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenMatchNotFound()
         {
             // Arrange
             var matchId = Guid.NewGuid();
             _dbContext.GetMatchByIdAsync(matchId, Arg.Any<CancellationToken>()).Returns((Match?)null);
-            var command = new CorrectFinishedMatchScoreCommand(Guid.NewGuid(), matchId, 1, 1);
+            var command = new CorrectFinishedMatchScoreCommand(Guid.NewGuid(), matchId, 1, 1, null);
 
             // Act
             var result = await _handler.Handle(command, CancellationToken.None);
@@ -73,7 +108,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             // Arrange
             var match = Match.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddDays(1), StageType.Group).Value;
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
-            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 1, 1);
+            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 1, 1, null);
 
             // Act
             var result = await _handler.Handle(command, CancellationToken.None);
@@ -89,7 +124,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             // Arrange
             var match = CreateFinishedMatch(editWindowMinutes: -1);
             _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
-            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 1, 1);
+            var command = new CorrectFinishedMatchScoreCommand(match.TournamentId, match.Id, 1, 1, null);
 
             // Act
             var result = await _handler.Handle(command, CancellationToken.None);

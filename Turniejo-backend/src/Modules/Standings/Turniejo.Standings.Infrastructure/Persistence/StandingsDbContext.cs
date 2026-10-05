@@ -30,6 +30,12 @@ public sealed class StandingsDbContext(DbContextOptions<StandingsDbContext> opti
             .OrderBy(s => s.Position)
             .ToListAsync(cancellationToken);
 
+    public Task RemoveStandingAsync(Standing standing, CancellationToken cancellationToken = default)
+    {
+        Standings.Remove(standing);
+        return Task.CompletedTask;
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("standings");

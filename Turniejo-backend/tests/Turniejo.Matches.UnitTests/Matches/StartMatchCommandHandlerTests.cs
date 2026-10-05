@@ -12,13 +12,14 @@ namespace Turniejo.Matches.UnitTests.Matches
     {
         private readonly IMatchesDbContext _dbContext;
         private readonly ICurrentUserContext _currentUserContext;
+        private readonly ITournamentModule _tournamentModule = Substitute.For<ITournamentModule>();
         private readonly StartMatchCommandHandler _handler;
 
         public StartMatchCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new StartMatchCommandHandler(_dbContext, _currentUserContext);
+            _handler = new StartMatchCommandHandler(_dbContext, _tournamentModule, _currentUserContext);
         }
 
         private static Match CreateFakeMatch(Guid tournamentId)
@@ -84,6 +85,38 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
             await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+        [Fact]
+        public async Task Handle_ShouldMarkTournamentStarted_AfterSavingTheMatch()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFakeMatch(tournamentId);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+            var userId = Guid.NewGuid();
+            _currentUserContext.UserId.Returns(userId);
+
+            var result = await _handler.Handle(new StartMatchCommand(tournamentId, match.Id), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            Received.InOrder(() =>
+            {
+                _dbContext.SaveChangesAsync(Arg.Any<CancellationToken>());
+                _tournamentModule.MarkTournamentStartedAsync(tournamentId, userId, Arg.Any<CancellationToken>());
+            });
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotTouchTournament_WhenMatchCannotStart()
+        {
+            var tournamentId = Guid.NewGuid();
+            var match = CreateFakeMatch(tournamentId);
+            match.Start(Guid.NewGuid());
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+
+            var result = await _handler.Handle(new StartMatchCommand(tournamentId, match.Id), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            await _tournamentModule.DidNotReceive().MarkTournamentStartedAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         }
     }
 }

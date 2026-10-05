@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Players.Application.Players.AssignUserToPlayer;
 using Turniejo.Players.Application.Players.CreatePlayer;
+using Turniejo.Players.Application.Players.GetPlayerBasicStats;
 using Turniejo.Players.Application.Players.GetPlayerById;
+using Turniejo.Players.Application.Players.GetPlayerMatchHistory;
 using Turniejo.Players.Application.Players.UpdatePlayer;
 using Turniejo.Players.Application.PlayerGuardians.AssignGuardianToPlayer;
 using Turniejo.Players.Application.PlayerGuardians.GetMyChildren;
@@ -51,6 +53,20 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpGet("{playerId}/stats")]
+        public async Task<IActionResult> GetPlayerStats([FromRoute] Guid playerId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPlayerBasicStatsQuery(playerId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("{playerId}/matches")]
+        public async Task<IActionResult> GetPlayerMatchHistory([FromRoute] Guid playerId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPlayerMatchHistoryQuery(playerId), cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpPost("{playerId}/link-user")]
         public async Task<IActionResult> LinkUser([FromRoute] Guid playerId, [FromBody] LinkUserRequest request, CancellationToken cancellationToken)
         {
@@ -62,7 +78,7 @@ namespace Turniejo.Api.Controllers
         [HttpPost("{playerId}/guardians")]
         public async Task<IActionResult> AssignGuardian([FromRoute] Guid playerId, [FromBody] AssignGuardianRequest request, CancellationToken cancellationToken)
         {
-            var command = new AssignGuardianToPlayerCommand(playerId, request.UserId, request.RelationshipType, request.CanEdit, request.CanReceiveNotifications);
+            var command = new AssignGuardianToPlayerCommand(request.TournamentId, request.TournamentTeamId, playerId, request.UserId, request.RelationshipType, request.CanEdit, request.CanReceiveNotifications);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -82,6 +98,6 @@ namespace Turniejo.Api.Controllers
         public sealed record CreatePlayerRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl, Guid? UserId);
         public sealed record UpdatePlayerRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl);
         public sealed record LinkUserRequest(Guid UserId);
-        public sealed record AssignGuardianRequest(Guid UserId, RelationshipType RelationshipType, bool CanEdit, bool CanReceiveNotifications);
+        public sealed record AssignGuardianRequest(Guid TournamentId, Guid TournamentTeamId, Guid UserId, RelationshipType RelationshipType, bool CanEdit, bool CanReceiveNotifications);
     }
 }

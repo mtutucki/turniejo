@@ -16,6 +16,7 @@ public interface IUsersDbContext
     Task<IReadOnlyList<UserRoleAssignment>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserRoleAssignment>> GetUserRoleAssignmentsByScopeAsync(RoleScopeType scopeType, Guid scopeId, CancellationToken cancellationToken = default);
     Task RemoveUserRoleAssignmentAsync(Guid userId, UserRole role, RoleScopeType scopeType, Guid? scopeId, CancellationToken cancellationToken = default);
+    void RemoveUserRoleAssignments(IEnumerable<UserRoleAssignment> assignments);
     Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
 }

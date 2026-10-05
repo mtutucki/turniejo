@@ -28,8 +28,12 @@ namespace Turniejo.Notifications.Application.EventHandlers
                 notification.TournamentId, NotificationType.PitchChanged, "Zmiana boiska",
                 "Boisko meczu zostało zmienione.", createdByUserId: null, recipients, matchId: notification.MatchId, cancellationToken);
 
-            if (publishResult.IsSuccess)
-                await dbContext.SaveChangesAsync(cancellationToken);
+            // Bez tego błąd publikacji był cichy — OutboxProcessor uznawał wiadomość za przetworzoną
+            // mimo że nic się nie zapisało. Throw uruchamia już istniejący mechanizm retry/dead-letter.
+            if (publishResult.IsFailure)
+                throw new InvalidOperationException($"Failed to publish PitchChanged notification: {publishResult.Error.Message}");
+
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }

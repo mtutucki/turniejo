@@ -1,0 +1,47 @@
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+{$DOMAIN} {
+	import security_headers
+	header X-Frame-Options "DENY"
+	encode zstd gzip
+
+	# Huby SignalR prosto do API — WebSocket nie musi przechodzić przez rewrite w Next.js.
+	# Reszta /backend/* (REST) idzie przez Next, tak jak lokalnie.
+	handle /backend/hubs/* {
+		uri strip_prefix /backend
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
+
+auth.{$DOMAIN} {
+	import security_headers
+	encode zstd gzip
+
+	# Publicznie potrzebne są tylko endpointy realmu (linki z maili: reset hasła, akcje konta).
+	# Konsola admina i Admin REST API — wyłącznie przez tunel SSH (KC_HOSTNAME_ADMIN).
+	@admin path /admin /admin/*
+	respond @admin 404
+
+	# Konto usera zmieniamy wyłącznie przez aplikację — zmiana emaila/imienia w konsoli konta
+	# Keycloaka rozjechałaby się z danymi w module Users.
+	@account path_regexp ^/realms/[^/]+/account(/.*)?$
+	respond @account 404
+
+	reverse_proxy keycloak:8080
+}

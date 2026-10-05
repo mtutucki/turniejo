@@ -1,23 +1,29 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using NSubstitute;
 using Turniejo.SharedKernel.Outbox;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.Tournaments.Application.Abstractions;
+using Turniejo.Tournaments.Application.Services;
 using Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat;
 using Turniejo.Tournaments.Domain.Entities;
 using Turniejo.Tournaments.Domain.Enums;
-// using Turniejo.Tournaments.Domain.Enums; ← dopasuj namespace TournamentFormat u siebie
 
 namespace Turniejo.Tournaments.UnitTests.Tournaments;
 
 public sealed class SetTournamentFormatCommandHandlerTests
 {
     private readonly ITournamentsDbContext _dbContext;
+    private readonly ITeamModule _teamModule;
+    private readonly ICurrentUserContext _currentUserContext;
     private readonly SetTournamentFormatCommandHandler _handler;
 
     public SetTournamentFormatCommandHandlerTests()
     {
         _dbContext = Substitute.For<ITournamentsDbContext>();
-        _handler = new SetTournamentFormatCommandHandler(_dbContext);
+        _teamModule = Substitute.For<ITeamModule>();
+        _currentUserContext = Substitute.For<ICurrentUserContext>();
+        _handler = new SetTournamentFormatCommandHandler(
+            _dbContext, new DefaultGroupProvisioner(_dbContext, _teamModule, _currentUserContext));
     }
 
     private static Tournament CreateFakeTournament()

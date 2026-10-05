@@ -18,8 +18,12 @@ namespace Turniejo.Players.Application.Services
 
             var tournament = await tournamentModule.GetTournamentAsync(tournamentId, cancellationToken);
             var settings = await tournamentModule.GetTournamentSettingsAsync(tournamentId, cancellationToken);
+
+            // Fail-closed: brak turnieju/ustawień pod danym Id to nie "brak zdania", tylko brak
+            // podstaw do przyznania dostępu. Wcześniej to gałąź "return" (fail-open) była furtką,
+            // przez którą sfałszowany/nieistniejący TournamentId omijał blokadę edycji składu.
             if (tournament == null || settings == null)
-                return;
+                throw new UnauthorizedException();
 
             var tournamentHasStarted = tournament.Status is "InProgress" or "Finished";
             if (tournamentHasStarted && !settings.CanCoachEditSquadAfterStart)

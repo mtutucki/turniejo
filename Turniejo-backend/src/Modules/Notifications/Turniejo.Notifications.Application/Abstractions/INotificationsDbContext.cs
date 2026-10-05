@@ -17,6 +17,8 @@ namespace Turniejo.Notifications.Application.Abstractions
         Task AddNotificationRecipientAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default);
         Task AddNotificationRecipientsAsync(IReadOnlyCollection<NotificationRecipient> recipients, CancellationToken cancellationToken = default);
         Task<NotificationRecipient?> GetNotificationRecipientByIdAsync(Guid notificationRecipientId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<NotificationRecipient>> GetNotificationRecipientsByNotificationIdAsync(Guid notificationId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<NotificationRecipient>> GetNotificationRecipientsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+        void RemoveNotificationRecipient(NotificationRecipient recipient);
     }
 }

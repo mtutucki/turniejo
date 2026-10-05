@@ -1,8 +1,9 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using NSubstitute;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
+using Turniejo.Tournaments.Application.Services;
 using Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCategory;
 using Turniejo.Tournaments.Domain.Entities;
 
@@ -12,13 +13,16 @@ namespace Turniejo.Tournaments.UnitTests.TournamentsCategories
     {
         private readonly ITournamentsDbContext _dbContext;
         private readonly ICurrentUserContext _currentUserContext;
+        private readonly ITeamModule _teamModule;
         private readonly AddTournamentCategoryCommandHandler _handler;
 
         public AddTournamentCategoryCommandHandlerTests()
         {
             _dbContext = Substitute.For<ITournamentsDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new AddTournamentCategoryCommandHandler(_dbContext, _currentUserContext);
+            _teamModule = Substitute.For<ITeamModule>();
+            _handler = new AddTournamentCategoryCommandHandler(
+                _dbContext, _currentUserContext, new DefaultGroupProvisioner(_dbContext, _teamModule, _currentUserContext));
         }
 
         private static Tournament CreateFakeTournament()

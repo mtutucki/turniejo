@@ -13,7 +13,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.JoinTournament
             var result = await dbContext.GetTournamentByCodeAsync(request.Code, cancellationToken);
 
             if (result == null)
-                return Result.Failure<JoinTournamentResponse>(new Error("404", "Invalid tournament code."));
+                return Result.Failure<JoinTournamentResponse>(Error.Validation("Code", "Invalid tournament code."));
 
             var role = result.RefereeCode == request.Code ? nameof(UserRole.Referee) :
                result.CoachCode == request.Code ? nameof(UserRole.Coach) :
@@ -21,7 +21,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.JoinTournament
 
             await userModule.AssignRoleAsync(currentUserContext.UserId, role, nameof(RoleScopeType.Tournament), result.Id, cancellationToken);
 
-            return Result.Success(new JoinTournamentResponse(result.Slug));
+            return Result.Success(new JoinTournamentResponse(result.Id, result.Name, result.Slug, role, result.PublicSettings.IsPublic));
         }
     }
 }

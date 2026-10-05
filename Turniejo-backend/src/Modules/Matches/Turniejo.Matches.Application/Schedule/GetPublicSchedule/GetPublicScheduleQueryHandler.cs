@@ -21,12 +21,16 @@ namespace Turniejo.Matches.Application.Schedule.GetPublicSchedule
 
             var matches = await dbContext.GetMatchesByTournamentIdAsync(tournament.Id, cancellationToken);
 
+            // RefereeId celowo null — kto sędziuje to wewnętrzna informacja organizacyjna, nie coś
+            // do publicznego ujawnienia przez stronę turnieju, tym bardziej dla meczów, które się
+            // jeszcze nie odbyły.
             var dtos = matches
                 .OrderBy(m => m.ScheduledAt)
                 .Select(m => new MatchDto(
                     m.Id, m.TournamentId, m.CategoryId, m.GroupId, m.PitchId,
-                    m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.RefereeId, m.ScheduledAt,
-                    m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString()))
+                    m.HomeTournamentTeamId, m.AwayTournamentTeamId, RefereeId: null, m.ScheduledAt,
+                    m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString(),
+                    m.HomePenaltyScore, m.AwayPenaltyScore))
                 .ToList();
 
             return Result.Success<IReadOnlyList<MatchDto>>(dtos);

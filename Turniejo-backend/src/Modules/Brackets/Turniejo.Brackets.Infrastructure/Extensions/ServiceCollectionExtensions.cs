@@ -6,6 +6,7 @@ using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Application.Brackets.GenerateBracket;
 using Turniejo.Brackets.Application.Services;
 using Turniejo.Brackets.Infrastructure.Persistence;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Brackets.Infrastructure.Extensions;
@@ -28,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBracketsDbContext>(sp => sp.GetRequiredService<BracketsDbContext>());
 
         services.AddScoped<BracketAdvancer>();
+        services.AddScoped<IBracketModule, BracketModule>();
 
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 

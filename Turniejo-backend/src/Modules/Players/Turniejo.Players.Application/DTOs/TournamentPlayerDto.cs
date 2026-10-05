@@ -6,5 +6,10 @@ namespace Turniejo.Players.Application.DTOs
         Guid PlayerId,
         int? ShirtNumber,
         string? Position,
-        string Status);
+        string Status,
+        // Dane globalnego profilu zawodnika — bez nich skład wymagałby zapytania per zawodnik.
+        string FirstName,
+        string LastName,
+        DateTime? BirthDate,
+        string? PhotoUrl);
 }

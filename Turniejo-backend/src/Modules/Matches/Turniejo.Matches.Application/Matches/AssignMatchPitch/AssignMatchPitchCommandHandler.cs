@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -9,6 +10,8 @@ namespace Turniejo.Matches.Application.Matches.AssignMatchPitch
 {
     internal sealed class AssignMatchPitchCommandHandler(
         IMatchesDbContext dbContext,
+        ScheduleConflictChecker conflictChecker,
+        PlannedSlotShifter plannedSlotShifter,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignMatchPitchCommand, AssignMatchPitchResponse>
     {
         public async Task<Result<AssignMatchPitchResponse>> Handle(AssignMatchPitchCommand request, CancellationToken cancellationToken)
@@ -17,12 +20,9 @@ namespace Turniejo.Matches.Application.Matches.AssignMatchPitch
             if (match == null || match.TournamentId != request.TournamentId)
                 return Result.Failure<AssignMatchPitchResponse>(Error.NotFound("Match", request.MatchId));
 
-            if (request.PitchId.HasValue)
-            {
-                var conflict = await dbContext.MatchExistsAtPitchAndTimeAsync(request.PitchId.Value, match.ScheduledAt, match.Id, cancellationToken);
-                if (conflict)
-                    return Result.Failure<AssignMatchPitchResponse>(Error.Validation("PitchId", "Another match is already scheduled on this pitch at this time"));
-            }
+            var conflict = await conflictChecker.FindConflictAsync(match, request.PitchId, match.ScheduledAt, "PitchId", cancellationToken);
+            if (conflict != null)
+                return Result.Failure<AssignMatchPitchResponse>(conflict);
 
             var result = match.AssignPitch(request.PitchId, currentUserContext.UserId);
             if (result.IsFailure)
@@ -38,6 +38,7 @@ namespace Turniejo.Matches.Application.Matches.AssignMatchPitch
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            await plannedSlotShifter.ShiftAsync(match.TournamentId, cancellationToken);
 
             return Result.Success(new AssignMatchPitchResponse(match.Id));
         }

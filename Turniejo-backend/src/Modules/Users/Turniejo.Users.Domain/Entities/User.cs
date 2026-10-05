@@ -1,4 +1,4 @@
-﻿using Turniejo.SharedKernel.Primitives;
+using Turniejo.SharedKernel.Primitives;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Users.Domain.Enums;
 using Turniejo.Users.Domain.Events;
@@ -12,6 +12,10 @@ public sealed class User : BaseEntity
     public string LastName { get; private set; } = string.Empty;
     public string? PhoneNumber { get; private set; }
     public UserStatus Status { get; private set; }
+    // RODO (rozliczalność): kiedy i którą wersję regulaminu/polityki prywatności user zaakceptował.
+    public DateTimeOffset? TermsAcceptedAt { get; private set; }
+    public string? TermsVersion { get; private set; }
+    public DateTimeOffset? DeletedAt { get; private set; }
 
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -25,7 +29,9 @@ public sealed class User : BaseEntity
         string email,
         string firstName,
         string lastName,
-        string? phoneNumber = null)
+        string? phoneNumber = null,
+        bool createOrganization = true,
+        string? acceptedTermsVersion = null)
     {
         if (id == Guid.Empty)
             return Result.Failure<User>(Error.Validation("Id", "User Id cannot be empty."));
@@ -47,10 +53,32 @@ public sealed class User : BaseEntity
         user.PhoneNumber = phoneNumber;
         user.Status = UserStatus.Active;
 
+        if (acceptedTermsVersion is not null)
+        {
+            user.TermsAcceptedAt = DateTimeOffset.UtcNow;
+            user.TermsVersion = acceptedTermsVersion;
+        }
+
         user._domainEvents.Add(new UserRegistered(
-            id, email, firstName, lastName));
+            id, email, firstName, lastName, createOrganization));
 
         return Result.Success(user);
+    }
+
+    /// <summary>
+    /// Usunięcie konta (prawo do usunięcia danych). Rekord zostaje, bo inne moduły trzymają jego Id
+    /// (sędzia meczu, autor zdarzenia) — znikają tylko dane osobowe. Akceptacja regulaminu zostaje
+    /// jako dowód zgodności.
+    /// </summary>
+    public void Anonymize()
+    {
+        Email = $"deleted-{Id:N}@deleted.invalid";
+        FirstName = "Usunięty";
+        LastName = "użytkownik";
+        PhoneNumber = null;
+        Status = UserStatus.Deleted;
+        DeletedAt = DateTimeOffset.UtcNow;
+        SetUpdatedAt();
     }
 
     public void ClearDomainEvents() => _domainEvents.Clear();

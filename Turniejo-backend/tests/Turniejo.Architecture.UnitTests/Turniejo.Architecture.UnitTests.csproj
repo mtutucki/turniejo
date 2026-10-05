@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Shared\Turniejo.SharedKernel\Turniejo.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Users\Turniejo.Users.Application\Turniejo.Users.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tournaments\Turniejo.Tournaments.Application\Turniejo.Tournaments.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Teams\Turniejo.Teams.Application\Turniejo.Teams.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Matches\Turniejo.Matches.Application\Turniejo.Matches.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Turniejo.Notifications.Application\Turniejo.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Organizations\Turniejo.Organizations.Application\Turniejo.Organizations.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Players\Turniejo.Players.Application\Turniejo.Players.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Standings\Turniejo.Standings.Application\Turniejo.Standings.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Brackets\Turniejo.Brackets.Application\Turniejo.Brackets.Application.csproj" />
+    <ProjectReference Include="..\..\src\Turniejo.Api\Turniejo.Api.csproj" />
+  </ItemGroup>
+
+</Project>

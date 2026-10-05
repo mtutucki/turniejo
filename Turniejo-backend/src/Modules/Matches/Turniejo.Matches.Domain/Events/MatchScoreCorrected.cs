@@ -8,6 +8,7 @@ namespace Turniejo.Matches.Domain.Events
         Guid? GroupId,
         int HomeScore,
         int AwayScore,
+        Guid? WinnerTournamentTeamId,
         Guid ChangedByUserId) : IOutboxEvent
     {
         public Guid EventId { get; } = Guid.NewGuid();

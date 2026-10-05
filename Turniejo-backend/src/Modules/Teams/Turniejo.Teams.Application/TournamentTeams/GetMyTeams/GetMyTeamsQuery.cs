@@ -3,5 +3,6 @@ using Turniejo.Teams.Application.DTOs;
 
 namespace Turniejo.Teams.Application.TournamentTeams.GetMyTeams
 {
-    public sealed record GetMyTeamsQuery : IQuery<IReadOnlyList<MyTeamDto>>;
+    // Handler filtruje po TeamStaff.UserId == CurrentUserId — brak parametrów wejściowych.
+    public sealed record GetMyTeamsQuery : IQuery<IReadOnlyList<MyTeamDto>>, IAuthenticatedOnlyRequest;
 }

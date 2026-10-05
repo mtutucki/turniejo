@@ -26,6 +26,8 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task<bool> GroupNameExistsAsync(Guid categoryId, string name, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentGroup>> GetTournamentGroupsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<TournamentGroup?> GetTournamentGroupByIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentGroup>> GetTournamentGroupsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
+        Task RemoveTournamentGroupAsync(TournamentGroup group, CancellationToken cancellationToken = default);
 
         // TieBreakerRule
         Task<IReadOnlyList<TieBreakerRule>> GetTieBreakerRulesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);

@@ -1,0 +1,155 @@
+# Produkcja na jednym VPS. Uruchomienie (z katalogu deploy/, obok pliku .env — patrz .env.example):
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Na zewnątrz wystawiony jest WYŁĄCZNIE Caddy (80/443). Postgres, Keycloak, API i frontend nie mają
+# sekcji `ports` — Docker omija ufw, więc każdy opublikowany port byłby dostępny z internetu mimo
+# firewalla. Jedyny wyjątek to konsola admina Keycloaka na 127.0.0.1 (dostęp tylko przez tunel SSH).
+
+name: turniejo
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  # Bez limitu logi kontenerów rosną w nieskończoność i w końcu zapełniają dysk VPS-a.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2.11-alpine
+    <<: [*restart, *logging]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - keycloak
+    networks:
+      internal:
+        # API pobiera metadane OIDC z https://auth.DOMAIN — aliasy kierują to do Caddy w sieci
+        # wewnętrznej, zamiast przez publiczny IP VPS-a (hairpin NAT nie u każdego dostawcy działa).
+        aliases:
+          - ${DOMAIN}
+          - auth.${DOMAIN}
+
+  frontend:
+    build:
+      context: ../Turniejo-frontend
+      args:
+        # Wpiekane w `next build` (rewrite /backend/*) — patrz Turniejo-frontend/Dockerfile.
+        API_URL: http://api:8080
+        NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
+        NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+    <<: [*restart, *logging]
+    environment:
+      # Logowanie grant_type=password idzie z serwera Next do Keycloaka siecią wewnętrzną.
+      # Issuer w tokenach i tak jest publiczny (KC_HOSTNAME), więc API waliduje je poprawnie.
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: turniejo
+      KEYCLOAK_CLIENT_ID: turniejo-frontend
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?}
+      NEXTAUTH_URL: https://${DOMAIN}
+      # Auth.js za reverse proxy — bez tego odrzuca żądania z Host innym niż localhost (UntrustedHost).
+      AUTH_TRUST_HOST: "true"
+    depends_on:
+      - api
+    networks: [internal]
+
+  api:
+    build:
+      context: ../Turniejo-backend
+    <<: [*restart, *logging]
+    environment:
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=turniejo;Username=turniejo_app;Password=${APP_DB_PASSWORD:?}
+      Database__MigrateOnStartup: "true"
+      # Authority = publiczny adres — musi się zgadzać z `iss` w tokenach, a metadane OIDC/JWKS
+      # muszą przyjść po HTTPS (RequireHttpsMetadata poza Development). Request idzie przez Caddy.
+      Keycloak__Authority: https://auth.${DOMAIN}/realms/turniejo
+      Keycloak__BaseUrl: http://keycloak:8080
+      Keycloak__AdminClientSecret: ${KEYCLOAK_BACKEND_ADMIN_SECRET:?}
+      # Host z Caddy (hub SignalR) i z rewrite'u Next (api:8080).
+      AllowedHosts: ${DOMAIN};api
+      ForwardedHeaders__KnownNetworks__0: 172.30.89.0/24
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks: [internal]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7
+    <<: [*restart, *logging]
+    command: start --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      # TLS kończy się na Caddy; Keycloak mówi HTTP w sieci wewnętrznej.
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: 172.30.89.0/24
+      # Publiczny adres = issuer tokenów i adres w linkach z maili (reset hasła). Backchannel dynamic
+      # pozwala API i frontendowi rozmawiać z Keycloakiem po http://keycloak:8080 bez zmiany issuera.
+      KC_HOSTNAME: https://auth.${DOMAIN}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      # Konsola admina nie jest wystawiona przez Caddy — tylko przez tunel SSH na localhost:8081.
+      KC_HOSTNAME_ADMIN: http://localhost:8081
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      # Placeholder w turniejo-realm.json — tylko przy pierwszym imporcie realmu.
+      TURNIEJO_BACKEND_ADMIN_SECRET: ${KEYCLOAK_BACKEND_ADMIN_SECRET:?}
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ../Turniejo-backend/infra/keycloak:/opt/keycloak/data/import:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+
+  postgres:
+    image: postgres:16
+    <<: [*restart, *logging]
+    environment:
+      # Superuser tylko do administracji; aplikacja i Keycloak mają osobnych userów i osobne bazy
+      # (tworzone przez postgres/init.sh przy pierwszym starcie z pustym wolumenem).
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+networks:
+  internal:
+    # Stała podsieć — API i Keycloak ufają nagłówkom X-Forwarded-* tylko z tego zakresu.
+    ipam:
+      config:
+        - subnet: 172.30.89.0/24
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

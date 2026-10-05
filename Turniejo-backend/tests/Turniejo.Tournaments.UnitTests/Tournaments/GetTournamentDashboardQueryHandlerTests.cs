@@ -177,12 +177,18 @@ public sealed class GetTournamentDashboardQueryHandlerTests
         // Arrange
         var tournament = CreateFakeTournament();
         _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
-        _teamModule.GetTournamentTeamsByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(new List<TournamentTeamDto>());
 
         var homeTournamentTeamId = Guid.NewGuid();
         var awayTournamentTeamId = Guid.NewGuid();
         var homeTeamId = Guid.NewGuid();
         var awayTeamId = Guid.NewGuid();
+
+        var tournamentTeams = new List<TournamentTeamDto>
+        {
+            new(homeTournamentTeamId, tournament.Id, homeTeamId, Guid.NewGuid(), null, "Accepted"),
+            new(awayTournamentTeamId, tournament.Id, awayTeamId, Guid.NewGuid(), null, "Accepted"),
+        };
+        _teamModule.GetTournamentTeamsByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournamentTeams);
 
         var laterMatchId = Guid.NewGuid();
         var earlierMatchId = Guid.NewGuid();
@@ -194,12 +200,8 @@ public sealed class GetTournamentDashboardQueryHandlerTests
         };
         _matchModule.GetMatchesByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(matches);
 
-        _teamModule.GetTournamentTeamAsync(homeTournamentTeamId, Arg.Any<CancellationToken>())
-            .Returns(new TournamentTeamDto(homeTournamentTeamId, tournament.Id, homeTeamId, Guid.NewGuid(), null, "Accepted"));
-        _teamModule.GetTournamentTeamAsync(awayTournamentTeamId, Arg.Any<CancellationToken>())
-            .Returns(new TournamentTeamDto(awayTournamentTeamId, tournament.Id, awayTeamId, Guid.NewGuid(), null, "Accepted"));
-        _teamModule.GetTeamAsync(homeTeamId, Arg.Any<CancellationToken>()).Returns(new TeamDto(homeTeamId, "Lechia", "LEC"));
-        _teamModule.GetTeamAsync(awayTeamId, Arg.Any<CancellationToken>()).Returns(new TeamDto(awayTeamId, "Legia", "LEG"));
+        _teamModule.GetTeamsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<TeamDto> { new(homeTeamId, "Lechia", "LEC"), new(awayTeamId, "Legia", "LEG") });
 
         var query = new GetTournamentDashboardQuery(tournament.Id, UpcomingMatchesCount: 5);
 
@@ -213,6 +215,54 @@ public sealed class GetTournamentDashboardQueryHandlerTests
         result.Value.UpcomingMatches[1].MatchId.Should().Be(laterMatchId);
         result.Value.UpcomingMatches[0].HomeTeamName.Should().Be("Lechia");
         result.Value.UpcomingMatches[0].AwayTeamName.Should().Be("Legia");
+    }
+
+    [Fact]
+    public async Task Handle_ShouldExcludePastDueMatches_FromUpcomingMatches()
+    {
+        // Audyt: mecz zaległy w statusie Scheduled/Ready (np. nikt go nie wystartował) wcześniej
+        // wypływał na górę listy "nadchodzących" przed realnie przyszłymi meczami.
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        _teamModule.GetTournamentTeamsByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(new List<TournamentTeamDto>());
+
+        var futureMatchId = Guid.NewGuid();
+        var pastDueMatchId = Guid.NewGuid();
+        var matches = new List<TournamentMatchDto>
+        {
+            new(pastDueMatchId, tournament.Id, "Scheduled", DateTimeOffset.UtcNow.AddHours(-2), Guid.NewGuid(), Guid.NewGuid(), 0, 0),
+            new(futureMatchId, tournament.Id, "Scheduled", DateTimeOffset.UtcNow.AddHours(2), Guid.NewGuid(), Guid.NewGuid(), 0, 0),
+        };
+        _matchModule.GetMatchesByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(matches);
+
+        var query = new GetTournamentDashboardQuery(tournament.Id, UpcomingMatchesCount: 5);
+
+        var result = await _handler.Handle(query, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.UpcomingMatches.Should().ContainSingle().Which.MatchId.Should().Be(futureMatchId);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldClampUpcomingMatchesCount_ToFiftyMax()
+    {
+        // Audyt: UpcomingMatchesCount był klienckim parametrem bez górnego limitu — ?upcomingMatchesCount=5000
+        // uruchamiało dawniej tysiące sekwencyjnych zapytań o nazwy drużyn (N+1 na mecz).
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        _teamModule.GetTournamentTeamsByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(new List<TournamentTeamDto>());
+
+        var matches = Enumerable.Range(0, 60)
+            .Select(i => new TournamentMatchDto(Guid.NewGuid(), tournament.Id, "Scheduled", DateTimeOffset.UtcNow.AddHours(i + 1), Guid.NewGuid(), Guid.NewGuid(), 0, 0))
+            .ToList();
+        _matchModule.GetMatchesByTournamentIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(matches);
+
+        var query = new GetTournamentDashboardQuery(tournament.Id, UpcomingMatchesCount: 5000);
+
+        var result = await _handler.Handle(query, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.UpcomingMatches.Should().HaveCount(50);
     }
 
     [Fact]

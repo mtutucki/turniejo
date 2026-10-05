@@ -3,6 +3,7 @@ using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Enums;
 using Turniejo.Users.Application.Abstractions;
 using Turniejo.Users.Application.Users.AssignUserRole;
+using Turniejo.Users.Application.Users.RemoveUserRole;
 
 namespace Turniejo.Users.Infrastructure;
 
@@ -42,6 +43,21 @@ internal sealed class UserModule(
         var roleScopeType = Enum.Parse<RoleScopeType>(scopeType);
 
         await sender.Send(new AssignUserRoleCommand(
+            userId, userRole, roleScopeType, scopeId),
+            cancellationToken);
+    }
+
+    public async Task RevokeRoleAsync(
+        Guid userId,
+        string role,
+        string scopeType,
+        Guid scopeId,
+        CancellationToken cancellationToken = default)
+    {
+        var userRole = Enum.Parse<UserRole>(role);
+        var roleScopeType = Enum.Parse<RoleScopeType>(scopeType);
+
+        await sender.Send(new RemoveUserRoleCommand(
             userId, userRole, roleScopeType, scopeId),
             cancellationToken);
     }

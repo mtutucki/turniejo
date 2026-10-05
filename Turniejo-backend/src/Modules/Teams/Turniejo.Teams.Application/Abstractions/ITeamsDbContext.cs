@@ -12,12 +12,21 @@ namespace Turniejo.Teams.Application.Abstractions
         // Team
         Task AddTeamAsync(Team team, CancellationToken cancellationToken = default);
         Task<Team?> GetTeamByIdAsync(Guid teamId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Team>> GetTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Team>> GetTeamsByIdsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
 
         // TournamentTeam
         Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default);
         Task<TournamentTeam?> GetTournamentTeamByIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default);
+        /// <summary>Śledzone (do zmiany) drużyny kategorii bez grupy — GetTournamentTeamsByTournamentIdAsync jest AsNoTracking.</summary>
+        Task<IReadOnlyList<TournamentTeam>> GetUngroupedTournamentTeamsForUpdateAsync(Guid tournamentId, Guid categoryId, CancellationToken cancellationToken = default);
         Task<bool> TournamentTeamExistsAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default);
+        /// <summary>Śledzony wpis drużyny w turnieju i kategorii (np. do ponownego zgłoszenia po odrzuceniu).</summary>
+        Task<TournamentTeam?> GetTournamentTeamForUpdateAsync(Guid tournamentId, Guid teamId, Guid categoryId, CancellationToken cancellationToken = default);
+        Task<bool> AnyTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
+        Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
 
         // TeamStaff

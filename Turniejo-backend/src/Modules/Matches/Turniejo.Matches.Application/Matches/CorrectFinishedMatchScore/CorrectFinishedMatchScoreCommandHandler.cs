@@ -18,13 +18,13 @@ namespace Turniejo.Matches.Application.Matches.CorrectFinishedMatchScore
             if (match == null || match.TournamentId != request.TournamentId)
                 return Result.Failure<CorrectFinishedMatchScoreResponse>(Error.NotFound("Match", request.MatchId));
 
-            var oldValue = JsonSerializer.Serialize(new { match.HomeScore, match.AwayScore });
+            var oldValue = JsonSerializer.Serialize(new { match.HomeScore, match.AwayScore, match.WinnerTournamentTeamId });
 
-            var result = match.CorrectFinishedScore(request.HomeScore, request.AwayScore, currentUserContext.UserId);
+            var result = match.CorrectFinishedScore(request.HomeScore, request.AwayScore, request.WinnerTournamentTeamId, currentUserContext.UserId);
             if (result.IsFailure)
                 return Result.Failure<CorrectFinishedMatchScoreResponse>(result.Error);
 
-            var newValue = JsonSerializer.Serialize(new { match.HomeScore, match.AwayScore });
+            var newValue = JsonSerializer.Serialize(new { match.HomeScore, match.AwayScore, match.WinnerTournamentTeamId });
 
             var auditLogResult = AuditLog.Create(
                 Guid.NewGuid(), currentUserContext.UserId, "Match", match.Id, "CorrectFinishedScore", oldValue, newValue);

@@ -9,7 +9,18 @@ namespace Turniejo.Brackets.Application.DTOs
         string AwaySourceType,
         Guid? AwayTournamentTeamId,
         Guid? WinnerGoesToNodeId,
-        Guid? LoserGoesToNodeId);
+        Guid? LoserGoesToNodeId,
+        // Slot (Home/Away) w meczu, do którego przechodzi zwycięzca — pozwala ułożyć drabinkę stabilnie
+        // (pary zasilające ten sam mecz obok siebie); węzeł nie ma własnej pozycji.
+        string? WinnerGoesToSlot = null,
+        // Dla slotów GroupPosition: "1. miejsce Grupa A" zamiast ogólnego "z fazy grupowej".
+        Guid? HomeSourceGroupId = null,
+        int? HomeSourcePosition = null,
+        Guid? AwaySourceGroupId = null,
+        int? AwaySourcePosition = null,
+        // Termin zaplanowany dla meczu, który jeszcze nie powstał (czeka na drużyny z poprzedniej rundy).
+        Guid? PlannedPitchId = null,
+        DateTimeOffset? PlannedAt = null);
 
     public sealed record BracketRoundDto(
         Guid Id,

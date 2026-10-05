@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Turniejo.SharedKernel.Behaviors;
 using Turniejo.SharedKernel.Exceptions;
 
@@ -33,6 +34,15 @@ public sealed class ExceptionHandlingMiddleware(
         {
             logger.LogWarning("Unauthorized: {Message}", ex.Message);
             await HandleExceptionAsync(context, ex.Message, 403, "Forbidden");
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogWarning(ex, "Concurrency conflict");
+            await HandleExceptionAsync(
+                context,
+                "This resource was modified by someone else in the meantime. Please reload and try again.",
+                409,
+                "Conflict");
         }
         catch (Exception ex)
         {

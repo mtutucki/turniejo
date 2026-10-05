@@ -50,6 +50,7 @@ namespace Turniejo.Organizations.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerUserId")
+                        .IsUnique()
                         .HasDatabaseName("IX_organizations_owner");
 
                     b.HasIndex("Slug")
@@ -67,6 +68,9 @@ namespace Turniejo.Organizations.Infrastructure.Persistence.Migrations
                     b.Property<string>("Error")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");

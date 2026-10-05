@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.next-*/
+out/
+coverage/
+e2e/
+playwright-report/
+test-results/
+*.tsbuildinfo
+Dockerfile
+.dockerignore
+
+# Lokalne sekrety — nigdy do obrazu. .env.example zostaje (bez wartości, tylko dokumentacja).
+.env
+.env.*
+!.env.example

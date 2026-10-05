@@ -16,6 +16,14 @@ namespace Turniejo.Players.Application.Players.UpdatePlayer
                 .MaximumLength(100).WithMessage("LastName must not exceed 100 characters.");
             RuleFor(x => x.BirthDate)
                 .LessThanOrEqualTo(DateTime.UtcNow.Date).WithMessage("BirthDate cannot be in the future.");
+            RuleFor(x => x.PhotoUrl)
+                .MaximumLength(2048).WithMessage("PhotoUrl must not exceed 2048 characters.")
+                .Must(BeAValidHttpUrl).WithMessage("PhotoUrl must be a valid absolute http(s) URL.")
+                .When(x => !string.IsNullOrEmpty(x.PhotoUrl));
         }
+
+        private static bool BeAValidHttpUrl(string? url) =>
+            Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 }

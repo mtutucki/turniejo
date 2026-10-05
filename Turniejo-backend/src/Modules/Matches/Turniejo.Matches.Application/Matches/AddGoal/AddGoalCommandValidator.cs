@@ -17,7 +17,7 @@ namespace Turniejo.Matches.Application.Matches.AddGoal
                 .Must(t => t is MatchEventType.Goal or MatchEventType.OwnGoal or MatchEventType.PenaltyGoal)
                 .WithMessage("GoalType must be Goal, OwnGoal or PenaltyGoal.");
             RuleFor(x => x.Minute)
-                .GreaterThanOrEqualTo(0).WithMessage("Minute cannot be negative.");
+                .InclusiveBetween(0, 300).WithMessage("Minute must be between 0 and 300.");
             RuleFor(x => x.Second)
                 .InclusiveBetween(0, 59).When(x => x.Second.HasValue).WithMessage("Second must be between 0 and 59.");
         }

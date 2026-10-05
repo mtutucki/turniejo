@@ -16,10 +16,10 @@ namespace Turniejo.Teams.Application.TournamentTeams.GetTeamPlayerStats
 
             var dtos = roster.Select(player => new TeamPlayerStatsDto(
                 player.Id, player.PlayerId, player.FirstName, player.LastName,
-                Goals: events.Count(e => e.PlayerId == player.PlayerId && e.Type is "Goal" or "OwnGoal" or "PenaltyGoal"),
-                Assists: events.Count(e =>
-                    (e.Type == "Assist" && e.PlayerId == player.PlayerId) ||
-                    (e.Type is "Goal" or "PenaltyGoal" && e.RelatedPlayerId == player.PlayerId)),
+                // OwnGoal pominięty w Goals (liczy się dla przeciwnej drużyny, nie dla sprawcy).
+                // Assist liczony wyłącznie z RelatedPlayerId gola/rzutu karnego — jedyna ścieżka zapisu asysty.
+                Goals: events.Count(e => e.PlayerId == player.PlayerId && e.Type is "Goal" or "PenaltyGoal"),
+                Assists: events.Count(e => e.Type is "Goal" or "PenaltyGoal" && e.RelatedPlayerId == player.PlayerId),
                 YellowCards: events.Count(e => e.PlayerId == player.PlayerId && e.Type == "YellowCard"),
                 RedCards: events.Count(e => e.PlayerId == player.PlayerId && e.Type == "RedCard")))
                 .ToList();

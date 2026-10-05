@@ -71,6 +71,24 @@ namespace Turniejo.Teams.Domain.Entities
             return Result.Success();
         }
 
+        /// <summary>
+        /// Ponowne zgłoszenie odrzuconej albo wycofanej drużyny — wraca jako "Oczekuje" (ten sam wpis,
+        /// bez duplikatu; unikalny indeks turniej+drużyna+kategoria i tak by go nie wpuścił).
+        /// </summary>
+        public Result Reapply(Guid changedByUserId)
+        {
+            if (RegistrationStatus is not (RegistrationStatus.Rejected or RegistrationStatus.Withdrawn))
+                return Result.Failure(Error.Validation("TeamId", "Team is already registered for this tournament and category"));
+
+            var oldStatus = RegistrationStatus;
+            RegistrationStatus = RegistrationStatus.Pending;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new TeamRegistrationStatusChanged(Id, TournamentId, oldStatus, RegistrationStatus.Pending, changedByUserId));
+
+            return Result.Success();
+        }
+
         public Result ChangePaymentStatus(PaymentStatus newStatus, Guid changedByUserId)
         {
             if (PaymentStatus == newStatus)

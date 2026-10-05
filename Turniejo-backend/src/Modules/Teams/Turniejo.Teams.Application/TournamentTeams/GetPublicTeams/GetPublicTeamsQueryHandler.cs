@@ -29,7 +29,7 @@ namespace Turniejo.Teams.Application.TournamentTeams.GetPublicTeams
                 var team = await dbContext.GetTeamByIdAsync(tournamentTeam.TeamId, cancellationToken);
                 dtos.Add(new PublicTeamDto(
                     tournamentTeam.Id, tournamentTeam.TeamId, team?.Name ?? "Unknown", team?.ShortName,
-                    tournamentTeam.CategoryId, tournamentTeam.GroupId));
+                    tournamentTeam.CategoryId, tournamentTeam.GroupId, team?.LogoUrl));
             }
 
             return Result.Success<IReadOnlyList<PublicTeamDto>>(dtos);

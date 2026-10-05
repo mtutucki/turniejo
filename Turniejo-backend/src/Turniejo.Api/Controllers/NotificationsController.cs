@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Notifications.Application.Notifications.CreateOrganizerAnnouncement;
+using Turniejo.Notifications.Application.Notifications.DeleteNotification;
 using Turniejo.Notifications.Application.Notifications.GetMyNotifications;
 using Turniejo.Notifications.Application.Notifications.MarkNotificationAsRead;
 
@@ -34,6 +35,13 @@ namespace Turniejo.Api.Controllers
         {
             var result = await sender.Send(new MarkNotificationAsReadCommand(id), cancellationToken);
             return result.ToActionResult();
+        }
+
+        [HttpDelete("/api/notifications/{id}")]
+        public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new DeleteNotificationCommand(id), cancellationToken);
+            return result.IsFailure ? result.ToActionResult() : NoContent();
         }
 
         public sealed record CreateAnnouncementRequest(string Title, string Message);

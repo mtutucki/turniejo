@@ -32,6 +32,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -105,6 +108,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -245,7 +251,7 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.HasOne("Turniejo.Tournaments.Domain.Entities.Tournament", null)
                         .WithMany()
                         .HasForeignKey("TournamentId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -255,6 +261,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                         {
                             b1.Property<Guid>("TournamentId")
                                 .HasColumnType("uuid");
+
+                            b1.Property<bool>("AbbreviatePlayerNames")
+                                .HasColumnType("boolean");
 
                             b1.Property<bool>("IsPublic")
                                 .HasColumnType("boolean");
@@ -272,6 +281,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                                 .HasColumnType("boolean");
 
                             b1.Property<bool>("ShowStandings")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowStats")
                                 .HasColumnType("boolean");
 
                             b1.Property<bool>("ShowTeams")

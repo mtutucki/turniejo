@@ -21,8 +21,23 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Configurations
             builder.Property(x => x.ResultType)
                 .HasConversion<int>();
 
+            // Optimistic concurrency: Version jest inkrementowany w każdej mutującej metodzie domenowej
+            // (Match.cs) przed zapisem. EF użyje wartości sprzed zmiany w klauzuli WHERE — jeśli sędzia
+            // i organizator zapiszą ten sam mecz równolegle, druga operacja dostanie
+            // DbUpdateConcurrencyException zamiast cichego last-write-wins.
+            builder.Property(x => x.Version)
+                .IsConcurrencyToken();
+
             builder.HasIndex(x => new { x.TournamentId, x.ScheduledAt });
-            builder.HasIndex(x => new { x.PitchId, x.ScheduledAt });
+            // Aplikacyjny check-then-save (MatchExistsAtPitchAndTimeAsync) nie wystarczy przy
+            // równoległych żądaniach — to jest ostatnia linia obrony przed podwójną rezerwacją
+            // boiska. PitchId jest nullable, a Postgres traktuje NULL-e jako różne od siebie, więc
+            // mecze bez przypisanego boiska nigdy się o ten indeks nie potkną.
+            // Odwołany mecz (Status = 7) nie zajmuje boiska: generator terminarza i ScheduleConflictChecker
+            // go pomijają, więc indeks też musi — inaczej slot po odwołanym meczu był nie do ponownego użycia.
+            builder.HasIndex(x => new { x.PitchId, x.ScheduledAt })
+                .IsUnique()
+                .HasFilter("\"Status\" <> 7");
             builder.HasIndex(x => new { x.RefereeId, x.ScheduledAt });
 
             builder.HasOne<Pitch>()

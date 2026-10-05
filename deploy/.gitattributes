@@ -1,0 +1,3 @@
+# Skrypty i konfiguracja montowane do kontenerów Linuksa — CRLF z checkoutu na Windowsie psuje sh.
+*.sh text eol=lf
+Caddyfile text eol=lf

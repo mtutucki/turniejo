@@ -2,6 +2,7 @@ using System.Text.Json;
 using MediatR;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Matches.RecalculateMatchScore;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Events;
 using Turniejo.SharedKernel.Contracts;
@@ -13,6 +14,8 @@ namespace Turniejo.Matches.Application.Matches.AddGoal
 {
     internal sealed class AddGoalCommandHandler(
         IMatchesDbContext dbContext,
+        MatchEventRosterGuard rosterGuard,
+        SendOffRules sendOffRules,
         ISender sender,
         ICurrentUserContext currentUserContext) : ICommandHandler<AddGoalCommand, AddGoalResponse>
     {
@@ -28,6 +31,22 @@ namespace Turniejo.Matches.Application.Matches.AddGoal
 
             if (request.TournamentTeamId != match.HomeTournamentTeamId && request.TournamentTeamId != match.AwayTournamentTeamId)
                 return Result.Failure<AddGoalResponse>(Error.Validation("TournamentTeamId", "Team is not playing in this match"));
+
+            var scorerCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.PlayerId, "PlayerId", cancellationToken);
+            if (scorerCheck.IsFailure)
+                return Result.Failure<AddGoalResponse>(scorerCheck.Error);
+
+            var assistCheck = await rosterGuard.EnsureOnRosterAsync(request.TournamentTeamId, request.AssistPlayerId, "AssistPlayerId", cancellationToken);
+            if (assistCheck.IsFailure)
+                return Result.Failure<AddGoalResponse>(assistCheck.Error);
+
+            var scorerSentOff = await sendOffRules.EnsureNotSentOffAsync(match.Id, request.PlayerId, "PlayerId", cancellationToken);
+            if (scorerSentOff != null)
+                return Result.Failure<AddGoalResponse>(scorerSentOff);
+
+            var assistSentOff = await sendOffRules.EnsureNotSentOffAsync(match.Id, request.AssistPlayerId, "AssistPlayerId", cancellationToken);
+            if (assistSentOff != null)
+                return Result.Failure<AddGoalResponse>(assistSentOff);
 
             var eventResult = MatchEvent.Create(
                 Guid.NewGuid(), match.Id, request.GoalType, request.Minute, currentUserContext.UserId,
