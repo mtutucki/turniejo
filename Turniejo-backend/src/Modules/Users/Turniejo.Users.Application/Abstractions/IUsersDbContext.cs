@@ -19,4 +19,8 @@ public interface IUsersDbContext
     void RemoveUserRoleAssignments(IEnumerable<UserRoleAssignment> assignments);
     Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    Task AddPasswordResetTokenAsync(PasswordResetToken token, CancellationToken cancellationToken = default);
+    Task<PasswordResetToken?> GetPasswordResetTokenByHashAsync(string tokenHash, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PasswordResetToken>> GetPasswordResetTokensAsync(Guid userId, CancellationToken cancellationToken = default);
+    void RemovePasswordResetTokens(IEnumerable<PasswordResetToken> tokens);
 }

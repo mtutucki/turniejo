@@ -27,6 +27,7 @@ public sealed class IntegrationTestWebApplicationFactory : WebApplicationFactory
         .Build();
 
     public FakeKeycloakAdminService FakeKeycloak { get; } = new();
+    public FakeEmailSender FakeEmail { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -42,6 +43,9 @@ public sealed class IntegrationTestWebApplicationFactory : WebApplicationFactory
         {
             services.RemoveAll<IKeycloakAdminService>();
             services.AddSingleton<IKeycloakAdminService>(FakeKeycloak);
+
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(FakeEmail);
 
             // OutboxProcessor/MatchReminderBackgroundService startują razem z hostem, czyli ZANIM
             // InitializeAsync zdąży wykonać migracje — uderzają w nieistniejące jeszcze tabele,
@@ -108,6 +112,7 @@ public sealed class IntegrationTestWebApplicationFactory : WebApplicationFactory
         await truncateCmd.ExecuteNonQueryAsync();
 
         FakeKeycloak.Reset();
+        FakeEmail.Reset();
     }
 
     // Domenowe eventy (MatchFinished -> przeliczenie tabeli, awans w drabince, ScheduleGenerated

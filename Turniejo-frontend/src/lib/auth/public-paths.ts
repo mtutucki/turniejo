@@ -5,7 +5,15 @@
 export const DEFAULT_APP_PATH = "/start"
 
 // Strony dostępne bez logowania. Portal publiczny turnieju (/t/[slug]) dojdzie w Fazie 6.
-const PUBLIC_PATHS = ["/login", "/register", "/password-reset", "/help", "/terms", "/privacy"]
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/password-reset",
+  "/password-reset/confirm",
+  "/help",
+  "/terms",
+  "/privacy",
+]
 const PUBLIC_PREFIXES = ["/t/"]
 
 export function isPublicPath(pathname: string) {

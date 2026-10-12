@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
+using Turniejo.Users.Application.Users.ConfirmPasswordReset;
 using Turniejo.Users.Application.Users.RegisterUser;
 using Turniejo.Users.Application.Users.RequestPasswordReset;
 
@@ -28,5 +29,12 @@ public sealed class AuthController(ISender sender) : ControllerBase
     {
         await sender.Send(command, cancellationToken);
         return Ok(new { message = "If the email exists, a reset link has been sent." });
+    }
+
+    [HttpPost("password-reset/confirm")]
+    public async Task<IActionResult> ConfirmPasswordReset([FromBody] ConfirmPasswordResetCommand command, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult();
     }
 }

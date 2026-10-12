@@ -228,6 +228,20 @@ const keycloak = [
 // --- Backend ---------------------------------------------------------------------------------
 
 const api = [
+  // Jak ConfirmPasswordResetCommandHandler; rolę maila z linkiem gra stały token "token-<email>".
+  http.post("*/api/auth/password-reset/confirm", async ({ request }) => {
+    const body = (await request.json()) as { token: string; newPassword: string }
+    const user = db.users.find((u) => `token-${u.email}` === body.token)
+    if (!user || db.usedResetTokens.includes(body.token)) {
+      return HttpResponse.json(
+        { code: "Validation.Token", message: "Reset link is invalid or has expired.", type: 2 },
+        { status: 400 },
+      )
+    }
+    db.usedResetTokens.push(body.token)
+    user.password = body.newPassword
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/api/auth/register", async ({ request }) => {
     const body = (await request.json()) as Record<string, string | boolean | null>
     const email = String(body.email).toLowerCase()

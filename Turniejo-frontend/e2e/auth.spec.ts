@@ -90,6 +90,49 @@ test.describe("Rejestracja → Logowanie", () => {
   })
 })
 
+test.describe("Reset hasła", () => {
+  test("link z maila: nowe hasło w aplikacji, stare przestaje działać, link jest jednorazowy", async ({
+    page,
+  }) => {
+    const link = "/password-reset/confirm?token=token-organizator@e2e.pl"
+    const newPassword = "NoweHaslo456!"
+
+    await page.goto(link)
+    await page.getByLabel("Nowe hasło").fill(newPassword)
+    await page.getByLabel("Powtórz hasło").fill("inne-haslo")
+    await page.getByRole("button", { name: "Ustaw hasło" }).click()
+    await expect(page.getByText("Hasła nie są takie same")).toBeVisible()
+
+    await page.getByLabel("Powtórz hasło").fill(newPassword)
+    await page.getByRole("button", { name: "Ustaw hasło" }).click()
+    await expect(page.getByText("Hasło zostało zmienione")).toBeVisible()
+
+    await page.getByRole("link", { name: "Zaloguj się" }).click()
+    await expect(page).toHaveURL(/\/login$/)
+    await login(page, "organizator@e2e.pl")
+    await expect(page.getByText(/Nieprawidłowy email lub hasło/)).toBeVisible()
+    await login(page, "organizator@e2e.pl", newPassword)
+    await expect(page).toHaveURL(/\/tournaments$/)
+
+    // Wylogowany user z tym samym linkiem — token jest już zużyty.
+    await page.context().clearCookies()
+    await page.goto(link)
+    await page.getByLabel("Nowe hasło").fill("JeszczeInne789!")
+    await page.getByLabel("Powtórz hasło").fill("JeszczeInne789!")
+    await page.getByRole("button", { name: "Ustaw hasło" }).click()
+    await expect(
+      page.getByRole("alert").filter({ hasText: "wygasł albo został już użyty" }),
+    ).toBeVisible()
+    await expect(page.getByRole("link", { name: "Wyślij nowy link" })).toBeVisible()
+  })
+
+  test("link bez tokenu nie pokazuje formularza", async ({ page }) => {
+    await page.goto("/password-reset/confirm")
+    await expect(page.getByText("Ten link jest niepełny")).toBeVisible()
+    await expect(page.getByRole("button", { name: "Ustaw hasło" })).toHaveCount(0)
+  })
+})
+
 test.describe("RODO: konto", () => {
   test("uczestnik pobiera dane i usuwa konto — potem nie może się zalogować", async ({ page }) => {
     const email = `usun.${Date.now()}@e2e.pl`

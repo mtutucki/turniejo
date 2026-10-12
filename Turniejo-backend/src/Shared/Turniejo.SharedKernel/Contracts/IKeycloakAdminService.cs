@@ -14,7 +14,13 @@ public interface IKeycloakAdminService
         Guid keycloakUserId,
         CancellationToken cancellationToken = default);
 
-    Task SendPasswordResetEmailAsync(
+    Task SetPasswordAsync(
+        Guid keycloakUserId,
+        string password,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Zamyka wszystkie sesje usera — jego refresh tokeny przestają działać.</summary>
+    Task LogoutAllSessionsAsync(
         Guid keycloakUserId,
         CancellationToken cancellationToken = default);
 }

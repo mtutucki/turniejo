@@ -9,7 +9,8 @@ namespace Turniejo.IntegrationTests.Infrastructure;
 public sealed class FakeKeycloakAdminService : IKeycloakAdminService
 {
     private readonly ConcurrentDictionary<string, Guid> _usersByEmail = new(StringComparer.OrdinalIgnoreCase);
-    public ConcurrentBag<Guid> PasswordResetRequests { get; } = [];
+    public ConcurrentBag<(Guid UserId, string Password)> PasswordChanges { get; } = [];
+    public ConcurrentBag<Guid> LoggedOutUsers { get; } = [];
     public ConcurrentBag<Guid> DeletedUsers { get; } = [];
 
     public Task<Guid> CreateUserAsync(
@@ -23,9 +24,15 @@ public sealed class FakeKeycloakAdminService : IKeycloakAdminService
         return Task.FromResult(id);
     }
 
-    public Task SendPasswordResetEmailAsync(Guid keycloakUserId, CancellationToken cancellationToken = default)
+    public Task SetPasswordAsync(Guid keycloakUserId, string password, CancellationToken cancellationToken = default)
     {
-        PasswordResetRequests.Add(keycloakUserId);
+        PasswordChanges.Add((keycloakUserId, password));
+        return Task.CompletedTask;
+    }
+
+    public Task LogoutAllSessionsAsync(Guid keycloakUserId, CancellationToken cancellationToken = default)
+    {
+        LoggedOutUsers.Add(keycloakUserId);
         return Task.CompletedTask;
     }
 
@@ -44,7 +51,8 @@ public sealed class FakeKeycloakAdminService : IKeycloakAdminService
     public void Reset()
     {
         _usersByEmail.Clear();
-        PasswordResetRequests.Clear();
+        PasswordChanges.Clear();
+        LoggedOutUsers.Clear();
         DeletedUsers.Clear();
     }
 }

@@ -26,6 +26,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddTrustedProxyForwarding(builder.Configuration);
 builder.Services.AddApiRateLimiting();
 builder.Services.AddSwaggerDocumentation();
+builder.Services.AddSmtpEmail(builder.Configuration);
 
 // Auth
 builder.Services.AddAuthModule(builder.Configuration, builder.Environment);

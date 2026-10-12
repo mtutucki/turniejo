@@ -11,6 +11,7 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRoleAssignment> UserRoleAssignments => Set<UserRoleAssignment>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddUserAsync(User user, CancellationToken ct) =>
@@ -73,6 +74,20 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
         UserRoleAssignments.RemoveRange(assignments);
 
     public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => await Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+    public async Task AddPasswordResetTokenAsync(PasswordResetToken token, CancellationToken cancellationToken = default) =>
+        await PasswordResetTokens.AddAsync(token, cancellationToken);
+
+    public async Task<PasswordResetToken?> GetPasswordResetTokenByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        await PasswordResetTokens.FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
+
+    public async Task<IReadOnlyList<PasswordResetToken>> GetPasswordResetTokensAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        await PasswordResetTokens
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+
+    public void RemovePasswordResetTokens(IEnumerable<PasswordResetToken> tokens) =>
+        PasswordResetTokens.RemoveRange(tokens);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

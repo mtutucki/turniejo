@@ -32,6 +32,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserModule, UserModule>();
         services.AddScoped<IAuthorizationService, AuthorizationService>();
 
+        services.AddOptions<AppOptions>()
+            .Configure(options => options.PublicUrl = configuration["App:PublicUrl"] ?? string.Empty);
+
         // Rejestracja walidatorów
         services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();
 

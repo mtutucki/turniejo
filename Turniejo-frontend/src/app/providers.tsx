@@ -25,7 +25,7 @@ declare module "@tanstack/react-query" {
 }
 
 /** Strony logowania/rejestracji — z nich nigdy nie przekierowujemy na logowanie (inaczej pętla). */
-const AUTH_PAGES = ["/login", "/register", "/password-reset"]
+const AUTH_PAGES = ["/login", "/register", "/password-reset", "/password-reset/confirm"]
 const onAuthPage = () => AUTH_PAGES.includes(window.location.pathname)
 
 function loginUrl() {
