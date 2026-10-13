@@ -11,7 +11,6 @@ import { useTournamentDashboard } from "@/features/tournaments/api"
 import { AccessCodesPanel } from "@/features/tournaments/components/access-codes-panel"
 import { TournamentStatusStepper } from "@/features/tournaments/components/status-stepper"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
-import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Tournament, TournamentDashboard } from "@/types/tournaments"
 
@@ -106,48 +105,6 @@ function StatCards({
   )
 }
 
-function UpcomingMatches({ id, dashboard }: { id: string; dashboard: TournamentDashboard }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Najbliższe mecze</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {dashboard.upcomingMatches.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Nie ma zaplanowanych meczów.{" "}
-            {dashboard.matches.total === 0 && (
-              <Link
-                href={`/tournaments/${id}/schedule`}
-                className="text-primary font-medium underline-offset-4 hover:underline"
-              >
-                Przejdź do terminarza
-              </Link>
-            )}
-          </p>
-        ) : (
-          <ul className="divide-y">
-            {dashboard.upcomingMatches.map((match) => (
-              <li
-                key={match.matchId}
-                className="flex items-center justify-between gap-3 py-2 text-sm"
-              >
-                <span className="min-w-0 truncate">
-                  {match.homeTeamName} <span className="text-muted-foreground">vs</span>{" "}
-                  {match.awayTeamName}
-                </span>
-                <span className="text-muted-foreground shrink-0 font-mono tabular-nums">
-                  {formatDateTime(match.scheduledAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 function PublicPortalCard({
   tournament,
   canManage,
@@ -226,15 +183,12 @@ export function TournamentDashboardView() {
             ))}
           </div>
         ) : dashboard.data ? (
-          <>
-            <StatCards
-              id={id}
-              dashboard={dashboard.data}
-              teamLimit={tournament.data?.teamLimit}
-              isOrganizer={isOrganizer}
-            />
-            <UpcomingMatches id={id} dashboard={dashboard.data} />
-          </>
+          <StatCards
+            id={id}
+            dashboard={dashboard.data}
+            teamLimit={tournament.data?.teamLimit}
+            isOrganizer={isOrganizer}
+          />
         ) : (
           <EmptyState icon={Trophy} title="Nie udało się pobrać podsumowania" />
         )}
