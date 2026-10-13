@@ -554,6 +554,47 @@ const api = [
     ),
   ),
   http.get(
+    "*/api/referee/matches/open",
+    authed(({ user }) =>
+      HttpResponse.json(
+        db.matches
+          .filter(
+            (m) =>
+              !m.refereeId &&
+              m.status !== "Finished" &&
+              m.status !== "Cancelled" &&
+              hasRole(user, "Referee", "Tournament", m.tournamentId),
+          )
+          .map(matchDto),
+      ),
+    ),
+  ),
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/referee/claim",
+    authed<{ tid: string; mid: string }>(({ params, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      if (!hasRole(user, "Referee", "Tournament", m.tournamentId)) return problem(403, "Forbidden")
+      if (m.refereeId) return problem(409, "Match already has a referee")
+      m.refereeId = user.id
+      user.roles.push({ role: "Referee", scopeType: "Match", scopeId: m.id })
+      return HttpResponse.json({ matchId: m.id })
+    }),
+  ),
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/referee/release",
+    authed<{ tid: string; mid: string }>(({ params, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      if (m.refereeId !== user.id) return problem(403, "Forbidden")
+      m.refereeId = null
+      user.roles = user.roles.filter(
+        (r) => !(r.role === "Referee" && r.scopeType === "Match" && r.scopeId === m.id),
+      )
+      return HttpResponse.json({ matchId: m.id })
+    }),
+  ),
+  http.get(
     "*/api/matches/:id/location",
     authed<{ id: string }>(({ params }) => {
       const m = findMatch(params.id)

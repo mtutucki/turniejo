@@ -3,6 +3,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { useApi } from "@/hooks/use-api"
+import { myRolesQueryKey } from "@/hooks/use-my-roles"
 import {
   type AddCardInput,
   type AddGoalInput,
@@ -21,6 +22,7 @@ import { matchKeys } from "./api"
 
 export const liveKeys = {
   assigned: ["referee", "matches"] as const,
+  open: ["referee", "matches", "open"] as const,
   location: (matchId: string) => ["matches", matchId, "location"] as const,
   panel: (matchId: string) => ["matches", matchId, "live-panel"] as const,
   clock: (matchId: string) => ["matches", matchId, "clock"] as const,
@@ -37,6 +39,16 @@ export function useAssignedMatches() {
   return useQuery({
     queryKey: liveKeys.assigned,
     queryFn: () => request<Match[]>("/api/referee/matches"),
+    enabled: isAuthenticated,
+  })
+}
+
+/** Mecze bez sędziego w turniejach, w których user jest sędzią — może wziąć dowolny z nich. */
+export function useOpenMatches() {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: liveKeys.open,
+    queryFn: () => request<Match[]>("/api/referee/matches/open"),
     enabled: isAuthenticated,
   })
 }
@@ -281,6 +293,27 @@ export function useSelectMvp(tournamentId: string, matchId: string) {
         body: input,
       }),
     onSettled: () => invalidateLive(queryClient, matchId),
+  })
+}
+
+/**
+ * Sędzia bierze wolny mecz ("claim") albo oddaje swój z powrotem do puli ("release"). Zmienia się też
+ * rola na meczu, od której zależy dostęp do panelu — stąd odświeżenie ról.
+ */
+export function useMatchRefereeSelf(action: "claim" | "release") {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tournamentId, matchId }: { tournamentId: string; matchId: string }) =>
+      request(`${matchPath(tournamentId, matchId)}/referee/${action}`, { method: "POST" }),
+    // liveKeys.assigned jest prefiksem liveKeys.open — jedno unieważnienie odświeża obie listy.
+    // Także po błędzie: "mecz wziął już ktoś inny" znaczy, że lista wolnych meczów jest nieaktualna.
+    onSettled: (_data, _error, { tournamentId }) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: myRolesQueryKey }),
+        queryClient.invalidateQueries({ queryKey: liveKeys.assigned }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) }),
+      ]),
   })
 }
 
