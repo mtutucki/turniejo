@@ -65,7 +65,12 @@ function StatCards({ dashboard }: { dashboard: TournamentDashboard }) {
   const { teams, matches } = dashboard
   return (
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <StatCard label="Drużyny" value={teams.total} hint={`${teams.accepted} zaakceptowanych`} />
+      {/* teams.total liczy też zgłoszenia odrzucone i wycofane — te drużyny w turnieju nie grają. */}
+      <StatCard
+        label="Drużyny"
+        value={teams.accepted + teams.pending}
+        hint={`${teams.accepted} zaakceptowanych`}
+      />
       <StatCard label="Oczekujące" value={teams.pending} hint="zgłoszenia do decyzji" />
       <StatCard
         label="Mecze"
