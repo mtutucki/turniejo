@@ -1,7 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, CalendarCheck, Check, Plus, ShieldAlert, X } from "lucide-react"
+import { ArrowLeft, CalendarCheck, Check, Info, Plus, ShieldAlert, X } from "lucide-react"
 import Link from "next/link"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -35,7 +35,14 @@ import {
   FieldSet,
 } from "@/components/ui/field"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useGenerateSchedule, usePitches, useSavePitch, useSchedule } from "@/features/matches/api"
+import {
+  useBrackets,
+  useGenerateSchedule,
+  usePitches,
+  useSavePitch,
+  useSchedule,
+} from "@/features/matches/api"
+import { bracketStages } from "@/features/matches/planned-bracket-matches"
 import { useAssignTeamToGroup, useTournamentTeams } from "@/features/teams/api"
 import {
   useCategories,
@@ -50,6 +57,7 @@ import { applyFieldErrors } from "@/lib/api/form-errors"
 import { formatDateTime, formatDayLong, plural, toDateTimeLocal, zonedToIso } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Match, Pitch } from "@/types/matches"
+import type { Bracket } from "@/types/public"
 import type { TournamentTeam } from "@/types/teams"
 import {
   TOURNAMENT_FORMAT_LABELS,
@@ -160,7 +168,56 @@ function dayEnd(day: DayValues, pitchCount: number, settings: TournamentSettings
 type GroupPlan = { group: TournamentGroup; teams: number; matches: number; rounds: number }
 
 /** Co generator rozłoży w czasie: mecze grupowe albo (puchar) mecze 1. rundy z drabinki. */
-type Workload = { totalMatches: number; maxRounds: number }
+type Workload = {
+  totalMatches: number
+  maxRounds: number
+  /** Puchar: etap każdego meczu w kolejności, w jakiej generator rozdaje je dniom. */
+  stages?: string[]
+}
+
+/**
+ * Wszystkie mecze pucharu, które dostaną termin: najpierw te, które już istnieją (1. runda), potem
+ * kolejne rundy czekające na zwycięzców — w tej samej kolejności co generator w backendzie.
+ * Dzięki temu "ile meczów którego dnia" przekłada się wprost na "która runda którego dnia".
+ */
+function bracketSequence(brackets: Bracket[], pending: Match[]) {
+  const pendingIds = new Set(pending.map((m) => m.id))
+  const items: { phase: number; order: number; title: string }[] = []
+  for (const bracket of brackets) {
+    const stageByRound = new Map(bracketStages(bracket).map((stage) => [stage.roundId, stage]))
+    for (const round of bracket.rounds) {
+      const stage = stageByRound.get(round.id)
+      if (!stage) continue
+      for (const node of round.nodes) {
+        if (node.matchId) {
+          if (pendingIds.has(node.matchId))
+            items.push({ phase: 0, order: round.roundNumber, title: stage.title })
+        } else if (node.homeSourceType !== "Bye" && node.awaySourceType !== "Bye") {
+          // Węzeł z wolnym losem nigdy nie dostaje meczu.
+          items.push({ phase: 1, order: stage.order, title: stage.title })
+        }
+      }
+    }
+  }
+  return items.sort((a, b) => a.phase - b.phase || a.order - b.order).map((item) => item.title)
+}
+
+/** "Półfinały × 2, Finał" — etapy meczów jednego dnia. */
+function summarizeStages(titles: string[]) {
+  const groups: { title: string; count: number }[] = []
+  for (const title of titles) {
+    const last = groups.at(-1)
+    if (last?.title === title) last.count++
+    else groups.push({ title, count: 1 })
+  }
+  return groups
+    .map(({ title, count }) =>
+      count === 1 && (title === "Finał" || title.startsWith("Mecz"))
+        ? title
+        : `${title} × ${count}`,
+    )
+    .join(", ")
+}
 
 const isKnockout = (t: Tournament) => t.format === "Knockout"
 const hasGroupStage = (t: Tournament) => t.format === "Group" || t.format === "GroupAndKnockout"
@@ -630,7 +687,7 @@ function GenerateForm({
 }) {
   const router = useRouter()
   const generate = useGenerateSchedule(tournament.id)
-  const { totalMatches } = workload
+  const { totalMatches, stages } = workload
   // Szkic przeżywa przejście do innej sekcji (np. "zmień" czas meczu w ustawieniach) i powrót.
   const [draft] = useState(() => readDraft(tournament.id))
   const [bounds] = useState((): TournamentBounds => {
@@ -710,6 +767,19 @@ function GenerateForm({
   // Dzień po ostatnim z listy — o ile turniej jeszcze wtedy trwa.
   const dateToAdd = lastDay?.date ? nextDate(lastDay.date) : bounds.startDate
   const canAddDay = dateToAdd <= bounds.endDate
+
+  // Puchar: które rundy wypadają którego dnia — mecze rozdajemy dniom po kolei, według dat.
+  const stagesOfDay: (string | null)[] = days.map(() => null)
+  if (stages) {
+    let offset = 0
+    for (const index of days
+      .map((_, i) => i)
+      .sort((a, b) => days[a]!.date.localeCompare(days[b]!.date))) {
+      const slice = stages.slice(offset, offset + count(days[index]!))
+      offset += count(days[index]!)
+      stagesOfDay[index] = slice.length ? summarizeStages(slice) : null
+    }
+  }
 
   /** Co jest nie tak z danym dniem (poza samymi polami) — blokuje generowanie. */
   function dayProblem(day: DayValues, index: number) {
@@ -912,10 +982,13 @@ function GenerateForm({
                       <p className="text-muted-foreground mt-2 text-xs">
                         Mecze{" "}
                         <span className="font-mono tabular-nums">
-                          {day.startTime}–{toTime(Math.min(end, 24 * 60 - 1))}
+                          {day.startTime} – ok. {toTime(Math.min(end, 24 * 60 - 1))}
                         </span>
                         {pitchCount > 1 &&
                           ` na ${plural(pitchCount, ["boisku", "boiskach", "boiskach"])} równolegle`}
+                        {stagesOfDay[index] && (
+                          <span className="text-foreground"> · {stagesOfDay[index]}</span>
+                        )}
                       </p>
                     )
                   )}
@@ -946,6 +1019,15 @@ function GenerateForm({
             )}
           </div>
           <FieldError errors={[errors.days?.root]} />
+          <p className="text-muted-foreground flex items-start gap-2 text-xs">
+            <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <span>
+              Godzina końca dnia to szacunek. Drużyna nie gra dwóch meczów naraz, więc przy kilku
+              boiskach dzień może skończyć się trochę później, niż pokazuje formularz.
+              {isKnockout(tournament) &&
+                " Mecze trafiają do dni w kolejności rund — żeby np. finał wypadł innego dnia, zostaw na ten dzień tylko tyle meczów, ile ma się w nim odbyć."}
+            </span>
+          </p>
         </FieldSet>
 
         {totalMatches > 0 && (
@@ -1004,10 +1086,7 @@ function GenerateForm({
           </div>
         )}
         <FieldDescription className="-mt-4">
-          Godziny w czasie polskim. Drużyna nigdy nie gra dwóch meczów jednocześnie, więc dzień może
-          skończyć się nieco później, niż pokazuje szacunek. Każdy mecz możesz potem przesunąć.
-          {isKnockout(tournament) &&
-            " Liczby dotyczą meczów 1. rundy — kolejne rundy generator dopisze w pierwszych wolnych godzinach wybranych dni."}
+          Godziny w czasie polskim. Każdy mecz możesz potem przesunąć w terminarzu.
         </FieldDescription>
 
         <FieldError errors={[errors.root]} />
@@ -1039,6 +1118,12 @@ export function GenerateScheduleView() {
   const teams = useTournamentTeams(id)
   const schedule = useSchedule(id)
   const categories = useCategories(id)
+  const knockout = tournament.data?.format === "Knockout"
+  const brackets = useBrackets(
+    id,
+    (categories.data ?? []).map((c) => c.id),
+    knockout,
+  )
 
   const backLink = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
@@ -1066,16 +1151,28 @@ export function GenerateScheduleView() {
     groups.isPending ||
     teams.isPending ||
     schedule.isPending ||
-    categories.isPending
+    categories.isPending ||
+    // Kategoria bez drabinki kończy się błędem 404, nie wiecznym ładowaniem.
+    (knockout && brackets.some((bracket) => bracket.isPending))
   if (loading) return <Skeleton className="h-96 w-full max-w-3xl rounded-xl" />
 
   const t = tournament.data!
   const activePitches = (pitches.data ?? []).filter((p) => p.isActive)
   const plan = planGroups(groups.data ?? [], teams.data ?? [])
-  const bracketMatches = pendingBracketMatches(schedule.data ?? []).length
-  // Puchar: 1. runda to jedna "kolejka" — każda drużyna gra w niej raz.
+  const pendingBracket = pendingBracketMatches(schedule.data ?? [])
+  const bracketMatches = pendingBracket.length
+  // Puchar: rozplanowujemy całą drabinkę — mecze 1. rundy i kolejne rundy, które jeszcze nie powstały.
+  const stages = bracketSequence(
+    brackets.flatMap((bracket) => (bracket.data ? [bracket.data] : [])),
+    pendingBracket,
+  )
   const workload: Workload = isKnockout(t)
-    ? { totalMatches: bracketMatches, maxRounds: bracketMatches > 0 ? 1 : 0 }
+    ? {
+        totalMatches: bracketMatches > 0 ? Math.max(stages.length, bracketMatches) : 0,
+        maxRounds: bracketMatches > 0 ? 1 : 0,
+        // Etapy pokazujemy tylko, gdy lista zgadza się z meczami z terminarza.
+        stages: stages.length >= bracketMatches ? stages : undefined,
+      }
     : {
         totalMatches: plan.reduce((sum, p) => sum + p.matches, 0),
         maxRounds: Math.max(0, ...plan.map((p) => p.rounds)),
