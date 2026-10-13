@@ -195,11 +195,16 @@ export function TournamentSetupView({ initialStep }: { initialStep?: SetupStepKe
   const publicSettings = usePublicSettings(id, isOrganizer)
   const organization = useMyOrganization()
   const progress = useSetupProgress(id, tournament.data)
-  // null = jeszcze nie wybrany ręcznie: startujemy od kroku z linku albo pierwszego niegotowego.
+  // null = dane jeszcze się wczytują: startujemy od kroku z linku albo pierwszego niegotowego.
   const [selected, setSelected] = useState<number | null>(
     initialStep ? SETUP_STEP_KEYS.indexOf(initialStep) : null,
   )
   const top = useRef<HTMLDivElement>(null)
+  // Krok startowy ustalamy raz, gdy dane się wczytają. Liczony na bieżąco przeskakiwał sam do
+  // następnego kroku w chwili, gdy obecny stawał się gotowy (np. po akceptacji drugiej drużyny).
+  if (selected === null && !progress.isPending) {
+    setSelected(SETUP_STEP_KEYS.indexOf(progress.firstIncomplete))
+  }
   const data = tournament.data!
   const base = `/tournaments/${id}`
 
