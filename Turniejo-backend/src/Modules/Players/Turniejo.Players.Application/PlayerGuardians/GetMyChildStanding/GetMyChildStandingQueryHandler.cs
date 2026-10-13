@@ -29,14 +29,21 @@ namespace Turniejo.Players.Application.PlayerGuardians.GetMyChildStanding
                 if (tournamentTeam?.GroupId == null)
                     continue;
 
+                // Turniej pucharowy nie ma fazy grupowej — drużyny siedzą w technicznej grupie tylko po to,
+                // żeby dało się rozstawić drabinkę. Tabela z samymi zerami nic rodzicowi nie mówi.
+                var tournament = await tournamentModule.GetTournamentAsync(tournamentTeam.TournamentId, cancellationToken);
+                if (tournament?.Format == "Knockout")
+                    continue;
+
                 var groupId = tournamentTeam.GroupId.Value;
                 var computed = await standingModule.GetGroupStandingsAsync(groupId, cancellationToken);
                 var group = await tournamentModule.GetTournamentGroupAsync(groupId, cancellationToken);
 
                 // Tabela liczy tylko rozegrane mecze — przed pierwszym gwizdkiem byłaby pusta. Rodzic ma
                 // widzieć cały skład grupy, więc brakujące drużyny dopisujemy z zerami na końcu.
+                // Tylko zaakceptowane: wycofana/odrzucona drużyna zachowuje GroupId, ale w grupie już nie gra.
                 var groupTeamIds = (await teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentTeam.TournamentId, cancellationToken))
-                    .Where(t => t.GroupId == groupId)
+                    .Where(t => t.GroupId == groupId && t.RegistrationStatus == "Accepted")
                     .Select(t => t.Id);
                 var standings = computed
                     .Concat(groupTeamIds
@@ -52,7 +59,7 @@ namespace Turniejo.Players.Application.PlayerGuardians.GetMyChildStanding
                     teamNames[row.TournamentTeamId] = team?.Name ?? "Drużyna";
                 }
 
-                dtos.Add(new MyChildStandingDto(tournamentTeamId, tournamentTeam.GroupId.Value, standings, group?.Name, teamNames));
+                dtos.Add(new MyChildStandingDto(tournamentTeamId, tournamentTeam.GroupId.Value, standings, group?.Name, teamNames, tournament?.Name));
             }
 
             return Result.Success<IReadOnlyList<MyChildStandingDto>>(dtos);
