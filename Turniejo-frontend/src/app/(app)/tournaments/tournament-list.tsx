@@ -17,7 +17,7 @@ import {
   useTournaments,
 } from "@/features/tournaments/api"
 import { BecomeOrganizerDialog } from "@/features/tournaments/components/become-organizer-dialog"
-import { TournamentCard } from "@/features/tournaments/components/tournament-card"
+import { TournamentSections } from "@/features/tournaments/components/tournament-card"
 
 function NewTournamentButton() {
   return (
@@ -71,11 +71,7 @@ export function TournamentList() {
           </div>
         </div>
       ) : isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {[0, 1].map((i) => (
-            <Skeleton key={i} className="h-40 rounded-xl" />
-          ))}
-        </div>
+        <Skeleton className="h-40 rounded-xl" />
       ) : organization.data === null ? (
         // Konto założone jako rodzic/trener/sędzia — organizację zakłada się na żądanie.
         <EmptyState
@@ -98,11 +94,7 @@ export function TournamentList() {
           description="Odśwież stronę i spróbuj ponownie."
         />
       ) : tournaments.data?.length ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {tournaments.data.map((tournament) => (
-            <TournamentCard key={tournament.id} tournament={tournament} />
-          ))}
-        </div>
+        <TournamentSections items={tournaments.data.map((tournament) => ({ tournament }))} />
       ) : (
         <EmptyState
           icon={Trophy}

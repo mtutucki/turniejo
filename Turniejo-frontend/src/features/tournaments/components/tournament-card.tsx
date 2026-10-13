@@ -1,6 +1,6 @@
 "use client"
 
-import { CalendarDays, KeyRound, Trash2, UserRound, Users } from "lucide-react"
+import { ChevronRight, Trash2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -16,18 +16,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { prefetchHandlers, usePrefetch } from "@/hooks/use-prefetch"
 import { formatDateRange } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
-import { TOURNAMENT_FORMAT_LABELS, type Tournament } from "@/types/tournaments"
+import {
+  TOURNAMENT_FORMAT_LABELS,
+  type Tournament,
+  type TournamentStatus,
+} from "@/types/tournaments"
 
 import { tournamentKeys, useDeleteTournament } from "../api"
 import { TournamentStatusBadge } from "./status-badge"
 
-/** Usuń anulowany turniej — przycisk obok karty (nie w linku), z potwierdzeniem. */
+/** Usuń anulowany turniej — przycisk obok wiersza (nie w linku), z potwierdzeniem. */
 function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
   const remove = useDeleteTournament(tournament.id)
   const active = useActiveTournamentStore((state) => state.tournament)
@@ -38,12 +43,12 @@ function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
       <AlertDialogTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive absolute right-3 bottom-3"
+          size="icon"
+          className="text-muted-foreground hover:text-destructive mr-2 shrink-0"
           aria-label={`Usuń turniej ${tournament.name}`}
+          title="Usuń turniej"
         >
           <Trash2 />
-          Usuń
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -76,14 +81,13 @@ function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
   )
 }
 
-export function TournamentCard({
-  tournament,
-  roleLabel,
-}: {
+export type TournamentListItem = {
   tournament: Tournament
   /** Rola usera w turnieju, do którego dołączył kodem (lista "Dołączone turnieje"). */
   roleLabel?: string
-}) {
+}
+
+function TournamentRow({ tournament, roleLabel }: TournamentListItem) {
   const setTournament = useActiveTournamentStore((state) => state.setTournament)
   // Kody dostępu backend zwraca tylko organizatorowi — tylko on może usunąć turniej.
   const deletable = tournament.status === "Cancelled" && tournament.refereeCode !== null
@@ -101,51 +105,84 @@ export function TournamentCard({
   }
 
   return (
-    <div className="relative">
+    <li className="flex items-center">
       <Link
         href={`/tournaments/${tournament.id}/dashboard`}
         onClick={() =>
           setTournament({ id: tournament.id, name: tournament.name, format: tournament.format })
         }
         {...prefetchHandlers(warmUp)}
-        className="focus-visible:ring-ring group block h-full rounded-xl outline-none focus-visible:ring-2"
+        className="hover:bg-accent/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-3 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset"
       >
-        <Card className="group-hover:border-primary/50 h-full gap-4 transition-colors">
-          <CardHeader className="flex flex-row items-start justify-between gap-3">
-            <CardTitle className="min-w-0 truncate text-base">{tournament.name}</CardTitle>
-            <TournamentStatusBadge status={tournament.status} className="shrink-0" />
-          </CardHeader>
-          <CardContent
-            className={cn("text-muted-foreground space-y-2 text-sm", deletable && "pb-10")}
-          >
-            <p className="flex items-center gap-2">
-              <CalendarDays className="size-4" />
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="min-w-0 truncate font-medium">{tournament.name}</span>
+            {roleLabel && <Badge variant="outline">{roleLabel}</Badge>}
+          </p>
+          <p className="text-muted-foreground text-sm">
+            <span className="font-mono tabular-nums">
               {formatDateRange(tournament.startAt, tournament.endAt)}
-            </p>
-            <p className="flex items-center gap-2">
-              <Users className="size-4" />
-              Do {tournament.teamLimit} drużyn
-              {tournament.format && ` · ${TOURNAMENT_FORMAT_LABELS[tournament.format]}`}
-            </p>
-            {roleLabel && (
-              <p className="flex items-center gap-2">
-                <UserRound className="size-4" />
-                {roleLabel}
-              </p>
-            )}
-            {tournament.refereeCode && tournament.coachCode && (
-              <p className="flex items-center gap-2">
-                <KeyRound className="size-4" />
-                <span>
-                  Sędzia <code className="text-foreground font-mono">{tournament.refereeCode}</code>{" "}
-                  · Trener <code className="text-foreground font-mono">{tournament.coachCode}</code>
-                </span>
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            </span>
+            {tournament.format && ` · ${TOURNAMENT_FORMAT_LABELS[tournament.format]}`}
+          </p>
+        </div>
+        <TournamentStatusBadge status={tournament.status} className="shrink-0" />
+        <ChevronRight className="text-muted-foreground size-4 shrink-0" />
       </Link>
       {deletable && <DeleteCancelledTournament tournament={tournament} />}
+    </li>
+  )
+}
+
+type SectionKey = "live" | "upcoming" | "drafts" | "past"
+
+const SECTION_OF: Record<TournamentStatus, SectionKey> = {
+  InProgress: "live",
+  RegistrationOpen: "upcoming",
+  RegistrationClosed: "upcoming",
+  ScheduleGenerated: "upcoming",
+  Draft: "drafts",
+  Finished: "past",
+  Cancelled: "past",
+}
+
+const SECTIONS: { key: SectionKey; title: string }[] = [
+  { key: "live", title: "Trwają" },
+  { key: "upcoming", title: "Nadchodzące" },
+  { key: "drafts", title: "Szkice" },
+  { key: "past", title: "Zakończone i anulowane" },
+]
+
+/**
+ * Lista turniejów pogrupowana według tego, co się z nimi dzieje — najpierw trwające, na końcu
+ * zamknięte. W grupie najbliższy termin jest na górze; zakończone od najnowszego.
+ */
+export function TournamentSections({ items }: { items: TournamentListItem[] }) {
+  return (
+    <div className="space-y-6">
+      {SECTIONS.map(({ key, title }) => {
+        const inSection = items
+          .filter((item) => SECTION_OF[item.tournament.status] === key)
+          .sort((a, b) => {
+            const order = a.tournament.startAt.localeCompare(b.tournament.startAt)
+            return key === "past" ? -order : order
+          })
+        if (inSection.length === 0) return null
+        return (
+          <section key={key} className="space-y-2">
+            <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              {title} <span className="font-mono tabular-nums">({inSection.length})</span>
+            </h2>
+            <Card className={cn("gap-0 overflow-hidden py-0", key === "past" && "opacity-80")}>
+              <ul className="divide-y">
+                {inSection.map((item) => (
+                  <TournamentRow key={item.tournament.id} {...item} />
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )
+      })}
     </div>
   )
 }
