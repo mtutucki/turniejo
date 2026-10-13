@@ -240,13 +240,24 @@ function MatchRow({
 }
 
 /** Zapowiedź meczu kolejnej rundy: termin już jest, pary jeszcze nie (czeka na wcześniejsze mecze). */
-function PlannedRow({ planned, pitch }: { planned: PlannedBracketMatch; pitch: string | null }) {
+function PlannedRow({
+  planned,
+  pitch,
+  unscheduled = false,
+}: {
+  planned: PlannedBracketMatch
+  pitch: string | null
+  /** Terminarz jeszcze nie powstał — sama para, bez godziny i boiska. */
+  unscheduled?: boolean
+}) {
   const sideClass = (known: boolean) => cn("truncate", !known && "text-muted-foreground italic")
   return (
     <li className="flex items-start gap-4 py-3" data-testid="planned-bracket-match">
-      <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
-        {formatTime(planned.scheduledAt)}
-      </span>
+      {!unscheduled && (
+        <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
+          {formatTime(planned.scheduledAt)}
+        </span>
+      )}
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex flex-wrap items-center gap-x-2 font-medium">
           <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
@@ -258,10 +269,12 @@ function PlannedRow({ planned, pitch }: { planned: PlannedBracketMatch; pitch: s
             <Hourglass className="size-3" />
             Czeka na wynik wcześniejszych meczów
           </span>
-          <span className="flex items-center gap-1">
-            <MapPin className="size-3" />
-            {pitch ?? "Bez boiska"}
-          </span>
+          {!unscheduled && (
+            <span className="flex items-center gap-1">
+              <MapPin className="size-3" />
+              {pitch ?? "Bez boiska"}
+            </span>
+          )}
           <span>{planned.stage}</span>
         </p>
       </div>
@@ -400,21 +413,25 @@ export function TournamentScheduleView() {
     knockout &&
     (status === "Draft" || status === "RegistrationOpen" || status === "RegistrationClosed")
 
-  // Mecze kolejnych rund pucharu, które jeszcze nie istnieją, ale mają zaplanowany termin.
-  const planned = awaitingSchedule
-    ? []
-    : brackets
-        .flatMap((bracket, i) =>
-          bracket.data
-            ? plannedBracketMatches(bracket.data, bracketCategoryIds[i]!, lookups.teamName)
-            : [],
-        )
-        .filter(
-          (p) =>
-            (categoryId === ALL || p.categoryId === categoryId) &&
-            groupId === ALL &&
-            (pitchId === ALL || p.pitchId === pitchId),
-        )
+  // Mecze kolejnych rund pucharu, które jeszcze nie istnieją (czekają na zwycięzców). Przed
+  // wygenerowaniem terminarza nie mają terminu — pokazujemy je i tak, żeby było widać całą drabinkę.
+  const planned = brackets
+    .flatMap((bracket, i) =>
+      bracket.data
+        ? plannedBracketMatches(
+            bracket.data,
+            bracketCategoryIds[i]!,
+            lookups.teamName,
+            awaitingSchedule,
+          )
+        : [],
+    )
+    .filter(
+      (p) =>
+        (categoryId === ALL || p.categoryId === categoryId) &&
+        groupId === ALL &&
+        (pitchId === ALL || p.pitchId === pitchId),
+    )
 
   type Row =
     | { kind: "match"; at: string; match: Match }
@@ -489,7 +506,7 @@ export function TournamentScheduleView() {
           </h2>
           <p className="text-muted-foreground text-sm">
             {awaitingSchedule
-              ? `${plural(filtered.length, ["para czeka", "pary czekają", "par czeka"])} na godziny i boiska — nadasz je, generując terminarz.`
+              ? `${plural(rows.length, ["mecz czeka", "mecze czekają", "meczów czeka"])} na godziny i boiska — nadasz je, generując terminarz.`
               : plural(filtered.length, ["mecz", "mecze", "meczów"])}
             {!awaitingSchedule &&
               filtered.length !== schedule.data.length &&
@@ -577,6 +594,7 @@ export function TournamentScheduleView() {
                       key={row.planned.nodeId}
                       planned={row.planned}
                       pitch={lookups.pitchName(row.planned.pitchId)}
+                      unscheduled={awaitingSchedule}
                     />
                   ) : (
                     <MatchRow
