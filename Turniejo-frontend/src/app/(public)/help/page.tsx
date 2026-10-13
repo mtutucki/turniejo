@@ -3,6 +3,8 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
 
+import { PASSWORD_HINT } from "@/lib/auth/password"
+
 export const metadata: Metadata = {
   title: "Pomoc",
   description:
@@ -159,7 +161,7 @@ const SECTIONS: FaqSection[] = [
       },
       {
         question: "Jakie są wymagania dotyczące hasła?",
-        answer: <p>Hasło musi mieć co najmniej 8 znaków. Numer telefonu jest opcjonalny.</p>,
+        answer: <p>{PASSWORD_HINT} Numer telefonu jest opcjonalny.</p>,
       },
       {
         question: "Jak pobrać swoje dane albo usunąć konto?",

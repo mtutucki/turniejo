@@ -17,17 +17,18 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { markOrganizationProvisioning } from "@/features/tournaments/api"
 import { apiFetch } from "@/lib/api/client"
 import { applyFieldErrors } from "@/lib/api/form-errors"
+import { PASSWORD_HINT, passwordSchema } from "@/lib/auth/password"
 import { DEFAULT_APP_PATH } from "@/lib/auth/public-paths"
 import { cn } from "@/lib/utils"
 
-// Limity 1:1 z RegisterUserCommandValidator.
+// Limity 1:1 z RegisterUserCommandValidator (hasło: passwordSchema).
 const schema = z
   .object({
     firstName: z.string().trim().min(1, "Podaj imię").max(100),
     lastName: z.string().trim().min(1, "Podaj nazwisko").max(100),
     email: z.email("Nieprawidłowy adres email").max(256),
     phoneNumber: z.string().trim().max(20, "Maksymalnie 20 znaków").optional(),
-    password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(100),
+    password: passwordSchema,
     confirmPassword: z.string(),
     accountType: z.enum(["organizer", "participant"], {
       error: "Wybierz, jak chcesz korzystać z Turniejo",
@@ -213,6 +214,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           label="Hasło"
           type="password"
           autoComplete="new-password"
+          description={PASSWORD_HINT}
           error={errors.password}
           {...form.register("password")}
         />

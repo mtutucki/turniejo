@@ -13,11 +13,12 @@ import { FieldError, FieldGroup } from "@/components/ui/field"
 import { apiFetch } from "@/lib/api/client"
 import { isApiError } from "@/lib/api/errors"
 import { applyFieldErrors } from "@/lib/api/form-errors"
+import { PASSWORD_HINT, passwordSchema } from "@/lib/auth/password"
 
-// Limity 1:1 z ConfirmPasswordResetCommandValidator.
+// Limity 1:1 z ConfirmPasswordResetCommandValidator (hasło: passwordSchema).
 const schema = z
   .object({
-    newPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(100),
+    newPassword: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -85,6 +86,7 @@ export function NewPasswordForm({ token }: { token: string }) {
           type="password"
           autoComplete="new-password"
           autoFocus
+          description={PASSWORD_HINT}
           error={errors.newPassword}
           {...form.register("newPassword")}
         />

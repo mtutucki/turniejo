@@ -67,7 +67,7 @@ test.describe("Rejestracja → Logowanie", () => {
     await page.getByLabel("Powtórz hasło").fill("inne")
     await page.getByRole("button", { name: "Załóż konto" }).click()
     await expect(page.getByText("Nieprawidłowy adres email")).toBeVisible()
-    await expect(page.getByText("Hasło musi mieć co najmniej 8 znaków")).toBeVisible()
+    await expect(page.getByText("Hasło musi mieć co najmniej 10 znaków")).toBeVisible()
     await expect(page.getByText("Hasła nie są takie same")).toBeVisible()
     // Typ konta trzeba wybrać świadomie — nie ma domyślnego "organizatora".
     await expect(page.getByText("Wybierz, jak chcesz korzystać z Turniejo")).toBeVisible()
