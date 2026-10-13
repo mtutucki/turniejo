@@ -70,11 +70,18 @@ import {
 
 const schema = z
   .object({
+    // Godziny wspólne dla wszystkich dni — organizator ustawia je raz, wyjątki przy konkretnym dniu.
+    commonStart: z.string(),
+    commonEnd: z.string(),
+    // "sequential": dni wypełniane po kolei; "even": po tyle samo meczów każdego wybranego dnia.
+    mode: z.enum(["sequential", "even"]),
     // Jeden wiersz na każdy dzień turnieju; wyłączony dzień nie dostaje meczów.
     days: z.array(
       z.object({
         date: z.string(),
         enabled: z.boolean(),
+        // Dzień ma własne godziny — zmiana wspólnych już go nie rusza.
+        custom: z.boolean(),
         startTime: z.string(),
         endTime: z.string(),
       }),
@@ -133,11 +140,15 @@ function clearScheduleDraft(tournamentId: string) {
 function readDraft(tournamentId: string): GenerateDraft | null {
   try {
     const draft = JSON.parse(sessionStorage.getItem(draftKey(tournamentId)) ?? "null")
+    // Szkic sprzed wspólnych godzin i trybu rozkładu nie ma tych pól — zaczynamy wtedy od zera.
     const valid =
       draft &&
       Array.isArray(draft.days) &&
       Array.isArray(draft.pitchIds) &&
-      Array.isArray(draft.knownPitchIds)
+      Array.isArray(draft.knownPitchIds) &&
+      typeof draft.commonStart === "string" &&
+      typeof draft.commonEnd === "string" &&
+      (draft.mode === "sequential" || draft.mode === "even")
     return valid ? draft : null
   } catch {
     return null
@@ -208,6 +219,61 @@ const toMinutes = (time: string) => {
 }
 const toTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+
+type TournamentBounds = { firstStart: string; lastEnd: string; count: number }
+
+/**
+ * Godziny dnia ze wspólnych godzin, przycięte do ram turnieju: pierwszy dzień nie zaczyna się przed
+ * startem turnieju, ostatni nie kończy po jego końcu.
+ */
+function dayHours(index: number, start: string, end: string, bounds: TournamentBounds) {
+  const isFirst = index === 0
+  const isLast = index === bounds.count - 1
+  let startTime = isFirst && start < bounds.firstStart ? bounds.firstStart : start
+  const endTime = isLast && end > bounds.lastEnd ? bounds.lastEnd : end
+  // Turniej kończy się ostatniego dnia przed wspólną godziną startu (np. o 8:00) — gramy od północy.
+  if (isLast && !isFirst && endTime <= startTime) startTime = "00:00"
+  return { startTime, endTime }
+}
+
+const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay())
+
+const MODES = [
+  {
+    value: "sequential",
+    title: "Jak najwcześniej",
+    hint: "Mecze wypełniają dni po kolei — turniej kończy się najszybciej, jak się da.",
+  },
+  {
+    value: "even",
+    title: "Równo na wybrane dni",
+    hint: "Każdego dnia mniej więcej tyle samo meczów; dzień kończy się po ostatnim z nich.",
+  },
+] as const
+
+/**
+ * Okna czasowe, które trafią do generatora. Generator zawsze wypełnia dni po kolei, więc rozkład
+ * "równo" robimy, skracając każdy dzień do jego części meczów. Ostatni dzień zostaje w pełnych
+ * godzinach — przejmie mecze, których generator nie zmieścił wcześniej (szacunek slotów bywa za niski).
+ */
+function planWindows(
+  days: DayValues[],
+  mode: GenerateValues["mode"],
+  slots: number,
+  settings: TournamentSettings,
+) {
+  const active = days.filter((day) => dayCapacity(day, settings) > 0)
+  if (mode !== "even" || active.length < 2 || slots === 0) return days
+  const perDay = Math.ceil(slots / active.length)
+  const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
+  const last = active.at(-1)
+  return days.map((day) => {
+    if (day === last || dayCapacity(day, settings) <= perDay) return day
+    const end =
+      toMinutes(day.startTime) + (perDay - 1) * slotMinutes + settings.matchDurationMinutes
+    return { ...day, endTime: toTime(end) }
+  })
+}
 
 type GroupPlan = { group: TournamentGroup; teams: number; matches: number; rounds: number }
 
@@ -601,44 +667,59 @@ function GenerateForm({
   const generate = useGenerateSchedule(tournament.id)
   // Szkic przeżywa przejście do innej sekcji (np. "zmień" czas meczu w ustawieniach) i powrót.
   const [draft] = useState(() => readDraft(tournament.id))
-  // Godziny wyliczone z turnieju: pierwszy dzień od godziny rozpoczęcia, ostatni do godziny zakończenia,
-  // dni pomiędzy w tych samych godzinach. Szkic wygrywa, o ile mieści się w datach turnieju
-  // (mogły się zmienić od jego zapisania).
-  const [initialDays] = useState(() => {
+  // Turniej wyznacza ramy: pierwszy dzień nie zaczyna się przed jego startem, ostatni nie kończy po
+  // jego końcu. Wspólne godziny i godziny dni liczymy raz, przy otwarciu formularza.
+  const [initial] = useState(() => {
     const dates = tournamentDays(
       toZonedDateInput(tournament.startAt),
       toZonedDateInput(tournament.endAt),
     )
-    const firstStart = toDateTimeLocal(tournament.startAt).slice(11)
-    const lastEnd = toDateTimeLocal(tournament.endAt).slice(11)
-    return dates.map((date, index): DayValues => {
-      const isFirst = index === 0
-      const isLast = index === dates.length - 1
+    const bounds: TournamentBounds = {
+      firstStart: toDateTimeLocal(tournament.startAt).slice(11),
+      lastEnd: toDateTimeLocal(tournament.endAt).slice(11),
+      count: dates.length,
+    }
+    const commonStart = draft?.commonStart ?? bounds.firstStart
+    const commonEnd =
+      draft?.commonEnd ??
+      (bounds.lastEnd > commonStart ? bounds.lastEnd : commonStart < "18:00" ? "18:00" : "23:59")
+    const days = dates.map((date, index): DayValues => {
       const saved = draft?.days.find((day) => day.date === date)
+      // Własne godziny dnia ze szkicu zostają, o ile nadal mieszczą się w datach turnieju.
       if (
-        saved &&
-        (!isFirst || saved.startTime >= firstStart) &&
-        (!isLast || saved.endTime <= lastEnd)
+        saved?.custom &&
+        (index > 0 || saved.startTime >= bounds.firstStart) &&
+        (index < dates.length - 1 || saved.endTime <= bounds.lastEnd)
       )
         return saved
-      const startTime = isFirst || !isLast || firstStart < lastEnd ? firstStart : "00:00"
-      const endTime =
-        isLast || lastEnd > startTime ? lastEnd : "18:00" > startTime ? "18:00" : "23:59"
-      return { date, enabled: saved?.enabled ?? true, startTime, endTime }
+      return {
+        date,
+        enabled: saved?.enabled ?? true,
+        custom: false,
+        ...dayHours(index, commonStart, commonEnd, bounds),
+      }
     })
+    return { bounds, commonStart, commonEnd, days }
   })
-  const multiDay = initialDays.length > 1
+  const { bounds } = initial
+  const multiDay = initial.days.length > 1
   const form = useForm<GenerateValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      days: initialDays,
+      commonStart: initial.commonStart,
+      commonEnd: initial.commonEnd,
+      mode: draft?.mode ?? "sequential",
+      days: initial.days,
       pitchIds: draft
         ? draft.pitchIds.filter((id) => pitches.some((p) => p.id === id))
         : pitches.map((p) => p.id),
     },
   })
   const { errors } = form.formState
-  const [days, pitchIds] = useWatch({ control: form.control, name: ["days", "pitchIds"] })
+  const [days, pitchIds, mode, commonStart, commonEnd] = useWatch({
+    control: form.control,
+    name: ["days", "pitchIds", "mode", "commonStart", "commonEnd"],
+  })
 
   // Boisko dodane już po otwarciu strony (np. przyciskiem "Dodaj Boisko 1" w warunkach) ma być od
   // razu zaznaczone — defaultValues zapamiętały listę z chwili montowania formularza.
@@ -654,13 +735,16 @@ function GenerateForm({
         JSON.stringify({
           days,
           pitchIds,
+          mode,
+          commonStart,
+          commonEnd,
           knownPitchIds: pitchKey ? pitchKey.split(",") : [],
         } satisfies GenerateDraft),
       )
     } catch {
       // Brak sessionStorage (tryb prywatny) — formularz działa bez szkicu.
     }
-  }, [tournament.id, days, pitchIds, pitchKey])
+  }, [tournament.id, days, pitchIds, mode, commonStart, commonEnd, pitchKey])
   useEffect(() => {
     const added = pitches.filter((p) => !knownPitches.current.has(p.id)).map((p) => p.id)
     if (added.length === 0) return
@@ -671,37 +755,60 @@ function GenerateForm({
   const { totalMatches, maxRounds } = workload
   // Szacunek: tyle slotów, ile wymaga liczba boisk, ale nie mniej niż kolejek w największej grupie
   // (drużyna nie gra dwóch meczów naraz). Generator może potrzebować trochę więcej.
-  const slots = pitchIds.length ? Math.max(Math.ceil(totalMatches / pitchIds.length), maxRounds) : 0
-  const estimate = estimateDays(days, slots, totalMatches, settings)
+  const slotsFor = (pitchCount: number) =>
+    pitchCount ? Math.max(Math.ceil(totalMatches / pitchCount), maxRounds) : 0
+  const slots = slotsFor(pitchIds.length)
+  // To, co faktycznie pójdzie do generatora: przy rozkładzie "równo" dni są przycięte do swojej części.
+  const planned = planWindows(days, mode, slots, settings)
+  const estimate = estimateDays(planned, slots, totalMatches, settings)
   const fits = estimate.missingSlots === 0
   const usedDays = estimate.perDay.filter(Boolean).length
   const lastEnd = estimate.perDay.findLast(Boolean)?.end
   const enabledDays = days.filter((day) => day.enabled).length
+  const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
+  const hasWeekend = days.some((day) => isWeekend(day.date))
+  const hasWeekday = days.some((day) => !isWeekend(day.date))
 
-  // Podpowiedź: tyle samo slotów każdego włączonego dnia, koniec dnia zaraz po ostatnim meczu.
-  // Godziny rozpoczęcia zostają; dzień nie wychodzi poza północ ani poza koniec turnieju.
-  function spreadEvenly() {
-    const current = form.getValues("days")
-    const active = current.filter((day) => day.enabled && day.startTime)
-    if (active.length === 0 || slots === 0) return
-    const perDaySlots = Math.ceil(slots / active.length)
-    const slotMinutes = settings.matchDurationMinutes + settings.breakDurationMinutes
-    const tournamentEnd = toDateTimeLocal(tournament.endAt)
-    current.forEach((day, index) => {
-      if (!day.enabled || !day.startTime) return
-      const wanted =
-        toMinutes(day.startTime) + (perDaySlots - 1) * slotMinutes + settings.matchDurationMinutes
-      const limit =
-        day.date === tournamentEnd.slice(0, 10) ? toMinutes(tournamentEnd.slice(11)) : 23 * 60 + 59
-      form.setValue(`days.${index}.endTime`, toTime(Math.min(wanted, limit)), {
-        shouldDirty: true,
-        shouldValidate: true,
-      })
+  /** Wspólne godziny trafiają do wszystkich dni, które nie mają własnych. */
+  function applyCommonHours(start: string, end: string) {
+    form.getValues("days").forEach((day, index) => {
+      if (day.custom) return
+      const hours = dayHours(index, start, end, bounds)
+      form.setValue(`days.${index}.startTime`, hours.startTime, { shouldValidate: true })
+      form.setValue(`days.${index}.endTime`, hours.endTime, { shouldValidate: true })
     })
   }
 
+  function setCustomHours(index: number, custom: boolean) {
+    form.setValue(`days.${index}.custom`, custom, { shouldDirty: true })
+    if (custom) return
+    const hours = dayHours(
+      index,
+      form.getValues("commonStart"),
+      form.getValues("commonEnd"),
+      bounds,
+    )
+    form.setValue(`days.${index}.startTime`, hours.startTime, { shouldValidate: true })
+    form.setValue(`days.${index}.endTime`, hours.endTime, { shouldValidate: true })
+  }
+
+  function setEnabledDays(pick: (day: DayValues) => boolean) {
+    form.getValues("days").forEach((day, index) =>
+      form.setValue(`days.${index}.enabled`, pick(day), {
+        shouldDirty: true,
+        shouldValidate: true,
+      }),
+    )
+  }
+
   function submit(values: GenerateValues) {
-    const playDays = values.days
+    const windowsOf = planWindows(
+      values.days,
+      values.mode,
+      slotsFor(values.pitchIds.length),
+      settings,
+    )
+    const playDays = windowsOf
       .map((day, index) => ({ day, index }))
       .filter(({ day }) => day.enabled)
     const first = playDays[0]
@@ -754,88 +861,20 @@ function GenerateForm({
   return (
     <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
-        <FieldSet>
-          <FieldLegend variant="label">{multiDay ? "Dni gry" : "Godziny gry"}</FieldLegend>
-          <div className="space-y-4">
-            {initialDays.map(({ date }, index) => {
-              const enabled = days[index]?.enabled ?? true
-              const dayLabel = formatDayLong(`${date}T12:00:00Z`)
-              return (
-                <div key={date} className="grid gap-3 sm:grid-cols-3 sm:items-start">
-                  {multiDay ? (
-                    <Controller
-                      control={form.control}
-                      name={`days.${index}.enabled`}
-                      render={({ field }) => (
-                        <Field orientation="horizontal" className="sm:pt-8">
-                          <Checkbox
-                            id={`schedule-day-${index}`}
-                            checked={field.value}
-                            onCheckedChange={(next) => field.onChange(next === true)}
-                          />
-                          <FieldLabel htmlFor={`schedule-day-${index}`} className="font-normal">
-                            {dayLabel}
-                          </FieldLabel>
-                        </Field>
-                      )}
-                    />
-                  ) : (
-                    <p className="text-sm sm:pt-8">{dayLabel}</p>
-                  )}
-                  {enabled ? (
-                    <>
-                      <TextField
-                        id={`schedule-start-${index}`}
-                        label="Pierwszy mecz"
-                        type="time"
-                        className="font-mono tabular-nums"
-                        error={errors.days?.[index]?.startTime}
-                        {...form.register(`days.${index}.startTime`)}
-                      />
-                      <TextField
-                        id={`schedule-end-${index}`}
-                        label="Koniec"
-                        type="time"
-                        className="font-mono tabular-nums"
-                        error={errors.days?.[index]?.endTime}
-                        {...form.register(`days.${index}.endTime`)}
-                      />
-                      {multiDay && slots > 0 && (
-                        <p className="text-muted-foreground -mt-1 text-xs sm:col-span-2 sm:col-start-2">
-                          {estimate.perDay[index] ? (
-                            <>
-                              ok.{" "}
-                              {plural(estimate.perDay[index].matches, ["mecz", "mecze", "meczów"])},
-                              koniec ok.{" "}
-                              <span className="font-mono tabular-nums">
-                                {formatTime(estimate.perDay[index].end)}
-                              </span>
-                            </>
-                          ) : fits ? (
-                            "Wolny — wszystkie mecze zmieszczą się wcześniej"
-                          ) : (
-                            "Za krótki, żeby zmieścić mecz"
-                          )}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground text-sm sm:col-span-2 sm:pt-8">
-                      Bez meczów tego dnia
-                    </p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </FieldSet>
-        <FieldDescription className="-mt-4">
-          Godziny wyliczone z dat turnieju ({formatDateTime(tournament.startAt)} –{" "}
-          {formatDateTime(tournament.endAt)}) — możesz je dostosować. Ostatni mecz dnia musi się
-          skończyć przed godziną końca.
-          {multiDay &&
-            " Mecze wypełniają kolejne dni po kolei — pod każdym dniem widać, ile ich wypadnie."}
-        </FieldDescription>
+        {/* 1. Co układamy — stałe wejście do całego wyliczenia. */}
+        <p className="bg-muted/40 rounded-lg border px-3 py-2 text-sm">
+          <span className="font-medium">{plural(totalMatches, ["mecz", "mecze", "meczów"])}</span>{" "}
+          do rozstawienia · mecz{" "}
+          <span className="font-mono tabular-nums">{settings.matchDurationMinutes} min</span> +
+          przerwa{" "}
+          <span className="font-mono tabular-nums">{settings.breakDurationMinutes} min</span>{" "}
+          <Link
+            href={`/tournaments/${tournament.id}/settings#rules`}
+            className="text-muted-foreground text-xs underline"
+          >
+            zmień
+          </Link>
+        </p>
 
         <Controller
           control={form.control}
@@ -843,11 +882,11 @@ function GenerateForm({
           render={({ field }) => (
             <FieldSet data-invalid={!!errors.pitchIds}>
               <FieldLegend variant="label">Boiska</FieldLegend>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
                 {pitches.map((pitch) => {
                   const checked = field.value.includes(pitch.id)
                   return (
-                    <Field key={pitch.id} orientation="horizontal">
+                    <Field key={pitch.id} orientation="horizontal" className="w-auto">
                       <Checkbox
                         id={`pitch-${pitch.id}`}
                         checked={checked}
@@ -871,55 +910,252 @@ function GenerateForm({
           )}
         />
 
-        <div className="bg-muted/40 space-y-1 rounded-lg border p-3 text-sm">
-          <p>
-            <span className="font-medium">{plural(totalMatches, ["mecz", "mecze", "meczów"])}</span>{" "}
-            · mecz{" "}
-            <span className="font-mono tabular-nums">{settings.matchDurationMinutes} min</span> +
-            przerwa{" "}
-            <span className="font-mono tabular-nums">{settings.breakDurationMinutes} min</span>{" "}
-            <Link
-              href={`/tournaments/${tournament.id}/settings#rules`}
-              className="text-muted-foreground text-xs underline"
-            >
-              zmień
-            </Link>
-          </p>
-          {slots > 0 && (
-            <p className={cn("text-muted-foreground", !fits && "text-destructive")}>
-              {fits && lastEnd ? (
-                <>
+        {/* 2. Godziny — jedne dla wszystkich dni; wyjątki ustawia się przy konkretnym dniu. */}
+        <FieldSet>
+          <FieldLegend variant="label">
+            {multiDay ? "Godziny gry (każdego dnia)" : "Godziny gry"}
+          </FieldLegend>
+          <div className="grid max-w-md grid-cols-2 gap-3">
+            <TextField
+              id="schedule-common-start"
+              label="Pierwszy mecz"
+              type="time"
+              className="font-mono tabular-nums"
+              error={multiDay ? undefined : errors.days?.[0]?.startTime}
+              {...form.register("commonStart", {
+                onChange: (e) => applyCommonHours(e.target.value, form.getValues("commonEnd")),
+              })}
+            />
+            <TextField
+              id="schedule-common-end"
+              label="Koniec"
+              type="time"
+              className="font-mono tabular-nums"
+              error={multiDay ? undefined : errors.days?.[0]?.endTime}
+              {...form.register("commonEnd", {
+                onChange: (e) => applyCommonHours(form.getValues("commonStart"), e.target.value),
+              })}
+            />
+          </div>
+          <FieldDescription>
+            Ostatni mecz dnia musi się skończyć przed godziną końca. Turniej trwa{" "}
+            {formatDateTime(tournament.startAt)} – {formatDateTime(tournament.endAt)}.
+          </FieldDescription>
+        </FieldSet>
+
+        {/* 3. Dni — wybór i od razu wynik: ile meczów wypadnie którego dnia. */}
+        {multiDay && (
+          <FieldSet>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <FieldLegend variant="label" className="mb-0">
+                Dni gry
+              </FieldLegend>
+              <div className="flex flex-wrap gap-2">
+                {hasWeekend && hasWeekday && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEnabledDays((day) => !isWeekend(day.date))}
+                  >
+                    Bez weekendów
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEnabledDays(() => true)}
+                >
+                  Wszystkie dni
+                </Button>
+              </div>
+            </div>
+            <ul className="divide-y rounded-lg border">
+              {days.map((day, index) => {
+                const dayEstimate = estimate.perDay[index]
+                const dayErrors = errors.days?.[index]
+                const showInputs = day.enabled && (day.custom || !!dayErrors)
+                return (
+                  <li key={day.date} className="space-y-3 px-3 py-2.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <Controller
+                        control={form.control}
+                        name={`days.${index}.enabled`}
+                        render={({ field }) => (
+                          <Field orientation="horizontal" className="w-auto min-w-0 flex-1">
+                            <Checkbox
+                              id={`schedule-day-${index}`}
+                              checked={field.value}
+                              onCheckedChange={(next) => field.onChange(next === true)}
+                            />
+                            <FieldLabel
+                              htmlFor={`schedule-day-${index}`}
+                              className={cn(
+                                "font-normal first-letter:uppercase",
+                                !day.enabled && "text-muted-foreground",
+                              )}
+                            >
+                              {formatDayLong(`${day.date}T12:00:00Z`)}
+                            </FieldLabel>
+                          </Field>
+                        )}
+                      />
+                      {day.enabled ? (
+                        <>
+                          <span
+                            className={cn(
+                              "text-sm",
+                              dayEstimate ? "font-medium" : "text-muted-foreground",
+                            )}
+                          >
+                            {dayEstimate ? (
+                              <>
+                                {plural(dayEstimate.matches, ["mecz", "mecze", "meczów"])}
+                                <span className="text-muted-foreground font-mono font-normal tabular-nums">
+                                  {" "}
+                                  {day.startTime}–{formatTime(dayEstimate.end)}
+                                </span>
+                              </>
+                            ) : slots === 0 ? (
+                              `${day.startTime}–${day.endTime}`
+                            ) : fits ? (
+                              "wolny — mecze zmieszczą się wcześniej"
+                            ) : (
+                              "za krótki na mecz"
+                            )}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="link"
+                            className="text-muted-foreground h-auto px-0"
+                            onClick={() => setCustomHours(index, !day.custom)}
+                          >
+                            {day.custom ? "Wspólne godziny" : "Inne godziny"}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">bez meczów</span>
+                      )}
+                    </div>
+                    {showInputs && (
+                      <div className="grid max-w-md grid-cols-2 gap-3 pl-7">
+                        <TextField
+                          id={`schedule-start-${index}`}
+                          label="Pierwszy mecz"
+                          type="time"
+                          className="font-mono tabular-nums"
+                          error={dayErrors?.startTime}
+                          {...form.register(`days.${index}.startTime`, {
+                            onChange: () => form.setValue(`days.${index}.custom`, true),
+                          })}
+                        />
+                        <TextField
+                          id={`schedule-end-${index}`}
+                          label="Koniec"
+                          type="time"
+                          className="font-mono tabular-nums"
+                          error={dayErrors?.endTime}
+                          {...form.register(`days.${index}.endTime`, {
+                            onChange: () => form.setValue(`days.${index}.custom`, true),
+                          })}
+                        />
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </FieldSet>
+        )}
+
+        {/* 4. Rozkład — bez tego organizator sam skracał dni, żeby mecze nie zbiły się na początku. */}
+        {multiDay && enabledDays > 1 && (
+          <Controller
+            control={form.control}
+            name="mode"
+            render={({ field }) => (
+              <FieldSet>
+                <FieldLegend variant="label">Jak rozłożyć mecze</FieldLegend>
+                <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                  {MODES.map(({ value, title, hint }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={field.value === value}
+                      onClick={() => field.onChange(value)}
+                      className={cn(
+                        "focus-visible:ring-ring rounded-lg border p-3 text-left text-sm transition-colors outline-none focus-visible:ring-2",
+                        field.value === value
+                          ? "border-primary bg-primary/5"
+                          : "hover:border-primary/50",
+                      )}
+                    >
+                      <span className="block font-medium">{title}</span>
+                      <span className="text-muted-foreground block text-xs">{hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </FieldSet>
+            )}
+          />
+        )}
+
+        {/* 5. Wynik wyliczenia — czy się mieści, a jeśli nie, to ile brakuje. */}
+        {slots > 0 && (
+          <div
+            role="status"
+            className={cn(
+              "rounded-lg border px-3 py-2.5 text-sm",
+              fits ? "border-primary/40 bg-primary/5" : "border-destructive/50 bg-destructive/10",
+            )}
+          >
+            {enabledDays === 0 ? (
+              <p className="font-medium">Wybierz co najmniej jeden dzień gry.</p>
+            ) : fits && lastEnd ? (
+              <>
+                <p className="font-medium">
+                  Zmieści się
                   {multiDay &&
-                    `Mecze zajmą ${usedDays} z ${plural(initialDays.length, ["dnia", "dni", "dni"])} turnieju. `}
-                  Szacowany koniec ok.{" "}
+                    ` — mecze zajmą ${usedDays} z ${plural(enabledDays, ["wybranego dnia", "wybranych dni", "wybranych dni"])}`}
+                  .
+                </p>
+                <p className="text-muted-foreground">
+                  Ostatni mecz skończy się ok.{" "}
                   <span className="font-mono tabular-nums">
                     {multiDay ? formatDateTime(lastEnd) : formatTime(lastEnd)}
                   </span>
-                </>
-              ) : (
-                <>
+                  .
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">
                   Zabraknie czasu na ok.{" "}
                   {plural(Math.min(totalMatches, estimate.missingSlots * pitchIds.length), [
                     "mecz",
                     "mecze",
                     "meczów",
                   ])}
-                  . Dodaj boisko
-                  {multiDay ? ", wydłuż dzień albo włącz kolejny" : " albo wydłuż dzień"}.
-                </>
-              )}
-            </p>
-          )}
-          {multiDay && slots > 0 && enabledDays > 1 && (
-            <Button type="button" size="sm" variant="outline" onClick={spreadEvenly}>
-              Rozłóż równo na {plural(enabledDays, ["dzień", "dni", "dni"])}
-            </Button>
-          )}
-          <FieldDescription>
-            Godziny w czasie polskim. Drużyna nigdy nie gra dwóch meczów jednocześnie. Terminy można
-            potem przesuwać pojedynczo.
-          </FieldDescription>
-        </div>
+                  .
+                </p>
+                <p className="text-muted-foreground">
+                  Brakuje ok.{" "}
+                  <span className="font-mono tabular-nums">
+                    {estimate.missingSlots * slotMinutes} min
+                  </span>{" "}
+                  gry: wydłuż godziny{multiDay && ", włącz kolejny dzień"} albo dodaj boisko.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        <FieldDescription className="-mt-4">
+          Godziny w czasie polskim. Drużyna nigdy nie gra dwóch meczów jednocześnie. To szacunek —
+          dokładne terminy zobaczysz po wygenerowaniu i każdy mecz możesz potem przesunąć.
+        </FieldDescription>
 
         <FieldError errors={[errors.root]} />
 
