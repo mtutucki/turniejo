@@ -27,6 +27,10 @@ namespace Turniejo.Players.Application.PlayerGuardians.GetMyChildTeam
                 if (tournamentTeam == null)
                     continue;
 
+                // Odrzucona/wycofana drużyna nie gra w turnieju — rodzic nie widzi jej wśród drużyn dziecka.
+                if (tournamentTeam.RegistrationStatus is "Rejected" or "Withdrawn")
+                    continue;
+
                 var team = await teamModule.GetTeamAsync(tournamentTeam.TeamId, cancellationToken);
                 var tournament = await tournamentModule.GetTournamentAsync(tournamentTeam.TournamentId, cancellationToken);
 
