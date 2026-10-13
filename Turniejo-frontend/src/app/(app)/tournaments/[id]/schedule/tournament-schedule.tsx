@@ -128,6 +128,7 @@ function MatchRow({
   const group = lookups.groupLabel(match)
   const referee = lookups.referee(match.refereeId)
   const editable = SCHEDULABLE_STATUSES.includes(match.status)
+  const inProgress = match.status === "Live" || match.status === "Paused"
   const showScore =
     match.status === "Live" || match.status === "Paused" || match.status === "Finished"
 
@@ -159,7 +160,7 @@ function MatchRow({
             {isOrganizer && (
               <span className={cn("flex items-center gap-1", !referee && "text-foreground")}>
                 <UserRound className="size-3" />
-                {referee ? memberName(referee) : "Brak sędziego"}
+                {referee ? memberName(referee) : "Dowolny sędzia"}
               </span>
             )}
           </p>
@@ -168,35 +169,37 @@ function MatchRow({
 
       {isOrganizer && !unscheduled && (
         <div className="flex flex-wrap items-center gap-2 pl-16 lg:pl-0">
-          {editable ? (
-            <div className="flex gap-2">
-              <RescheduleMatchDialog
-                tournamentId={tournamentId}
-                match={match}
-                title={title}
-                pitches={pitches}
-                trigger={
-                  <Button size="sm" variant="outline" aria-label={`Zmień termin: ${title}`}>
-                    <Clock />
-                    Termin
-                  </Button>
-                }
-              />
-              <AssignRefereeDialog
-                tournamentId={tournamentId}
-                match={match}
-                title={title}
-                referees={referees}
-                refereeCode={refereeCode}
-                trigger={
-                  <Button size="sm" variant="outline" aria-label={`Sędzia: ${title}`}>
-                    <Whistle />
-                    Sędzia
-                  </Button>
-                }
-              />
-            </div>
-          ) : (
+          {editable && (
+            <RescheduleMatchDialog
+              tournamentId={tournamentId}
+              match={match}
+              title={title}
+              pitches={pitches}
+              trigger={
+                <Button size="sm" variant="outline" aria-label={`Zmień termin: ${title}`}>
+                  <Clock />
+                  Termin
+                </Button>
+              }
+            />
+          )}
+          {/* Sędziego da się zmienić także w trakcie meczu — prowadzący może nagle wypaść. */}
+          {(editable || inProgress) && (
+            <AssignRefereeDialog
+              tournamentId={tournamentId}
+              match={match}
+              title={title}
+              referees={referees}
+              refereeCode={refereeCode}
+              trigger={
+                <Button size="sm" variant="outline" aria-label={`Sędzia: ${title}`}>
+                  <Whistle />
+                  Sędzia
+                </Button>
+              }
+            />
+          )}
+          {!editable && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
@@ -208,8 +211,9 @@ function MatchRow({
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                Mecz się rozpoczął, zakończył albo został odwołany — termin, boiska i sędziego nie
-                można już zmienić.
+                {inProgress
+                  ? "Mecz trwa — terminu i boiska nie można już zmienić."
+                  : "Mecz się zakończył albo został odwołany — terminu, boiska i sędziego nie można już zmienić."}
               </TooltipContent>
             </Tooltip>
           )}
