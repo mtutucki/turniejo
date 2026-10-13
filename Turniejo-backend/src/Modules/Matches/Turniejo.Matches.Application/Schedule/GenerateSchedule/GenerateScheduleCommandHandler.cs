@@ -117,7 +117,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .ToHashSet();
 
             var clubOf = ClubLookup(allTournamentTeams);
-            var (placements, unplaced) = PlaceInSlots(
+            var (placements, unplaced, _) = PlaceInSlots(
                 pairs, p => (clubOf(p.HomeTournamentTeamId), clubOf(p.AwayTournamentTeamId)), pitches, occupiedSlots, windows, settings);
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
@@ -192,13 +192,13 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .ToHashSet();
 
             var clubOf = ClubLookup(await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken));
-            var (placements, unplaced) = PlaceInSlots(
+            var (placements, unplaced, placedInWindow) = PlaceInSlots(
                 toSchedule, m => (clubOf(m.HomeTournamentTeamId), clubOf(m.AwayTournamentTeamId)), pitches, occupiedSlots, windows, settings);
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
 
             var (plannedSlots, unplanned) = PlanLaterRounds(
-                windows, settings, pitches, nodes, existingMatches, placements, occupiedSlots);
+                windows, settings, pitches, nodes, existingMatches, placements, occupiedSlots, placedInWindow);
             if (unplanned > 0)
                 return NotEnoughTime(unplanned);
 
@@ -240,6 +240,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         /// <summary>
         /// Terminy dla meczów kolejnych rund, które jeszcze nie istnieją (czekają na zwycięzców): runda po
         /// rundzie, każdy najwcześniej po meczach, z których przyjdą drużyny, na pierwszym wolnym boisku.
+        /// Limit meczów dnia (MaxMatches) liczy się razem z meczami już rozstawionymi — dzięki temu
+        /// organizator decyduje, którego dnia wypada np. finał: zostawia na ten dzień tylko tyle meczów.
         /// </summary>
         private static (List<BracketPlannedSlotDto> Planned, int Unplanned) PlanLaterRounds(
             IReadOnlyList<ScheduleWindow> windows,
@@ -248,10 +250,11 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             IReadOnlyList<BracketNodeInfoDto> nodes,
             IReadOnlyList<Match> existingMatches,
             List<Placement<Match>> placements,
-            HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots)
+            HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots,
+            int[] placedInWindow)
         {
             var slot = TimeSpan.FromMinutes(settings.MatchDurationMinutes + settings.BreakDurationMinutes);
-            var slotStarts = SlotStarts(windows, settings).Select(s => s.SlotStart).ToList();
+            var slotStarts = SlotStarts(windows, settings).ToList();
 
             // Koniec meczu (z przerwą) każdego węzła, który ma już mecz: nowy termin z tego generowania
             // albo dotychczasowy (mecz, którego generator nie rusza).
@@ -284,9 +287,12 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                     .Max();
 
                 BracketPlannedSlotDto? found = null;
-                foreach (var slotStart in slotStarts)
+                foreach (var (slotStart, windowIndex) in slotStarts)
                 {
                     if (slotStart < notBefore)
+                        continue;
+
+                    if (placedInWindow[windowIndex] >= (windows[windowIndex].MaxMatches ?? int.MaxValue))
                         continue;
 
                     var pitch = pitches.FirstOrDefault(p => !occupiedSlots.Contains((p.Id, slotStart)));
@@ -294,6 +300,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                         continue;
 
                     found = new BracketPlannedSlotDto(node.Id, pitch.Id, slotStart);
+                    placedInWindow[windowIndex]++;
                     break;
                 }
 
@@ -333,7 +340,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         /// nie gra dwóch meczów w jednym slocie, a pierwszeństwo mają pary, których drużyny odpoczywały.
         /// Okno z limitem (MaxMatches) dostaje najwyżej tyle meczów — reszta przechodzi na kolejne dni.
         /// </summary>
-        private static (List<Placement<T>> Placements, int Unplaced) PlaceInSlots<T>(
+        private static (List<Placement<T>> Placements, int Unplaced, int[] PlacedInWindow) PlaceInSlots<T>(
             List<T> items,
             Func<T, (Guid Home, Guid Away)> teamsOf,
             List<Pitch> pitches,
@@ -397,7 +404,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 playedPreviousSlot = playingThisSlot;
             }
 
-            return (placements, remaining.Count);
+            return (placements, remaining.Count, placedInWindow);
         }
 
         // Ta sama drużyna z bazy może grać w kilku kategoriach (osobne zgłoszenia). Dla generatora to

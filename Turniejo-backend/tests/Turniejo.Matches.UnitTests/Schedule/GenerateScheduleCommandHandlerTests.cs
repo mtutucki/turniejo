@@ -225,6 +225,35 @@ namespace Turniejo.Matches.UnitTests.Schedule
         }
 
         [Fact]
+        public async Task Handle_ShouldPlanTheFinalOnTheNextDay_WhenTheFirstDayIsLimitedToTheSemiFinals()
+        {
+            // Pierwszy dzień ma czas na trzy mecze, ale organizator chce w nim tylko dwa półfinały —
+            // finał musi wypaść drugiego dnia, a nie w pierwszej wolnej godzinie pierwszego.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var matches = SetupKnockout(tournamentId, pitchId, 2);
+            var semi1 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[0].Id, null, null, false);
+            var semi2 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[1].Id, null, null, false);
+            var final = new BracketNodeInfoDto(Guid.NewGuid(), 2, false, null, semi1.Id, semi2.Id, false);
+            _bracketModule.GetNodesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<BracketNodeInfoDto> { final, semi1, semi2 });
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var day2 = day1.AddDays(1);
+
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, day1, day2.AddHours(4), new[] { pitchId },
+                    new[] { new ScheduleWindow(day1, day1.AddHours(4), 2), new ScheduleWindow(day2, day2.AddHours(4), 1) }),
+                CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            matches.Should().OnlyContain(m => m.ScheduledAt < day2);
+            await _bracketModule.Received(1).SetPlannedSlotsAsync(
+                Arg.Is<IReadOnlyCollection<BracketPlannedSlotDto>>(slots =>
+                    slots.Count == 1 && slots.Single().NodeId == final.Id && slots.Single().ScheduledAt == day2),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenLaterRoundsDoNotFitInTheWindow()
         {
             var tournamentId = Guid.NewGuid();
