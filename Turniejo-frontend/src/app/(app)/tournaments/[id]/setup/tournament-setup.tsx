@@ -189,21 +189,30 @@ function ReadinessRow({
  * (drużyny potrzebują kategorii, terminarz — drużyn i boisk). To te same ekrany co w zakładkach,
  * ale po jednym naraz i z jasnym "co dalej". Postęp liczymy z danych, więc można wyjść i wrócić.
  */
-export function TournamentSetupView({ initialStep }: { initialStep?: SetupStepKey }) {
+/**
+ * Krok z adresu (?step=…). Czytany w przeglądarce, nie z propsów strony serwerowej: po "wstecz"
+ * Next odtwarza stronę z pamięci podręcznej ze starymi propsami, a aktualny jest tylko adres.
+ */
+function stepFromUrl() {
+  const index = SETUP_STEP_KEYS.indexOf(
+    new URLSearchParams(window.location.search).get("step") as SetupStepKey,
+  )
+  return index >= 0 ? index : null
+}
+
+export function TournamentSetupView() {
   const { id, tournament, isOrganizer, rolesLoading } = useTournamentContext()
   const settings = useTournamentSettings(id)
   const publicSettings = usePublicSettings(id, isOrganizer)
   const organization = useMyOrganization()
   const progress = useSetupProgress(id, tournament.data)
   // null = dane jeszcze się wczytują: startujemy od kroku z linku albo pierwszego niegotowego.
-  const [selected, setSelected] = useState<number | null>(
-    initialStep ? SETUP_STEP_KEYS.indexOf(initialStep) : null,
-  )
+  const [selected, setSelected] = useState<number | null>(null)
   const top = useRef<HTMLDivElement>(null)
   // Krok startowy ustalamy raz, gdy dane się wczytają. Liczony na bieżąco przeskakiwał sam do
   // następnego kroku w chwili, gdy obecny stawał się gotowy (np. po akceptacji drugiej drużyny).
   if (selected === null && !progress.isPending) {
-    setSelected(SETUP_STEP_KEYS.indexOf(progress.firstIncomplete))
+    setSelected(stepFromUrl() ?? SETUP_STEP_KEYS.indexOf(progress.firstIncomplete))
   }
   // Bieżący krok trzymamy w adresie. Z kreatora wychodzi się na chwilę (np. do składu drużyny) —
   // po "wstecz" przeglądarka wraca pod ten adres i otwiera ten sam krok, a nie pierwszy niegotowy.
