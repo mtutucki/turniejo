@@ -78,6 +78,8 @@ const EXACT: Record<string, string> = {
     "Brak meczów do rozegrania — każda grupa potrzebuje co najmniej 2 zaakceptowanych drużyn",
   "Tournament cannot transition to ScheduleGenerated from its current status":
     "Terminarz został już wygenerowany albo turniej jest na innym etapie",
+  "Some accepted teams are not assigned to a group":
+    "Część zaakceptowanych drużyn nie ma grupy — przypisz je, zanim wygenerujesz terminarz",
   "EndAt must be after StartAt.": "Koniec musi być po rozpoczęciu",
   "At least one pitch is required.": "Wybierz co najmniej jedno boisko",
   "Description must not exceed 500 characters.": "Maksymalnie 500 znaków",

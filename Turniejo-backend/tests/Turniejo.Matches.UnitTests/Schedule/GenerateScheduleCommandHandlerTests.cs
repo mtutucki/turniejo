@@ -89,6 +89,33 @@ namespace Turniejo.Matches.UnitTests.Schedule
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenAnAcceptedTeamHasNoGroup()
+        {
+            // Drużyna bez grupy nie dostałaby żadnego meczu — generator ma odmówić, zamiast ją pominąć.
+            var tournamentId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, Guid.NewGuid(), groupId, categoryId, [Guid.NewGuid(), Guid.NewGuid()]);
+            _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamDto>
+                {
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, groupId, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, groupId, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, null, "Accepted"),
+                    // Odrzucona drużyna bez grupy nie blokuje — i tak nie gra.
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, null, "Rejected"),
+                });
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), new[] { Guid.NewGuid() }), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Be("Some accepted teams are not assigned to a group");
+            await _dbContext.DidNotReceive().AddMatchesAsync(Arg.Any<IReadOnlyCollection<Match>>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldNotScheduleSameClubInTwoCategoriesAtTheSameTime()
         {
             // Ta sama drużyna z bazy zgłoszona do dwóch kategorii to dwa zgłoszenia (różne TournamentTeamId),

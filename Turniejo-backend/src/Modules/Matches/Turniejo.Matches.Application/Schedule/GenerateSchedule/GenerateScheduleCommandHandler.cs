@@ -76,6 +76,11 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("TournamentId", "Tournament has no groups defined"));
 
             var allTournamentTeams = await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken);
+            // Mecze grają tylko drużyny przypisane do grupy. Zaakceptowana drużyna bez grupy zostałaby po
+            // cichu pominięta, a terminarz generuje się raz — organizator zauważał to dopiero po fakcie.
+            if (allTournamentTeams.Any(t => t.RegistrationStatus == "Accepted" && !t.GroupId.HasValue))
+                return Result.Failure<GenerateScheduleResponse>(Error.Validation("TournamentId", "Some accepted teams are not assigned to a group"));
+
             var acceptedTeamsByGroup = allTournamentTeams
                 .Where(t => t.RegistrationStatus == "Accepted" && t.GroupId.HasValue)
                 .GroupBy(t => t.GroupId!.Value)

@@ -373,6 +373,66 @@ function QuickGroupSetup({
   )
 }
 
+/**
+ * Zaakceptowane drużyny bez grupy nie dostają żadnego meczu. Gdy kategoria ma już grupy, rozdzielamy
+ * je jednym kliknięciem — każda trafia do grupy, w której jest aktualnie najmniej drużyn.
+ */
+function DistributeTeams({
+  tournamentId,
+  categoryName,
+  groups,
+  unassigned,
+  allTeams,
+}: {
+  tournamentId: string
+  categoryName: string | null
+  groups: TournamentGroup[]
+  unassigned: TournamentTeam[]
+  allTeams: TournamentTeam[]
+}) {
+  const assign = useAssignTeamToGroup(tournamentId)
+  const [pending, setPending] = useState(false)
+
+  async function run() {
+    setPending(true)
+    const sizes = new Map(
+      groups.map((g) => [
+        g.id,
+        allTeams.filter((t) => t.groupId === g.id && t.registrationStatus === "Accepted").length,
+      ]),
+    )
+    try {
+      for (const team of unassigned) {
+        const target = groups.reduce((a, b) => (sizes.get(b.id)! < sizes.get(a.id)! ? b : a))
+        await assign.mutateAsync({ tournamentTeamId: team.id, groupId: target.id })
+        sizes.set(target.id, sizes.get(target.id)! + 1)
+      }
+      toast.success(`Przypisano ${plural(unassigned.length, ["drużynę", "drużyny", "drużyn"])}`)
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const where =
+    groups.length === 1
+      ? `do „${groups[0]!.name}”`
+      : `po równo między ${plural(groups.length, ["grupę", "grupy", "grup"])}`
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="mt-2 mr-2"
+      onClick={run}
+      disabled={pending}
+    >
+      {pending
+        ? "Przypisywanie…"
+        : `${groups.length === 1 ? "Przypisz" : "Rozdziel"} ${plural(unassigned.length, ["drużynę", "drużyny", "drużyn"])}${categoryName ? ` (${categoryName})` : ""} ${where}`}
+    </Button>
+  )
+}
+
 /** Następny krok zapisów prosto z listy warunków: Szkic → otwarte → zamknięte (z potwierdzeniem). */
 function RegistrationAction({ tournament }: { tournament: Tournament }) {
   const change = useChangeTournamentStatus(tournament.id)
@@ -514,6 +574,15 @@ function Requirements({
     .filter((c) => !groups.some((g) => g.categoryId === c.id))
     .map((c) => ({ category: c, teams: unassigned.filter((t) => t.categoryId === c.id) }))
     .filter((x) => x.teams.length >= 2)
+  // Kategorie, które mają grupy, ale część zaakceptowanych drużyn do żadnej nie trafiła (przy kilku
+  // grupach przypisania nie ma automatycznie).
+  const toDistribute = categories
+    .map((c) => ({
+      category: c,
+      groups: groups.filter((g) => g.categoryId === c.id).sort((a, b) => a.order - b.order),
+      teams: unassigned.filter((t) => t.categoryId === c.id),
+    }))
+    .filter((x) => x.groups.length > 0 && x.teams.length > 0)
   return (
     <ul className="space-y-2">
       <Requirement ok={tournament.status === "RegistrationClosed"}>
@@ -604,19 +673,6 @@ function Requirements({
               </Link>
             </span>
           )}
-          {unassigned.length > 0 && groups.length > 0 && (
-            <span className="text-muted-foreground block text-xs">
-              {plural(unassigned.length, [
-                "zaakceptowana drużyna nie ma",
-                "zaakceptowane drużyny nie mają",
-                "zaakceptowanych drużyn nie ma",
-              ])}{" "}
-              grupy: {unassigned.map((t) => t.teamName).join(", ")}.{" "}
-              <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
-                Przypisz w Drużynach
-              </Link>
-            </span>
-          )}
           {waiting.length > 0 && (
             <span className="text-muted-foreground block text-xs">
               {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
@@ -634,6 +690,33 @@ function Requirements({
                 teams={categoryTeams}
               />
             ))}
+        </Requirement>
+      )}
+      {!isKnockout(tournament) && unassigned.length > 0 && (
+        <Requirement ok={false}>
+          {plural(unassigned.length, [
+            "zaakceptowana drużyna nie ma",
+            "zaakceptowane drużyny nie mają",
+            "zaakceptowanych drużyn nie ma",
+          ])}{" "}
+          grupy: {unassigned.map((t) => t.teamName).join(", ")}
+          <span className="text-muted-foreground block text-xs">
+            Mecze grają tylko drużyny przypisane do grupy — te nie dostałyby żadnego, a terminarz
+            generuje się raz.{" "}
+            <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
+              Przypisz ręcznie w Drużynach
+            </Link>
+          </span>
+          {toDistribute.map(({ category, groups: categoryGroups, teams: categoryTeams }) => (
+            <DistributeTeams
+              key={category.id}
+              tournamentId={id}
+              categoryName={categories.length > 1 ? category.name : null}
+              groups={categoryGroups}
+              unassigned={categoryTeams}
+              allTeams={teams}
+            />
+          ))}
         </Requirement>
       )}
       <Requirement ok={activePitches > 0}>
@@ -1245,9 +1328,15 @@ export function GenerateScheduleView() {
     )
   }
 
+  // Zaakceptowana drużyna bez grupy zostałaby po cichu pominięta — a generowanie jest jednorazowe.
+  const teamsWithoutGroup = (teams.data ?? []).some(
+    (team) => team.registrationStatus === "Accepted" && !team.groupId,
+  )
   const ready =
     t.status === "RegistrationClosed" &&
-    (isKnockout(t) ? bracketMatches > 0 : hasGroupStage(t) && plan.some((p) => p.matches > 0)) &&
+    (isKnockout(t)
+      ? bracketMatches > 0
+      : hasGroupStage(t) && plan.some((p) => p.matches > 0) && !teamsWithoutGroup) &&
     activePitches.length > 0
 
   return (
