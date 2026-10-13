@@ -37,6 +37,14 @@ public sealed class OrganizationsDbContext(DbContextOptions<OrganizationsDbConte
             x => x.OwnerUserId == ownerUserId,
             cancellationToken);
 
+    // ExecuteDelete — od razu w bazie, bez SaveChanges (usunięcie konta woła to z innego modułu).
+    public async Task RemoveOrganizationAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default) =>
+        await Organizations
+            .Where(x => x.Id == organizationId)
+            .ExecuteDeleteAsync(cancellationToken);
+
     public new async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         try

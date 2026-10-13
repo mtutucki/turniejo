@@ -73,6 +73,20 @@ public sealed class UsersDbContext(DbContextOptions<UsersDbContext> options)
     public void RemoveUserRoleAssignments(IEnumerable<UserRoleAssignment> assignments) =>
         UserRoleAssignments.RemoveRange(assignments);
 
+    // ExecuteDelete — od razu w bazie, bez SaveChanges. Role exceptUserId zostają: wywołujący ma je
+    // śledzone, a usunięcie ich tutaj skończyłoby się błędem współbieżności przy jego SaveChanges.
+    public async Task RemoveUserRoleAssignmentsByScopeAsync(
+        RoleScopeType scopeType, IReadOnlyCollection<Guid> scopeIds, Guid exceptUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (scopeIds.Count == 0)
+            return;
+
+        await UserRoleAssignments
+            .Where(x => x.UserId != exceptUserId && x.ScopeType == scopeType && x.ScopeId != null && scopeIds.Contains(x.ScopeId.Value))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     public async Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default) => await Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
     public async Task AddPasswordResetTokenAsync(PasswordResetToken token, CancellationToken cancellationToken = default) =>

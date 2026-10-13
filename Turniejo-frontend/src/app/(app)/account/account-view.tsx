@@ -3,6 +3,7 @@
 import { Download, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { signOut, useSession } from "next-auth/react"
+import { useState } from "react"
 import { toast } from "sonner"
 
 import { LegalLinks } from "@/components/layout/legal-links"
@@ -20,18 +21,31 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useDeleteMyAccount, useExportMyData } from "@/features/account/api"
+import { useMyOrganization } from "@/features/tournaments/api"
 import { isApiError } from "@/lib/api/errors"
-import { LEGAL } from "@/lib/legal"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
+
+/** Słowo przepisywane ręcznie przed usunięciem organizacji — drugi, świadomy krok potwierdzenia. */
+const ORGANIZATION_CONFIRM_WORD = "USUŃ"
 
 function DeleteAccount() {
   const remove = useDeleteMyAccount()
+  const organization = useMyOrganization()
   const setTournament = useActiveTournamentStore((state) => state.setTournament)
-  const soleOrganizer =
-    isApiError(remove.error) &&
-    remove.error.status === 409 &&
-    remove.error.code === "Conflict.Account"
+  // Drugi krok tylko dla jedynego organizatora: backend odmawia (409), dopóki nie potwierdzi,
+  // że razem z kontem znika organizacja — czyli dane także innych osób.
+  const [confirmOrganization, setConfirmOrganization] = useState(false)
+  const [confirmText, setConfirmText] = useState("")
+  const confirmed = confirmText.trim().toUpperCase() === ORGANIZATION_CONFIRM_WORD
+
+  function onDeleted() {
+    setTournament(null)
+    toast.success("Konto zostało usunięte")
+    void signOut({ redirectTo: "/login" })
+  }
 
   return (
     <Card className="border-destructive/40">
@@ -44,12 +58,6 @@ function DeleteAccount() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {soleOrganizer && (
-          <p role="alert" className="bg-destructive/10 text-destructive rounded-lg p-3 text-sm">
-            Jesteś jedynym organizatorem organizacji — jej usunięcie obejmuje turnieje, drużyny i
-            dane zawodników, więc robimy to na prośbę mailową: {LEGAL.contactEmail}.
-          </p>
-        )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" className="text-destructive hover:text-destructive">
@@ -71,16 +79,75 @@ function DeleteAccount() {
                 variant="destructive"
                 disabled={remove.isPending}
                 onClick={() =>
-                  remove.mutate(undefined, {
-                    onSuccess: () => {
-                      setTournament(null)
-                      toast.success("Konto zostało usunięte")
-                      void signOut({ redirectTo: "/login" })
+                  remove.mutate(
+                    {},
+                    {
+                      onSuccess: onDeleted,
+                      onError: (error) => {
+                        if (
+                          isApiError(error) &&
+                          error.status === 409 &&
+                          error.code === "Conflict.Account"
+                        ) {
+                          setConfirmText("")
+                          setConfirmOrganization(true)
+                        }
+                      },
                     },
-                  })
+                  )
                 }
               >
                 Usuń konto na zawsze
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={confirmOrganization} onOpenChange={setConfirmOrganization}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Usunąć też całą organizację?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    Jesteś jedynym organizatorem
+                    {organization.data
+                      ? ` organizacji „${organization.data.name}”`
+                      : " organizacji"}
+                    , więc razem z kontem usuniemy ją w całości — nie tylko dla Ciebie, ale dla
+                    wszystkich:
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>wszystkie turnieje z terminarzem, wynikami, tabelami i drabinkami,</li>
+                    <li>bazę drużyn i ich składy,</li>
+                    <li>dane zawodników i powiązania z rodzicami,</li>
+                    <li>dostęp trenerów, sędziów, rodziców i kibiców do tych turniejów.</li>
+                  </ul>
+                  <p className="text-destructive font-medium">Tej operacji nie da się cofnąć.</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-organization-delete">
+                Aby potwierdzić, wpisz {ORGANIZATION_CONFIRM_WORD}
+              </Label>
+              <Input
+                id="confirm-organization-delete"
+                autoComplete="off"
+                value={confirmText}
+                onChange={(event) => setConfirmText(event.target.value)}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Anuluj</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={!confirmed || remove.isPending}
+                onClick={() =>
+                  remove.mutate({ deleteOrganization: true }, { onSuccess: onDeleted })
+                }
+              >
+                {remove.isPending ? "Usuwanie…" : "Usuń konto i organizację"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

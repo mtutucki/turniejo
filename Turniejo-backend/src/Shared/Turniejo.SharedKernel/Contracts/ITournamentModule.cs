@@ -18,6 +18,11 @@ public interface ITournamentModule
     Task<bool> MarkTournamentStartedAsync(Guid tournamentId, Guid changedByUserId, CancellationToken cancellationToken = default);
     Task<PublicTournamentDto?> GetPublicTournamentBySlugAsync(string slug, CancellationToken cancellationToken = default);
     Task<TournamentPublicSettingsDto?> GetTournamentPublicSettingsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Usunięcie organizacji: miękko usuwa wszystkie jej turnieje niezależnie od statusu (zwykłe usuwanie
+    /// wymaga anulowania). Zwraca Id wszystkich turniejów organizacji, także usuniętych wcześniej.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> DeleteTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 }
 
 // StartAt/EndAt opcjonalne w konstruktorze, żeby nie przepisywać wszystkich istniejących wywołań.

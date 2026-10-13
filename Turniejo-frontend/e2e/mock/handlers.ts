@@ -300,15 +300,20 @@ const api = [
       }),
     ),
   ),
-  // Jak DeleteMyAccountCommandHandler: jedyny organizator organizacji → 409, inaczej konto znika.
+  // Jak DeleteMyAccountCommandHandler: jedyny organizator organizacji → 409, dopóki nie potwierdzi
+  // usunięcia organizacji (?deleteOrganization=true); inaczej konto znika.
   http.delete(
     "*/api/me",
-    authed(({ user }) => {
-      if (db.organizations.some((o) => o.ownerUserId === user.id)) {
-        return HttpResponse.json(
-          { code: "Conflict.Account", message: "You are the only organizer.", type: 3 },
-          { status: 409 },
-        )
+    authed(({ user, request }) => {
+      const organization = db.organizations.find((o) => o.ownerUserId === user.id)
+      if (organization) {
+        if (new URL(request.url).searchParams.get("deleteOrganization") !== "true") {
+          return HttpResponse.json(
+            { code: "Conflict.Account", message: "You are the only organizer.", type: 3 },
+            { status: 409 },
+          )
+        }
+        db.organizations.splice(db.organizations.indexOf(organization), 1)
       }
       db.users.splice(db.users.indexOf(user), 1)
       return new HttpResponse(null, { status: 204 })

@@ -98,6 +98,38 @@ public sealed class PlayersDbContext(DbContextOptions<PlayersDbContext> options)
             .Where(g => g.UserId == userId)
             .ExecuteDeleteAsync(cancellationToken);
 
+    // ExecuteDelete — od razu w bazie, bez SaveChanges (usunięcie organizacji woła to z innego modułu).
+    // W transakcji: po usunięciu samych składów nie dałoby się już ustalić, których zawodników dotyczyły.
+    public async Task<IReadOnlyList<Guid>> RemovePlayersOfTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentTeamIds.Count == 0)
+            return [];
+
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        var rosterPlayerIds = await TournamentPlayers
+            .Where(tp => tournamentTeamIds.Contains(tp.TournamentTeamId))
+            .Select(tp => tp.PlayerId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        await TournamentPlayers
+            .Where(tp => tournamentTeamIds.Contains(tp.TournamentTeamId))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        // Zawodnik grający także w drużynie innej organizacji zostaje — traci tylko te składy.
+        var orphanedPlayerIds = await Players
+            .Where(p => rosterPlayerIds.Contains(p.Id) && !TournamentPlayers.Any(tp => tp.PlayerId == p.Id))
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        await Players
+            .Where(p => orphanedPlayerIds.Contains(p.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return orphanedPlayerIds;
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("players");

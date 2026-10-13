@@ -197,9 +197,9 @@ export default function TermsPage() {
 
       <LegalSection title="§10. Usunięcie organizacji">
         <p>
-          Organizacja z turniejami, drużynami i danymi Zawodników jest usuwana na prośbę jej
-          jedynego Organizatora wysłaną na <Fill value={LEGAL.contactEmail} /> — w ciągu 30 dni,
-          razem z kontem Organizatora.
+          Organizacja z turniejami, drużynami i danymi Zawodników jest usuwana razem z kontem jej
+          jedynego Organizatora — po dodatkowym potwierdzeniu w zakładce „Moje konto”. Operacja jest
+          nieodwracalna i odbiera dostęp do tych turniejów wszystkim Użytkownikom.
         </p>
       </LegalSection>
 

@@ -20,9 +20,9 @@ namespace Turniejo.Api.Controllers
         }
 
         [HttpDelete]
-        public async Task<IActionResult> DeleteMyAccount(CancellationToken cancellationToken)
+        public async Task<IActionResult> DeleteMyAccount(CancellationToken cancellationToken, [FromQuery] bool deleteOrganization = false)
         {
-            var result = await sender.Send(new DeleteMyAccountCommand(), cancellationToken);
+            var result = await sender.Send(new DeleteMyAccountCommand(deleteOrganization), cancellationToken);
             return result.ToActionResult();
         }
     }

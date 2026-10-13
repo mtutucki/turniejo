@@ -137,6 +137,9 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         return MapPublicSettings(tournament);
     }
 
+    public Task<IReadOnlyList<Guid>> DeleteTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        dbContext.SoftDeleteTournamentsByOrganizationIdAsync(organizationId, cancellationToken);
+
     private static TournamentPublicSettingsDto MapPublicSettings(global::Turniejo.Tournaments.Domain.Entities.Tournament tournament) => new(
         tournament.Id, tournament.PublicSettings.IsPublic, tournament.PublicSettings.ShowTeams,
         tournament.PublicSettings.ShowPlayers, tournament.PublicSettings.ShowSchedule,

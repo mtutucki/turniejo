@@ -17,6 +17,11 @@ public interface IUsersDbContext
     Task<IReadOnlyList<UserRoleAssignment>> GetUserRoleAssignmentsByScopeAsync(RoleScopeType scopeType, Guid scopeId, CancellationToken cancellationToken = default);
     Task RemoveUserRoleAssignmentAsync(Guid userId, UserRole role, RoleScopeType scopeType, Guid? scopeId, CancellationToken cancellationToken = default);
     void RemoveUserRoleAssignments(IEnumerable<UserRoleAssignment> assignments);
+    /// <summary>
+    /// Odbiera role we wskazanych zasobach (np. po usunięciu organizacji) wszystkim poza <paramref name="exceptUserId"/>,
+    /// którego role wywołujący ma śledzone i usuwa sam.
+    /// </summary>
+    Task RemoveUserRoleAssignmentsByScopeAsync(RoleScopeType scopeType, IReadOnlyCollection<Guid> scopeIds, Guid exceptUserId, CancellationToken cancellationToken = default);
     Task<User?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     Task AddPasswordResetTokenAsync(PasswordResetToken token, CancellationToken cancellationToken = default);

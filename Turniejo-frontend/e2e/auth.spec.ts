@@ -157,14 +157,26 @@ test.describe("RODO: konto", () => {
     await expect(page.getByText(/Nieprawidłowy email lub hasło/)).toBeVisible()
   })
 
-  test("jedyny organizator nie usunie konta samodzielnie", async ({ page }) => {
+  test("jedyny organizator usuwa konto z organizacją dopiero po drugim potwierdzeniu", async ({
+    page,
+  }) => {
     await login(page, "organizator@e2e.pl")
     await expect(page).toHaveURL(/\/tournaments$/)
 
     await page.goto("/account")
     await page.getByRole("button", { name: "Usuń konto" }).click()
     await page.getByRole("button", { name: "Usuń konto na zawsze" }).click()
-    await expect(page.getByRole("alert").filter({ hasText: "jedynym organizatorem" })).toBeVisible()
-    await expect(page).toHaveURL(/\/account$/)
+
+    // Pierwsze potwierdzenie nie wystarcza — konto i organizacja wciąż istnieją.
+    const confirm = page.getByRole("alertdialog", { name: "Usunąć też całą organizację?" })
+    await expect(confirm).toContainText("jedynym organizatorem")
+    const submit = confirm.getByRole("button", { name: "Usuń konto i organizację" })
+    await expect(submit).toBeDisabled()
+    expect((await mock.state()).users.some((u) => u.email === "organizator@e2e.pl")).toBe(true)
+
+    await confirm.getByLabel("Aby potwierdzić, wpisz USUŃ").fill("USUŃ")
+    await submit.click()
+    await expect(page).toHaveURL(/\/login/)
+    expect((await mock.state()).users.some((u) => u.email === "organizator@e2e.pl")).toBe(false)
   })
 })

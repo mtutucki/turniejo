@@ -6,6 +6,7 @@ using Turniejo.Organizations.Application.Abstractions;
 using Turniejo.Organizations.Application.Organizations.CreateOrganization;
 using Turniejo.Organizations.Application.Services;
 using Turniejo.Organizations.Infrastructure.Persistence;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Organizations.Infrastructure.Extensions;
@@ -31,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         services.AddScoped<OrganizationProvisioner>();
+        services.AddScoped<IOrganizationModule, OrganizationModule>();
 
         services.AddValidatorsFromAssemblyContaining<CreateOrganizationCommandValidator>();
 

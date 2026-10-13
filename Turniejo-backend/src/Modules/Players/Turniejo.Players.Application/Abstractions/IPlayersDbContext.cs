@@ -28,5 +28,11 @@ namespace Turniejo.Players.Application.Abstractions
         Task<IReadOnlyList<PlayerGuardian>> GetPlayerGuardiansByPlayerIdsAsync(IReadOnlyCollection<Guid> playerIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<PlayerGuardian>> GetGuardianshipsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
         Task RemoveGuardianshipsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Usuwa składy wskazanych drużyn i zawodników, którzy nie grają już nigdzie indziej (opiekunowie
+        /// znikają kaskadą FK). Zwraca Id usuniętych zawodników.
+        /// </summary>
+        Task<IReadOnlyList<Guid>> RemovePlayersOfTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
     }
 }

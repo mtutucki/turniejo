@@ -14,6 +14,9 @@ namespace Turniejo.Teams.Application.Abstractions
         Task<Team?> GetTeamByIdAsync(Guid teamId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Team>> GetTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Team>> GetTeamsByIdsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Guid>> GetTournamentTeamIdsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+        /// <summary>Usuwa drużyny organizacji razem ze zgłoszeniami do turniejów i sztabem.</summary>
+        Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
         // TournamentTeam
         Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default);
