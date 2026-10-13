@@ -541,6 +541,50 @@ namespace Turniejo.Matches.UnitTests.Schedule
         }
 
         [Fact]
+        public async Task Handle_ShouldPlaceNoMoreMatchesInADay_ThanTheOrganizerAskedFor()
+        {
+            // 4 drużyny = 6 meczów. Oba dni mają czas na wszystkie, ale organizator chce 2 pierwszego
+            // dnia i 4 drugiego — generator nie może dołożyć do pierwszego dnia więcej.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(),
+                new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+            IReadOnlyCollection<Match>? created = null;
+            await _dbContext.AddMatchesAsync(Arg.Do<IReadOnlyCollection<Match>>(m => created = m), Arg.Any<CancellationToken>());
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var day2 = day1.AddDays(1);
+
+            var command = new GenerateScheduleCommand(tournamentId, day1, day2.AddHours(8), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(8), 2), new ScheduleWindow(day2, day2.AddHours(8), 4) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            created.Should().HaveCount(6);
+            created!.Count(m => m.ScheduledAt < day2).Should().Be(2);
+            created!.Count(m => m.ScheduledAt >= day2).Should().Be(4);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenDayLimitsDoNotCoverAllMatches()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(),
+                new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+
+            var command = new GenerateScheduleCommand(tournamentId, day1, day1.AddHours(8), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(8), 5) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.EndAt");
+            await _dbContext.DidNotReceive().AddMatchesAsync(Arg.Any<IReadOnlyCollection<Match>>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenAWindowIsOutsideTheTournamentDates()
         {
             var tournamentId = Guid.NewGuid();

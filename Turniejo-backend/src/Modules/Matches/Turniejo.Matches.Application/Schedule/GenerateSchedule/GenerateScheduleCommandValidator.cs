@@ -14,6 +14,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .GreaterThan(x => x.StartAt).WithMessage("EndAt must be after StartAt.");
             RuleForEach(x => x.Windows)
                 .Must(w => w.EndAt > w.StartAt).WithMessage("Each day must end after it starts.");
+            RuleForEach(x => x.Windows)
+                .Must(w => w.MaxMatches is null or > 0).WithMessage("The number of matches for a day must be greater than zero.");
             RuleFor(x => x.Windows)
                 .Must(windows =>
                 {

@@ -331,6 +331,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         /// <summary>
         /// Rozkłada mecze w slotach kolejnych okien (dni gry) na wolnych boiskach. Drużyna nigdy
         /// nie gra dwóch meczów w jednym slocie, a pierwszeństwo mają pary, których drużyny odpoczywały.
+        /// Okno z limitem (MaxMatches) dostaje najwyżej tyle meczów — reszta przechodzi na kolejne dni.
         /// </summary>
         private static (List<Placement<T>> Placements, int Unplaced) PlaceInSlots<T>(
             List<T> items,
@@ -344,6 +345,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             var remaining = new List<T>(items);
             var playedPreviousSlot = new HashSet<Guid>();
             var previousWindow = 0;
+            var placedInWindow = new int[windows.Count];
 
             foreach (var (slotStart, windowIndex) in SlotStarts(windows, settings))
             {
@@ -355,7 +357,12 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                     playedPreviousSlot = [];
                 previousWindow = windowIndex;
 
+                var windowLimit = (windows[windowIndex].MaxMatches ?? int.MaxValue) - placedInWindow[windowIndex];
+                if (windowLimit <= 0)
+                    continue;
+
                 var freePitches = pitches.Where(p => !occupiedSlots.Contains((p.Id, slotStart))).ToList();
+                var slotCapacity = Math.Min(freePitches.Count, windowLimit);
                 var playingThisSlot = new HashSet<Guid>();
                 var slotItems = new List<T>();
 
@@ -363,7 +370,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 {
                     foreach (var item in remaining.ToList())
                     {
-                        if (slotItems.Count >= freePitches.Count)
+                        if (slotItems.Count >= slotCapacity)
                             break;
 
                         var (home, away) = teamsOf(item);
@@ -386,6 +393,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                     occupiedSlots.Add((freePitches[i].Id, slotStart));
                 }
 
+                placedInWindow[windowIndex] += slotItems.Count;
                 playedPreviousSlot = playingThisSlot;
             }
 

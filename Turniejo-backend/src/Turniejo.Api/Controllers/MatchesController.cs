@@ -85,7 +85,7 @@ namespace Turniejo.Api.Controllers
         {
             var command = new GenerateScheduleCommand(
                 tournamentId, request.StartAt, request.EndAt, request.PitchIds,
-                request.Windows?.Select(w => new ScheduleWindow(w.StartAt, w.EndAt)).ToList());
+                request.Windows?.Select(w => new ScheduleWindow(w.StartAt, w.EndAt, w.MaxMatches)).ToList());
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -333,7 +333,7 @@ namespace Turniejo.Api.Controllers
 
         public sealed record AddPitchRequest(string Name, string? Description);
         public sealed record UpdatePitchRequest(string Name, string? Description, bool IsActive);
-        public sealed record ScheduleWindowRequest(DateTimeOffset StartAt, DateTimeOffset EndAt);
+        public sealed record ScheduleWindowRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, int? MaxMatches = null);
         public sealed record GenerateScheduleRequest(
             DateTimeOffset StartAt,
             DateTimeOffset EndAt,
