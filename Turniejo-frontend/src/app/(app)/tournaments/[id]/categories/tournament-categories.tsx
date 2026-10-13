@@ -13,7 +13,12 @@ import { CategoryFormDialog } from "@/features/tournaments/components/category-f
 import { TieBreakerEditor } from "@/features/tournaments/components/tie-breaker-editor"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 
-export function TournamentCategoriesView() {
+export function TournamentCategoriesView({
+  embedded = false,
+}: {
+  /** W kreatorze turnieju: same kategorie, bez reguł tabeli (to ustawienie na później). */
+  embedded?: boolean
+}) {
   const { id, isOrganizer, tournament } = useTournamentContext()
   const categories = useCategories(id)
   const groups = useGroups(id)
@@ -95,29 +100,31 @@ export function TournamentCategoriesView() {
         )}
       </section>
 
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">
-            Kolejność w tabeli przy równej liczbie punktów
-          </CardTitle>
-          <CardDescription>
-            Reguły stosowane po kolei — przeciągnij, żeby zmienić priorytet.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {tieBreakerRules.data ? (
-            <TieBreakerEditor
-              // Po zapisie i odświeżeniu danych stan edytora startuje od nowa z zapisanej kolejności.
-              key={tieBreakerRules.data.map((r) => r.type).join()}
-              tournamentId={id}
-              savedRules={tieBreakerRules.data}
-              canManage={isOrganizer}
-            />
-          ) : (
-            <Skeleton className="h-40" />
-          )}
-        </CardContent>
-      </Card>
+      {!embedded && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-base">
+              Kolejność w tabeli przy równej liczbie punktów
+            </CardTitle>
+            <CardDescription>
+              Reguły stosowane po kolei — przeciągnij, żeby zmienić priorytet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {tieBreakerRules.data ? (
+              <TieBreakerEditor
+                // Po zapisie i odświeżeniu danych stan edytora startuje od nowa z zapisanej kolejności.
+                key={tieBreakerRules.data.map((r) => r.type).join()}
+                tournamentId={id}
+                savedRules={tieBreakerRules.data}
+                canManage={isOrganizer}
+              />
+            ) : (
+              <Skeleton className="h-40" />
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

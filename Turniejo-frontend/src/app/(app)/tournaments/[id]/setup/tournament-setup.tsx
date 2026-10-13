@@ -1,71 +1,100 @@
 "use client"
 
-import { Check, Layers, type LucideIcon, MapPin, PartyPopper, Shield } from "lucide-react"
+import { ArrowRight, CalendarCheck, Check, CircleAlert, Network, Plus, Shield } from "lucide-react"
 import Link from "next/link"
-import { useRef, useState } from "react"
+import { type ReactNode, useRef, useState } from "react"
+import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { usePublicSettings, useTournamentSettings } from "@/features/tournaments/api"
+import { useChangeRegistrationStatus } from "@/features/teams/api"
+import { TeamFormDialog } from "@/features/teams/components/team-form-dialog"
+import {
+  useMyOrganization,
+  usePublicSettings,
+  useTournamentSettings,
+} from "@/features/tournaments/api"
 import { FormatForm } from "@/features/tournaments/components/format-form"
 import { PublicSettingsForm } from "@/features/tournaments/components/public-settings-form"
 import { SportSettingsForm } from "@/features/tournaments/components/sport-settings-form"
+import {
+  SETUP_STEP_KEYS,
+  type SetupStepKey,
+  useSetupProgress,
+} from "@/features/tournaments/use-setup-progress"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { statusAtLeast } from "@/types/tournaments"
+import { TOURNAMENT_FORMAT_LABELS, statusAtLeast } from "@/types/tournaments"
+import type { TournamentTeam } from "@/types/teams"
 
-const STEPS = [
-  {
-    title: "Format rozgrywek",
+import { TournamentCategoriesView } from "../categories/tournament-categories"
+import { TournamentPitchesView } from "../pitches/tournament-pitches"
+import { TournamentTeamsView } from "../teams/tournament-teams"
+
+const STEPS: Record<SetupStepKey, { title: string; description: string }> = {
+  format: {
+    title: "Format",
     description:
       "Jak drużyny będą ze sobą grać. Format możesz zmienić do czasu wygenerowania terminarza.",
   },
-  {
+  rules: {
     title: "Zasady gry",
     description:
       "Punktacja i czas meczu. Domyślne wartości pasują do większości turniejów — zmień tylko to, co trzeba.",
   },
-  {
+  portal: {
     title: "Portal kibica",
     description: "Publiczna strona z wynikami na żywo dla rodziców i kibiców, bez logowania.",
   },
-  { title: "Gotowe", description: "Podstawy ustawione. Co dalej?" },
-]
+  categories: { title: "Kategorie", description: "" },
+  pitches: { title: "Boiska", description: "" },
+  teams: { title: "Drużyny", description: "" },
+  schedule: {
+    title: "Terminarz",
+    description: "Ostatni krok: sprawdź, czy wszystko jest, i ułóż mecze.",
+  },
+}
 
-function StepIndicator({ current, onSelect }: { current: number; onSelect: (i: number) => void }) {
+function StepIndicator({
+  current,
+  isDone,
+  onSelect,
+}: {
+  current: number
+  isDone: (key: SetupStepKey, index: number) => boolean
+  onSelect: (index: number) => void
+}) {
   return (
-    <ol className="flex flex-wrap gap-x-2 gap-y-3" aria-label="Kroki konfiguracji">
-      {STEPS.map((step, index) => {
-        const done = index < current
+    <ol className="flex flex-wrap gap-x-1 gap-y-2" aria-label="Kroki konfiguracji">
+      {SETUP_STEP_KEYS.map((key, index) => {
+        const done = isDone(key, index)
         return (
-          <li key={step.title} className="flex items-center gap-2">
+          <li key={key} className="flex items-center gap-1">
             <button
               type="button"
-              // Wracać można zawsze; do przodu prowadzą przyciski kroku.
-              disabled={index > current}
               onClick={() => onSelect(index)}
               aria-current={index === current ? "step" : undefined}
               className={cn(
-                "flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-sm font-medium transition-colors",
+                "hover:text-foreground flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-sm font-medium transition-colors",
                 index === current ? "bg-primary/10 text-primary" : "text-muted-foreground",
-                done && "hover:text-foreground",
               )}
             >
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full border font-mono text-xs tabular-nums",
+                  "flex size-6 items-center justify-center rounded-full border text-xs tabular-nums",
                   index === current && "border-primary",
                   done && "bg-primary text-primary-foreground border-primary",
                 )}
               >
                 {done ? <Check className="size-3.5" aria-label="Zrobione" /> : index + 1}
               </span>
-              {step.title}
+              {STEPS[key].title}
             </button>
-            {index < STEPS.length - 1 && (
-              <span className="bg-border hidden h-px w-4 sm:block" aria-hidden />
+            {index < SETUP_STEP_KEYS.length - 1 && (
+              <span className="bg-border hidden h-px w-3 sm:block" aria-hidden />
             )}
           </li>
         )
@@ -74,47 +103,101 @@ function StepIndicator({ current, onSelect }: { current: number; onSelect: (i: n
   )
 }
 
-function NextAction({
-  href,
-  icon: Icon,
-  title,
-  hint,
+/** Organizator zgłasza własne drużyny — akceptowanie każdej osobno to tylko dodatkowe kliknięcia. */
+function AcceptPendingTeams({
+  tournamentId,
+  teams,
 }: {
-  href: string
-  icon: LucideIcon
+  tournamentId: string
+  teams: TournamentTeam[]
+}) {
+  const changeStatus = useChangeRegistrationStatus(tournamentId)
+  const [pending, setPending] = useState(false)
+
+  async function acceptAll() {
+    setPending(true)
+    let accepted = 0
+    // Po kolei — limit drużyn backend sprawdza przy każdej akceptacji (błąd pokazuje globalny toast).
+    for (const team of teams) {
+      try {
+        await changeStatus.mutateAsync({ tournamentTeamId: team.id, status: "Accepted" })
+        accepted++
+      } catch {
+        break
+      }
+    }
+    setPending(false)
+    if (accepted > 0) {
+      toast.success(`Zaakceptowano ${plural(accepted, ["drużynę", "drużyny", "drużyn"])}`)
+    }
+  }
+
+  return (
+    <div className="border-primary/40 bg-primary/5 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
+      <p>
+        {plural(teams.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na akceptację —
+        dopóki jej nie zaakceptujesz, nie zagra w turnieju.
+      </p>
+      <Button size="sm" onClick={acceptAll} disabled={pending}>
+        {pending ? "Akceptowanie…" : "Akceptuj wszystkie"}
+      </Button>
+    </div>
+  )
+}
+
+function ReadinessRow({
+  ok,
+  title,
+  detail,
+  onFix,
+}: {
+  ok: boolean
   title: string
-  hint: string
+  detail: string
+  onFix: () => void
 }) {
   return (
-    <li>
-      <Link
-        href={href}
-        className="hover:bg-accent flex items-center gap-3 rounded-lg border p-3 transition-colors"
-      >
-        <Icon className="text-primary size-5 shrink-0" />
-        <span>
-          <span className="block text-sm font-medium">{title}</span>
-          <span className="text-muted-foreground block text-xs">{hint}</span>
+    <li className="flex items-center gap-3 py-3 text-sm">
+      {ok ? (
+        <span className="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center rounded-full">
+          <Check className="size-3" aria-label="Gotowe" />
         </span>
-      </Link>
+      ) : (
+        <CircleAlert className="text-live size-5 shrink-0" aria-label="Do uzupełnienia" />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{title}</span>
+        <span className="text-muted-foreground block text-xs">{detail}</span>
+      </span>
+      <Button size="sm" variant={ok ? "ghost" : "outline"} onClick={onFix}>
+        {ok ? "Zmień" : "Uzupełnij"}
+      </Button>
     </li>
   )
 }
 
 /**
- * Kreator po utworzeniu turnieju: te same formularze co w Ustawieniach, ale po jednym na ekran
- * i z przyciskiem "Zapisz i dalej". Każdy krok można pominąć — wszystko da się zmienić później.
+ * Kreator turnieju: od formatu po terminarz, w kolejności, w jakiej jedno zależy od drugiego
+ * (drużyny potrzebują kategorii, terminarz — drużyn i boisk). To te same ekrany co w zakładkach,
+ * ale po jednym naraz i z jasnym "co dalej". Postęp liczymy z danych, więc można wyjść i wrócić.
  */
-export function TournamentSetupView() {
+export function TournamentSetupView({ initialStep }: { initialStep?: SetupStepKey }) {
   const { id, tournament, isOrganizer, rolesLoading } = useTournamentContext()
   const settings = useTournamentSettings(id)
   const publicSettings = usePublicSettings(id, isOrganizer)
-  const [step, setStep] = useState(0)
+  const organization = useMyOrganization()
+  const progress = useSetupProgress(id, tournament.data)
+  // null = jeszcze nie wybrany ręcznie: startujemy od kroku z linku albo pierwszego niegotowego.
+  const [selected, setSelected] = useState<number | null>(
+    initialStep ? SETUP_STEP_KEYS.indexOf(initialStep) : null,
+  )
   const top = useRef<HTMLDivElement>(null)
   const data = tournament.data!
   const base = `/tournaments/${id}`
 
-  if (rolesLoading) return <Skeleton className="h-72 max-w-3xl rounded-xl" />
+  if (rolesLoading || (selected === null && progress.isPending)) {
+    return <Skeleton className="h-72 max-w-3xl rounded-xl" />
+  }
   if (!isOrganizer) {
     return (
       <EmptyState
@@ -125,33 +208,83 @@ export function TournamentSetupView() {
     )
   }
 
+  const step = selected ?? SETUP_STEP_KEYS.indexOf(progress.firstIncomplete)
+  const key = SETUP_STEP_KEYS[step]!
+  const lastIndex = SETUP_STEP_KEYS.length - 1
+
   // Kolejny krok zaczyna się od góry — poprzedni formularz mógł być przewinięty do przycisku.
   function goTo(index: number) {
-    setStep(Math.max(0, Math.min(index, STEPS.length - 1)))
+    setSelected(Math.max(0, Math.min(index, lastIndex)))
     top.current?.scrollIntoView({ block: "start" })
   }
+  const goToKey = (target: SetupStepKey) => goTo(SETUP_STEP_KEYS.indexOf(target))
   const next = () => goTo(step + 1)
-  const current = STEPS[step]!
-  const isLast = step === STEPS.length - 1
+
   // Te same blokady co w Ustawieniach (domena backendu).
   const formatLocked = statusAtLeast(data.status, "ScheduleGenerated")
   const rulesLocked = statusAtLeast(data.status, "InProgress")
+  const knockout = data.format === "Knockout"
 
-  return (
-    <div ref={top} className="max-w-3xl scroll-mt-20 space-y-6">
-      <StepIndicator current={step} onSelect={goTo} />
+  // Zasad gry i portalu nie da się "odhaczyć" z danych (mają domyślne) — liczy się, że je minięto.
+  const isDone = (stepKey: SetupStepKey, index: number) =>
+    stepKey === "rules" || stepKey === "portal" ? index < step : progress.done[stepKey]
 
+  // Czego brakuje, żeby pójść dalej z kroku z listą (kategorie, boiska, drużyny).
+  const blocker: Partial<Record<SetupStepKey, string | null>> = {
+    categories: progress.done.categories ? null : "Dodaj co najmniej jedną kategorię",
+    pitches: progress.done.pitches ? null : "Dodaj co najmniej jedno boisko",
+    teams: progress.done.teams ? null : "Potrzeba co najmniej 2 zaakceptowanych drużyn",
+  }
+  const isListStep = key in blocker
+  const isFormStep = key === "format" || key === "rules" || key === "portal"
+
+  let body: ReactNode
+  if (key === "categories") {
+    body = <TournamentCategoriesView embedded />
+  } else if (key === "pitches") {
+    body = <TournamentPitchesView />
+  } else if (key === "teams") {
+    body = (
+      <div className="space-y-4">
+        {progress.pendingTeams.length > 0 && (
+          <AcceptPendingTeams tournamentId={id} teams={progress.pendingTeams} />
+        )}
+        <TournamentTeamsView />
+        {organization.data && progress.done.categories && (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+            Drużyny nie ma jeszcze w bazie organizacji?
+            <TeamFormDialog
+              organizationId={organization.data.id}
+              trigger={
+                <Button size="sm" variant="outline">
+                  <Plus />
+                  Nowa drużyna
+                </Button>
+              }
+            />
+            Potem zgłosisz ją przyciskiem „Zgłoś drużynę”.
+          </p>
+        )}
+      </div>
+    )
+  } else {
+    const ready =
+      progress.done.format &&
+      progress.done.categories &&
+      progress.done.pitches &&
+      progress.done.teams
+    const needsBracket = knockout && progress.matchCount === 0
+    body = (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            {isLast && <PartyPopper className="text-primary size-4" />}
-            {current.title}
-          </CardTitle>
-          <CardDescription>{current.description}</CardDescription>
+          <CardTitle className="text-base">{STEPS[key].title}</CardTitle>
+          <CardDescription>{STEPS[key].description}</CardDescription>
         </CardHeader>
         <CardContent>
-          {step === 0 && <FormatForm tournament={data} disabled={formatLocked} onSaved={next} />}
-          {step === 1 &&
+          {key === "format" && (
+            <FormatForm tournament={data} disabled={formatLocked} onSaved={next} />
+          )}
+          {key === "rules" &&
             (settings.data ? (
               <SportSettingsForm
                 tournamentId={id}
@@ -162,7 +295,7 @@ export function TournamentSetupView() {
             ) : (
               <Skeleton className="h-72" />
             ))}
-          {step === 2 &&
+          {key === "portal" &&
             (publicSettings.data ? (
               <PublicSettingsForm
                 tournamentId={id}
@@ -174,53 +307,137 @@ export function TournamentSetupView() {
             ) : (
               <Skeleton className="h-72" />
             ))}
-          {isLast && (
+          {key === "schedule" && (
             <div className="space-y-4">
-              <ul className="grid gap-2 sm:grid-cols-3">
-                <NextAction
-                  href={`${base}/categories`}
-                  icon={Layers}
-                  title={data.format === "Knockout" ? "Kategorie" : "Kategorie i grupy"}
-                  hint="Podział wiekowy drużyn"
+              <ul className="divide-y">
+                <ReadinessRow
+                  ok={progress.done.format}
+                  title="Format rozgrywek"
+                  detail={
+                    data.format ? TOURNAMENT_FORMAT_LABELS[data.format] : "Nie wybrano formatu"
+                  }
+                  onFix={() => goToKey("format")}
                 />
-                <NextAction
-                  href={`${base}/pitches`}
-                  icon={MapPin}
+                <ReadinessRow
+                  ok={progress.done.categories}
+                  title="Kategorie"
+                  detail={
+                    progress.categoryCount
+                      ? plural(progress.categoryCount, ["kategoria", "kategorie", "kategorii"])
+                      : "Brak kategorii — drużyny zgłasza się do kategorii"
+                  }
+                  onFix={() => goToKey("categories")}
+                />
+                <ReadinessRow
+                  ok={progress.done.pitches}
                   title="Boiska"
-                  hint="Potrzebne do terminarza"
+                  detail={
+                    progress.activePitches
+                      ? plural(progress.activePitches, [
+                          "aktywne boisko",
+                          "aktywne boiska",
+                          "aktywnych boisk",
+                        ])
+                      : "Brak boisk — generator nie ma gdzie ustawić meczów"
+                  }
+                  onFix={() => goToKey("pitches")}
                 />
-                <NextAction
-                  href={`${base}/teams`}
-                  icon={Shield}
+                <ReadinessRow
+                  ok={progress.done.teams}
                   title="Drużyny"
-                  hint="Zgłoszenia i składy"
+                  detail={
+                    `${plural(progress.acceptedTeams.length, ["zaakceptowana drużyna", "zaakceptowane drużyny", "zaakceptowanych drużyn"])}` +
+                    (progress.pendingTeams.length
+                      ? `, ${plural(progress.pendingTeams.length, ["czeka", "czekają", "czeka"])} na akceptację`
+                      : "") +
+                    (progress.done.teams ? "" : " — potrzeba co najmniej 2")
+                  }
+                  onFix={() => goToKey("teams")}
                 />
               </ul>
-              <Button asChild>
-                <Link href={`${base}/dashboard`}>Przejdź do przeglądu turnieju</Link>
-              </Button>
+              {progress.done.schedule ? (
+                <div className="space-y-3">
+                  <p className="text-sm">Terminarz jest gotowy — turniej może ruszać.</p>
+                  <Button asChild>
+                    <Link href={`${base}/schedule`}>
+                      <CalendarCheck />
+                      Zobacz terminarz
+                    </Link>
+                  </Button>
+                </div>
+              ) : !ready ? (
+                <p className="text-muted-foreground text-sm">
+                  Uzupełnij brakujące kroki, a tutaj pojawi się przycisk generowania terminarza.
+                </p>
+              ) : needsBracket ? (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-sm">
+                    Puchar zaczyna się od drabinki: ułóż pary 1. rundy, a potem nadasz im godziny i
+                    boiska.
+                  </p>
+                  <Button asChild>
+                    <Link href={`${base}/bracket`}>
+                      <Network />
+                      Utwórz drabinkę
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-sm">
+                    Wszystko jest. W generatorze zamkniesz zapisy, wybierzesz godziny i zobaczysz
+                    mecze przed zapisaniem.
+                  </p>
+                  <Button asChild>
+                    <Link href={`${base}/schedule/generate`}>
+                      <CalendarCheck />
+                      Generuj terminarz
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+    )
+  }
 
-      {!isLast && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            {step > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => goTo(step - 1)}>
-                Wstecz
-              </Button>
-            )}
+  return (
+    // Kroki z formularzem są wąskie; listy (kategorie, boiska, drużyny) potrzebują miejsca.
+    <div ref={top} className={cn("scroll-mt-20 space-y-6", isListStep ? "max-w-5xl" : "max-w-3xl")}>
+      <StepIndicator current={step} isDone={isDone} onSelect={goTo} />
+
+      {body}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {step > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => goTo(step - 1)}>
+              Wstecz
+            </Button>
+          )}
+          {isFormStep && (
             <Button variant="ghost" size="sm" onClick={next}>
               Pomiń ten krok
             </Button>
-          </div>
+          )}
           <Button asChild variant="link" size="sm" className="text-muted-foreground">
-            <Link href={`${base}/dashboard`}>Pomiń konfigurację</Link>
+            <Link href={`${base}/dashboard`}>
+              {step === lastIndex ? "Przejdź do przeglądu" : "Pomiń konfigurację"}
+            </Link>
           </Button>
         </div>
-      )}
+        {isListStep && (
+          <div className="flex flex-wrap items-center gap-3">
+            {blocker[key] && <span className="text-muted-foreground text-sm">{blocker[key]}</span>}
+            <Button onClick={next} variant={blocker[key] ? "outline" : "default"}>
+              {blocker[key] ? "Dalej mimo to" : "Dalej"}
+              <ArrowRight />
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

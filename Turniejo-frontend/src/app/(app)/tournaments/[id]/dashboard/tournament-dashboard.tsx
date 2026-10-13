@@ -9,10 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AnnouncementCard } from "@/features/notifications/components/announcement-card"
 import { useTournamentDashboard } from "@/features/tournaments/api"
 import { AccessCodesPanel } from "@/features/tournaments/components/access-codes-panel"
+import { SetupProgressCard } from "@/features/tournaments/components/setup-progress-card"
 import { TournamentStatusStepper } from "@/features/tournaments/components/status-stepper"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { cn } from "@/lib/utils"
-import type { Tournament, TournamentDashboard } from "@/types/tournaments"
+import { type Tournament, type TournamentDashboard, statusAtLeast } from "@/types/tournaments"
 
 const SCHEDULE_STATUS_LABELS: Record<TournamentDashboard["scheduleStatus"], string> = {
   NotGenerated: "terminarz jeszcze nie powstał",
@@ -165,6 +166,12 @@ export function TournamentDashboardView() {
   return (
     <div className="grid max-w-7xl gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <div className="space-y-6">
+        {/* Dopóki nie ma terminarza, najważniejsze na tej stronie jest to, czego jeszcze brakuje. */}
+        {isOrganizer &&
+          tournament.data &&
+          !statusAtLeast(tournament.data.status, "ScheduleGenerated") && (
+            <SetupProgressCard tournament={tournament.data} />
+          )}
         {tournament.data && (
           <Card>
             <CardHeader>

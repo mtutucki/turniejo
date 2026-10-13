@@ -24,7 +24,7 @@ export function NewTournament() {
     })
     setActiveTournament({ id: tournamentId, name: input.name })
     toast.success("Turniej utworzony")
-    // Kreator prowadzi przez format, zasady gry i portal kibica — każdy krok da się pominąć.
+    // Kreator prowadzi dalej: format, zasady, kategorie, boiska, drużyny i terminarz.
     router.push(`/tournaments/${tournamentId}/setup`)
   }
 
@@ -32,7 +32,7 @@ export function NewTournament() {
     <>
       <PageHeader
         title="Nowy turniej"
-        description="Podstawowe dane — w kolejnych krokach ustawisz format i zasady gry."
+        description="Zacznij od nazwy i terminu — kreator przeprowadzi Cię potem krok po kroku aż do terminarza."
       />
       <Card className="max-w-2xl">
         <CardContent>
