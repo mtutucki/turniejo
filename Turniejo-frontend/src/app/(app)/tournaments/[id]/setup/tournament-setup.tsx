@@ -6,6 +6,17 @@ import { type ReactNode, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -227,11 +238,33 @@ export function TournamentSetupView({ initialStep }: { initialStep?: SetupStepKe
     stepKey === "rules" || stepKey === "portal" ? index < step : progress.done[stepKey]
 
   // Czego brakuje, żeby pójść dalej z kroku z listą (kategorie, boiska, drużyny).
-  const blocker: Partial<Record<SetupStepKey, string | null>> = {
-    categories: progress.done.categories ? null : "Dodaj co najmniej jedną kategorię",
-    pitches: progress.done.pitches ? null : "Dodaj co najmniej jedno boisko",
-    teams: progress.done.teams ? null : "Potrzeba co najmniej 2 zaakceptowanych drużyn",
+  // `consequence` trafia do potwierdzenia: sama szara linijka przy przycisku była za słabym sygnałem.
+  const blocker: Partial<Record<SetupStepKey, { missing: string; consequence: string } | null>> = {
+    categories: progress.done.categories
+      ? null
+      : {
+          missing: "Dodaj co najmniej jedną kategorię",
+          consequence:
+            "Drużyny zgłasza się do kategorii — bez niej nie dodasz w następnych krokach żadnej drużyny.",
+        },
+    pitches: progress.done.pitches
+      ? null
+      : {
+          missing: "Dodaj co najmniej jedno boisko",
+          consequence:
+            "Generator ustawia mecze na boiskach — bez boiska nie wygenerujesz terminarza.",
+        },
+    teams: progress.done.teams
+      ? null
+      : {
+          missing: "Potrzeba co najmniej 2 zaakceptowanych drużyn",
+          consequence:
+            progress.pendingTeams.length > 0
+              ? "Zgłoszone drużyny czekają na akceptację i na razie nie zagrają — bez dwóch zaakceptowanych nie ułożysz żadnego meczu."
+              : "Bez dwóch zaakceptowanych drużyn nie ułożysz żadnego meczu ani terminarza.",
+        },
   }
+  const currentBlocker = blocker[key] ?? null
   const isListStep = key in blocker
   const isFormStep = key === "format" || key === "rules" || key === "portal"
 
@@ -427,11 +460,40 @@ export function TournamentSetupView({ initialStep }: { initialStep?: SetupStepKe
         </div>
         {isListStep && (
           <div className="flex flex-wrap items-center gap-3">
-            {blocker[key] && <span className="text-muted-foreground text-sm">{blocker[key]}</span>}
-            <Button onClick={next} variant={blocker[key] ? "outline" : "default"}>
-              {blocker[key] ? "Dalej mimo to" : "Dalej"}
-              <ArrowRight />
-            </Button>
+            {currentBlocker ? (
+              <>
+                <span className="text-live flex items-center gap-1.5 text-sm font-medium">
+                  <CircleAlert className="size-4 shrink-0" />
+                  {currentBlocker.missing}
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline">
+                      Dalej mimo to
+                      <ArrowRight />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Ten krok nie jest skończony</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {currentBlocker.consequence} Możesz iść dalej i wrócić tu później — krok
+                        zostanie oznaczony jako niegotowy.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Zostaję i uzupełniam</AlertDialogCancel>
+                      <AlertDialogAction onClick={next}>Dalej mimo to</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            ) : (
+              <Button onClick={next}>
+                Dalej
+                <ArrowRight />
+              </Button>
+            )}
           </div>
         )}
       </div>
