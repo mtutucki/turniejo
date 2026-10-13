@@ -9,7 +9,8 @@ import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { TOURNAMENT_FORMAT_LABELS, type Tournament } from "@/types/tournaments"
 
-import { SETUP_CHECKLIST, type SetupChecklistKey, useSetupProgress } from "../use-setup-progress"
+import { SETUP_CHECKLIST, type SetupChecklistKey } from "../setup-steps"
+import { useSetupProgress } from "../use-setup-progress"
 
 /**
  * Lista "co jeszcze trzeba zrobić, żeby turniej mógł ruszyć" na przeglądzie. Każda pozycja otwiera

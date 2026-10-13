@@ -19,11 +19,8 @@ import {
 import { FormatForm } from "@/features/tournaments/components/format-form"
 import { PublicSettingsForm } from "@/features/tournaments/components/public-settings-form"
 import { SportSettingsForm } from "@/features/tournaments/components/sport-settings-form"
-import {
-  SETUP_STEP_KEYS,
-  type SetupStepKey,
-  useSetupProgress,
-} from "@/features/tournaments/use-setup-progress"
+import { SETUP_STEP_KEYS, type SetupStepKey } from "@/features/tournaments/setup-steps"
+import { useSetupProgress } from "@/features/tournaments/use-setup-progress"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { SETUP_STEP_KEYS, type SetupStepKey } from "@/features/tournaments/use-setup-progress"
+import { SETUP_STEP_KEYS, type SetupStepKey } from "@/features/tournaments/setup-steps"
 
 import { TournamentSetupView } from "./tournament-setup"
 

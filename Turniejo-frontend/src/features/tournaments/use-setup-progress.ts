@@ -5,22 +5,7 @@ import { useTournamentTeams } from "@/features/teams/api"
 import { statusAtLeast, type Tournament } from "@/types/tournaments"
 
 import { useCategories } from "./api"
-
-/** Kroki kreatora w kolejności, w jakiej jeden zależy od drugiego. */
-export const SETUP_STEP_KEYS = [
-  "format",
-  "rules",
-  "portal",
-  "categories",
-  "pitches",
-  "teams",
-  "schedule",
-] as const
-export type SetupStepKey = (typeof SETUP_STEP_KEYS)[number]
-
-/** Kroki, których ukończenie widać w danych turnieju (zasady gry i portal mają sensowne domyślne). */
-export const SETUP_CHECKLIST = ["format", "categories", "pitches", "teams", "schedule"] as const
-export type SetupChecklistKey = (typeof SETUP_CHECKLIST)[number]
+import { SETUP_CHECKLIST, type SetupChecklistKey } from "./setup-steps"
 
 /**
  * Co już jest gotowe do rozegrania turnieju — liczone z danych, nie z tego, które ekrany organizator
