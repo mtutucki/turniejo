@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronRight, Trash2 } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { prefetchHandlers, usePrefetch } from "@/hooks/use-prefetch"
-import { formatDateRange } from "@/lib/format"
+import { APP_TIME_ZONE } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 import {
@@ -32,7 +32,7 @@ import {
 import { tournamentKeys, useDeleteTournament } from "../api"
 import { TournamentStatusBadge } from "./status-badge"
 
-/** Usuń anulowany turniej — przycisk obok wiersza (nie w linku), z potwierdzeniem. */
+/** Usuń anulowany turniej — przycisk na karcie (poza linkiem), z potwierdzeniem. */
 function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
   const remove = useDeleteTournament(tournament.id)
   const active = useActiveTournamentStore((state) => state.tournament)
@@ -44,7 +44,7 @@ function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-destructive mr-2 shrink-0"
+          className="text-muted-foreground hover:text-destructive absolute right-2 bottom-2"
           aria-label={`Usuń turniej ${tournament.name}`}
           title="Usuń turniej"
         >
@@ -87,10 +87,40 @@ export type TournamentListItem = {
   roleLabel?: string
 }
 
-function TournamentRow({ tournament, roleLabel }: TournamentListItem) {
+const dayMonthFormatter = new Intl.DateTimeFormat("pl-PL", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: APP_TIME_ZONE,
+})
+
+function dateParts(value: string) {
+  const parts = dayMonthFormatter.formatToParts(new Date(value))
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? ""
+  return { day: part("day"), month: part("month").replace(".", ""), year: part("year") }
+}
+
+/** Druga linia karty: format i to, czego nie widać na kafelku z datą (koniec turnieju, inny rok). */
+function metaLine(tournament: Tournament) {
+  const start = dateParts(tournament.startAt)
+  const end = dateParts(tournament.endAt)
+  const sameDay = start.day === end.day && start.month === end.month && start.year === end.year
+  const thisYear = String(new Date().getFullYear())
+  return [
+    tournament.format && TOURNAMENT_FORMAT_LABELS[tournament.format],
+    sameDay ? "jednodniowy" : `do ${end.day} ${end.month}`,
+    end.year !== thisYear && end.year,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+}
+
+function TournamentCard({ tournament, roleLabel }: TournamentListItem) {
   const setTournament = useActiveTournamentStore((state) => state.setTournament)
   // Kody dostępu backend zwraca tylko organizatorowi — tylko on może usunąć turniej.
   const deletable = tournament.status === "Cancelled" && tournament.refereeCode !== null
+  const live = tournament.status === "InProgress"
+  const start = dateParts(tournament.startAt)
   const queryClient = useQueryClient()
   const prefetch = usePrefetch()
   const warmUp = () => {
@@ -105,29 +135,48 @@ function TournamentRow({ tournament, roleLabel }: TournamentListItem) {
   }
 
   return (
-    <li className="flex items-center">
+    <li className="relative">
       <Link
         href={`/tournaments/${tournament.id}/dashboard`}
         onClick={() =>
           setTournament({ id: tournament.id, name: tournament.name, format: tournament.format })
         }
         {...prefetchHandlers(warmUp)}
-        className="hover:bg-accent/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-3 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset"
+        className="focus-visible:ring-ring group block h-full rounded-xl outline-none focus-visible:ring-2"
       >
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="min-w-0 truncate font-medium">{tournament.name}</span>
-            {roleLabel && <Badge variant="outline">{roleLabel}</Badge>}
-          </p>
-          <p className="text-muted-foreground text-sm">
-            <span className="font-mono tabular-nums">
-              {formatDateRange(tournament.startAt, tournament.endAt)}
+        <Card
+          className={cn(
+            "group-hover:border-primary/50 h-full flex-row items-start gap-4 p-4 transition-colors",
+            live && "border-primary/40 bg-primary/5",
+          )}
+        >
+          <div
+            className={cn(
+              "flex size-14 shrink-0 flex-col items-center justify-center rounded-lg",
+              live ? "bg-primary text-primary-foreground" : "bg-secondary",
+            )}
+          >
+            <span className="text-xl leading-none font-semibold tabular-nums">{start.day}</span>
+            <span
+              className={cn(
+                "mt-1 text-[11px] leading-none font-medium tracking-wide uppercase",
+                !live && "text-muted-foreground",
+              )}
+            >
+              {start.month}
             </span>
-            {tournament.format && ` · ${TOURNAMENT_FORMAT_LABELS[tournament.format]}`}
-          </p>
-        </div>
-        <TournamentStatusBadge status={tournament.status} className="shrink-0" />
-        <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="space-y-0.5">
+              <p className="truncate leading-tight font-semibold">{tournament.name}</p>
+              <p className="text-muted-foreground truncate text-sm">{metaLine(tournament)}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <TournamentStatusBadge status={tournament.status} />
+              {roleLabel && <Badge variant="outline">{roleLabel}</Badge>}
+            </div>
+          </div>
+        </Card>
       </Link>
       {deletable && <DeleteCancelledTournament tournament={tournament} />}
     </li>
@@ -148,7 +197,7 @@ const SECTION_OF: Record<TournamentStatus, SectionKey> = {
 
 const SECTIONS: { key: SectionKey; title: string }[] = [
   { key: "live", title: "Trwają" },
-  { key: "upcoming", title: "Nadchodzące" },
+  { key: "upcoming", title: "W przygotowaniu" },
   { key: "drafts", title: "Szkice" },
   { key: "past", title: "Zakończone i anulowane" },
 ]
@@ -159,7 +208,7 @@ const SECTIONS: { key: SectionKey; title: string }[] = [
  */
 export function TournamentSections({ items }: { items: TournamentListItem[] }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {SECTIONS.map(({ key, title }) => {
         const inSection = items
           .filter((item) => SECTION_OF[item.tournament.status] === key)
@@ -169,17 +218,23 @@ export function TournamentSections({ items }: { items: TournamentListItem[] }) {
           })
         if (inSection.length === 0) return null
         return (
-          <section key={key} className="space-y-2">
-            <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              {title} <span className="font-mono tabular-nums">({inSection.length})</span>
+          <section key={key} className="space-y-3">
+            <h2 className="text-sm font-semibold">
+              {title}{" "}
+              <span className="text-muted-foreground font-normal tabular-nums">
+                {inSection.length}
+              </span>
             </h2>
-            <Card className={cn("gap-0 overflow-hidden py-0", key === "past" && "opacity-80")}>
-              <ul className="divide-y">
-                {inSection.map((item) => (
-                  <TournamentRow key={item.tournament.id} {...item} />
-                ))}
-              </ul>
-            </Card>
+            <ul
+              className={cn(
+                "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4",
+                key === "past" && "opacity-70",
+              )}
+            >
+              {inSection.map((item) => (
+                <TournamentCard key={item.tournament.id} {...item} />
+              ))}
+            </ul>
           </section>
         )
       })}
