@@ -2,7 +2,7 @@
 
 import { ArrowRight, CalendarCheck, Check, CircleAlert, Network, Plus, Shield } from "lucide-react"
 import Link from "next/link"
-import { type ReactNode, useRef, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -205,6 +205,13 @@ export function TournamentSetupView({ initialStep }: { initialStep?: SetupStepKe
   if (selected === null && !progress.isPending) {
     setSelected(SETUP_STEP_KEYS.indexOf(progress.firstIncomplete))
   }
+  // Bieżący krok trzymamy w adresie. Z kreatora wychodzi się na chwilę (np. do składu drużyny) —
+  // po "wstecz" przeglądarka wraca pod ten adres i otwiera ten sam krok, a nie pierwszy niegotowy.
+  useEffect(() => {
+    if (selected !== null) {
+      window.history.replaceState(null, "", `?step=${SETUP_STEP_KEYS[selected]}`)
+    }
+  }, [selected])
   const data = tournament.data!
   const base = `/tournaments/${id}`
 
