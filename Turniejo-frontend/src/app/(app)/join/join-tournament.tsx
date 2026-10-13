@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useJoinTournament } from "@/features/teams/api"
+import { useApi } from "@/hooks/use-api"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 import { JOIN_ROLE_LABELS, type JoinResult } from "@/types/teams"
@@ -79,6 +80,7 @@ function NextSteps({ result }: { result: JoinResult }) {
 
 export function JoinTournament({ initialCode = "" }: { initialCode?: string }) {
   const join = useJoinTournament()
+  const { isAuthenticated } = useApi()
   const setActiveTournament = useActiveTournamentStore((state) => state.setTournament)
   const form = useForm<JoinValues>({
     resolver: zodResolver(schema),
@@ -96,13 +98,15 @@ export function JoinTournament({ initialCode = "" }: { initialCode?: string }) {
   }
 
   // Link zaproszenia (/join?code=…) dołącza od razu — raz na wejście, bez ponownego wpisywania kodu.
+  // Czekamy na sesję: przy pierwszym renderze tokenu jeszcze nie ma, a zapytanie bez niego kończyło
+  // się 403 i komunikatem "Brak uprawnień", mimo że kod był dobry.
   const autoJoined = useRef(false)
   useEffect(() => {
-    if (!initialCode || autoJoined.current) return
+    if (!initialCode || !isAuthenticated || autoJoined.current) return
     autoJoined.current = true
     void form.handleSubmit(submit)()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- tylko przy pierwszym renderze
-  }, [initialCode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- raz, gdy sesja jest gotowa
+  }, [initialCode, isAuthenticated])
 
   if (join.isSuccess) {
     const { tournamentName, role } = join.data
