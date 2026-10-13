@@ -133,6 +133,28 @@ test.describe("Reset hasła", () => {
   })
 })
 
+test.describe("Organizacja", () => {
+  test("organizator nazywa organizację przy rejestracji i zmienia nazwę w koncie", async ({
+    page,
+  }) => {
+    const email = `klub.${Date.now()}@e2e.pl`
+    await page.goto("/register")
+    await fillRegistration(page, email, "Olga")
+    await page.getByText("Organizuję turnieje").click()
+    await page.getByLabel("Nazwa organizacji (opcjonalnie)").fill("UKS Orły")
+    await page.getByRole("button", { name: "Załóż konto" }).click()
+    await expect(page.getByText("Organizacja: UKS Orły")).toBeVisible()
+
+    await page.goto("/account")
+    await page.getByRole("button", { name: "Zmień nazwę" }).click()
+    const dialog = page.getByRole("dialog", { name: "Nazwa organizacji" })
+    await dialog.getByLabel("Nazwa organizacji").fill("Akademia Orły")
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(page.getByText("Akademia Orły")).toBeVisible()
+    expect((await mock.state()).organizations).toContain("Akademia Orły")
+  })
+})
+
 test.describe("RODO: konto", () => {
   test("uczestnik pobiera dane i usuwa konto — potem nie może się zalogować", async ({ page }) => {
     const email = `usun.${Date.now()}@e2e.pl`

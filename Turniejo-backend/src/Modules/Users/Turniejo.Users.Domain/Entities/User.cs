@@ -31,7 +31,8 @@ public sealed class User : BaseEntity
         string lastName,
         string? phoneNumber = null,
         bool createOrganization = true,
-        string? acceptedTermsVersion = null)
+        string? acceptedTermsVersion = null,
+        string? organizationName = null)
     {
         if (id == Guid.Empty)
             return Result.Failure<User>(Error.Validation("Id", "User Id cannot be empty."));
@@ -60,7 +61,8 @@ public sealed class User : BaseEntity
         }
 
         user._domainEvents.Add(new UserRegistered(
-            id, email, firstName, lastName, createOrganization));
+            id, email, firstName, lastName, createOrganization,
+            string.IsNullOrWhiteSpace(organizationName) ? null : organizationName.Trim()));
 
         return Result.Success(user);
     }

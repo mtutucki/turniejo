@@ -269,7 +269,10 @@ const api = [
     db.users.push(user)
     // Jak UserRegisteredHandler: organizacja + rola tylko dla organizatora (domyślnie true).
     if (body.createOrganization !== false) {
-      createOrganization(user, `${user.firstName} ${user.lastName}`)
+      createOrganization(
+        user,
+        String(body.organizationName ?? "").trim() || `${user.firstName} ${user.lastName}`,
+      )
     }
     return HttpResponse.json({ userId: user.id }, { status: 201 })
   }),
@@ -335,6 +338,17 @@ const api = [
             slug: organization.slug,
           })
         : new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id",
+    authed<{ id: string }>(async ({ request, user, params }) => {
+      const organization = db.organizations.find((o) => o.id === params.id)
+      if (!organization || !hasRole(user, "Organizer", "Organization", organization.id)) {
+        return problem(403, "Forbidden")
+      }
+      organization.name = ((await request.json()) as { name: string }).name.trim()
+      return new HttpResponse(null, { status: 204 })
     }),
   ),
   http.post(

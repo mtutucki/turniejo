@@ -27,5 +27,10 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
         RuleFor(x => x.PhoneNumber)
             .MaximumLength(20)
             .When(x => x.PhoneNumber is not null);
+
+        // Limit jak w CreateOrganizationCommandValidator — inaczej zbyt długa nazwa wywracałaby dopiero outbox.
+        RuleFor(x => x.OrganizationName)
+            .MaximumLength(200)
+            .When(x => x.OrganizationName is not null);
     }
 }

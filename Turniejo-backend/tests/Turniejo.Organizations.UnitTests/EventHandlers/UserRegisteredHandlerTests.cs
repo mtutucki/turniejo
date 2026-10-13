@@ -26,6 +26,28 @@ public sealed class UserRegisteredHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ShouldNameOrganizationAsGivenAtRegistration()
+    {
+        var notification = new UserRegistered(Guid.NewGuid(), "jan@example.com", "Jan", "Kowalski", OrganizationName: " UKS Orły ");
+
+        await _handler.Handle(notification, CancellationToken.None);
+
+        await _dbContext.Received(1).AddOrganizationAsync(
+            Arg.Is<Organization>(o => o.Name == "UKS Orły"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldNameOrganizationAfterOwner_WhenNoNameWasGiven()
+    {
+        var notification = new UserRegistered(Guid.NewGuid(), "jan@example.com", "Jan", "Kowalski");
+
+        await _handler.Handle(notification, CancellationToken.None);
+
+        await _dbContext.Received(1).AddOrganizationAsync(
+            Arg.Is<Organization>(o => o.Name == "Jan Kowalski"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_ShouldCreateOrganizationAndAssignOrganizerRole_WhenUserHasNoOrganizationYet()
     {
         // Domyka główny scenariusz z audytu: rejestracja ma faktycznie utworzyć organizację.

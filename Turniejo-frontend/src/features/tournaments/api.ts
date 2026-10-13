@@ -108,6 +108,18 @@ export function useCreateOrganization() {
   })
 }
 
+/** PUT /api/organizations/{id} — zmiana nazwy organizacji (tylko organizator). */
+export function useRenameOrganization(organizationId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) =>
+      request(`/api/organizations/${organizationId}`, { method: "PUT", body: { name } }),
+    meta: { handlesValidation: true },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tournamentKeys.myOrganization }),
+  })
+}
+
 export function useTournaments(organizationId: string | undefined) {
   const { request, isAuthenticated } = useApi()
   return useQuery({

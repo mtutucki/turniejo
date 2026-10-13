@@ -37,5 +37,15 @@ public sealed class Organization : BaseEntity
         return Result.Success(organization);
     }
 
+    /// <summary>Zmiana nazwy. Slug zostaje — jest stałym identyfikatorem, nie etykietą.</summary>
+    public Result Rename(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return Result.Failure(Error.Validation("Name", "Name cannot be empty."));
+
+        Name = name.Trim();
+        SetUpdatedAt();
+        return Result.Success();
+    }
 
 }

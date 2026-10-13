@@ -1,6 +1,6 @@
 "use client"
 
-import { Download, Trash2 } from "lucide-react"
+import { Download, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { signOut, useSession } from "next-auth/react"
 import { useState } from "react"
@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useDeleteMyAccount, useExportMyData } from "@/features/account/api"
 import { useMyOrganization } from "@/features/tournaments/api"
+import { RenameOrganizationDialog } from "@/features/tournaments/components/rename-organization-dialog"
 import { isApiError } from "@/lib/api/errors"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 
@@ -157,6 +158,35 @@ function DeleteAccount() {
   )
 }
 
+/** Organizacja zakłada się sama przy rejestracji — tu ją widać i tu zmienia się jej nazwę. */
+function OrganizationCard() {
+  const organization = useMyOrganization()
+  if (!organization.data) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardDescription>Organizacja</CardDescription>
+        <CardTitle className="text-base">{organization.data.name}</CardTitle>
+        <CardDescription>
+          Pod tą nazwą prowadzisz turnieje i bazę drużyn — może to być klub, szkoła albo Ty sam.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <RenameOrganizationDialog
+          organization={organization.data}
+          trigger={
+            <Button variant="outline">
+              <Pencil />
+              Zmień nazwę
+            </Button>
+          }
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
 /** Ustawienia konta: dane profilu, eksport danych i usunięcie konta (prawa z RODO). */
 export function AccountView() {
   const { data: session } = useSession()
@@ -172,6 +202,8 @@ export function AccountView() {
             <CardDescription>{session?.user?.email}</CardDescription>
           </CardHeader>
         </Card>
+
+        <OrganizationCard />
 
         <Card>
           <CardHeader>

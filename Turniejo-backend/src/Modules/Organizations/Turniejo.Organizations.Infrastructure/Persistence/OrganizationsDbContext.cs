@@ -30,6 +30,13 @@ public sealed class OrganizationsDbContext(DbContextOptions<OrganizationsDbConte
             x => x.OwnerUserId == ownerUserId,
             cancellationToken);
 
+    public async Task<Organization?> GetOrganizationByIdAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default) =>
+        await Organizations.FirstOrDefaultAsync(
+            x => x.Id == organizationId,
+            cancellationToken);
+
     public async Task<Organization?> GetOrganizationByOwnerUserIdAsync(
         Guid ownerUserId,
         CancellationToken cancellationToken = default) =>

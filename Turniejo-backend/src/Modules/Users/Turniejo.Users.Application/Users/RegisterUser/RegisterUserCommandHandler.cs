@@ -40,7 +40,8 @@ internal sealed class RegisterUserCommandHandler(
             request.LastName,
             request.PhoneNumber,
             request.CreateOrganization,
-            LegalDocuments.CurrentVersion);
+            LegalDocuments.CurrentVersion,
+            request.OrganizationName);
 
         if (userResult.IsFailure)
             return Result.Failure<RegisterUserResponse>(userResult.Error);

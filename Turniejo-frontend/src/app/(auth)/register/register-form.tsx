@@ -6,7 +6,7 @@ import { type LucideIcon, Ticket, Trophy } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import Link from "next/link"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -28,6 +28,8 @@ const schema = z
     lastName: z.string().trim().min(1, "Podaj nazwisko").max(100),
     email: z.email("Nieprawidłowy adres email").max(256),
     phoneNumber: z.string().trim().max(20, "Maksymalnie 20 znaków").optional(),
+    // Tylko dla organizatora; puste = organizacja nazwana imieniem i nazwiskiem.
+    organizationName: z.string().trim().max(200, "Maksymalnie 200 znaków").optional(),
     password: passwordSchema,
     confirmPassword: z.string(),
     accountType: z.enum(["organizer", "participant"], {
@@ -86,6 +88,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
       lastName: "",
       email: "",
       phoneNumber: "",
+      organizationName: "",
       password: "",
       confirmPassword: "",
       // Bez domyślnego wyboru (poza linkiem zaproszenia) — user świadomie decyduje, czy organizuje.
@@ -95,6 +98,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
   })
   const { errors } = form.formState
   const router = useRouter()
+  const isOrganizer = useWatch({ control: form.control, name: "accountType" }) === "organizer"
 
   const register = useMutation({
     mutationFn: ({
@@ -103,6 +107,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
       email,
       password,
       phoneNumber,
+      organizationName,
       accountType,
     }: RegisterValues) =>
       apiFetch<{ userId: string }>("/api/auth/register", {
@@ -115,6 +120,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           phoneNumber: phoneNumber || null,
           // Organizacja (i rola organizatora) tylko dla organizatora — reszta może ją założyć później.
           createOrganization: accountType === "organizer",
+          organizationName: (accountType === "organizer" && organizationName) || null,
           acceptTerms: true,
         },
       }),
@@ -177,6 +183,17 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           </div>
           <FieldError errors={[errors.accountType]} />
         </fieldset>
+        {isOrganizer && (
+          <TextField
+            id="organizationName"
+            label="Nazwa organizacji (opcjonalnie)"
+            placeholder="np. UKS Orły Warszawa"
+            autoComplete="organization"
+            description="Klub, szkoła albo Ty sam. Bez nazwy użyjemy Twojego imienia i nazwiska — zmienisz ją w „Moje konto”."
+            error={errors.organizationName}
+            {...form.register("organizationName")}
+          />
+        )}
         <div className="grid grid-cols-2 gap-4">
           <TextField
             id="firstName"
