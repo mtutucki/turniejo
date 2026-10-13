@@ -1,7 +1,7 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { Plus, Trophy } from "lucide-react"
+import { Loader2, Plus, Trophy } from "lucide-react"
 import Link from "next/link"
 import { useEffect } from "react"
 
@@ -56,7 +56,21 @@ export function TournamentList() {
         actions={organization.data && <NewTournamentButton />}
       />
 
-      {isLoading ? (
+      {isProvisioning ? (
+        // Bez komunikatu same szkielety wyglądały po rejestracji jak zawieszona aplikacja.
+        <div
+          role="status"
+          className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-4 py-12 text-center"
+        >
+          <Loader2 className="text-primary size-8 animate-spin" />
+          <div className="space-y-1">
+            <p className="font-medium">Konfigurujemy Twoje konto</p>
+            <p className="text-muted-foreground text-sm">
+              Zakładamy Twoją organizację — to potrwa kilka sekund.
+            </p>
+          </div>
+        </div>
+      ) : isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[0, 1].map((i) => (
             <Skeleton key={i} className="h-40 rounded-xl" />

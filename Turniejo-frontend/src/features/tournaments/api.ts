@@ -36,8 +36,10 @@ const base = (id: string) => `/api/tournaments/${id}`
 
 // --- Queries ---------------------------------------------------------------------------------
 
-/** Ile razy dopytujemy o organizację, zanim uznamy, że konto jej nie ma (~30 s co 4 s). */
-const ORGANIZATION_POLL_LIMIT = 8
+/** Ile razy dopytujemy o organizację, zanim uznamy, że konto jej nie ma (~30 s co 1,5 s). */
+const ORGANIZATION_POLL_LIMIT = 20
+// Outbox backendu chodzi co sekundę — rzadsze dopytywanie tylko wydłużało ekran oczekiwania.
+const ORGANIZATION_POLL_INTERVAL_MS = 1_500
 const PROVISIONING_KEY = "turniejo:organization-provisioning"
 
 /** Rejestracja jako organizator: organizacja dopiero powstaje, więc brak danych ≠ "nie masz organizacji". */
@@ -80,7 +82,7 @@ export function useMyOrganization() {
     // założeniu konta dopytujemy przez ~30 s, zamiast pokazywać "nie masz organizacji" do odświeżenia.
     refetchInterval: (query) =>
       query.state.data === null && query.state.dataUpdateCount < ORGANIZATION_POLL_LIMIT
-        ? 4_000
+        ? ORGANIZATION_POLL_INTERVAL_MS
         : false,
   })
 }

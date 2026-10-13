@@ -263,7 +263,12 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           className="w-full"
           disabled={register.isPending || register.isSuccess}
         >
-          {register.isPending ? "Tworzenie konta…" : "Załóż konto"}
+          {/* Po utworzeniu konta trwa jeszcze logowanie i przekierowanie — przycisk nie może wyglądać na bezczynny. */}
+          {register.isPending
+            ? "Tworzenie konta…"
+            : register.isSuccess
+              ? "Konfigurujemy Twoje konto…"
+              : "Załóż konto"}
         </Button>
       </FieldGroup>
     </form>
