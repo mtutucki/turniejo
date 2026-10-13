@@ -18,6 +18,7 @@ using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamPaymentStat
 using Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistrationStatus;
 using Turniejo.Teams.Application.TournamentTeams.GetTeamStaff;
 using Turniejo.Teams.Application.TournamentTeams.GetTournamentTeams;
+using Turniejo.Teams.Application.TournamentTeams.RemoveStaffFromTeam;
 using Turniejo.Teams.Domain.Enums;
 using Turniejo.Tournaments.Application.TieBreakerRules.GetTieBreakerRules;
 using Turniejo.Tournaments.Application.TieBreakerRules.SetTieBreakerRules;
@@ -332,6 +333,14 @@ namespace Turniejo.Api.Controllers
                 return result.ToActionResult();
 
             return Created($"api/tournaments/{tournamentId}/tournament-teams/{tournamentTeamId}/staff/{result.Value.TeamStaffId}", result.Value);
+        }
+
+        [HttpDelete("{tournamentId}/tournament-teams/{tournamentTeamId}/staff/{teamStaffId}")]
+        public async Task<IActionResult> RemoveStaffFromTeam([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromRoute] Guid teamStaffId, CancellationToken cancellationToken)
+        {
+            var command = new RemoveStaffFromTeamCommand(tournamentId, tournamentTeamId, teamStaffId);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
         }
 
         [HttpGet("{tournamentId}/tournament-teams/{tournamentTeamId}/staff")]

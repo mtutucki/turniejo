@@ -1,11 +1,23 @@
 "use client"
 
-import { ArrowLeft, Pencil, SearchX, UserPlus, Users } from "lucide-react"
+import { ArrowLeft, Pencil, SearchX, UserMinus, UserPlus, Users } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
+import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -16,7 +28,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useTeamPlayers, useTeamStaff, useTournamentTeams } from "@/features/teams/api"
+import {
+  useRemoveStaff,
+  useTeamPlayers,
+  useTeamStaff,
+  useTournamentTeams,
+} from "@/features/teams/api"
 import { AddPlayerDialog } from "@/features/teams/components/add-player-dialog"
 import { AssignGuardianDialog } from "@/features/teams/components/assign-guardian-dialog"
 import { AssignStaffDialog } from "@/features/teams/components/assign-staff-dialog"
@@ -33,6 +50,7 @@ import {
   PLAYER_POSITION_LABELS,
   PLAYER_STATUS_LABELS,
   TEAM_STAFF_ROLE_LABELS,
+  type TeamStaffMember,
   type TournamentPlayer,
 } from "@/types/teams"
 
@@ -91,6 +109,58 @@ function Squad({
         </li>
       ))}
     </ul>
+  )
+}
+
+const staffName = (s: TeamStaffMember) =>
+  s.firstName || s.lastName ? `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() : "—"
+
+function RemoveStaffButton({
+  tournamentId,
+  tournamentTeamId,
+  member,
+}: {
+  tournamentId: string
+  tournamentTeamId: string
+  member: TeamStaffMember
+}) {
+  const remove = useRemoveStaff(tournamentId, tournamentTeamId)
+  const name =
+    member.firstName || member.lastName ? staffName(member) : (member.email ?? "tę osobę")
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={remove.isPending}
+          aria-label={`Usuń ze sztabu: ${name}`}
+          title="Usuń ze sztabu"
+        >
+          <UserMinus />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Usunąć ze sztabu?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {name} straci dostęp do tej drużyny jako{" "}
+            {TEAM_STAFF_ROLE_LABELS[member.role].toLowerCase()}. W turnieju zostaje — możesz
+            przypisać tę osobę ponownie.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Anuluj</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() =>
+              remove.mutate(member.id, { onSuccess: () => toast.success("Usunięto ze sztabu") })
+            }
+          >
+            Usuń
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
@@ -221,16 +291,17 @@ export function TournamentTeamDetails() {
               ) : staff.data?.length ? (
                 <ul className="divide-y">
                   {staff.data.map((s) => (
-                    <li key={s.id} className="py-2 text-sm">
-                      <p className="font-medium">
-                        {s.firstName || s.lastName
-                          ? `${s.firstName ?? ""} ${s.lastName ?? ""}`
-                          : "—"}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {TEAM_STAFF_ROLE_LABELS[s.role]}
-                        {s.email && ` · ${s.email}`}
-                      </p>
+                    <li key={s.id} className="flex items-center gap-2 py-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{staffName(s)}</p>
+                        <p className="text-muted-foreground truncate text-xs">
+                          {TEAM_STAFF_ROLE_LABELS[s.role]}
+                          {s.email && ` · ${s.email}`}
+                        </p>
+                      </div>
+                      {isOrganizer && (
+                        <RemoveStaffButton tournamentId={id} tournamentTeamId={teamId} member={s} />
+                      )}
                     </li>
                   ))}
                 </ul>

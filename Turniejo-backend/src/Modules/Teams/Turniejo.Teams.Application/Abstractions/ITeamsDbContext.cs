@@ -34,6 +34,7 @@ namespace Turniejo.Teams.Application.Abstractions
 
         // TeamStaff
         Task AddTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default);
+        Task RemoveTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default);
         Task<bool> TeamStaffExistsAsync(Guid tournamentTeamId, Guid userId, TeamStaffRole role, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TeamStaff>> GetTeamStaffByTournamentTeamIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TeamStaff>> GetTeamStaffByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);

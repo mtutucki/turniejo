@@ -115,6 +115,12 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
     public async Task AddTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default) =>
         await TeamStaffs.AddAsync(teamStaff, cancellationToken);
 
+    public Task RemoveTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default)
+    {
+        TeamStaffs.Remove(teamStaff);
+        return Task.CompletedTask;
+    }
+
     public async Task<bool> TeamStaffExistsAsync(Guid tournamentTeamId, Guid userId, TeamStaffRole role, CancellationToken cancellationToken = default) =>
         await TeamStaffs.AnyAsync(s =>
             s.TournamentTeamId == tournamentTeamId && s.UserId == userId && s.Role == role,
