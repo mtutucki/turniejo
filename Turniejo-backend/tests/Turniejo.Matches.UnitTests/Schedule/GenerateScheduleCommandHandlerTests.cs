@@ -89,6 +89,50 @@ namespace Turniejo.Matches.UnitTests.Schedule
         }
 
         [Fact]
+        public async Task Handle_ShouldNotScheduleSameClubInTwoCategoriesAtTheSameTime()
+        {
+            // Ta sama drużyna z bazy zgłoszona do dwóch kategorii to dwa zgłoszenia (różne TournamentTeamId),
+            // ale wspólny trener i często zawodnicy — mimo dwóch wolnych boisk jej mecze nie mogą się nakładać.
+            var tournamentId = Guid.NewGuid();
+            var sharedClubId = Guid.NewGuid();
+            var (categoryA, groupA) = (Guid.NewGuid(), Guid.NewGuid());
+            var (categoryB, groupB) = (Guid.NewGuid(), Guid.NewGuid());
+            var pitchIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeTournament(tournamentId));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeSettings(tournamentId));
+            _tournamentModule.GetTournamentGroupsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentGroupDto>
+                {
+                    new(groupA, tournamentId, categoryA, "Grupa A"),
+                    new(groupB, tournamentId, categoryB, "Grupa A"),
+                });
+            _dbContext.GetPitchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(pitchIds.Select((id, i) => Pitch.Create(id, tournamentId, $"Boisko {i + 1}", null, Guid.NewGuid()).Value).ToList());
+            _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamDto>
+                {
+                    new(Guid.NewGuid(), tournamentId, sharedClubId, categoryA, groupA, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryA, groupA, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, sharedClubId, categoryB, groupB, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryB, groupB, "Accepted"),
+                });
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(new List<Match>());
+            _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>()).Returns(true);
+            _currentUserContext.UserId.Returns(Guid.NewGuid());
+            IReadOnlyCollection<Match>? created = null;
+            await _dbContext.AddMatchesAsync(Arg.Do<IReadOnlyCollection<Match>>(m => created = m), Arg.Any<CancellationToken>());
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), pitchIds), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            created.Should().HaveCount(2);
+            created!.Select(m => m.ScheduledAt).Should().OnlyHaveUniqueItems();
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenTournamentNotFound()
         {
             // Arrange

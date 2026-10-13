@@ -111,8 +111,9 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .Select(m => (m.PitchId!.Value, m.ScheduledAt))
                 .ToHashSet();
 
+            var clubOf = ClubLookup(allTournamentTeams);
             var (placements, unplaced) = PlaceInSlots(
-                pairs, p => (p.HomeTournamentTeamId, p.AwayTournamentTeamId), pitches, occupiedSlots, windows, settings);
+                pairs, p => (clubOf(p.HomeTournamentTeamId), clubOf(p.AwayTournamentTeamId)), pitches, occupiedSlots, windows, settings);
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
 
@@ -185,8 +186,9 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .Select(m => (m.PitchId!.Value, m.ScheduledAt))
                 .ToHashSet();
 
+            var clubOf = ClubLookup(await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken));
             var (placements, unplaced) = PlaceInSlots(
-                toSchedule, m => (m.HomeTournamentTeamId, m.AwayTournamentTeamId), pitches, occupiedSlots, windows, settings);
+                toSchedule, m => (clubOf(m.HomeTournamentTeamId), clubOf(m.AwayTournamentTeamId)), pitches, occupiedSlots, windows, settings);
             if (unplaced > 0)
                 return NotEnoughTime(unplaced);
 
@@ -383,6 +385,14 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             }
 
             return (placements, remaining.Count);
+        }
+
+        // Ta sama drużyna z bazy może grać w kilku kategoriach (osobne zgłoszenia). Dla generatora to
+        // jedna drużyna: ma wspólnego trenera, a często i zawodników, więc nie gra dwóch meczów naraz.
+        private static Func<Guid, Guid> ClubLookup(IReadOnlyList<TournamentTeamDto> tournamentTeams)
+        {
+            var teamIdByTournamentTeamId = tournamentTeams.ToDictionary(t => t.Id, t => t.TeamId);
+            return tournamentTeamId => teamIdByTournamentTeamId.GetValueOrDefault(tournamentTeamId, tournamentTeamId);
         }
 
         private static Result<GenerateScheduleResponse> NotEnoughTime(int unplaced) =>
