@@ -305,6 +305,50 @@ const api = [
     "*/api/me/roles",
     authed(({ user }) => HttpResponse.json(user.roles)),
   ),
+  // Jak GetMyProfileQuery / UpdateMyProfileCommand / ChangeMyPasswordCommand.
+  http.get(
+    "*/api/me/profile",
+    authed(({ user }) =>
+      HttpResponse.json({
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumber ?? null,
+      }),
+    ),
+  ),
+  http.put(
+    "*/api/me/profile",
+    authed(async ({ user, request }) => {
+      const body = (await request.json()) as {
+        firstName: string
+        lastName: string
+        phoneNumber: string | null
+      }
+      user.firstName = body.firstName.trim()
+      user.lastName = body.lastName.trim()
+      user.phoneNumber = body.phoneNumber?.trim() || null
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.post(
+    "*/api/me/password",
+    authed(async ({ user, request }) => {
+      const body = (await request.json()) as { currentPassword: string; newPassword: string }
+      if (body.currentPassword !== user.password) {
+        return HttpResponse.json(
+          {
+            code: "Validation.CurrentPassword",
+            message: "Current password is incorrect.",
+            type: 2,
+          },
+          { status: 400 },
+        )
+      }
+      user.password = body.newPassword
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
   http.get(
     "*/api/me/export",
     authed(({ user }) =>

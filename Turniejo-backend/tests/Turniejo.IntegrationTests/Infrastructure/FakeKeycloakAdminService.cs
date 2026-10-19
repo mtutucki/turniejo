@@ -9,7 +9,9 @@ namespace Turniejo.IntegrationTests.Infrastructure;
 public sealed class FakeKeycloakAdminService : IKeycloakAdminService
 {
     private readonly ConcurrentDictionary<string, Guid> _usersByEmail = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<Guid, string> _passwords = new();
     public ConcurrentBag<(Guid UserId, string Password)> PasswordChanges { get; } = [];
+    public ConcurrentBag<(Guid UserId, string FirstName, string LastName)> NameChanges { get; } = [];
     public ConcurrentBag<Guid> LoggedOutUsers { get; } = [];
     public ConcurrentBag<Guid> DeletedUsers { get; } = [];
 
@@ -21,14 +23,28 @@ public sealed class FakeKeycloakAdminService : IKeycloakAdminService
 
         var id = Guid.NewGuid();
         _usersByEmail[email] = id;
+        _passwords[id] = password;
         return Task.FromResult(id);
     }
 
     public Task SetPasswordAsync(Guid keycloakUserId, string password, CancellationToken cancellationToken = default)
     {
         PasswordChanges.Add((keycloakUserId, password));
+        _passwords[keycloakUserId] = password;
         return Task.CompletedTask;
     }
+
+    public Task UpdateNameAsync(Guid keycloakUserId, string firstName, string lastName, CancellationToken cancellationToken = default)
+    {
+        NameChanges.Add((keycloakUserId, firstName, lastName));
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> VerifyPasswordAsync(string username, string password, CancellationToken cancellationToken = default) =>
+        Task.FromResult(
+            _usersByEmail.TryGetValue(username, out var id)
+            && _passwords.TryGetValue(id, out var stored)
+            && stored == password);
 
     public Task LogoutAllSessionsAsync(Guid keycloakUserId, CancellationToken cancellationToken = default)
     {
@@ -51,7 +67,9 @@ public sealed class FakeKeycloakAdminService : IKeycloakAdminService
     public void Reset()
     {
         _usersByEmail.Clear();
+        _passwords.Clear();
         PasswordChanges.Clear();
+        NameChanges.Clear();
         LoggedOutUsers.Clear();
         DeletedUsers.Clear();
     }

@@ -19,6 +19,22 @@ public interface IKeycloakAdminService
         string password,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Imię i nazwisko konta logowania — trafiają do tokenu, więc muszą zgadzać się z profilem.</summary>
+    Task UpdateNameAsync(
+        Guid keycloakUserId,
+        string firstName,
+        string lastName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sprawdza hasło logowaniem do Keycloaka (bez zostawiania sesji). Zmiana hasła wymaga podania
+    /// obecnego, żeby przejęta sesja nie wystarczyła do przejęcia konta.
+    /// </summary>
+    Task<bool> VerifyPasswordAsync(
+        string username,
+        string password,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Zamyka wszystkie sesje usera — jego refresh tokeny przestają działać.</summary>
     Task LogoutAllSessionsAsync(
         Guid keycloakUserId,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { useApi } from "@/hooks/use-api"
 
@@ -33,5 +33,50 @@ export function useDeleteMyAccount() {
         method: "DELETE",
       }),
     meta: { handlesConflict: true },
+  })
+}
+
+export type MyProfile = {
+  email: string
+  firstName: string
+  lastName: string
+  phoneNumber: string | null
+}
+
+export const accountKeys = {
+  profile: ["me", "profile"] as const,
+}
+
+/** GET /api/me/profile — dane z bazy (token nie ma telefonu i nie odświeża się po zmianie). */
+export function useMyProfile() {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: accountKeys.profile,
+    queryFn: () => request<MyProfile>("/api/me/profile"),
+    enabled: isAuthenticated,
+  })
+}
+
+export type UpdateMyProfile = Pick<MyProfile, "firstName" | "lastName" | "phoneNumber">
+
+/** PUT /api/me/profile — imię, nazwisko i telefon. E-mail jest loginem, więc się nie zmienia. */
+export function useUpdateMyProfile() {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: UpdateMyProfile) => request("/api/me/profile", { method: "PUT", body }),
+    // Imię i nazwisko widać też u organizatora (członkowie turnieju) i w sztabie drużyn.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+    meta: { handlesValidation: true },
+  })
+}
+
+/** POST /api/me/password — wymaga obecnego hasła; backend zamyka potem wszystkie sesje. */
+export function useChangeMyPassword() {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+      request("/api/me/password", { method: "POST", body }),
+    meta: { handlesValidation: true },
   })
 }

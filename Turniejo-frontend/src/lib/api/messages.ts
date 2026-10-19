@@ -6,6 +6,8 @@ const EXACT: Record<string, string> = {
   // Auth / konto
   "User with this email already exists.": "Konto z tym adresem email już istnieje",
   "You already have an organization.": "Masz już organizację",
+  "Current password is incorrect.": "Obecne hasło jest nieprawidłowe",
+  "New password must be different from the current one.": "Nowe hasło musi się różnić od obecnego",
   // Dołączanie kodem
   "Invalid tournament code.": "Nieprawidłowy kod turnieju",
   // Turniej

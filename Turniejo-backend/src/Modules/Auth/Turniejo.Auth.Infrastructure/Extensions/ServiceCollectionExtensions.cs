@@ -57,6 +57,7 @@ public static class ServiceCollectionExtensions
         var keycloakBaseUrl = new Uri(configuration["Keycloak:BaseUrl"]!);
 
         services.AddHttpClient(KeycloakAdminTokenProvider.HttpClientName, client => client.BaseAddress = keycloakBaseUrl);
+        services.AddHttpClient(KeycloakAdminService.PasswordCheckHttpClientName, client => client.BaseAddress = keycloakBaseUrl);
         services.AddSingleton<KeycloakAdminTokenProvider>();
         services.AddTransient<KeycloakAdminTokenHandler>();
         services.AddHttpClient<IKeycloakAdminService, KeycloakAdminService>(client =>

@@ -9,6 +9,7 @@ export type User = {
   password: string
   firstName: string
   lastName: string
+  phoneNumber?: string | null
   roles: Role[]
 }
 export type Team = { id: string; name: string; shortName: string | null }
