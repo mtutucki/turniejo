@@ -1,7 +1,9 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { KeyRound } from "lucide-react"
 import { signIn, useSession } from "next-auth/react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -32,12 +34,13 @@ const schema = z
   })
 type Values = z.infer<typeof schema>
 
-const EMPTY: Values = { currentPassword: "", newPassword: "", confirmPassword: "" }
-
-export function ChangePasswordForm() {
+function PasswordForm({ onDone }: { onDone: () => void }) {
   const { data: session } = useSession()
   const change = useChangeMyPassword()
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: EMPTY })
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  })
   const { errors } = form.formState
 
   function submit({ currentPassword, newPassword }: Values) {
@@ -45,18 +48,18 @@ export function ChangePasswordForm() {
       { currentPassword, newPassword },
       {
         onSuccess: async () => {
-          form.reset(EMPTY)
           // Backend zamknął wszystkie sesje (także tę). Logujemy od razu nowym hasłem, żeby user
           // nie wypadł z aplikacji po kilku minutach, gdy wygaśnie token.
           const email = session?.user?.email
           const result = email
             ? await signIn("credentials", { email, password: newPassword, redirect: false })
             : null
-          if (result && !result.error) {
-            toast.success("Hasło zmienione. Na innych urządzeniach zaloguj się nowym hasłem.")
-          } else {
-            toast.success("Hasło zmienione. Zaloguj się ponownie nowym hasłem.")
-          }
+          toast.success(
+            result && !result.error
+              ? "Hasło zmienione. Na innych urządzeniach zaloguj się nowym hasłem."
+              : "Hasło zmienione. Zaloguj się ponownie nowym hasłem.",
+          )
+          onDone()
         },
         onError: (error) => applyFieldErrors(error, form),
       },
@@ -64,50 +67,73 @@ export function ChangePasswordForm() {
   }
 
   return (
+    <form onSubmit={form.handleSubmit(submit)} noValidate>
+      <FieldGroup>
+        <TextField
+          id="currentPassword"
+          label="Obecne hasło"
+          type="password"
+          autoComplete="current-password"
+          autoFocus
+          error={errors.currentPassword}
+          {...form.register("currentPassword")}
+        />
+        <TextField
+          id="newPassword"
+          label="Nowe hasło"
+          type="password"
+          autoComplete="new-password"
+          description={PASSWORD_HINT}
+          error={errors.newPassword}
+          {...form.register("newPassword")}
+        />
+        <TextField
+          id="confirmPassword"
+          label="Powtórz nowe hasło"
+          type="password"
+          autoComplete="new-password"
+          error={errors.confirmPassword}
+          {...form.register("confirmPassword")}
+        />
+        <FieldError errors={[errors.root]} />
+        <div className="flex gap-2">
+          <Button type="submit" disabled={change.isPending}>
+            {change.isPending ? "Zmienianie…" : "Zapisz nowe hasło"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDone}>
+            Anuluj
+          </Button>
+        </div>
+      </FieldGroup>
+    </form>
+  )
+}
+
+/** Hasło: sam przycisk, formularz dopiero po kliknięciu. */
+export function ChangePasswordForm() {
+  const [editing, setEditing] = useState(false)
+
+  return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Zmiana hasła</CardTitle>
-        <CardDescription>
-          Po zmianie wylogujemy Cię na innych urządzeniach. Tutaj zostaniesz zalogowany.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <CardTitle className="text-base">Hasło</CardTitle>
+          <CardDescription>
+            Po zmianie wylogujemy Cię na innych urządzeniach. Tutaj zostaniesz zalogowany.
+          </CardDescription>
+        </div>
+        {!editing && (
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <KeyRound />
+            Zmień hasło
+          </Button>
+        )}
       </CardHeader>
-      <CardContent>
-        <form onSubmit={form.handleSubmit(submit)} noValidate>
-          <FieldGroup>
-            <TextField
-              id="currentPassword"
-              label="Obecne hasło"
-              type="password"
-              autoComplete="current-password"
-              error={errors.currentPassword}
-              {...form.register("currentPassword")}
-            />
-            <TextField
-              id="newPassword"
-              label="Nowe hasło"
-              type="password"
-              autoComplete="new-password"
-              description={PASSWORD_HINT}
-              error={errors.newPassword}
-              {...form.register("newPassword")}
-            />
-            <TextField
-              id="confirmPassword"
-              label="Powtórz nowe hasło"
-              type="password"
-              autoComplete="new-password"
-              error={errors.confirmPassword}
-              {...form.register("confirmPassword")}
-            />
-            <FieldError errors={[errors.root]} />
-            <div>
-              <Button type="submit" disabled={change.isPending}>
-                {change.isPending ? "Zmienianie…" : "Zmień hasło"}
-              </Button>
-            </div>
-          </FieldGroup>
-        </form>
-      </CardContent>
+      {editing && (
+        <CardContent>
+          <PasswordForm onDone={() => setEditing(false)} />
+        </CardContent>
+      )}
     </Card>
   )
 }

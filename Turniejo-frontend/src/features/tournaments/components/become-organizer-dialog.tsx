@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -34,27 +34,13 @@ type Values = z.infer<typeof schema>
  * Konto założone jako rodzic/trener/sędzia może w każdej chwili zacząć organizować turnieje —
  * zakłada własną organizację (klub, szkołę, osobę) i dostaje rolę organizatora.
  */
-export function BecomeOrganizerDialog({
-  trigger,
-  defaultOpen = false,
-}: {
-  trigger: ReactNode
-  /** Strona "Zostań organizatorem" z menu otwiera formularz od razu. */
-  defaultOpen?: boolean
-}) {
+export function BecomeOrganizerDialog({ trigger }: { trigger: ReactNode }) {
+  const [open, setOpen] = useState(false)
   const { data: session } = useSession()
-  const [open, setOpen] = useState(defaultOpen)
   const router = useRouter()
   const create = useCreateOrganization()
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: "" } })
   const { errors } = form.formState
-
-  // Otwarty od razu dialog nie przechodzi przez onOpenChange, więc podpowiedź nazwy wpisujemy,
-  // gdy sesja się wczyta.
-  const sessionName = session?.user?.name
-  useEffect(() => {
-    if (defaultOpen && sessionName) form.reset({ name: sessionName })
-  }, [defaultOpen, sessionName, form])
 
   function submit({ name }: Values) {
     create.mutate(name, {

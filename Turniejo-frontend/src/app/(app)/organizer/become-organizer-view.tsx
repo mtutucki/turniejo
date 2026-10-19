@@ -54,7 +54,6 @@ export function BecomeOrganizerView() {
               ))}
             </ul>
             <BecomeOrganizerDialog
-              defaultOpen
               trigger={<Button className="w-full sm:w-auto">Załóż organizację</Button>}
             />
           </CardContent>
