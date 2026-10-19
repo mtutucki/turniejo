@@ -13,37 +13,37 @@ type RoleStyle = {
   link?: { href: string; label: string }
 }
 
-// Bursztyn (--live) jest zarezerwowany dla trwających meczów — role mają własne odcienie.
+// Bursztyn (--live) jest zarezerwowany dla trwających meczów, role mają własne odcienie.
 const ROLE_STYLES: Partial<Record<UserRole, RoleStyle>> = {
   [UserRole.Organizer]: {
     label: "Organizator",
     icon: Crown,
     className: "bg-primary/15 text-primary",
-    hint: "zarządzasz turniejem — drużyny, terminarz i ustawienia są w Twoich rękach.",
+    hint: "Zarządzasz całym turniejem.",
   },
   [UserRole.Referee]: {
     label: "Sędzia",
     icon: Whistle,
     className: "bg-sky-500/15 text-sky-300",
-    hint: "prowadzisz mecze, które przydzieli Ci organizator, i możesz brać wolne.",
+    hint: "Sędziujesz mecze w tym turnieju.",
     link: { href: "/referee/matches", label: "Moje mecze" },
   },
   [UserRole.Coach]: {
     label: "Trener",
     icon: ClipboardList,
     className: "bg-violet-500/15 text-violet-300",
-    hint: "organizator przypisze Cię do drużyny — jej skład i mecze znajdziesz w panelu trenera.",
+    hint: "Prowadzisz drużynę w tym turnieju.",
     link: { href: "/coach/teams", label: "Moje drużyny" },
   },
   [UserRole.Viewer]: {
     label: "Kibic / rodzic",
     icon: Heart,
     className: "bg-rose-500/15 text-rose-300",
-    hint: "śledzisz terminarz, wyniki i tabelę. Miłego kibicowania!",
+    hint: "Kibicujesz! Śledź terminarz i wyniki.",
   },
 }
 
-// Najważniejsza rola decyduje o podpowiedzi, gdy user ma kilka (np. trener, który też sędziuje).
+// Kolejność ról, gdy user ma kilka (np. trener, który też sędziuje).
 const PRIORITY: UserRole[] = [UserRole.Organizer, UserRole.Referee, UserRole.Coach, UserRole.Viewer]
 
 const styleOf = (role: UserRole): RoleStyle =>
@@ -65,30 +65,49 @@ export function RoleBadge({ role, className }: { role: UserRole; className?: str
   )
 }
 
-/** "Jesteś tu jako …" w nagłówku turnieju — rola usera i jedno zdanie, co może tu robić. */
-export function MyTournamentRole({ roles }: { roles: UserRole[] }) {
-  if (roles.length === 0) return null
-  const sorted = [...new Set(roles)].sort(
-    (a, b) =>
-      (PRIORITY.indexOf(a) + 1 || PRIORITY.length + 1) -
-      (PRIORITY.indexOf(b) + 1 || PRIORITY.length + 1),
-  )
-  const main = styleOf(sorted[0]!)
+/** Odznaka roli, krótkie zdanie, co user tu robi, i skrót do jego panelu. */
+function RoleLine({ role }: { role: UserRole }) {
+  const { hint, link } = styleOf(role)
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <span className="text-muted-foreground">Jesteś tu jako</span>
-      {sorted.map((role) => (
-        <RoleBadge key={role} role={role} />
-      ))}
-      {main.hint && <span className="text-muted-foreground">— {main.hint}</span>}
-      {main.link && (
+    <>
+      <RoleBadge role={role} />
+      {hint && <span className="text-muted-foreground">{hint}</span>}
+      {link && (
         <Link
-          href={main.link.href}
+          href={link.href}
           className="text-primary font-medium underline-offset-2 hover:underline"
         >
-          {main.link.label} →
+          {link.label} →
         </Link>
       )}
-    </p>
+    </>
+  )
+}
+
+/** "Jesteś tu jako …" w nagłówku turnieju. Przy kilku rolach każda dostaje własną linię. */
+export function MyTournamentRole({ roles }: { roles: UserRole[] }) {
+  if (roles.length === 0) return null
+  const rank = (role: UserRole) => PRIORITY.indexOf(role) + 1 || PRIORITY.length + 1
+  const sorted = [...new Set(roles)].sort((a, b) => rank(a) - rank(b))
+
+  if (sorted.length === 1) {
+    return (
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <span className="text-muted-foreground">Jesteś tu jako</span>
+        <RoleLine role={sorted[0]!} />
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-1.5 text-sm">
+      <p className="text-muted-foreground">Masz tu kilka ról:</p>
+      <ul className="space-y-1.5">
+        {sorted.map((role) => (
+          <li key={role} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <RoleLine role={role} />
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
