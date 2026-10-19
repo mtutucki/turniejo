@@ -11,7 +11,11 @@ import { useTournament } from "./api"
 export function useTournamentContext() {
   const { id } = useParams<{ id: string }>()
   const tournament = useTournament(id)
-  const { hasRole, isLoading: rolesLoading } = useMyRoles({
+  const {
+    roles,
+    hasRole,
+    isLoading: rolesLoading,
+  } = useMyRoles({
     resourceType: "Tournament",
     resourceId: id,
   })
@@ -19,6 +23,8 @@ export function useTournamentContext() {
   return {
     id,
     tournament,
+    /** Role zalogowanego usera w tym turnieju (organizator, sędzia, trener, kibic). */
+    roles,
     isOrganizer: hasRole(UserRole.Organizer),
     rolesLoading,
   }

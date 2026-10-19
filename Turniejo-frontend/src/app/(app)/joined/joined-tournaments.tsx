@@ -16,7 +16,7 @@ import {
 import { useApi } from "@/hooks/use-api"
 import { joinedTournaments } from "@/lib/auth/role-landing"
 import { useAuthStore } from "@/stores/auth-store"
-import { JOIN_ROLE_LABELS } from "@/types/teams"
+import type { UserRole } from "@/types/roles"
 import type { Tournament } from "@/types/tournaments"
 
 function JoinButton() {
@@ -45,14 +45,7 @@ export function JoinedTournaments() {
   // Usunięty turniej albo brak dostępu kończy się błędem — pomijamy go, nie blokując reszty listy.
   const items: TournamentListItem[] = joined.flatMap(({ roles: tournamentRoles }, index) => {
     const tournament = tournaments[index]?.data
-    return tournament
-      ? [
-          {
-            tournament,
-            roleLabel: tournamentRoles.map((role) => JOIN_ROLE_LABELS[role] ?? role).join(", "),
-          },
-        ]
-      : []
+    return tournament ? [{ tournament, roles: tournamentRoles as UserRole[] }] : []
   })
   const stillLoading = tournaments.some((query) => query.isPending)
 

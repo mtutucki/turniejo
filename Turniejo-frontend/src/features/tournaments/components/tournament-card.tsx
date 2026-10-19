@@ -16,13 +16,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { prefetchHandlers, usePrefetch } from "@/hooks/use-prefetch"
 import { APP_TIME_ZONE } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
+import type { UserRole } from "@/types/roles"
 import {
   TOURNAMENT_FORMAT_LABELS,
   type Tournament,
@@ -30,6 +30,7 @@ import {
 } from "@/types/tournaments"
 
 import { tournamentKeys, useDeleteTournament } from "../api"
+import { RoleBadge } from "./my-role-badge"
 import { TournamentStatusBadge } from "./status-badge"
 
 /** Usuń anulowany turniej — przycisk na karcie (poza linkiem), z potwierdzeniem. */
@@ -83,8 +84,8 @@ function DeleteCancelledTournament({ tournament }: { tournament: Tournament }) {
 
 export type TournamentListItem = {
   tournament: Tournament
-  /** Rola usera w turnieju, do którego dołączył kodem (lista "Dołączone turnieje"). */
-  roleLabel?: string
+  /** Role usera w turnieju, do którego dołączył kodem (lista "Dołączone turnieje"). */
+  roles?: UserRole[]
 }
 
 const dayMonthFormatter = new Intl.DateTimeFormat("pl-PL", {
@@ -115,7 +116,7 @@ function metaLine(tournament: Tournament) {
     .join(" · ")
 }
 
-function TournamentCard({ tournament, roleLabel }: TournamentListItem) {
+function TournamentCard({ tournament, roles }: TournamentListItem) {
   const setTournament = useActiveTournamentStore((state) => state.setTournament)
   // Kody dostępu backend zwraca tylko organizatorowi — tylko on może usunąć turniej.
   const deletable = tournament.status === "Cancelled" && tournament.refereeCode !== null
@@ -173,7 +174,9 @@ function TournamentCard({ tournament, roleLabel }: TournamentListItem) {
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <TournamentStatusBadge status={tournament.status} />
-              {roleLabel && <Badge variant="outline">{roleLabel}</Badge>}
+              {roles?.map((role) => (
+                <RoleBadge key={role} role={role} />
+              ))}
             </div>
           </div>
         </Card>

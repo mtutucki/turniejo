@@ -8,6 +8,7 @@ import { type ReactNode, useEffect } from "react"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { MyTournamentRole } from "@/features/tournaments/components/my-role-badge"
 import { TournamentStatusBadge } from "@/features/tournaments/components/status-badge"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { isApiError } from "@/lib/api/errors"
@@ -60,7 +61,7 @@ function TournamentTabs({ id }: { id: string }) {
 }
 
 export function TournamentShell({ children }: { children: ReactNode }) {
-  const { id, tournament } = useTournamentContext()
+  const { id, tournament, roles } = useTournamentContext()
   const setActiveTournament = useActiveTournamentStore((state) => state.setTournament)
 
   // Wejście w turniej (także z linku) ustawia go jako aktywny kontekst nawigacji.
@@ -113,6 +114,7 @@ export function TournamentShell({ children }: { children: ReactNode }) {
           <CalendarDays className="size-4" />
           {formatDateRange(data.startAt, data.endAt)}
         </p>
+        <MyTournamentRole roles={roles} />
         <TournamentTabs id={id} />
       </header>
       {children}
