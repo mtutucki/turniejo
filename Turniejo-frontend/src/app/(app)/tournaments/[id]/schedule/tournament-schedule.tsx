@@ -63,6 +63,7 @@ import { UserRole } from "@/types/roles"
 import { hasScheduleDraft } from "./generate/generate-schedule"
 
 const ALL = "all"
+const NO_REFEREE = "none"
 
 type Lookups = {
   teamName: (tournamentTeamId: string) => string
@@ -98,6 +99,51 @@ function FilterSelect({
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+function RefereeChip({
+  refereeId,
+  referee,
+  actionable,
+}: {
+  refereeId: string | null
+  referee: TournamentMember | undefined
+  /** Mecz jeszcze się nie skończył — brak sędziego wymaga uwagi organizatora. */
+  actionable: boolean
+}) {
+  if (refereeId) {
+    return (
+      <span className="text-foreground flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium">
+        <Whistle className="size-3" />
+        {/* Sędzia mógł opuścić turniej — przypisanie zostaje, choć nie znamy już nazwiska. */}
+        {referee ? memberName(referee) : "Sędzia przypisany"}
+      </span>
+    )
+  }
+  if (!actionable) {
+    return (
+      <span className="flex items-center gap-1">
+        <UserRound className="size-3" />
+        Bez sędziego
+      </span>
+    )
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="flex items-center gap-1 rounded-full border border-dashed border-amber-500/60 px-2 py-0.5 text-amber-700 dark:text-amber-400"
+        >
+          <UserRound className="size-3" />
+          Bez sędziego
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        Mecz może wziąć dowolny sędzia turnieju albo poprowadzić go organizator.
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -165,10 +211,11 @@ function MatchRow({
             )}
             {group && <span>{group}</span>}
             {isOrganizer && !unscheduled && (
-              <span className="flex items-center gap-1">
-                <UserRound className="size-3" />
-                {referee ? memberName(referee) : "Dowolny sędzia"}
-              </span>
+              <RefereeChip
+                refereeId={match.refereeId}
+                referee={referee}
+                actionable={editable || inProgress}
+              />
             )}
           </p>
         </div>
@@ -350,6 +397,7 @@ export function TournamentScheduleView() {
   const [categoryId, setCategoryId] = useState(ALL)
   const [groupId, setGroupId] = useState(ALL)
   const [pitchId, setPitchId] = useState(ALL)
+  const [refereeId, setRefereeId] = useState(ALL)
 
   const lookups = useMemo<Lookups>(() => {
     const teamById = new Map((teams.data ?? []).map((t) => [t.id, t.teamName]))
@@ -381,7 +429,8 @@ export function TournamentScheduleView() {
       (m) =>
         (categoryId === ALL || m.categoryId === categoryId) &&
         (groupId === ALL || m.groupId === groupId) &&
-        (pitchId === ALL || m.pitchId === pitchId),
+        (pitchId === ALL || m.pitchId === pitchId) &&
+        (refereeId === ALL || (m.refereeId ?? NO_REFEREE) === refereeId),
     )
     // Backend sortuje tylko po godzinie — mecze z tego samego slotu układamy po boisku,
     // inaczej wiersze zmieniają kolejność przy każdym odświeżeniu.
@@ -396,6 +445,12 @@ export function TournamentScheduleView() {
           },
         ),
     )
+  // Mecze, które jeszcze się nie skończyły, a nikt ich nie prowadzi — organizator powinien je obsadzić.
+  const withoutReferee = (schedule.data ?? []).filter(
+    (m) =>
+      !m.refereeId &&
+      (SCHEDULABLE_STATUSES.includes(m.status) || m.status === "Live" || m.status === "Paused"),
+  ).length
   const anyStarted = (schedule.data ?? []).some(
     (m) => !SCHEDULABLE_STATUSES.includes(m.status) && m.status !== "Cancelled",
   )
@@ -430,6 +485,8 @@ export function TournamentScheduleView() {
       (p) =>
         (categoryId === ALL || p.categoryId === categoryId) &&
         groupId === ALL &&
+        // Zapowiedziane mecze nie mają jeszcze sędziego — filtr po sędzi je chowa.
+        refereeId === ALL &&
         (pitchId === ALL || p.pitchId === pitchId),
     )
 
@@ -454,6 +511,7 @@ export function TournamentScheduleView() {
   // Puchar nie ma grup; pary bez terminu nie mają jeszcze boisk.
   const showGroupFilter = !knockout && groupOptions.length > 1
   const showPitchFilter = !awaitingSchedule && (pitches.data?.length ?? 0) > 1
+  const showRefereeFilter = isOrganizer && !awaitingSchedule
 
   // Organizator jest w trakcie generowania (otworzył formularz i wyszedł np. dodać drużyny) —
   // wraca prosto do formularza. "Anuluj" i "← Terminarz" kończą ten tryb.
@@ -511,6 +569,22 @@ export function TournamentScheduleView() {
             {!awaitingSchedule &&
               filtered.length !== schedule.data.length &&
               ` z ${schedule.data.length}`}
+            {isOrganizer && !awaitingSchedule && (
+              <>
+                {" · "}
+                {withoutReferee === 0 ? (
+                  "wszystkie mają sędziego"
+                ) : (
+                  <button
+                    type="button"
+                    className="font-medium text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+                    onClick={() => setRefereeId(NO_REFEREE)}
+                  >
+                    {plural(withoutReferee, ["mecz", "mecze", "meczów"])} bez sędziego
+                  </button>
+                )}
+              </>
+            )}
           </p>
         </div>
         {isOrganizer && (
@@ -541,7 +615,7 @@ export function TournamentScheduleView() {
       </div>
 
       {/* Filtr z jedną opcją niczego nie filtruje — pokazujemy tylko te, w których jest wybór. */}
-      {(showCategoryFilter || showGroupFilter || showPitchFilter) && (
+      {(showCategoryFilter || showGroupFilter || showPitchFilter || showRefereeFilter) && (
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
           {showCategoryFilter && (
             <FilterSelect
@@ -571,6 +645,18 @@ export function TournamentScheduleView() {
               onChange={setPitchId}
               options={pitches.data ?? []}
               allLabel="Wszystkie boiska"
+            />
+          )}
+          {showRefereeFilter && (
+            <FilterSelect
+              label="Sędzia"
+              value={refereeId}
+              onChange={setRefereeId}
+              options={[
+                { id: NO_REFEREE, name: "Bez sędziego" },
+                ...referees.map((r) => ({ id: r.userId, name: memberName(r) })),
+              ]}
+              allLabel="Wszyscy sędziowie"
             />
           )}
         </div>
