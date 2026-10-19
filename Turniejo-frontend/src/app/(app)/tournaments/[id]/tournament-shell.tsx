@@ -114,7 +114,7 @@ export function TournamentShell({ children }: { children: ReactNode }) {
           <CalendarDays className="size-4" />
           {formatDateRange(data.startAt, data.endAt)}
         </p>
-        <MyTournamentRole roles={roles} />
+        <MyTournamentRole roles={roles} tournamentId={id} />
         <TournamentTabs id={id} />
       </header>
       {children}

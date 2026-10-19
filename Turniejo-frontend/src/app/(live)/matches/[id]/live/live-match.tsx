@@ -50,18 +50,28 @@ import { type MatchLivePanel, type MatchTeam, isGoal } from "@/types/matches"
 import { selectRoles } from "@/stores/auth-store"
 import { type RoleAssignment, UserRole } from "@/types/roles"
 
+const refereeMatchesHref = (tournamentId?: string) =>
+  tournamentId ? `/referee/matches?tournament=${tournamentId}` : "/referee/matches"
+
 /**
  * Sędzia wraca do swojej listy meczów. Organizator prowadzący mecz bez przypisania jako sędzia nie ma
  * tam nic — wraca do terminarza turnieju, z którego otworzył panel.
  */
-function BackLink({ scheduleTournamentId }: { scheduleTournamentId?: string }) {
+function BackLink({
+  scheduleTournamentId,
+  tournamentId,
+}: {
+  scheduleTournamentId?: string
+  /** Lista meczów sędziego otwiera się na turnieju, z którego jest ten mecz. */
+  tournamentId?: string
+}) {
   return (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
       <Link
         href={
           scheduleTournamentId
             ? `/tournaments/${scheduleTournamentId}/schedule`
-            : "/referee/matches"
+            : refereeMatchesHref(tournamentId)
         }
       >
         <ArrowLeft />
@@ -370,7 +380,10 @@ export function LiveMatchView() {
 
   const header = (
     <header className="flex items-center justify-between gap-3">
-      <BackLink scheduleTournamentId={isOrganizer && !isMatchReferee ? tournamentId : undefined} />
+      <BackLink
+        scheduleTournamentId={isOrganizer && !isMatchReferee ? tournamentId : undefined}
+        tournamentId={tournamentId}
+      />
       <div className="flex items-center gap-1">
         {isMatchReferee &&
           tournamentId &&
@@ -382,7 +395,7 @@ export function LiveMatchView() {
               matchId={matchId}
               title={`${panel.data.homeTeam.name} – ${panel.data.awayTeam.name}`}
               inProgress={panel.data.status === "Live" || panel.data.status === "Paused"}
-              onReleased={() => router.push("/referee/matches")}
+              onReleased={() => router.push(refereeMatchesHref(tournamentId))}
             />
           )}
         {canOperate && <ConnectionBadge state={realtime} />}

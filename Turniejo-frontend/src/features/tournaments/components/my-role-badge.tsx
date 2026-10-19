@@ -10,7 +10,7 @@ type RoleStyle = {
   className: string
   /** Jedno zdanie o tym, co ta rola robi w turnieju. */
   hint: string
-  link?: { href: string; label: string }
+  link?: { href: (tournamentId: string) => string; label: string }
 }
 
 // Bursztyn (--live) jest zarezerwowany dla trwających meczów, role mają własne odcienie.
@@ -26,14 +26,14 @@ const ROLE_STYLES: Partial<Record<UserRole, RoleStyle>> = {
     icon: Whistle,
     className: "bg-sky-500/15 text-sky-300",
     hint: "Sędziujesz mecze w tym turnieju.",
-    link: { href: "/referee/matches", label: "Moje mecze" },
+    link: { href: (id) => `/referee/matches?tournament=${id}`, label: "Moje mecze" },
   },
   [UserRole.Coach]: {
     label: "Trener",
     icon: ClipboardList,
     className: "bg-violet-500/15 text-violet-300",
     hint: "Prowadzisz drużynę w tym turnieju.",
-    link: { href: "/coach/teams", label: "Moje drużyny" },
+    link: { href: () => "/coach/teams", label: "Moje drużyny" },
   },
   [UserRole.Viewer]: {
     label: "Kibic / rodzic",
@@ -66,7 +66,7 @@ export function RoleBadge({ role, className }: { role: UserRole; className?: str
 }
 
 /** Odznaka roli, krótkie zdanie, co user tu robi, i skrót do jego panelu. */
-function RoleLine({ role }: { role: UserRole }) {
+function RoleLine({ role, tournamentId }: { role: UserRole; tournamentId: string }) {
   const { hint, link } = styleOf(role)
   return (
     <>
@@ -74,7 +74,7 @@ function RoleLine({ role }: { role: UserRole }) {
       {hint && <span className="text-muted-foreground">{hint}</span>}
       {link && (
         <Link
-          href={link.href}
+          href={link.href(tournamentId)}
           className="text-primary font-medium underline-offset-2 hover:underline"
         >
           {link.label} →
@@ -85,7 +85,13 @@ function RoleLine({ role }: { role: UserRole }) {
 }
 
 /** "Jesteś tu jako …" w nagłówku turnieju. Przy kilku rolach każda dostaje własną linię. */
-export function MyTournamentRole({ roles }: { roles: UserRole[] }) {
+export function MyTournamentRole({
+  roles,
+  tournamentId,
+}: {
+  roles: UserRole[]
+  tournamentId: string
+}) {
   if (roles.length === 0) return null
   const rank = (role: UserRole) => PRIORITY.indexOf(role) + 1 || PRIORITY.length + 1
   const sorted = [...new Set(roles)].sort((a, b) => rank(a) - rank(b))
@@ -94,7 +100,7 @@ export function MyTournamentRole({ roles }: { roles: UserRole[] }) {
     return (
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <span className="text-muted-foreground">Jesteś tu jako</span>
-        <RoleLine role={sorted[0]!} />
+        <RoleLine role={sorted[0]!} tournamentId={tournamentId} />
       </p>
     )
   }
@@ -104,7 +110,7 @@ export function MyTournamentRole({ roles }: { roles: UserRole[] }) {
       <ul className="space-y-1.5">
         {sorted.map((role) => (
           <li key={role} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <RoleLine role={role} />
+            <RoleLine role={role} tournamentId={tournamentId} />
           </li>
         ))}
       </ul>
