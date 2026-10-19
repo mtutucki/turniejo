@@ -114,7 +114,7 @@ function RefereeChip({
 }) {
   if (refereeId) {
     return (
-      <span className="text-foreground flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium">
+      <span className="bg-primary/15 text-primary flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
         <Whistle className="size-3" />
         {/* Sędzia mógł opuścić turniej — przypisanie zostaje, choć nie znamy już nazwiska. */}
         {referee ? memberName(referee) : "Sędzia przypisany"}
@@ -129,12 +129,13 @@ function RefereeChip({
       </span>
     )
   }
+  // Bursztyn (--live) jest zarezerwowany dla trwających meczów — brak sędziego to obrys, nie alarm.
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
           tabIndex={0}
-          className="flex items-center gap-1 rounded-full border border-dashed border-amber-500/60 px-2 py-0.5 text-amber-700 dark:text-amber-400"
+          className="border-muted-foreground/60 text-foreground flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5"
         >
           <UserRound className="size-3" />
           Bez sędziego
@@ -577,7 +578,7 @@ export function TournamentScheduleView() {
                 ) : (
                   <button
                     type="button"
-                    className="font-medium text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+                    className="text-foreground font-medium underline underline-offset-2"
                     onClick={() => setRefereeId(NO_REFEREE)}
                   >
                     {plural(withoutReferee, ["mecz", "mecze", "meczów"])} bez sędziego
