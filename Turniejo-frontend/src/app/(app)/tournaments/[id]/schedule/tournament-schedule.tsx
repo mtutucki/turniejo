@@ -51,6 +51,7 @@ import {
   plannedBracketMatches,
 } from "@/features/matches/planned-bracket-matches"
 import { RescheduleMatchDialog } from "@/features/matches/components/reschedule-match-dialog"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { useTournamentMembers, useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
@@ -385,6 +386,8 @@ export function TournamentScheduleView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
   const router = useRouter()
   const schedule = useSchedule(id)
+  // Sędziowie biorą i oddają mecze, wyniki się zmieniają: terminarz odświeża się sam.
+  useTournamentMatchesRealtime([id])
   const pitches = usePitches(id)
   const teams = useTournamentTeams(id)
   const categories = useCategories(id)

@@ -42,5 +42,17 @@ namespace Turniejo.Matches.UnitTests.EventHandlers
                 CancellationToken.None);
             await ShouldHavePublished();
         }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task RefereeAssignedOrReleased_ShouldNotifyTournamentGroup(bool assigned)
+        {
+            var refereeId = Guid.NewGuid();
+            await _handler.Handle(
+                new RefereeAssignedToMatch(_matchId, _tournamentId, assigned ? refereeId : null, refereeId),
+                CancellationToken.None);
+            await ShouldHavePublished();
+        }
     }
 }

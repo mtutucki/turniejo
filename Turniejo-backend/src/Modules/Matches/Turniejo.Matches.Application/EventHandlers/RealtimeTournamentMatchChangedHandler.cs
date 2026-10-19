@@ -13,7 +13,8 @@ namespace Turniejo.Matches.Application.EventHandlers
         INotificationHandler<MatchResumed>,
         INotificationHandler<MatchFinished>,
         INotificationHandler<MatchEventAdded>,
-        INotificationHandler<MatchEventReverted>
+        INotificationHandler<MatchEventReverted>,
+        INotificationHandler<RefereeAssignedToMatch>
     {
         // Kartki nie zmieniają wyniku — bez tych dwóch strona meczu na portalu nie odświeżyłaby osi czasu.
         public Task Handle(MatchEventAdded notification, CancellationToken cancellationToken) =>
@@ -35,6 +36,11 @@ namespace Turniejo.Matches.Application.EventHandlers
             realtimeService.PublishTournamentMatchChangedAsync(notification.TournamentId, notification.MatchId, cancellationToken);
 
         public Task Handle(MatchFinished notification, CancellationToken cancellationToken) =>
+            realtimeService.PublishTournamentMatchChangedAsync(notification.TournamentId, notification.MatchId, cancellationToken);
+
+        // Wzięcie, oddanie albo przydzielenie meczu: inni sędziowie muszą od razu zobaczyć, że mecz zniknął
+        // z wolnych (albo do nich wrócił). W zdarzeniu idą tylko identyfikatory, bez RefereeId.
+        public Task Handle(RefereeAssignedToMatch notification, CancellationToken cancellationToken) =>
             realtimeService.PublishTournamentMatchChangedAsync(notification.TournamentId, notification.MatchId, cancellationToken);
     }
 }

@@ -159,6 +159,24 @@ function createOrganization(user: User, name: string) {
 }
 
 /** Gol: wynik + zdarzenie + te same powiadomienia SignalR, które wysyła backend. */
+// Wzięcie, oddanie i przydzielenie sędziego idą do grupy turnieju (MatchChanged), jak w backendzie.
+function refereeChanged(m: (typeof db.matches)[number]) {
+  publish("tournaments", m.tournamentId, "MatchChanged", {
+    tournamentId: m.tournamentId,
+    matchId: m.id,
+  })
+}
+
+function releaseReferee(m: (typeof db.matches)[number]) {
+  const referee = db.users.find((u) => u.id === m.refereeId)
+  if (referee)
+    referee.roles = referee.roles.filter(
+      (r) => !(r.role === "Referee" && r.scopeType === "Match" && r.scopeId === m.id),
+    )
+  m.refereeId = null
+  refereeChanged(m)
+}
+
 export function scoreGoal(
   m: Match,
   tournamentTeamId: string,
@@ -578,6 +596,7 @@ const api = [
       if (m.refereeId) return problem(409, "Match already has a referee")
       m.refereeId = user.id
       user.roles.push({ role: "Referee", scopeType: "Match", scopeId: m.id })
+      refereeChanged(m)
       return HttpResponse.json({ matchId: m.id })
     }),
   ),
@@ -587,10 +606,7 @@ const api = [
       const m = findMatch(params.mid)
       if (!m) return problem(404, "Match not found")
       if (m.refereeId !== user.id) return problem(403, "Forbidden")
-      m.refereeId = null
-      user.roles = user.roles.filter(
-        (r) => !(r.role === "Referee" && r.scopeType === "Match" && r.scopeId === m.id),
-      )
+      releaseReferee(m)
       return HttpResponse.json({ matchId: m.id })
     }),
   ),
@@ -732,6 +748,14 @@ const control = [
     const { side } = (await request.json()) as { side: "home" | "away" }
     scoreGoal(m, side === "home" ? m.home : m.away, IDS.referee, 10)
     return HttpResponse.json({ homeScore: m.homeScore, awayScore: m.awayScore })
+  }),
+  // Sędzia oddaje mecz "z innego urządzenia" (albo organizator go zdejmuje) — inni sędziowie
+  // powinni od razu zobaczyć mecz w wolnych.
+  http.post("*/__control/matches/:id/release", ({ params }) => {
+    const m = findMatch(String(params.id))
+    if (!m) return problem(404, "Match not found")
+    releaseReferee(m)
+    return new HttpResponse(null, { status: 204 })
   }),
   http.get("*/__control/state", () =>
     HttpResponse.json({

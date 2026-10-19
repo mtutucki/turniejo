@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { matchKeys } from "@/features/matches/api"
 import { OpenMatchCard, RefereeMatchCard } from "@/features/matches/components/referee-match-card"
 import { useAssignedMatches, useOpenMatches } from "@/features/matches/live-api"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { teamKeys } from "@/features/teams/api"
 import { tournamentKeys } from "@/features/tournaments/api"
 import { useApi } from "@/hooks/use-api"
@@ -193,6 +194,8 @@ export function RefereeMatchesView() {
     ]),
   ]
   const lookups = useTournamentLookups(tournamentIds)
+  // Inny sędzia wziął albo oddał mecz: listy odświeżają się same.
+  useTournamentMatchesRealtime(tournamentIds)
   const inTournament = (id: string) => (m: Match) => m.tournamentId.toLowerCase() === id
 
   const tabs: TournamentTab[] = tournamentIds
