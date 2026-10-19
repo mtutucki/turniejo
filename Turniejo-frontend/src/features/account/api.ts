@@ -21,11 +21,17 @@ export function useExportMyData() {
   })
 }
 
-/** DELETE /api/me — anonimizacja konta i usunięcie logowania. 409 "Conflict.Account" = jedyny organizator. */
+/**
+ * DELETE /api/me — anonimizacja konta i usunięcie logowania. 409 "Conflict.Account" = jedyny organizator:
+ * konto znika dopiero z `deleteOrganization`, czyli razem z organizacją i jej danymi.
+ */
 export function useDeleteMyAccount() {
   const { request } = useApi()
   return useMutation({
-    mutationFn: () => request("/api/me", { method: "DELETE" }),
+    mutationFn: ({ deleteOrganization = false }: { deleteOrganization?: boolean } = {}) =>
+      request(deleteOrganization ? "/api/me?deleteOrganization=true" : "/api/me", {
+        method: "DELETE",
+      }),
     meta: { handlesConflict: true },
   })
 }

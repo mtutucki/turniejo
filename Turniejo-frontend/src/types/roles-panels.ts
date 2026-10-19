@@ -62,6 +62,7 @@ export type MyChildStanding = {
   standings: GroupStandingRow[]
   groupName: string | null
   teamNames: Record<string, string> | null
+  tournamentName: string | null
 }
 
 export const RELATIONSHIP_LABELS: Record<MyChild["relationshipType"], string> = {

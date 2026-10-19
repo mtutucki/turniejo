@@ -64,6 +64,11 @@ export type Match = {
 export type GenerateScheduleInput = {
   startAt: string
   endAt: string
+  /**
+   * Okno gry na każdy dzień turnieju — mecze nie trafiają w noc między dniami.
+   * maxMatches: ile meczów organizator chce rozegrać tego dnia (generator nie dołoży więcej).
+   */
+  windows: { startAt: string; endAt: string; maxMatches?: number }[]
   pitchIds: string[]
 }
 

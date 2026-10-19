@@ -13,4 +13,6 @@ public sealed record RegisterUserCommand(
     // wywołania API zachowały dotychczasowe zachowanie.
     bool CreateOrganization = true,
     // Obowiązkowy checkbox "Akceptuję Regulamin i Politykę prywatności" — wersję dopisuje serwer.
-    bool AcceptTerms = false) : ICommand<RegisterUserResponse>, IPublicRequest;
+    bool AcceptTerms = false,
+    // Tylko z CreateOrganization: nazwa klubu/szkoły. Pusta = organizacja nazwana imieniem i nazwiskiem.
+    string? OrganizationName = null) : ICommand<RegisterUserResponse>, IPublicRequest;

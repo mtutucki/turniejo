@@ -326,6 +326,19 @@ export function useAssignStaff(tournamentId: string, tournamentTeamId: string) {
   })
 }
 
+/** Organizator zdejmuje osobę ze sztabu drużyny — traci ona rolę na tej drużynie (skład, panel trenera). */
+export function useRemoveStaff(tournamentId: string, tournamentTeamId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (teamStaffId: string) =>
+      request(`${tournamentTeamPath(tournamentId, tournamentTeamId)}/staff/${teamStaffId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.staff(tournamentTeamId) }),
+  })
+}
+
 // --- Dołączanie kodem ----------------------------------------------------------------------
 
 export function useJoinTournament() {

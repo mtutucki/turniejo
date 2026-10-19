@@ -107,6 +107,10 @@ function ConfirmTransition({
       <AlertDialogTrigger asChild>
         <Button
           variant={secondary ? "ghost" : destructive ? "outline" : "default"}
+          className={cn(
+            destructive &&
+              "border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive",
+          )}
           disabled={disabled}
         >
           {actionLabel}
@@ -119,10 +123,7 @@ function ConfirmTransition({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Anuluj</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            className={cn(destructive && "bg-destructive hover:bg-destructive/90 text-white")}
-          >
+          <AlertDialogAction onClick={onConfirm} variant={destructive ? "destructive" : "default"}>
             {actionLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

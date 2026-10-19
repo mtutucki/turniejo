@@ -78,6 +78,28 @@ public sealed class GetMyChildTeamQueryHandlerTests
         result.Value[0].ShirtNumber.Should().Be(7);
     }
 
+    [Theory]
+    [InlineData("Withdrawn")]
+    [InlineData("Rejected")]
+    public async Task Handle_ShouldSkipMembership_WhenTeamWasWithdrawnOrRejected(string registrationStatus)
+    {
+        var playerId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var tournamentTeamId = Guid.NewGuid();
+        _currentUserContext.UserId.Returns(userId);
+        var guardian = PlayerGuardian.Create(Guid.NewGuid(), playerId, userId, RelationshipType.Parent, false, true, Guid.NewGuid()).Value;
+        _dbContext.GetPlayerGuardiansByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<PlayerGuardian> { guardian });
+        var tournamentPlayer = TournamentPlayer.Create(Guid.NewGuid(), tournamentTeamId, playerId, 7, PlayerPosition.Midfielder, Guid.NewGuid()).Value;
+        _dbContext.GetTournamentPlayersByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<TournamentPlayer> { tournamentPlayer });
+        _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
+            .Returns(new TournamentTeamDto(tournamentTeamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), registrationStatus));
+
+        var result = await _handler.Handle(new GetMyChildTeamQuery(playerId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Handle_ShouldSkipMembership_WhenTournamentTeamLookupMisses()
     {

@@ -113,7 +113,7 @@ export function CategoryCard({
                 <AlertDialogFooter>
                   <AlertDialogCancel>Anuluj</AlertDialogCancel>
                   <AlertDialogAction
-                    className="bg-destructive hover:bg-destructive/90 text-white"
+                    variant="destructive"
                     onClick={() =>
                       deleteCategory.mutate(category.id, {
                         onSuccess: () => toast.success("Kategoria usunięta"),

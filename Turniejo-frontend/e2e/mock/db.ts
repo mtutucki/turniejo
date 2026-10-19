@@ -158,7 +158,7 @@ function seed() {
   const organizations: Organization[] = [
     { id: IDS.organization, name: "Klub E2E", slug: "klub-e2e", ownerUserId: IDS.organizer },
   ]
-  return { users, tournaments, matches, organizations }
+  return { users, tournaments, matches, organizations, usedResetTokens: [] as string[] }
 }
 
 export const db = seed()

@@ -228,6 +228,20 @@ const keycloak = [
 // --- Backend ---------------------------------------------------------------------------------
 
 const api = [
+  // Jak ConfirmPasswordResetCommandHandler; rolę maila z linkiem gra stały token "token-<email>".
+  http.post("*/api/auth/password-reset/confirm", async ({ request }) => {
+    const body = (await request.json()) as { token: string; newPassword: string }
+    const user = db.users.find((u) => `token-${u.email}` === body.token)
+    if (!user || db.usedResetTokens.includes(body.token)) {
+      return HttpResponse.json(
+        { code: "Validation.Token", message: "Reset link is invalid or has expired.", type: 2 },
+        { status: 400 },
+      )
+    }
+    db.usedResetTokens.push(body.token)
+    user.password = body.newPassword
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/api/auth/register", async ({ request }) => {
     const body = (await request.json()) as Record<string, string | boolean | null>
     const email = String(body.email).toLowerCase()
@@ -255,7 +269,10 @@ const api = [
     db.users.push(user)
     // Jak UserRegisteredHandler: organizacja + rola tylko dla organizatora (domyślnie true).
     if (body.createOrganization !== false) {
-      createOrganization(user, `${user.firstName} ${user.lastName}`)
+      createOrganization(
+        user,
+        String(body.organizationName ?? "").trim() || `${user.firstName} ${user.lastName}`,
+      )
     }
     return HttpResponse.json({ userId: user.id }, { status: 201 })
   }),
@@ -286,15 +303,20 @@ const api = [
       }),
     ),
   ),
-  // Jak DeleteMyAccountCommandHandler: jedyny organizator organizacji → 409, inaczej konto znika.
+  // Jak DeleteMyAccountCommandHandler: jedyny organizator organizacji → 409, dopóki nie potwierdzi
+  // usunięcia organizacji (?deleteOrganization=true); inaczej konto znika.
   http.delete(
     "*/api/me",
-    authed(({ user }) => {
-      if (db.organizations.some((o) => o.ownerUserId === user.id)) {
-        return HttpResponse.json(
-          { code: "Conflict.Account", message: "You are the only organizer.", type: 3 },
-          { status: 409 },
-        )
+    authed(({ user, request }) => {
+      const organization = db.organizations.find((o) => o.ownerUserId === user.id)
+      if (organization) {
+        if (new URL(request.url).searchParams.get("deleteOrganization") !== "true") {
+          return HttpResponse.json(
+            { code: "Conflict.Account", message: "You are the only organizer.", type: 3 },
+            { status: 409 },
+          )
+        }
+        db.organizations.splice(db.organizations.indexOf(organization), 1)
       }
       db.users.splice(db.users.indexOf(user), 1)
       return new HttpResponse(null, { status: 204 })
@@ -316,6 +338,17 @@ const api = [
             slug: organization.slug,
           })
         : new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id",
+    authed<{ id: string }>(async ({ request, user, params }) => {
+      const organization = db.organizations.find((o) => o.id === params.id)
+      if (!organization || !hasRole(user, "Organizer", "Organization", organization.id)) {
+        return problem(403, "Forbidden")
+      }
+      organization.name = ((await request.json()) as { name: string }).name.trim()
+      return new HttpResponse(null, { status: 204 })
     }),
   ),
   http.post(
@@ -519,6 +552,47 @@ const api = [
     authed(({ user }) =>
       HttpResponse.json(db.matches.filter((m) => m.refereeId === user.id).map(matchDto)),
     ),
+  ),
+  http.get(
+    "*/api/referee/matches/open",
+    authed(({ user }) =>
+      HttpResponse.json(
+        db.matches
+          .filter(
+            (m) =>
+              !m.refereeId &&
+              m.status !== "Finished" &&
+              m.status !== "Cancelled" &&
+              hasRole(user, "Referee", "Tournament", m.tournamentId),
+          )
+          .map(matchDto),
+      ),
+    ),
+  ),
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/referee/claim",
+    authed<{ tid: string; mid: string }>(({ params, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      if (!hasRole(user, "Referee", "Tournament", m.tournamentId)) return problem(403, "Forbidden")
+      if (m.refereeId) return problem(409, "Match already has a referee")
+      m.refereeId = user.id
+      user.roles.push({ role: "Referee", scopeType: "Match", scopeId: m.id })
+      return HttpResponse.json({ matchId: m.id })
+    }),
+  ),
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/referee/release",
+    authed<{ tid: string; mid: string }>(({ params, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      if (m.refereeId !== user.id) return problem(403, "Forbidden")
+      m.refereeId = null
+      user.roles = user.roles.filter(
+        (r) => !(r.role === "Referee" && r.scopeType === "Match" && r.scopeId === m.id),
+      )
+      return HttpResponse.json({ matchId: m.id })
+    }),
   ),
   http.get(
     "*/api/matches/:id/location",

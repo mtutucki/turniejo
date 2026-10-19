@@ -48,6 +48,26 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetTournamentTeamIdsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .Where(tt => Teams.Any(t => t.Id == tt.TeamId && t.OrganizationId == organizationId))
+            .Select(tt => tt.Id)
+            .ToListAsync(cancellationToken);
+
+    // ExecuteDelete — od razu w bazie, bez SaveChanges (usunięcie organizacji woła to z innego modułu).
+    // Sztab znika kaskadą FK; zgłoszenia trzeba usunąć przed drużynami (FK Restrict), więc w transakcji.
+    public async Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        await TournamentTeams
+            .Where(tt => Teams.Any(t => t.Id == tt.TeamId && t.OrganizationId == organizationId))
+            .ExecuteDeleteAsync(cancellationToken);
+        await Teams
+            .Where(t => t.OrganizationId == organizationId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default) =>
         await TournamentTeams.AddAsync(tournamentTeam, cancellationToken);
 
@@ -94,6 +114,12 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
 
     public async Task AddTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default) =>
         await TeamStaffs.AddAsync(teamStaff, cancellationToken);
+
+    public Task RemoveTeamStaffAsync(TeamStaff teamStaff, CancellationToken cancellationToken = default)
+    {
+        TeamStaffs.Remove(teamStaff);
+        return Task.CompletedTask;
+    }
 
     public async Task<bool> TeamStaffExistsAsync(Guid tournamentTeamId, Guid userId, TeamStaffRole role, CancellationToken cancellationToken = default) =>
         await TeamStaffs.AnyAsync(s =>

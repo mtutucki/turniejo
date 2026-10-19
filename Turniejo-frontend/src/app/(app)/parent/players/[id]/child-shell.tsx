@@ -8,7 +8,7 @@ import type { ReactNode } from "react"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useChildTeams, useMyChildren } from "@/features/panels/api"
+import { useChildStanding, useChildTeams, useMyChildren } from "@/features/panels/api"
 import { EditChildDialog } from "@/features/panels/components/edit-child-dialog"
 import { SectionTabs } from "@/features/panels/components/section-tabs"
 
@@ -23,6 +23,9 @@ export function ChildShell({ children }: { children: ReactNode }) {
   const myChildren = useMyChildren()
   const teams = useChildTeams(id)
   const child = myChildren.data?.find((c) => c.playerId === id)
+  // Turniej pucharowy albo drużyna bez grupy: nie ma czego pokazać, więc zakładka tylko by myliła.
+  const standing = useChildStanding(id)
+  const tabs = standing.data?.length === 0 ? TABS.filter((t) => t.segment !== "standing") : TABS
 
   const back = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
@@ -68,7 +71,7 @@ export function ChildShell({ children }: { children: ReactNode }) {
           </div>
           {child.canEdit && <EditChildDialog child={child} />}
         </div>
-        <SectionTabs base={`/parent/players/${id}`} tabs={TABS} />
+        <SectionTabs base={`/parent/players/${id}`} tabs={tabs} />
       </header>
       {children}
     </div>

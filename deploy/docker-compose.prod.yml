@@ -79,6 +79,13 @@ services:
       Keycloak__Authority: https://auth.${DOMAIN}/realms/turniejo
       Keycloak__BaseUrl: http://keycloak:8080
       Keycloak__AdminClientSecret: ${KEYCLOAK_BACKEND_ADMIN_SECRET:?}
+      # Baza linków w mailach (reset hasła prowadzi na stronę aplikacji, nie Keycloaka).
+      App__PublicUrl: https://${DOMAIN}
+      Smtp__Host: ${SMTP_HOST:?}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__Username: ${SMTP_USERNAME:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__FromAddress: ${SMTP_FROM_ADDRESS:?}
       # Host z Caddy (hub SignalR) i z rewrite'u Next (api:8080).
       AllowedHosts: ${DOMAIN};api
       ForwardedHeaders__KnownNetworks__0: 172.30.89.0/24
@@ -102,7 +109,7 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
       KC_PROXY_TRUSTED_ADDRESSES: 172.30.89.0/24
-      # Publiczny adres = issuer tokenów i adres w linkach z maili (reset hasła). Backchannel dynamic
+      # Publiczny adres = issuer tokenów. Backchannel dynamic
       # pozwala API i frontendowi rozmawiać z Keycloakiem po http://keycloak:8080 bez zmiany issuera.
       KC_HOSTNAME: https://auth.${DOMAIN}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"

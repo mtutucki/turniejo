@@ -9,6 +9,7 @@ export type PlannedBracketMatch = {
   nodeId: string
   roundId: string
   categoryId: string
+  /** Pusty, gdy terminarz jeszcze nie powstał (tylko z includeUnplanned). */
   scheduledAt: string
   pitchId: string | null
   /** "Finał", "Półfinał", "Mecz o 3. miejsce"… */
@@ -66,6 +67,8 @@ export function plannedBracketMatches(
   bracket: Bracket,
   categoryId: string,
   teamName: (tournamentTeamId: string) => string,
+  /** Także mecze bez terminu — drabinka przed wygenerowaniem terminarza, w kolejności rund. */
+  includeUnplanned = false,
 ): PlannedBracketMatch[] {
   const standardRounds = bracket.rounds.filter((r) => r.roundType === "Standard").length
   const nodes = bracket.rounds.flatMap((round) => round.nodes.map((node) => ({ node, round })))
@@ -106,13 +109,18 @@ export function plannedBracketMatches(
     return { label: `${prefix} ${stageOf(from.round, standardRounds)[1]}`, known: false }
   }
 
+  // Kolejność rozgrywania jak w bracketStages — mecz o 3. miejsce tuż przed finałem.
+  const order = (round: BracketRound) =>
+    round.roundType === "ThirdPlace" ? standardRounds - 0.5 : round.roundNumber
+
   return nodes
-    .filter(({ node }) => !node.matchId && !!node.plannedAt)
+    .filter(({ node }) => !node.matchId && (includeUnplanned || !!node.plannedAt))
+    .sort((a, b) => order(a.round) - order(b.round))
     .map(({ node, round }) => ({
       nodeId: node.id,
       roundId: round.id,
       categoryId,
-      scheduledAt: node.plannedAt!,
+      scheduledAt: node.plannedAt ?? "",
       pitchId: node.plannedPitchId,
       stage: stageOf(round, standardRounds)[0],
       home: side(node, "Home"),

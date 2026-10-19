@@ -60,7 +60,9 @@ export function AssignRefereeDialog({
       { matchId: match.id, refereeId: refereeId === NO_REFEREE ? null : refereeId },
       {
         onSuccess: () => {
-          toast.success(refereeId === NO_REFEREE ? "Sędzia usunięty z meczu" : "Sędzia przypisany")
+          toast.success(
+            refereeId === NO_REFEREE ? "Mecz może wziąć dowolny sędzia" : "Sędzia przypisany",
+          )
           setOpen(false)
         },
         onError: (e) => {
@@ -94,7 +96,7 @@ export function AssignRefereeDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_REFEREE}>Bez sędziego</SelectItem>
+              <SelectItem value={NO_REFEREE}>Dowolny sędzia</SelectItem>
               {referees.map((r) => (
                 <SelectItem key={r.userId} value={r.userId}>
                   {memberName(r)} · {r.email}
@@ -103,6 +105,8 @@ export function AssignRefereeDialog({
             </SelectContent>
           </Select>
           <FieldDescription>
+            Mecz bez wskazanej osoby może wziąć każdy sędzia turnieju; przypisany widzi go tylko
+            wybrany sędzia.{" "}
             {referees.length === 0
               ? "Nikt jeszcze nie dołączył jako sędzia. "
               : "Na liście są osoby, które dołączyły do turnieju jako sędziowie. "}

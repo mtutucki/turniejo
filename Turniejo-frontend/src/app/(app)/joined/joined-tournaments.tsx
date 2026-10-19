@@ -9,7 +9,10 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { tournamentKeys } from "@/features/tournaments/api"
-import { TournamentCard } from "@/features/tournaments/components/tournament-card"
+import {
+  type TournamentListItem,
+  TournamentSections,
+} from "@/features/tournaments/components/tournament-card"
 import { useApi } from "@/hooks/use-api"
 import { joinedTournaments } from "@/lib/auth/role-landing"
 import { useAuthStore } from "@/stores/auth-store"
@@ -39,6 +42,19 @@ export function JoinedTournaments() {
       enabled: isAuthenticated,
     })),
   })
+  // Usunięty turniej albo brak dostępu kończy się błędem — pomijamy go, nie blokując reszty listy.
+  const items: TournamentListItem[] = joined.flatMap(({ roles: tournamentRoles }, index) => {
+    const tournament = tournaments[index]?.data
+    return tournament
+      ? [
+          {
+            tournament,
+            roleLabel: tournamentRoles.map((role) => JOIN_ROLE_LABELS[role] ?? role).join(", "),
+          },
+        ]
+      : []
+  })
+  const stillLoading = tournaments.some((query) => query.isPending)
 
   return (
     <>
@@ -49,12 +65,8 @@ export function JoinedTournaments() {
       />
 
       {!roles ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {[0, 1].map((i) => (
-            <Skeleton key={i} className="h-40 rounded-xl" />
-          ))}
-        </div>
-      ) : joined.length === 0 ? (
+        <Skeleton className="h-40 rounded-xl" />
+      ) : joined.length === 0 || (items.length === 0 && !stillLoading) ? (
         <EmptyState
           icon={Medal}
           title="Nie dołączyłeś jeszcze do żadnego turnieju"
@@ -62,24 +74,9 @@ export function JoinedTournaments() {
           action={<JoinButton />}
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {joined.map(({ id, roles: tournamentRoles }, index) => {
-            const tournament = tournaments[index]
-            if (tournament?.data) {
-              return (
-                <TournamentCard
-                  key={id}
-                  tournament={tournament.data}
-                  roleLabel={tournamentRoles
-                    .map((role) => JOIN_ROLE_LABELS[role] ?? role)
-                    .join(", ")}
-                />
-              )
-            }
-            // Usunięty turniej albo brak dostępu — nie blokujemy reszty listy.
-            if (tournament?.isError) return null
-            return <Skeleton key={id} className="h-40 rounded-xl" />
-          })}
+        <div className="space-y-6">
+          <TournamentSections items={items} />
+          {stillLoading && <Skeleton className="h-16 rounded-xl" />}
         </div>
       )}
     </>

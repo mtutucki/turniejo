@@ -179,10 +179,7 @@ export function PitchFormDialog({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Anuluj</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive hover:bg-destructive/90 text-white"
-                    onClick={remove}
-                  >
+                  <AlertDialogAction variant="destructive" onClick={remove}>
                     Usuń
                   </AlertDialogAction>
                 </AlertDialogFooter>

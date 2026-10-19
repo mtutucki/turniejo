@@ -100,6 +100,21 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         .OrderByDescending(t => t.CreatedAt)
         .ToListAsync(cancellationToken);
 
+    // ExecuteUpdate — od razu w bazie, bez SaveChanges (usunięcie organizacji woła to z innego modułu).
+    public async Task<IReadOnlyList<Guid>> SoftDeleteTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await Tournaments
+            .Where(t => t.OrganizationId == organizationId)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.DeletedAt, now).SetProperty(t => t.UpdatedAt, now), cancellationToken);
+
+        return await Tournaments
+            .IgnoreQueryFilters()
+            .Where(t => t.OrganizationId == organizationId)
+            .Select(t => t.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToken = default) =>
     await TournamentCategories.AddAsync(category, cancellationToken);
 

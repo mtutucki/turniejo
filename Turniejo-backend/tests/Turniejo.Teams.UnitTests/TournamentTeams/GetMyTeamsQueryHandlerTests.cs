@@ -76,6 +76,30 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
         }
 
         [Theory]
+        [InlineData(RegistrationStatus.Withdrawn)]
+        [InlineData(RegistrationStatus.Rejected)]
+        public async Task Handle_ShouldSkipTeams_ThatWereWithdrawnOrRejected(RegistrationStatus status)
+        {
+            var userId = Guid.NewGuid();
+            var tournamentTeamId = Guid.NewGuid();
+            _currentUserContext.UserId.Returns(userId);
+
+            var staff = TeamStaff.CreateCoach(Guid.NewGuid(), tournamentTeamId, userId, Guid.NewGuid()).Value;
+            _dbContext.GetTeamStaffByUserIdAsync(userId, Arg.Any<CancellationToken>()).Returns(new List<TeamStaff> { staff });
+            var tournamentTeam = TournamentTeam.Create(tournamentTeamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()).Value;
+            if (status == RegistrationStatus.Withdrawn)
+                tournamentTeam.ChangeRegistrationStatus(RegistrationStatus.Accepted, Guid.NewGuid());
+            tournamentTeam.ChangeRegistrationStatus(status, Guid.NewGuid());
+            _dbContext.GetTournamentTeamByIdAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(tournamentTeam);
+
+            var result = await _handler.Handle(new GetMyTeamsQuery(), CancellationToken.None);
+
+            tournamentTeam.RegistrationStatus.Should().Be(status);
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Should().BeEmpty();
+        }
+
+        [Theory]
         [InlineData("Draft", false, true)]
         [InlineData("InProgress", false, false)]
         [InlineData("InProgress", true, true)]

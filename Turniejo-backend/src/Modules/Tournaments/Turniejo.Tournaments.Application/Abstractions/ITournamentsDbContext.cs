@@ -13,6 +13,8 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task<Tournament?> GetTournamentByIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentBySlugAsync(string slug, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+        /// <summary>Miękko usuwa wszystkie turnieje organizacji; zwraca Id wszystkich, także usuniętych wcześniej.</summary>
+        Task<IReadOnlyList<Guid>> SoftDeleteTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
         // TournamentCategory
         Task AddTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToken = default);

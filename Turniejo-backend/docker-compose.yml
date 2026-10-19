@@ -45,6 +45,15 @@ services:
       postgres:
         condition: service_healthy
 
+  # Skrzynka na maile z aplikacji (reset hasła) — nic nie wychodzi na zewnątrz.
+  # SMTP: localhost:1025 (domyślne Smtp:* w appsettings.json), podgląd: http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: turniejo-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: turniejo-pgadmin

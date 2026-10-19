@@ -87,4 +87,7 @@ internal sealed class PlayerModule(IPlayersDbContext dbContext) : IPlayerModule
 
     public Task RemoveGuardianshipsAsync(Guid userId, CancellationToken cancellationToken = default) =>
         dbContext.RemoveGuardianshipsByUserIdAsync(userId, cancellationToken);
+
+    public Task<IReadOnlyList<Guid>> RemovePlayersOfTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default) =>
+        dbContext.RemovePlayersOfTournamentTeamsAsync(tournamentTeamIds, cancellationToken);
 }

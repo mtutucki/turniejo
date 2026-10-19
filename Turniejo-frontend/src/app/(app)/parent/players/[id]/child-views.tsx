@@ -54,7 +54,13 @@ export function ChildStandingView() {
 
   if (standing.isPending) return <Skeleton className="h-48 w-full rounded-xl" />
   if (!standing.data?.length) {
-    return <EmptyState icon={ListOrdered} title="Drużyna nie jest jeszcze w grupie" />
+    return (
+      <EmptyState
+        icon={ListOrdered}
+        title="Brak tabeli"
+        description="Tabela pojawia się w turniejach z fazą grupową, gdy drużyna trafi do grupy."
+      />
+    )
   }
 
   return (
@@ -65,7 +71,12 @@ export function ChildStandingView() {
           className="bg-card rounded-xl border"
           aria-label={`Tabela ${group.groupName ?? ""}`}
         >
-          <h2 className="border-b px-4 py-3 font-semibold">{group.groupName ?? "Grupa"}</h2>
+          <div className="border-b px-4 py-3">
+            <h2 className="font-semibold">{group.groupName ?? "Grupa"}</h2>
+            {group.tournamentName && (
+              <p className="text-muted-foreground text-xs">{group.tournamentName}</p>
+            )}
+          </div>
           <table className="w-full text-sm">
             <thead className="text-muted-foreground text-xs">
               <tr>

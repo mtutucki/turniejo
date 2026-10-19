@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -30,6 +30,7 @@ import {
   SelectMvpDialog,
 } from "@/features/matches/components/match-event-dialogs"
 import { LiveScoreBoard } from "@/features/matches/components/live-score-board"
+import { ReleaseMatchButton } from "@/features/matches/components/release-match-button"
 import {
   scoringTeamId,
   useAddGoal,
@@ -339,6 +340,7 @@ function LivePanel({
 
 export function LiveMatchView() {
   const { id: matchId } = useParams<{ id: string }>()
+  const router = useRouter()
   const { request, isAuthenticated } = useApi()
   const location = useMatchLocation(matchId)
   const tournamentId = location.data?.tournamentId
@@ -369,7 +371,22 @@ export function LiveMatchView() {
   const header = (
     <header className="flex items-center justify-between gap-3">
       <BackLink scheduleTournamentId={isOrganizer && !isMatchReferee ? tournamentId : undefined} />
-      {canOperate && <ConnectionBadge state={realtime} />}
+      <div className="flex items-center gap-1">
+        {isMatchReferee &&
+          tournamentId &&
+          panel.data &&
+          panel.data.status !== "Finished" &&
+          panel.data.status !== "Cancelled" && (
+            <ReleaseMatchButton
+              tournamentId={tournamentId}
+              matchId={matchId}
+              title={`${panel.data.homeTeam.name} – ${panel.data.awayTeam.name}`}
+              inProgress={panel.data.status === "Live" || panel.data.status === "Paused"}
+              onReleased={() => router.push("/referee/matches")}
+            />
+          )}
+        {canOperate && <ConnectionBadge state={realtime} />}
+      </div>
     </header>
   )
 
@@ -385,12 +402,12 @@ export function LiveMatchView() {
   } else if (location.isPending || rolesLoading) {
     content = <Skeleton className="h-96 w-full rounded-2xl" />
   } else if (!canOperate) {
-    // Panel prowadzi tylko przypisany sędzia albo organizator (to samo co komendy meczu → 403).
+    // Panel prowadzi tylko sędzia tego meczu albo organizator (to samo co komendy meczu → 403).
     content = (
       <EmptyState
         icon={ShieldAlert}
         title="To nie jest Twój mecz"
-        description="Panel meczu prowadzi sędzia przypisany przez organizatora."
+        description="Panel meczu prowadzi sędzia, który go wziął albo dostał od organizatora. Wolne mecze znajdziesz w „Moje mecze”."
       />
     )
   } else if (panel.isPending) {

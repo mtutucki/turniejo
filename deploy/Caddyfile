@@ -33,7 +33,7 @@ auth.{$DOMAIN} {
 	import security_headers
 	encode zstd gzip
 
-	# Publicznie potrzebne są tylko endpointy realmu (linki z maili: reset hasła, akcje konta).
+	# Publicznie potrzebne są tylko endpointy realmu (issuer tokenów, metadane OIDC/JWKS dla API).
 	# Konsola admina i Admin REST API — wyłącznie przez tunel SSH (KC_HOSTNAME_ADMIN).
 	@admin path /admin /admin/*
 	respond @admin 404

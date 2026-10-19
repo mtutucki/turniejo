@@ -1,15 +1,18 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import type { ComponentProps } from "react"
+import type { FieldError as RhfFieldError } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 
 import { TextField } from "@/components/forms/text-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { applyFieldErrors } from "@/lib/api/form-errors"
-import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/format"
+import { toDateTimeLocal, zonedToIso } from "@/lib/format"
 import type { Tournament, TournamentDetailsInput } from "@/types/tournaments"
 
 // Limity 1:1 z CreateTournamentCommandValidator / UpdateTournamentDetailsValidator.
@@ -17,8 +20,10 @@ const schema = z
   .object({
     name: z.string().trim().min(1, "Podaj nazwę turnieju").max(200, "Maksymalnie 200 znaków"),
     description: z.string().trim().max(500, "Maksymalnie 500 znaków"),
-    startAt: z.string().min(1, "Podaj datę rozpoczęcia"),
-    endAt: z.string().min(1, "Podaj datę zakończenia"),
+    startDate: z.string().min(1, "Podaj datę rozpoczęcia"),
+    startTime: z.string().min(1, "Podaj godzinę rozpoczęcia"),
+    endDate: z.string().min(1, "Podaj datę zakończenia"),
+    endTime: z.string().min(1, "Podaj godzinę zakończenia"),
     teamLimit: z
       .number({ error: "Podaj liczbę" })
       .int("Podaj liczbę całkowitą")
@@ -26,12 +31,53 @@ const schema = z
       // limit 0 oznaczałby turniej, do którego nie da się zgłosić żadnej drużyny.
       .min(1, "Limit musi wynosić co najmniej 1"),
   })
-  .refine((v) => !v.startAt || !v.endAt || new Date(v.endAt) > new Date(v.startAt), {
-    path: ["endAt"],
-    message: "Zakończenie musi być po rozpoczęciu",
+  // "RRRR-MM-DD" i "GG:MM" porównują się leksykograficznie tak samo jak chronologicznie.
+  .refine((v) => !v.startDate || !v.endDate || v.endDate >= v.startDate, {
+    path: ["endDate"],
+    message: "Zakończenie nie może być przed rozpoczęciem",
   })
+  .refine(
+    (v) => v.startDate !== v.endDate || !v.startTime || !v.endTime || v.endTime > v.startTime,
+    { path: ["endTime"], message: "Godzina zakończenia musi być po rozpoczęciu" },
+  )
 
 type DetailsValues = z.infer<typeof schema>
+
+type DateTimeFieldProps = {
+  id: string
+  label: string
+  dateProps: ComponentProps<typeof Input>
+  timeProps: ComponentProps<typeof Input>
+  dateError?: RhfFieldError
+  timeError?: RhfFieldError
+}
+
+/** Dzień i godzina jako osobne pola — natywny kalendarz i zegar zamiast jednego datetime-local. */
+function DateTimeField({
+  id,
+  label,
+  dateProps,
+  timeProps,
+  dateError,
+  timeError,
+}: DateTimeFieldProps) {
+  return (
+    <Field data-invalid={!!dateError || !!timeError}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <div className="flex gap-2">
+        <Input id={id} type="date" aria-invalid={!!dateError} {...dateProps} />
+        <Input
+          type="time"
+          aria-label={`${label} — godzina`}
+          aria-invalid={!!timeError}
+          className="w-28 shrink-0 font-mono tabular-nums"
+          {...timeProps}
+        />
+      </div>
+      <FieldError errors={[dateError ?? timeError]} />
+    </Field>
+  )
+}
 
 type TournamentDetailsFormProps = {
   tournament?: Tournament
@@ -48,25 +94,37 @@ export function TournamentDetailsForm({
   disabled = false,
   onSubmit,
 }: TournamentDetailsFormProps) {
+  const start = tournament && toDateTimeLocal(tournament.startAt)
+  const end = tournament && toDateTimeLocal(tournament.endAt)
   const form = useForm<DetailsValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: tournament?.name ?? "",
       description: tournament?.description ?? "",
-      startAt: tournament ? toDateTimeLocal(tournament.startAt) : "",
-      endAt: tournament ? toDateTimeLocal(tournament.endAt) : "",
+      startDate: start?.slice(0, 10) ?? "",
+      startTime: start?.slice(11) ?? "09:00",
+      endDate: end?.slice(0, 10) ?? "",
+      endTime: end?.slice(11) ?? "17:00",
       teamLimit: tournament?.teamLimit ?? 16,
     },
   })
   const { errors, isSubmitting } = form.formState
+  const startDate = useWatch({ control: form.control, name: "startDate" })
+
+  // Zakończenie podąża za rozpoczęciem: puste albo wcześniejsze ustawiamy na ten sam dzień.
+  function syncEndDate(nextStart: string) {
+    const endDate = form.getValues("endDate")
+    if (nextStart && (!endDate || endDate < nextStart))
+      form.setValue("endDate", nextStart, { shouldDirty: true, shouldValidate: !!endDate })
+  }
 
   async function submit(values: DetailsValues) {
     try {
       await onSubmit({
         name: values.name,
         description: values.description || null,
-        startAt: fromDateTimeLocal(values.startAt),
-        endAt: fromDateTimeLocal(values.endAt),
+        startAt: zonedToIso(values.startDate, values.startTime),
+        endAt: zonedToIso(values.endDate, values.endTime),
         teamLimit: values.teamLimit,
       })
       form.reset(values)
@@ -91,19 +149,23 @@ export function TournamentDetailsForm({
             <FieldError errors={[errors.description]} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              id="startAt"
+            <DateTimeField
+              id="startDate"
               label="Rozpoczęcie"
-              type="datetime-local"
-              error={errors.startAt}
-              {...form.register("startAt")}
+              dateError={errors.startDate}
+              timeError={errors.startTime}
+              dateProps={form.register("startDate", {
+                onChange: (event) => syncEndDate(event.target.value),
+              })}
+              timeProps={form.register("startTime", { deps: ["endTime"] })}
             />
-            <TextField
-              id="endAt"
+            <DateTimeField
+              id="endDate"
               label="Zakończenie"
-              type="datetime-local"
-              error={errors.endAt}
-              {...form.register("endAt")}
+              dateError={errors.endDate}
+              timeError={errors.endTime}
+              dateProps={{ min: startDate || undefined, ...form.register("endDate") }}
+              timeProps={form.register("endTime")}
             />
           </div>
           <TextField

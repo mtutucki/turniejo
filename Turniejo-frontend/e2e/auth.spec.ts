@@ -67,7 +67,7 @@ test.describe("Rejestracja → Logowanie", () => {
     await page.getByLabel("Powtórz hasło").fill("inne")
     await page.getByRole("button", { name: "Załóż konto" }).click()
     await expect(page.getByText("Nieprawidłowy adres email")).toBeVisible()
-    await expect(page.getByText("Hasło musi mieć co najmniej 8 znaków")).toBeVisible()
+    await expect(page.getByText("Hasło musi mieć co najmniej 10 znaków")).toBeVisible()
     await expect(page.getByText("Hasła nie są takie same")).toBeVisible()
     // Typ konta trzeba wybrać świadomie — nie ma domyślnego "organizatora".
     await expect(page.getByText("Wybierz, jak chcesz korzystać z Turniejo")).toBeVisible()
@@ -87,6 +87,71 @@ test.describe("Rejestracja → Logowanie", () => {
       page.getByText(/email/i).and(page.locator("[data-slot=field-error]")),
     ).toBeVisible()
     await expect(page).toHaveURL(/\/register/)
+  })
+})
+
+test.describe("Reset hasła", () => {
+  test("link z maila: nowe hasło w aplikacji, stare przestaje działać, link jest jednorazowy", async ({
+    page,
+  }) => {
+    const link = "/password-reset/confirm?token=token-organizator@e2e.pl"
+    const newPassword = "NoweHaslo456!"
+
+    await page.goto(link)
+    await page.getByLabel("Nowe hasło").fill(newPassword)
+    await page.getByLabel("Powtórz hasło").fill("inne-haslo")
+    await page.getByRole("button", { name: "Ustaw hasło" }).click()
+    await expect(page.getByText("Hasła nie są takie same")).toBeVisible()
+
+    await page.getByLabel("Powtórz hasło").fill(newPassword)
+    await page.getByRole("button", { name: "Ustaw hasło" }).click()
+    await expect(page.getByText("Hasło zostało zmienione")).toBeVisible()
+
+    await page.getByRole("link", { name: "Zaloguj się" }).click()
+    await expect(page).toHaveURL(/\/login$/)
+    await login(page, "organizator@e2e.pl")
+    await expect(page.getByText(/Nieprawidłowy email lub hasło/)).toBeVisible()
+    await login(page, "organizator@e2e.pl", newPassword)
+    await expect(page).toHaveURL(/\/tournaments$/)
+
+    // Wylogowany user z tym samym linkiem — token jest już zużyty.
+    await page.context().clearCookies()
+    await page.goto(link)
+    await page.getByLabel("Nowe hasło").fill("JeszczeInne789!")
+    await page.getByLabel("Powtórz hasło").fill("JeszczeInne789!")
+    await page.getByRole("button", { name: "Ustaw hasło" }).click()
+    await expect(
+      page.getByRole("alert").filter({ hasText: "wygasł albo został już użyty" }),
+    ).toBeVisible()
+    await expect(page.getByRole("link", { name: "Wyślij nowy link" })).toBeVisible()
+  })
+
+  test("link bez tokenu nie pokazuje formularza", async ({ page }) => {
+    await page.goto("/password-reset/confirm")
+    await expect(page.getByText("Ten link jest niepełny")).toBeVisible()
+    await expect(page.getByRole("button", { name: "Ustaw hasło" })).toHaveCount(0)
+  })
+})
+
+test.describe("Organizacja", () => {
+  test("organizator nazywa organizację przy rejestracji i zmienia nazwę w koncie", async ({
+    page,
+  }) => {
+    const email = `klub.${Date.now()}@e2e.pl`
+    await page.goto("/register")
+    await fillRegistration(page, email, "Olga")
+    await page.getByText("Organizuję turnieje").click()
+    await page.getByLabel("Nazwa organizacji (opcjonalnie)").fill("UKS Orły")
+    await page.getByRole("button", { name: "Załóż konto" }).click()
+    await expect(page.getByText("Organizacja: UKS Orły")).toBeVisible()
+
+    await page.goto("/account")
+    await page.getByRole("button", { name: "Zmień nazwę" }).click()
+    const dialog = page.getByRole("dialog", { name: "Nazwa organizacji" })
+    await dialog.getByLabel("Nazwa organizacji").fill("Akademia Orły")
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(page.getByText("Akademia Orły")).toBeVisible()
+    expect((await mock.state()).organizations).toContain("Akademia Orły")
   })
 })
 
@@ -114,14 +179,26 @@ test.describe("RODO: konto", () => {
     await expect(page.getByText(/Nieprawidłowy email lub hasło/)).toBeVisible()
   })
 
-  test("jedyny organizator nie usunie konta samodzielnie", async ({ page }) => {
+  test("jedyny organizator usuwa konto z organizacją dopiero po drugim potwierdzeniu", async ({
+    page,
+  }) => {
     await login(page, "organizator@e2e.pl")
     await expect(page).toHaveURL(/\/tournaments$/)
 
     await page.goto("/account")
     await page.getByRole("button", { name: "Usuń konto" }).click()
     await page.getByRole("button", { name: "Usuń konto na zawsze" }).click()
-    await expect(page.getByRole("alert").filter({ hasText: "jedynym organizatorem" })).toBeVisible()
-    await expect(page).toHaveURL(/\/account$/)
+
+    // Pierwsze potwierdzenie nie wystarcza — konto i organizacja wciąż istnieją.
+    const confirm = page.getByRole("alertdialog", { name: "Usunąć też całą organizację?" })
+    await expect(confirm).toContainText("jedynym organizatorem")
+    const submit = confirm.getByRole("button", { name: "Usuń konto i organizację" })
+    await expect(submit).toBeDisabled()
+    expect((await mock.state()).users.some((u) => u.email === "organizator@e2e.pl")).toBe(true)
+
+    await confirm.getByLabel("Aby potwierdzić, wpisz USUŃ").fill("USUŃ")
+    await submit.click()
+    await expect(page).toHaveURL(/\/login/)
+    expect((await mock.state()).users.some((u) => u.email === "organizator@e2e.pl")).toBe(false)
   })
 })

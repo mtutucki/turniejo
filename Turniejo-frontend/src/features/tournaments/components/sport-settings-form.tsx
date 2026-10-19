@@ -5,7 +5,6 @@ import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { TextField } from "@/components/forms/text-field"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -17,8 +16,10 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { applyFieldErrors } from "@/lib/api/form-errors"
+import { cn } from "@/lib/utils"
 import type { TournamentSettings } from "@/types/tournaments"
 
 import { useUpdateTournamentSettings } from "../api"
@@ -62,23 +63,40 @@ type SportSettingsFormProps = {
   tournamentId: string
   settings: TournamentSettings
   disabled: boolean
+  /** Tryb kreatora: przycisk prowadzi do kolejnego kroku, także gdy nic się nie zmieniło. */
+  onSaved?: () => void
 }
 
-export function SportSettingsForm({ tournamentId, settings, disabled }: SportSettingsFormProps) {
+export function SportSettingsForm({
+  tournamentId,
+  settings,
+  disabled,
+  onSaved,
+}: SportSettingsFormProps) {
   const updateSettings = useUpdateTournamentSettings(tournamentId)
   const form = useForm<TournamentSettings>({ resolver: zodResolver(schema), values: settings })
   const { errors, isDirty } = form.formState
 
   const numberField = (name: NumberField, label: string, suffix?: string) => (
-    <TextField
-      id={name}
-      label={suffix ? `${label} (${suffix})` : label}
-      type="number"
-      inputMode="numeric"
-      className="font-mono tabular-nums"
-      error={errors[name]}
-      {...form.register(name, { valueAsNumber: true })}
-    />
+    <Field data-invalid={!!errors[name]}>
+      <FieldLabel htmlFor={name}>{label}</FieldLabel>
+      <div className="relative">
+        <Input
+          id={name}
+          type="number"
+          inputMode="numeric"
+          aria-invalid={!!errors[name]}
+          className={cn("font-mono tabular-nums", suffix && "pr-12")}
+          {...form.register(name, { valueAsNumber: true })}
+        />
+        {suffix && (
+          <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm">
+            {suffix}
+          </span>
+        )}
+      </div>
+      <FieldError errors={[errors[name]]} />
+    </Field>
   )
 
   const switchField = (
@@ -90,7 +108,7 @@ export function SportSettingsForm({ tournamentId, settings, disabled }: SportSet
       control={form.control}
       name={name}
       render={({ field }) => (
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="rounded-lg border p-3">
           <FieldContent>
             <FieldLabel htmlFor={name}>{label}</FieldLabel>
             <FieldDescription>{description}</FieldDescription>
@@ -102,8 +120,12 @@ export function SportSettingsForm({ tournamentId, settings, disabled }: SportSet
   )
 
   function submit(values: TournamentSettings) {
+    if (!isDirty) return onSaved?.()
     updateSettings.mutate(values, {
-      onSuccess: () => toast.success("Ustawienia sportowe zapisane"),
+      onSuccess: () => {
+        toast.success("Zasady gry zapisane")
+        onSaved?.()
+      },
       onError: (error) => applyFieldErrors(error, form),
     })
   }
@@ -114,14 +136,16 @@ export function SportSettingsForm({ tournamentId, settings, disabled }: SportSet
         <FieldGroup>
           <FieldSet>
             <FieldLegend>Punktacja</FieldLegend>
+            <FieldDescription>Punkty do tabeli za wynik meczu.</FieldDescription>
             <div className="grid gap-4 sm:grid-cols-3">
-              {numberField("pointsForWin", "Wygrana")}
-              {numberField("pointsForDraw", "Remis")}
-              {numberField("pointsForLoss", "Porażka")}
+              {numberField("pointsForWin", "Wygrana", "pkt")}
+              {numberField("pointsForDraw", "Remis", "pkt")}
+              {numberField("pointsForLoss", "Porażka", "pkt")}
             </div>
           </FieldSet>
           <FieldSet>
             <FieldLegend>Czas</FieldLegend>
+            <FieldDescription>Na tej podstawie generator układa terminarz.</FieldDescription>
             <div className="grid gap-4 sm:grid-cols-2">
               {numberField("matchDurationMinutes", "Długość meczu", "min")}
               {numberField("breakDurationMinutes", "Przerwa między meczami", "min")}
@@ -129,15 +153,21 @@ export function SportSettingsForm({ tournamentId, settings, disabled }: SportSet
           </FieldSet>
           <FieldSet>
             <FieldLegend>Walkower</FieldLegend>
+            <FieldDescription>Wynik wpisywany, gdy mecz kończy się walkowerem.</FieldDescription>
             <div className="grid gap-4 sm:grid-cols-2">
               {numberField("walkoverHomeScore", "Gole gospodarzy")}
               {numberField("walkoverAwayScore", "Gole gości")}
             </div>
           </FieldSet>
           <FieldSet>
-            <FieldLegend>Opcje</FieldLegend>
+            <FieldLegend>Sędziowie i składy</FieldLegend>
             <FieldGroup>
-              {numberField("refereeEditWindowMinutes", "Okno edycji wyniku przez sędziego", "min")}
+              <div className="space-y-2 sm:max-w-xs">
+                {numberField("refereeEditWindowMinutes", "Okno poprawek sędziego", "min")}
+                <FieldDescription>
+                  Tyle minut po meczu sędzia może jeszcze poprawić wynik.
+                </FieldDescription>
+              </div>
               {switchField(
                 "isThirdPlaceMatchEnabled",
                 "Mecz o 3. miejsce",
@@ -152,8 +182,15 @@ export function SportSettingsForm({ tournamentId, settings, disabled }: SportSet
           </FieldSet>
           <FieldError errors={[errors.root]} />
           <div className="flex gap-2">
-            <Button type="submit" disabled={disabled || !isDirty || updateSettings.isPending}>
-              {updateSettings.isPending ? "Zapisywanie…" : "Zapisz ustawienia"}
+            <Button
+              type="submit"
+              disabled={disabled || updateSettings.isPending || (!isDirty && !onSaved)}
+            >
+              {updateSettings.isPending
+                ? "Zapisywanie…"
+                : onSaved
+                  ? "Zapisz i dalej"
+                  : "Zapisz zasady gry"}
             </Button>
             {isDirty && !disabled && (
               <Button type="button" variant="ghost" onClick={() => form.reset(settings)}>

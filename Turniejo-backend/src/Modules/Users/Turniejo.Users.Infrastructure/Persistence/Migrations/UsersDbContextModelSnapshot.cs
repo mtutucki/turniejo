@@ -65,6 +65,43 @@ namespace Turniejo.Users.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "users");
                 });
 
+            modelBuilder.Entity("Turniejo.Users.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_password_reset_tokens_token_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_password_reset_tokens_user_id");
+
+                    b.ToTable("password_reset_tokens", "users");
+                });
+
             modelBuilder.Entity("Turniejo.Users.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -146,6 +183,15 @@ namespace Turniejo.Users.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_user_role_assignments_composite");
 
                     b.ToTable("user_role_assignments", "users");
+                });
+
+            modelBuilder.Entity("Turniejo.Users.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("Turniejo.Users.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Turniejo.Users.Domain.Entities.UserRoleAssignment", b =>

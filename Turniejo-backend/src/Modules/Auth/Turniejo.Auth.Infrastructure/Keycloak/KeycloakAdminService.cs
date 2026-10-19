@@ -68,21 +68,40 @@ internal sealed class KeycloakAdminService(
         }
     }
 
-    public async Task SendPasswordResetEmailAsync(
-    Guid keycloakUserId,
-    CancellationToken cancellationToken = default)
+    public async Task SetPasswordAsync(
+        Guid keycloakUserId,
+        string password,
+        CancellationToken cancellationToken = default)
     {
         var realm = configuration["Keycloak:Realm"];
         var response = await httpClient.PutAsJsonAsync(
-            $"/admin/realms/{realm}/users/{keycloakUserId}/execute-actions-email",
-            new[] { "UPDATE_PASSWORD" },
+            $"/admin/realms/{realm}/users/{keycloakUserId}/reset-password",
+            new KeycloakCredential("password", password, Temporary: false),
             cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
-                $"Keycloak password reset failed: {response.StatusCode} - {error}");
+                $"Keycloak password change failed: {response.StatusCode} - {error}");
+        }
+    }
+
+    public async Task LogoutAllSessionsAsync(
+        Guid keycloakUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var realm = configuration["Keycloak:Realm"];
+        var response = await httpClient.PostAsync(
+            $"/admin/realms/{realm}/users/{keycloakUserId}/logout",
+            content: null,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Keycloak session logout failed: {response.StatusCode} - {error}");
         }
     }
 }

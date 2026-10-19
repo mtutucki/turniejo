@@ -17,6 +17,10 @@ public interface IPlayerModule
     // Dla modułu Users (eksport danych i usunięcie konta rodzica) — dzieci, których user jest opiekunem.
     Task<IReadOnlyList<PlayerDto>> GetPlayersByGuardianAsync(Guid userId, CancellationToken cancellationToken = default);
     Task RemoveGuardianshipsAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    // Usunięcie organizacji: usuwa składy wskazanych drużyn oraz zawodników, którzy nie grają już
+    // w żadnej innej drużynie (razem z powiązaniami opiekunów). Zwraca Id usuniętych zawodników.
+    Task<IReadOnlyList<Guid>> RemovePlayersOfTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
 }
 
 public record PlayerDto(Guid Id, string FirstName, string LastName);

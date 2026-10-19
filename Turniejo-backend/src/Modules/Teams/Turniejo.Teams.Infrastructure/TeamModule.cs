@@ -76,6 +76,12 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         return teams.Count;
     }
 
+    public Task<IReadOnlyList<Guid>> GetTournamentTeamIdsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        dbContext.GetTournamentTeamIdsByOrganizationIdAsync(organizationId, cancellationToken);
+
+    public Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        dbContext.RemoveTeamsByOrganizationIdAsync(organizationId, cancellationToken);
+
     private static TournamentTeamDto ToDto(TournamentTeam tournamentTeam) =>
         new(tournamentTeam.Id, tournamentTeam.TournamentId, tournamentTeam.TeamId,
             tournamentTeam.CategoryId, tournamentTeam.GroupId, tournamentTeam.RegistrationStatus.ToString());

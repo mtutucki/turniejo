@@ -3,6 +3,7 @@ using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Teams.Application.Abstractions;
 using Turniejo.Teams.Application.DTOs;
+using Turniejo.Teams.Domain.Enums;
 
 namespace Turniejo.Teams.Application.TournamentTeams.GetMyTeams
 {
@@ -20,6 +21,11 @@ namespace Turniejo.Teams.Application.TournamentTeams.GetMyTeams
             {
                 var tournamentTeam = await dbContext.GetTournamentTeamByIdAsync(staff.TournamentTeamId, cancellationToken);
                 if (tournamentTeam == null)
+                    continue;
+
+                // Odrzucona/wycofana drużyna nie gra w turnieju — przypisanie trenera zostaje (wraca po
+                // ponownym zgłoszeniu), ale na liście "Moje drużyny" jej nie pokazujemy.
+                if (tournamentTeam.RegistrationStatus is RegistrationStatus.Rejected or RegistrationStatus.Withdrawn)
                     continue;
 
                 var team = await dbContext.GetTeamByIdAsync(tournamentTeam.TeamId, cancellationToken);

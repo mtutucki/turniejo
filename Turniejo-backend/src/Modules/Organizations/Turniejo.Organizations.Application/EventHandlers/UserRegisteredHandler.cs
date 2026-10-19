@@ -27,7 +27,10 @@ namespace Turniejo.Organizations.Application.EventHandlers
 
             if (organization is null)
             {
-                var name = $"{notification.FirstName} {notification.LastName}".Trim();
+                // Nazwa z formularza rejestracji; bez niej organizacja nazywa się jak jej właściciel.
+                var name = string.IsNullOrWhiteSpace(notification.OrganizationName)
+                    ? $"{notification.FirstName} {notification.LastName}".Trim()
+                    : notification.OrganizationName.Trim();
                 var result = await provisioner.CreateAsync(
                     notification.UserId,
                     string.IsNullOrWhiteSpace(name) ? notification.Email : name,

@@ -78,14 +78,18 @@ const EXACT: Record<string, string> = {
     "Brak meczów do rozegrania — każda grupa potrzebuje co najmniej 2 zaakceptowanych drużyn",
   "Tournament cannot transition to ScheduleGenerated from its current status":
     "Terminarz został już wygenerowany albo turniej jest na innym etapie",
+  "Some accepted teams are not assigned to a group":
+    "Część zaakceptowanych drużyn nie ma grupy — przypisz je, zanim wygenerujesz terminarz",
   "EndAt must be after StartAt.": "Koniec musi być po rozpoczęciu",
   "At least one pitch is required.": "Wybierz co najmniej jedno boisko",
   "Description must not exceed 500 characters.": "Maksymalnie 500 znaków",
   // Mecze
   "Cannot change the schedule once the match has started, finished or been cancelled":
     "Mecz się rozpoczął, zakończył albo został odwołany — terminu nie można już zmienić",
-  "Cannot change the referee once the match has started, finished or been cancelled":
-    "Mecz się rozpoczął, zakończył albo został odwołany — sędziego nie można już zmienić",
+  "Cannot change the referee once the match has finished or been cancelled":
+    "Mecz się zakończył albo został odwołany — sędziego nie można już zmienić",
+  "Match already has a referee": "Ten mecz wziął już inny sędzia",
+  "You are not the referee of this match": "Nie prowadzisz już tego meczu",
   "User is not a referee in this tournament": "Ta osoba nie jest sędzią w tym turnieju",
   "The referee already has another match at this time":
     "Ten sędzia prowadzi w tym czasie inny mecz",

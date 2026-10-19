@@ -6,6 +6,7 @@ using Turniejo.Matches.Application.Matches.AddCard;
 using Turniejo.Matches.Application.Matches.AddGoal;
 using Turniejo.Matches.Application.Matches.AssignMatchPitch;
 using Turniejo.Matches.Application.Matches.AssignRefereeToMatch;
+using Turniejo.Matches.Application.Matches.ClaimMatch;
 using Turniejo.Matches.Application.Matches.CorrectFinishedMatchScore;
 using Turniejo.Matches.Application.Matches.FinishMatch;
 using Turniejo.Matches.Application.Matches.GetAssignedMatches;
@@ -17,7 +18,9 @@ using Turniejo.Matches.Application.Matches.GetMatchLivePanel;
 using Turniejo.Matches.Application.Matches.GetMatchScore;
 using Turniejo.Matches.Application.Matches.GetMatchSummary;
 using Turniejo.Matches.Application.Matches.GetMatchTimeline;
+using Turniejo.Matches.Application.Matches.GetOpenMatches;
 using Turniejo.Matches.Application.Matches.PauseMatch;
+using Turniejo.Matches.Application.Matches.ReleaseMatch;
 using Turniejo.Matches.Application.Matches.RescheduleMatch;
 using Turniejo.Matches.Application.Matches.ResumeMatch;
 using Turniejo.Matches.Application.Matches.RevertMatchEvent;
@@ -80,7 +83,9 @@ namespace Turniejo.Api.Controllers
         [HttpPost("schedule/generate")]
         public async Task<IActionResult> GenerateSchedule([FromRoute] Guid tournamentId, [FromBody] GenerateScheduleRequest request, CancellationToken cancellationToken)
         {
-            var command = new GenerateScheduleCommand(tournamentId, request.StartAt, request.EndAt, request.PitchIds);
+            var command = new GenerateScheduleCommand(
+                tournamentId, request.StartAt, request.EndAt, request.PitchIds,
+                request.Windows?.Select(w => new ScheduleWindow(w.StartAt, w.EndAt, w.MaxMatches)).ToList());
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -137,6 +142,27 @@ namespace Turniejo.Api.Controllers
         {
             var command = new AssignRefereeToMatchCommand(tournamentId, matchId, request.RefereeId);
             var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpPost("matches/{matchId}/referee/claim")]
+        public async Task<IActionResult> ClaimMatch([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ClaimMatchCommand(tournamentId, matchId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpPost("matches/{matchId}/referee/release")]
+        public async Task<IActionResult> ReleaseMatch([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new ReleaseMatchCommand(tournamentId, matchId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("/api/referee/matches/open")]
+        public async Task<IActionResult> GetOpenMatches(CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetOpenMatchesQuery(), cancellationToken);
             return result.ToActionResult();
         }
 
@@ -307,7 +333,12 @@ namespace Turniejo.Api.Controllers
 
         public sealed record AddPitchRequest(string Name, string? Description);
         public sealed record UpdatePitchRequest(string Name, string? Description, bool IsActive);
-        public sealed record GenerateScheduleRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, IReadOnlyList<Guid> PitchIds);
+        public sealed record ScheduleWindowRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, int? MaxMatches = null);
+        public sealed record GenerateScheduleRequest(
+            DateTimeOffset StartAt,
+            DateTimeOffset EndAt,
+            IReadOnlyList<Guid> PitchIds,
+            IReadOnlyList<ScheduleWindowRequest>? Windows = null);
         public sealed record UpdateMatchScheduleRequest(Guid? PitchId, DateTimeOffset ScheduledAt);
         public sealed record AssignMatchPitchRequest(Guid? PitchId);
         public sealed record RescheduleMatchRequest(DateTimeOffset ScheduledAt);

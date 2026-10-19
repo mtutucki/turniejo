@@ -18,6 +18,11 @@ public interface ITeamModule
     Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
     /// <summary>Drużyny kategorii bez grupy (poza odrzuconymi/wycofanymi) trafiają do wskazanej grupy.</summary>
     Task<int> AssignUngroupedTeamsToGroupAsync(Guid tournamentId, Guid categoryId, Guid groupId, CancellationToken cancellationToken = default);
+
+    // Usunięcie organizacji: zgłoszenia jej drużyn (potrzebne modułowi Players do usunięcia składów),
+    // a potem cała baza drużyn ze zgłoszeniami i sztabem.
+    Task<IReadOnlyList<Guid>> GetTournamentTeamIdsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 }
 
 public record TeamDto(Guid Id, string Name, string? ShortName);

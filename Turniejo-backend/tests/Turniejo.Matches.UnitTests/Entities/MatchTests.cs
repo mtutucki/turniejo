@@ -248,17 +248,105 @@ namespace Turniejo.Matches.UnitTests.Entities
         }
 
         [Theory]
-        [MemberData(nameof(StartedStates))]
-        public void AssignReferee_ShouldFail_OnceMatchHasStartedOrWasCancelled(string state)
+        [InlineData("Live")]
+        [InlineData("Paused")]
+        public void AssignReferee_ShouldSucceed_WhileMatchIsInProgress(string state)
         {
             var match = CreateMatchIn(state);
-            var refereeBefore = match.RefereeId;
+            var refereeId = Guid.NewGuid();
+
+            var result = match.AssignReferee(refereeId, ValidUserId);
+
+            result.IsSuccess.Should().BeTrue();
+            match.RefereeId.Should().Be(refereeId);
+        }
+
+        [Fact]
+        public void AssignReferee_ShouldFail_OnceMatchWasCancelled()
+        {
+            var match = CreateMatchIn("Cancelled");
 
             var result = match.AssignReferee(Guid.NewGuid(), ValidUserId);
 
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Conflict.Status");
-            match.RefereeId.Should().Be(refereeBefore);
+            match.RefereeId.Should().BeNull();
+        }
+
+        [Theory]
+        [InlineData("Scheduled")]
+        [InlineData("Live")]
+        [InlineData("Paused")]
+        public void ClaimReferee_ShouldSetRefereeId_WhenMatchHasNoReferee(string state)
+        {
+            var match = CreateMatchIn(state);
+            var refereeId = Guid.NewGuid();
+
+            var result = match.ClaimReferee(refereeId);
+
+            result.IsSuccess.Should().BeTrue();
+            match.RefereeId.Should().Be(refereeId);
+            match.DomainEvents.Should().ContainSingle(e => e is RefereeAssignedToMatch);
+        }
+
+        [Fact]
+        public void ClaimReferee_ShouldFail_WhenMatchAlreadyHasReferee()
+        {
+            var match = CreateValidMatch();
+            var refereeId = Guid.NewGuid();
+            match.AssignReferee(refereeId, ValidUserId);
+
+            var result = match.ClaimReferee(Guid.NewGuid());
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.RefereeId");
+            match.RefereeId.Should().Be(refereeId);
+        }
+
+        [Fact]
+        public void ClaimReferee_ShouldFail_OnceMatchWasCancelled()
+        {
+            var match = CreateMatchIn("Cancelled");
+
+            var result = match.ClaimReferee(Guid.NewGuid());
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.Status");
+            match.RefereeId.Should().BeNull();
+        }
+
+        [Theory]
+        [InlineData("Scheduled")]
+        [InlineData("Live")]
+        [InlineData("Paused")]
+        public void ReleaseReferee_ShouldClearRefereeId_AlsoWhileMatchIsInProgress(string state)
+        {
+            var refereeId = Guid.NewGuid();
+            var match = CreateValidMatch();
+            match.AssignReferee(refereeId, ValidUserId);
+            if (state is "Live" or "Paused")
+                match.Start(refereeId);
+            if (state == "Paused")
+                match.Pause(refereeId);
+
+            var result = match.ReleaseReferee(refereeId);
+
+            result.IsSuccess.Should().BeTrue();
+            match.RefereeId.Should().BeNull();
+        }
+
+        [Fact]
+        public void ReleaseReferee_ShouldFail_WhenCalledBySomeoneElse()
+        {
+            var refereeId = Guid.NewGuid();
+            var match = CreateValidMatch();
+            match.AssignReferee(refereeId, ValidUserId);
+
+            var result = match.ReleaseReferee(Guid.NewGuid());
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Conflict.RefereeId");
+            match.RefereeId.Should().Be(refereeId);
         }
 
         [Theory]

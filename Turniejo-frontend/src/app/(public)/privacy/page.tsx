@@ -155,9 +155,9 @@ export default function PrivacyPage() {
           odpowiemy w ciągu miesiąca.
         </p>
         <p>
-          Jeśli jesteś jedynym organizatorem organizacji, jej usunięcie (wraz z turniejami,
-          drużynami i danymi zawodników) wymaga kontaktu mailowego — żeby nie usunąć przez pomyłkę
-          danych innych osób.
+          Jeśli jesteś jedynym organizatorem organizacji, usunięcie konta usuwa także ją — wraz z
+          turniejami, drużynami i danymi zawodników. Wymaga to dodatkowego potwierdzenia, żeby nie
+          usunąć przez pomyłkę danych innych osób.
         </p>
         <p>
           Przysługuje Ci też skarga do Prezesa Urzędu Ochrony Danych Osobowych (ul. Stawki 2, 00-193

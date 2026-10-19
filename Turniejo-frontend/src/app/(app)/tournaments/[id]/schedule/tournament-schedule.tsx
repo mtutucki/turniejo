@@ -128,15 +128,19 @@ function MatchRow({
   const group = lookups.groupLabel(match)
   const referee = lookups.referee(match.refereeId)
   const editable = SCHEDULABLE_STATUSES.includes(match.status)
+  const inProgress = match.status === "Live" || match.status === "Paused"
   const showScore =
     match.status === "Live" || match.status === "Paused" || match.status === "Finished"
 
   return (
     <li className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center">
       <div className="flex min-w-0 flex-1 items-start gap-4">
-        <span className="w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
-          {unscheduled ? "–:–" : formatTime(match.scheduledAt)}
-        </span>
+        {/* Para bez terminu nie ma godziny, boiska ani sędziego — nie udajemy ich zaślepkami. */}
+        {!unscheduled && (
+          <span className="w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
+            {formatTime(match.scheduledAt)}
+          </span>
+        )}
         <div className="min-w-0 flex-1 space-y-1">
           <p className="flex flex-wrap items-center gap-x-2 font-medium">
             <span className="truncate">{home}</span>
@@ -150,16 +154,20 @@ function MatchRow({
             <span className="truncate">{away}</span>
           </p>
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <MatchStatusBadge status={match.status} />
-            <span className="flex items-center gap-1">
-              <MapPin className="size-3" />
-              {unscheduled ? "Bez terminu" : (pitch ?? "Bez boiska")}
-            </span>
+            {!unscheduled && (
+              <>
+                <MatchStatusBadge status={match.status} />
+                <span className="flex items-center gap-1">
+                  <MapPin className="size-3" />
+                  {pitch ?? "Bez boiska"}
+                </span>
+              </>
+            )}
             {group && <span>{group}</span>}
-            {isOrganizer && (
-              <span className={cn("flex items-center gap-1", !referee && "text-foreground")}>
+            {isOrganizer && !unscheduled && (
+              <span className="flex items-center gap-1">
                 <UserRound className="size-3" />
-                {referee ? memberName(referee) : "Brak sędziego"}
+                {referee ? memberName(referee) : "Dowolny sędzia"}
               </span>
             )}
           </p>
@@ -168,35 +176,37 @@ function MatchRow({
 
       {isOrganizer && !unscheduled && (
         <div className="flex flex-wrap items-center gap-2 pl-16 lg:pl-0">
-          {editable ? (
-            <div className="flex gap-2">
-              <RescheduleMatchDialog
-                tournamentId={tournamentId}
-                match={match}
-                title={title}
-                pitches={pitches}
-                trigger={
-                  <Button size="sm" variant="outline" aria-label={`Zmień termin: ${title}`}>
-                    <Clock />
-                    Termin
-                  </Button>
-                }
-              />
-              <AssignRefereeDialog
-                tournamentId={tournamentId}
-                match={match}
-                title={title}
-                referees={referees}
-                refereeCode={refereeCode}
-                trigger={
-                  <Button size="sm" variant="outline" aria-label={`Sędzia: ${title}`}>
-                    <Whistle />
-                    Sędzia
-                  </Button>
-                }
-              />
-            </div>
-          ) : (
+          {editable && (
+            <RescheduleMatchDialog
+              tournamentId={tournamentId}
+              match={match}
+              title={title}
+              pitches={pitches}
+              trigger={
+                <Button size="sm" variant="outline" aria-label={`Zmień termin: ${title}`}>
+                  <Clock />
+                  Termin
+                </Button>
+              }
+            />
+          )}
+          {/* Sędziego da się zmienić także w trakcie meczu — prowadzący może nagle wypaść. */}
+          {(editable || inProgress) && (
+            <AssignRefereeDialog
+              tournamentId={tournamentId}
+              match={match}
+              title={title}
+              referees={referees}
+              refereeCode={refereeCode}
+              trigger={
+                <Button size="sm" variant="outline" aria-label={`Sędzia: ${title}`}>
+                  <Whistle />
+                  Sędzia
+                </Button>
+              }
+            />
+          )}
+          {!editable && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
@@ -208,8 +218,9 @@ function MatchRow({
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                Mecz się rozpoczął, zakończył albo został odwołany — termin, boiska i sędziego nie
-                można już zmienić.
+                {inProgress
+                  ? "Mecz trwa — terminu i boiska nie można już zmienić."
+                  : "Mecz się zakończył albo został odwołany — terminu, boiska i sędziego nie można już zmienić."}
               </TooltipContent>
             </Tooltip>
           )}
@@ -229,13 +240,24 @@ function MatchRow({
 }
 
 /** Zapowiedź meczu kolejnej rundy: termin już jest, pary jeszcze nie (czeka na wcześniejsze mecze). */
-function PlannedRow({ planned, pitch }: { planned: PlannedBracketMatch; pitch: string | null }) {
+function PlannedRow({
+  planned,
+  pitch,
+  unscheduled = false,
+}: {
+  planned: PlannedBracketMatch
+  pitch: string | null
+  /** Terminarz jeszcze nie powstał — sama para, bez godziny i boiska. */
+  unscheduled?: boolean
+}) {
   const sideClass = (known: boolean) => cn("truncate", !known && "text-muted-foreground italic")
   return (
     <li className="flex items-start gap-4 py-3" data-testid="planned-bracket-match">
-      <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
-        {formatTime(planned.scheduledAt)}
-      </span>
+      {!unscheduled && (
+        <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
+          {formatTime(planned.scheduledAt)}
+        </span>
+      )}
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex flex-wrap items-center gap-x-2 font-medium">
           <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
@@ -247,10 +269,12 @@ function PlannedRow({ planned, pitch }: { planned: PlannedBracketMatch; pitch: s
             <Hourglass className="size-3" />
             Czeka na wynik wcześniejszych meczów
           </span>
-          <span className="flex items-center gap-1">
-            <MapPin className="size-3" />
-            {pitch ?? "Bez boiska"}
-          </span>
+          {!unscheduled && (
+            <span className="flex items-center gap-1">
+              <MapPin className="size-3" />
+              {pitch ?? "Bez boiska"}
+            </span>
+          )}
           <span>{planned.stage}</span>
         </p>
       </div>
@@ -289,7 +313,7 @@ function ClearScheduleButton({
         <AlertDialogFooter>
           <AlertDialogCancel>Anuluj</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive hover:bg-destructive/90 text-white"
+            variant="destructive"
             onClick={() =>
               clear.mutate(undefined, {
                 onSuccess: ({ matchesRemoved }) =>
@@ -338,7 +362,7 @@ export function TournamentScheduleView() {
       pitchName: (pid) => (pid ? (pitchById.get(pid) ?? "Boisko") : null),
       groupLabel: (m) =>
         [
-          m.categoryId && categoryById.get(m.categoryId),
+          categoryById.size > 1 && m.categoryId && categoryById.get(m.categoryId),
           m.groupId ? groupById.get(m.groupId) : m.stageType !== "Group" && "Faza pucharowa",
         ]
           .filter(Boolean)
@@ -389,21 +413,25 @@ export function TournamentScheduleView() {
     knockout &&
     (status === "Draft" || status === "RegistrationOpen" || status === "RegistrationClosed")
 
-  // Mecze kolejnych rund pucharu, które jeszcze nie istnieją, ale mają zaplanowany termin.
-  const planned = awaitingSchedule
-    ? []
-    : brackets
-        .flatMap((bracket, i) =>
-          bracket.data
-            ? plannedBracketMatches(bracket.data, bracketCategoryIds[i]!, lookups.teamName)
-            : [],
-        )
-        .filter(
-          (p) =>
-            (categoryId === ALL || p.categoryId === categoryId) &&
-            groupId === ALL &&
-            (pitchId === ALL || p.pitchId === pitchId),
-        )
+  // Mecze kolejnych rund pucharu, które jeszcze nie istnieją (czekają na zwycięzców). Przed
+  // wygenerowaniem terminarza nie mają terminu — pokazujemy je i tak, żeby było widać całą drabinkę.
+  const planned = brackets
+    .flatMap((bracket, i) =>
+      bracket.data
+        ? plannedBracketMatches(
+            bracket.data,
+            bracketCategoryIds[i]!,
+            lookups.teamName,
+            awaitingSchedule,
+          )
+        : [],
+    )
+    .filter(
+      (p) =>
+        (categoryId === ALL || p.categoryId === categoryId) &&
+        groupId === ALL &&
+        (pitchId === ALL || p.pitchId === pitchId),
+    )
 
   type Row =
     | { kind: "match"; at: string; match: Match }
@@ -421,6 +449,11 @@ export function TournamentScheduleView() {
     const key = awaitingSchedule ? "unscheduled" : toZonedDateInput(row.at)
     days.set(key, [...(days.get(key) ?? []), row])
   }
+
+  const showCategoryFilter = (categories.data?.length ?? 0) > 1
+  // Puchar nie ma grup; pary bez terminu nie mają jeszcze boisk.
+  const showGroupFilter = !knockout && groupOptions.length > 1
+  const showPitchFilter = !awaitingSchedule && (pitches.data?.length ?? 0) > 1
 
   // Organizator jest w trakcie generowania (otworzył formularz i wyszedł np. dodać drużyny) —
   // wraca prosto do formularza. "Anuluj" i "← Terminarz" kończą ten tryb.
@@ -465,17 +498,19 @@ export function TournamentScheduleView() {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="max-w-5xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">
             {awaitingSchedule ? "Pary z drabinki" : "Terminarz"}
           </h2>
           <p className="text-muted-foreground text-sm">
-            {plural(filtered.length, ["mecz", "mecze", "meczów"])}
-            {filtered.length !== schedule.data.length && ` z ${schedule.data.length}`}
-            {awaitingSchedule &&
-              " · bez terminów — wygeneruj terminarz, żeby nadać godziny i boiska"}
+            {awaitingSchedule
+              ? `${plural(rows.length, ["mecz czeka", "mecze czekają", "meczów czeka"])} na godziny i boiska — nadasz je, generując terminarz.`
+              : plural(filtered.length, ["mecz", "mecze", "meczów"])}
+            {!awaitingSchedule &&
+              filtered.length !== schedule.data.length &&
+              ` z ${schedule.data.length}`}
           </p>
         </div>
         {isOrganizer && (
@@ -505,32 +540,41 @@ export function TournamentScheduleView() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-        <FilterSelect
-          label="Kategoria"
-          value={categoryId}
-          onChange={(value) => {
-            setCategoryId(value)
-            setGroupId(ALL)
-          }}
-          options={categories.data ?? []}
-          allLabel="Wszystkie kategorie"
-        />
-        <FilterSelect
-          label="Grupa"
-          value={groupId}
-          onChange={setGroupId}
-          options={groupOptions}
-          allLabel="Wszystkie grupy"
-        />
-        <FilterSelect
-          label="Boisko"
-          value={pitchId}
-          onChange={setPitchId}
-          options={pitches.data ?? []}
-          allLabel="Wszystkie boiska"
-        />
-      </div>
+      {/* Filtr z jedną opcją niczego nie filtruje — pokazujemy tylko te, w których jest wybór. */}
+      {(showCategoryFilter || showGroupFilter || showPitchFilter) && (
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          {showCategoryFilter && (
+            <FilterSelect
+              label="Kategoria"
+              value={categoryId}
+              onChange={(value) => {
+                setCategoryId(value)
+                setGroupId(ALL)
+              }}
+              options={categories.data ?? []}
+              allLabel="Wszystkie kategorie"
+            />
+          )}
+          {showGroupFilter && (
+            <FilterSelect
+              label="Grupa"
+              value={groupId}
+              onChange={setGroupId}
+              options={groupOptions}
+              allLabel="Wszystkie grupy"
+            />
+          )}
+          {showPitchFilter && (
+            <FilterSelect
+              label="Boisko"
+              value={pitchId}
+              onChange={setPitchId}
+              options={pitches.data ?? []}
+              allLabel="Wszystkie boiska"
+            />
+          )}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState icon={CalendarClock} title="Brak meczów dla wybranych filtrów" />
@@ -538,9 +582,11 @@ export function TournamentScheduleView() {
         [...days.entries()].map(([day, dayRows]) => (
           <Card key={day} className="gap-0 py-0">
             <CardContent className="px-4">
-              <h3 className="text-muted-foreground border-b py-3 text-sm font-medium first-letter:uppercase">
-                {awaitingSchedule ? "Bez terminu" : formatDayLong(dayRows[0]!.at)}
-              </h3>
+              {!awaitingSchedule && (
+                <h3 className="text-muted-foreground border-b py-3 text-sm font-medium first-letter:uppercase">
+                  {formatDayLong(dayRows[0]!.at)}
+                </h3>
+              )}
               <ul className="divide-y">
                 {dayRows.map((row) =>
                   row.kind === "planned" ? (
@@ -548,6 +594,7 @@ export function TournamentScheduleView() {
                       key={row.planned.nodeId}
                       planned={row.planned}
                       pitch={lookups.pitchName(row.planned.pitchId)}
+                      unscheduled={awaitingSchedule}
                     />
                   ) : (
                     <MatchRow

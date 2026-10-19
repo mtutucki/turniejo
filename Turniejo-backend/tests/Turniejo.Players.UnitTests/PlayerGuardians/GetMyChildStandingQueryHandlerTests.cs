@@ -157,4 +157,58 @@ public sealed class GetMyChildStandingQueryHandlerTests
         standing.Standings.Select(r => r.Position).Should().BeEquivalentTo(new[] { 1, 2 });
         standing.TeamNames![rivalTeamId].Should().Be("Lwy");
     }
+
+    [Fact]
+    public async Task Handle_ShouldNotListWithdrawnTeams_ThatStillHaveGroupId()
+    {
+        var userId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var childTeamId = Guid.NewGuid();
+        var withdrawnTeamId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var tournamentId = Guid.NewGuid();
+        _currentUserContext.UserId.Returns(userId);
+        var guardian = PlayerGuardian.Create(Guid.NewGuid(), playerId, userId, RelationshipType.Parent, false, true, Guid.NewGuid()).Value;
+        _dbContext.GetPlayerGuardiansByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<PlayerGuardian> { guardian });
+        var tournamentPlayer = TournamentPlayer.Create(Guid.NewGuid(), childTeamId, playerId, null, null, Guid.NewGuid()).Value;
+        _dbContext.GetTournamentPlayersByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<TournamentPlayer> { tournamentPlayer });
+
+        var childTeam = new TournamentTeamDto(childTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), groupId, "Accepted");
+        var withdrawnTeam = new TournamentTeamDto(withdrawnTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), groupId, "Withdrawn");
+        _teamModule.GetTournamentTeamAsync(childTeamId, Arg.Any<CancellationToken>()).Returns(childTeam);
+        _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+            .Returns(new List<TournamentTeamDto> { childTeam, withdrawnTeam });
+        _standingModule.GetGroupStandingsAsync(groupId, Arg.Any<CancellationToken>()).Returns(new List<GroupStandingDto>());
+
+        var result = await _handler.Handle(new GetMyChildStandingQuery(playerId), CancellationToken.None);
+
+        result.Value.Single().Standings.Select(r => r.TournamentTeamId).Should().Equal(childTeamId);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldSkipTeam_WhenTournamentIsKnockoutOnly()
+    {
+        var userId = Guid.NewGuid();
+        var playerId = Guid.NewGuid();
+        var childTeamId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var tournamentId = Guid.NewGuid();
+        _currentUserContext.UserId.Returns(userId);
+        var guardian = PlayerGuardian.Create(Guid.NewGuid(), playerId, userId, RelationshipType.Parent, false, true, Guid.NewGuid()).Value;
+        _dbContext.GetPlayerGuardiansByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<PlayerGuardian> { guardian });
+        var tournamentPlayer = TournamentPlayer.Create(Guid.NewGuid(), childTeamId, playerId, null, null, Guid.NewGuid()).Value;
+        _dbContext.GetTournamentPlayersByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<TournamentPlayer> { tournamentPlayer });
+
+        _teamModule.GetTournamentTeamAsync(childTeamId, Arg.Any<CancellationToken>())
+            .Returns(new TournamentTeamDto(childTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), groupId, "Accepted"));
+        _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+            .Returns(new TournamentDto(tournamentId, "Puchar", "RegistrationClosed", "Knockout", Guid.NewGuid(), 4));
+        _standingModule.GetGroupStandingsAsync(groupId, Arg.Any<CancellationToken>())
+            .Returns(new List<GroupStandingDto> { new(childTeamId, 1, 0) });
+
+        var result = await _handler.Handle(new GetMyChildStandingQuery(playerId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEmpty();
+    }
 }

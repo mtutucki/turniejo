@@ -26,8 +26,8 @@ Internet ─443─> Caddy ─┬─> frontend (Next.js)  https://DOMAIN        �
    ```
    Przy pierwszym starcie Postgres tworzy bazy i userów (`postgres/init.sh`), Keycloak importuje
    realm `turniejo`, a API nakłada migracje wszystkich modułów (`Database__MigrateOnStartup`).
-5. **SMTP w Keycloaku** (bez tego nie działa reset hasła): konsola admina → realm `turniejo` →
-   Realm settings → Email. Dane SMTP to sekret, więc nie trafiają do `turniejo-realm.json`.
+5. **SMTP** (bez tego nie działa reset hasła): zmienne `SMTP_*` w `.env`. Maile wysyła API, a link
+   z maila prowadzi na `https://DOMAIN/password-reset/confirm` — Keycloak nie wysyła żadnych maili.
 6. **Sprawdzenie**: `https://DOMAIN/backend/health` powinno zwrócić `Healthy` (sprawdza też bazę).
    Ten adres podepnij do monitoringu uptime.
 

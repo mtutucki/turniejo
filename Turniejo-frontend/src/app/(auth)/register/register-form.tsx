@@ -6,7 +6,7 @@ import { type LucideIcon, Ticket, Trophy } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import Link from "next/link"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -14,19 +14,23 @@ import { TextField } from "@/components/forms/text-field"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { markOrganizationProvisioning } from "@/features/tournaments/api"
 import { apiFetch } from "@/lib/api/client"
 import { applyFieldErrors } from "@/lib/api/form-errors"
+import { PASSWORD_HINT, passwordSchema } from "@/lib/auth/password"
 import { DEFAULT_APP_PATH } from "@/lib/auth/public-paths"
 import { cn } from "@/lib/utils"
 
-// Limity 1:1 z RegisterUserCommandValidator.
+// Limity 1:1 z RegisterUserCommandValidator (hasło: passwordSchema).
 const schema = z
   .object({
     firstName: z.string().trim().min(1, "Podaj imię").max(100),
     lastName: z.string().trim().min(1, "Podaj nazwisko").max(100),
     email: z.email("Nieprawidłowy adres email").max(256),
     phoneNumber: z.string().trim().max(20, "Maksymalnie 20 znaków").optional(),
-    password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(100),
+    // Tylko dla organizatora; puste = organizacja nazwana imieniem i nazwiskiem.
+    organizationName: z.string().trim().max(200, "Maksymalnie 200 znaków").optional(),
+    password: passwordSchema,
     confirmPassword: z.string(),
     accountType: z.enum(["organizer", "participant"], {
       error: "Wybierz, jak chcesz korzystać z Turniejo",
@@ -84,6 +88,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
       lastName: "",
       email: "",
       phoneNumber: "",
+      organizationName: "",
       password: "",
       confirmPassword: "",
       // Bez domyślnego wyboru (poza linkiem zaproszenia) — user świadomie decyduje, czy organizuje.
@@ -93,6 +98,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
   })
   const { errors } = form.formState
   const router = useRouter()
+  const isOrganizer = useWatch({ control: form.control, name: "accountType" }) === "organizer"
 
   const register = useMutation({
     mutationFn: ({
@@ -101,6 +107,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
       email,
       password,
       phoneNumber,
+      organizationName,
       accountType,
     }: RegisterValues) =>
       apiFetch<{ userId: string }>("/api/auth/register", {
@@ -113,6 +120,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           phoneNumber: phoneNumber || null,
           // Organizacja (i rola organizatora) tylko dla organizatora — reszta może ją założyć później.
           createOrganization: accountType === "organizer",
+          organizationName: (accountType === "organizer" && organizationName) || null,
           acceptTerms: true,
         },
       }),
@@ -129,6 +137,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
         return
       }
       toast.success("Witaj w Turniejo!")
+      if (accountType === "organizer") markOrganizationProvisioning()
       // Organizator od razu do listy turniejów (organizacja dojdzie za chwilę z outboxa);
       // uczestnik do celu z zaproszenia albo na stronę startową z instrukcją.
       router.replace(
@@ -174,6 +183,17 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           </div>
           <FieldError errors={[errors.accountType]} />
         </fieldset>
+        {isOrganizer && (
+          <TextField
+            id="organizationName"
+            label="Nazwa organizacji (opcjonalnie)"
+            placeholder="np. UKS Orły Warszawa"
+            autoComplete="organization"
+            description="Klub, szkoła albo Ty sam. Bez nazwy użyjemy Twojego imienia i nazwiska — zmienisz ją w „Moje konto”."
+            error={errors.organizationName}
+            {...form.register("organizationName")}
+          />
+        )}
         <div className="grid grid-cols-2 gap-4">
           <TextField
             id="firstName"
@@ -211,6 +231,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           label="Hasło"
           type="password"
           autoComplete="new-password"
+          description={PASSWORD_HINT}
           error={errors.password}
           {...form.register("password")}
         />
@@ -259,7 +280,12 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           className="w-full"
           disabled={register.isPending || register.isSuccess}
         >
-          {register.isPending ? "Tworzenie konta…" : "Załóż konto"}
+          {/* Po utworzeniu konta trwa jeszcze logowanie i przekierowanie — przycisk nie może wyglądać na bezczynny. */}
+          {register.isPending
+            ? "Tworzenie konta…"
+            : register.isSuccess
+              ? "Konfigurujemy Twoje konto…"
+              : "Załóż konto"}
         </Button>
       </FieldGroup>
     </form>

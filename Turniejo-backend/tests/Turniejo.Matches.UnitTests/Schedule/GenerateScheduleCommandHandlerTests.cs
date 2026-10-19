@@ -89,6 +89,77 @@ namespace Turniejo.Matches.UnitTests.Schedule
         }
 
         [Fact]
+        public async Task Handle_ShouldFail_WhenAnAcceptedTeamHasNoGroup()
+        {
+            // Drużyna bez grupy nie dostałaby żadnego meczu — generator ma odmówić, zamiast ją pominąć.
+            var tournamentId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, Guid.NewGuid(), groupId, categoryId, [Guid.NewGuid(), Guid.NewGuid()]);
+            _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamDto>
+                {
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, groupId, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, groupId, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, null, "Accepted"),
+                    // Odrzucona drużyna bez grupy nie blokuje — i tak nie gra.
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryId, null, "Rejected"),
+                });
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), new[] { Guid.NewGuid() }), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Be("Some accepted teams are not assigned to a group");
+            await _dbContext.DidNotReceive().AddMatchesAsync(Arg.Any<IReadOnlyCollection<Match>>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotScheduleSameClubInTwoCategoriesAtTheSameTime()
+        {
+            // Ta sama drużyna z bazy zgłoszona do dwóch kategorii to dwa zgłoszenia (różne TournamentTeamId),
+            // ale wspólny trener i często zawodnicy — mimo dwóch wolnych boisk jej mecze nie mogą się nakładać.
+            var tournamentId = Guid.NewGuid();
+            var sharedClubId = Guid.NewGuid();
+            var (categoryA, groupA) = (Guid.NewGuid(), Guid.NewGuid());
+            var (categoryB, groupB) = (Guid.NewGuid(), Guid.NewGuid());
+            var pitchIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeTournament(tournamentId));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(FakeSettings(tournamentId));
+            _tournamentModule.GetTournamentGroupsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentGroupDto>
+                {
+                    new(groupA, tournamentId, categoryA, "Grupa A"),
+                    new(groupB, tournamentId, categoryB, "Grupa A"),
+                });
+            _dbContext.GetPitchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(pitchIds.Select((id, i) => Pitch.Create(id, tournamentId, $"Boisko {i + 1}", null, Guid.NewGuid()).Value).ToList());
+            _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamDto>
+                {
+                    new(Guid.NewGuid(), tournamentId, sharedClubId, categoryA, groupA, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryA, groupA, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, sharedClubId, categoryB, groupB, "Accepted"),
+                    new(Guid.NewGuid(), tournamentId, Guid.NewGuid(), categoryB, groupB, "Accepted"),
+                });
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(new List<Match>());
+            _tournamentModule.ChangeTournamentStatusAsync(tournamentId, "ScheduleGenerated", Arg.Any<CancellationToken>()).Returns(true);
+            _currentUserContext.UserId.Returns(Guid.NewGuid());
+            IReadOnlyCollection<Match>? created = null;
+            await _dbContext.AddMatchesAsync(Arg.Do<IReadOnlyCollection<Match>>(m => created = m), Arg.Any<CancellationToken>());
+
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(6), pitchIds), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            created.Should().HaveCount(2);
+            created!.Select(m => m.ScheduledAt).Should().OnlyHaveUniqueItems();
+        }
+
+        [Fact]
         public async Task Handle_ShouldFail_WhenTournamentNotFound()
         {
             // Arrange
@@ -150,6 +221,35 @@ namespace Turniejo.Matches.UnitTests.Schedule
                 Arg.Is<IReadOnlyCollection<BracketPlannedSlotDto>>(slots =>
                     slots.Count == 1 && slots.Single().NodeId == final.Id &&
                     slots.Single().PitchId == pitchId && slots.Single().ScheduledAt == startAt.AddMinutes(80)),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldPlanTheFinalOnTheNextDay_WhenTheFirstDayIsLimitedToTheSemiFinals()
+        {
+            // Pierwszy dzień ma czas na trzy mecze, ale organizator chce w nim tylko dwa półfinały —
+            // finał musi wypaść drugiego dnia, a nie w pierwszej wolnej godzinie pierwszego.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var matches = SetupKnockout(tournamentId, pitchId, 2);
+            var semi1 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[0].Id, null, null, false);
+            var semi2 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[1].Id, null, null, false);
+            var final = new BracketNodeInfoDto(Guid.NewGuid(), 2, false, null, semi1.Id, semi2.Id, false);
+            _bracketModule.GetNodesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<BracketNodeInfoDto> { final, semi1, semi2 });
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var day2 = day1.AddDays(1);
+
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, day1, day2.AddHours(4), new[] { pitchId },
+                    new[] { new ScheduleWindow(day1, day1.AddHours(4), 2), new ScheduleWindow(day2, day2.AddHours(4), 1) }),
+                CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            matches.Should().OnlyContain(m => m.ScheduledAt < day2);
+            await _bracketModule.Received(1).SetPlannedSlotsAsync(
+                Arg.Is<IReadOnlyCollection<BracketPlannedSlotDto>>(slots =>
+                    slots.Count == 1 && slots.Single().NodeId == final.Id && slots.Single().ScheduledAt == day2),
                 Arg.Any<CancellationToken>());
         }
 
@@ -439,6 +539,97 @@ namespace Turniejo.Matches.UnitTests.Schedule
 
             result.IsFailure.Should().BeTrue();
             result.Error.Message.Should().Contain("1 match(es) could not be placed");
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSpreadMatchesAcrossDays_WhenWindowsAreGiven()
+        {
+            // 4 drużyny = 6 meczów, 1 boisko. Każdy dzień 10:00–12:00 mieści 3 mecze (10:00 / 10:40 / 11:20),
+            // więc druga połowa trafia na kolejny dzień — nic nie ląduje w nocy między oknami.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(),
+                new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var day2 = day1.AddDays(1);
+            var command = new GenerateScheduleCommand(tournamentId, day1, day2.AddHours(2), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(2)), new ScheduleWindow(day2, day2.AddHours(2)) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            DateTimeOffset[] expected =
+            [
+                day1, day1.AddMinutes(40), day1.AddMinutes(80),
+                day2, day2.AddMinutes(40), day2.AddMinutes(80),
+            ];
+            await _dbContext.Received(1).AddMatchesAsync(
+                Arg.Is<IReadOnlyCollection<Match>>(m => m.Select(x => x.ScheduledAt).OrderBy(x => x).SequenceEqual(expected)),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldPlaceNoMoreMatchesInADay_ThanTheOrganizerAskedFor()
+        {
+            // 4 drużyny = 6 meczów. Oba dni mają czas na wszystkie, ale organizator chce 2 pierwszego
+            // dnia i 4 drugiego — generator nie może dołożyć do pierwszego dnia więcej.
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(),
+                new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+            IReadOnlyCollection<Match>? created = null;
+            await _dbContext.AddMatchesAsync(Arg.Do<IReadOnlyCollection<Match>>(m => created = m), Arg.Any<CancellationToken>());
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            var day2 = day1.AddDays(1);
+
+            var command = new GenerateScheduleCommand(tournamentId, day1, day2.AddHours(8), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(8), 2), new ScheduleWindow(day2, day2.AddHours(8), 4) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            created.Should().HaveCount(6);
+            created!.Count(m => m.ScheduledAt < day2).Should().Be(2);
+            created!.Count(m => m.ScheduledAt >= day2).Should().Be(4);
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenDayLimitsDoNotCoverAllMatches()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(),
+                new List<Guid> { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() });
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+
+            var command = new GenerateScheduleCommand(tournamentId, day1, day1.AddHours(8), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(8), 5) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.EndAt");
+            await _dbContext.DidNotReceive().AddMatchesAsync(Arg.Any<IReadOnlyCollection<Match>>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenAWindowIsOutsideTheTournamentDates()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            SetupHappyPath(tournamentId, pitchId, Guid.NewGuid(), Guid.NewGuid(), new List<Guid> { Guid.NewGuid(), Guid.NewGuid() });
+            var day1 = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(FakeTournament(tournamentId) with { StartAt = day1, EndAt = day1.AddHours(8) });
+
+            var command = new GenerateScheduleCommand(tournamentId, day1, day1.AddHours(8), new[] { pitchId },
+                new[] { new ScheduleWindow(day1, day1.AddHours(2)), new ScheduleWindow(day1.AddDays(1), day1.AddDays(1).AddHours(2)) });
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.StartAt");
         }
 
         [Fact]

@@ -72,7 +72,7 @@ namespace Turniejo.Matches.Domain.Entities
             return Result.Success(match);
         }
 
-        // Termin, boisko i sędziego zmieniamy tylko przed rozpoczęciem meczu.
+        // Termin i boisko zmieniamy tylko przed rozpoczęciem meczu.
         private bool IsSchedulable => Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed;
 
         // Zamiana par w drabince przed startem: mecz zostaje (termin, boisko, sędzia), zmieniają się
@@ -142,17 +142,56 @@ namespace Turniejo.Matches.Domain.Entities
             return Result.Success();
         }
 
+        // Sędziego — inaczej niż termin i boisko — da się zmienić także w trakcie meczu: prowadzący może
+        // nagle wypaść i ktoś musi dokończyć mecz. Po zakończeniu/odwołaniu nie ma już czego prowadzić.
+        private bool IsOver => Status is MatchStatus.Finished or MatchStatus.Cancelled;
+
         public Result AssignReferee(Guid? refereeId, Guid changedByUserId)
         {
-            // Paused to wciąż trwający mecz — zmiana sędziego w przerwie odebrałaby prowadzącemu panel.
-            if (!IsSchedulable)
-                return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has started, finished or been cancelled"));
+            if (IsOver)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has finished or been cancelled"));
 
             RefereeId = refereeId;
             Version++;
             SetUpdatedAt();
 
             _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, changedByUserId));
+
+            return Result.Success();
+        }
+
+        // Mecz bez sędziego jest w puli — bierze go pierwszy sędzia turnieju, który się zgłosi.
+        public Result ClaimReferee(Guid refereeId)
+        {
+            if (IsOver)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has finished or been cancelled"));
+
+            if (RefereeId.HasValue)
+                return Result.Failure(Error.Conflict("RefereeId", "Match already has a referee"));
+
+            RefereeId = refereeId;
+            Version++;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, refereeId));
+
+            return Result.Success();
+        }
+
+        // Sędzia oddaje mecz z powrotem do puli — także w trakcie, gdy musi nagle zejść z boiska.
+        public Result ReleaseReferee(Guid refereeId)
+        {
+            if (IsOver)
+                return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has finished or been cancelled"));
+
+            if (RefereeId != refereeId)
+                return Result.Failure(Error.Conflict("RefereeId", "You are not the referee of this match"));
+
+            RefereeId = null;
+            Version++;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, null, refereeId));
 
             return Result.Success();
         }

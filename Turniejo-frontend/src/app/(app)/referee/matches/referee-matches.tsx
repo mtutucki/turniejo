@@ -9,8 +9,8 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { matchKeys } from "@/features/matches/api"
-import { RefereeMatchCard } from "@/features/matches/components/referee-match-card"
-import { useAssignedMatches } from "@/features/matches/live-api"
+import { OpenMatchCard, RefereeMatchCard } from "@/features/matches/components/referee-match-card"
+import { useAssignedMatches, useOpenMatches } from "@/features/matches/live-api"
 import { teamKeys } from "@/features/teams/api"
 import { tournamentKeys } from "@/features/tournaments/api"
 import { useApi } from "@/hooks/use-api"
@@ -22,7 +22,7 @@ const LIVE = new Set(["Live", "Paused"])
 const UPCOMING = new Set(["Scheduled", "Ready", "Postponed"])
 
 /**
- * GetAssignedMatchesQuery zwraca same identyfikatory drużyn i boisk — nazwy dociągamy z turniejów,
+ * Lista meczów sędziego zwraca same identyfikatory drużyn i boisk — nazwy dociągamy z turniejów,
  * w których sędziuje (sędzia jest ich członkiem, więc ma do nich dostęp). Te same klucze co reszta
  * aplikacji, więc dane dzielą cache z widokami turnieju.
  */
@@ -60,21 +60,32 @@ function useTournamentLookups(tournamentIds: string[]) {
 
 function Section({
   title,
+  description,
   matches,
   lookups,
+  open = false,
 }: {
   title: string
+  description?: string
   matches: Match[]
   lookups: ReturnType<typeof useTournamentLookups>
+  /** Mecze bez sędziego — zamiast wejścia do panelu mają przycisk przejęcia. */
+  open?: boolean
 }) {
   if (matches.length === 0) return null
+  const MatchCard = open ? OpenMatchCard : RefereeMatchCard
   return (
     <section className="space-y-3">
-      <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{title}</h2>
+      <div className="space-y-1">
+        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          {title}
+        </h2>
+        {description && <p className="text-muted-foreground text-sm">{description}</p>}
+      </div>
       <ul className="grid gap-3 xl:grid-cols-2">
         {matches.map((match) => (
           <li key={match.id}>
-            <RefereeMatchCard
+            <MatchCard
               match={match}
               homeName={lookups.teamNames.get(match.homeTournamentTeamId) ?? "Drużyna"}
               awayName={lookups.teamNames.get(match.awayTournamentTeamId) ?? "Drużyna"}
@@ -90,8 +101,10 @@ function Section({
 
 export function RefereeMatchesView() {
   const matches = useAssignedMatches()
+  const openMatches = useOpenMatches()
   const all = matches.data ?? []
-  const tournamentIds = [...new Set(all.map((m) => m.tournamentId))]
+  const open = openMatches.data ?? []
+  const tournamentIds = [...new Set([...all, ...open].map((m) => m.tournamentId))]
   const lookups = useTournamentLookups(tournamentIds)
 
   const live = all.filter((m) => LIVE.has(m.status))
@@ -99,21 +112,27 @@ export function RefereeMatchesView() {
   const past = all
     .filter((m) => !LIVE.has(m.status) && !UPCOMING.has(m.status))
     .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt))
+  // Trwający mecz bez sędziego (ktoś go oddał w trakcie) jest pilny — idzie na samą górę.
+  const openLive = open.filter((m) => LIVE.has(m.status))
+  const openUpcoming = open.filter((m) => !LIVE.has(m.status))
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Moje mecze" description="Mecze, które prowadzisz jako sędzia." />
-      {matches.isPending ? (
+      <PageHeader
+        title="Moje mecze"
+        description="Mecze, które prowadzisz jako sędzia, i wolne mecze do wzięcia."
+      />
+      {matches.isPending || openMatches.isPending ? (
         <div className="grid gap-3 xl:grid-cols-2">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
-      ) : all.length === 0 ? (
+      ) : all.length === 0 && open.length === 0 ? (
         <EmptyState
           icon={Timer}
-          title="Nie masz przypisanych meczów"
-          description="Dołącz do turnieju kodem sędziego — organizator przypisze Cię do meczów."
+          title="Nie masz meczów do sędziowania"
+          description="Dołącz do turnieju kodem sędziego — zobaczysz tu mecze, które możesz wziąć, i te przydzielone przez organizatora."
           action={
             <Button asChild variant="outline">
               <Link href="/join">Dołącz kodem</Link>
@@ -122,8 +141,22 @@ export function RefereeMatchesView() {
         />
       ) : (
         <>
+          <Section
+            title="Trwają bez sędziego"
+            description="Te mecze już się toczą i nikt ich nie prowadzi."
+            matches={openLive}
+            lookups={lookups}
+            open
+          />
           <Section title="Teraz" matches={live} lookups={lookups} />
           <Section title="Nadchodzące" matches={upcoming} lookups={lookups} />
+          <Section
+            title="Wolne mecze"
+            description="Nie mają jeszcze sędziego — weź ten, który poprowadzisz."
+            matches={openUpcoming}
+            lookups={lookups}
+            open
+          />
           <Section title="Zakończone" matches={past} lookups={lookups} />
         </>
       )}

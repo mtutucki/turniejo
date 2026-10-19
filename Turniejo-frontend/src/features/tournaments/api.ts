@@ -36,6 +36,39 @@ const base = (id: string) => `/api/tournaments/${id}`
 
 // --- Queries ---------------------------------------------------------------------------------
 
+/** Ile razy dopytujemy o organizację, zanim uznamy, że konto jej nie ma (~30 s co 1,5 s). */
+const ORGANIZATION_POLL_LIMIT = 20
+// Outbox backendu chodzi co sekundę — rzadsze dopytywanie tylko wydłużało ekran oczekiwania.
+const ORGANIZATION_POLL_INTERVAL_MS = 1_500
+const PROVISIONING_KEY = "turniejo:organization-provisioning"
+
+/** Rejestracja jako organizator: organizacja dopiero powstaje, więc brak danych ≠ "nie masz organizacji". */
+export function markOrganizationProvisioning() {
+  try {
+    sessionStorage.setItem(PROVISIONING_KEY, "1")
+  } catch {
+    // Brak sessionStorage (tryb prywatny) — najwyżej mignie pusty stan.
+  }
+}
+
+export function clearOrganizationProvisioning() {
+  try {
+    sessionStorage.removeItem(PROVISIONING_KEY)
+  } catch {
+    // Brak sessionStorage — nie ma czego czyścić.
+  }
+}
+
+/** Czy wciąż czekamy na organizację zakładaną po rejestracji (zamiast pokazywać "Zostań organizatorem"). */
+export function isOrganizationProvisioning(dataUpdateCount: number) {
+  if (dataUpdateCount >= ORGANIZATION_POLL_LIMIT) return false
+  try {
+    return sessionStorage.getItem(PROVISIONING_KEY) !== null
+  } catch {
+    return false
+  }
+}
+
 export function useMyOrganization() {
   const { request, isAuthenticated } = useApi()
   return useQuery({
@@ -48,7 +81,9 @@ export function useMyOrganization() {
     // Organizacja organizatora powstaje asynchronicznie po rejestracji (outbox backendu) — tuż po
     // założeniu konta dopytujemy przez ~30 s, zamiast pokazywać "nie masz organizacji" do odświeżenia.
     refetchInterval: (query) =>
-      query.state.data === null && query.state.dataUpdateCount < 8 ? 4_000 : false,
+      query.state.data === null && query.state.dataUpdateCount < ORGANIZATION_POLL_LIMIT
+        ? ORGANIZATION_POLL_INTERVAL_MS
+        : false,
   })
 }
 
@@ -70,6 +105,18 @@ export function useCreateOrganization() {
         queryClient.invalidateQueries({ queryKey: tournamentKeys.myOrganization }),
       ])
     },
+  })
+}
+
+/** PUT /api/organizations/{id} — zmiana nazwy organizacji (tylko organizator). */
+export function useRenameOrganization(organizationId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) =>
+      request(`/api/organizations/${organizationId}`, { method: "PUT", body: { name } }),
+    meta: { handlesValidation: true },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tournamentKeys.myOrganization }),
   })
 }
 

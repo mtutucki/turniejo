@@ -60,11 +60,14 @@ export function PublicSettingsForm({
   slug,
   settings,
   disabled,
+  onSaved,
 }: {
   tournamentId: string
   slug: string
   settings: PublicSettings
   disabled: boolean
+  /** Tryb kreatora: przycisk prowadzi do kolejnego kroku, także gdy nic się nie zmieniło. */
+  onSaved?: () => void
 }) {
   const update = useUpdatePublicSettings(tournamentId)
   const form = useForm<PublicSettings>({ values: settings })
@@ -73,9 +76,12 @@ export function PublicSettingsForm({
   const path = `/t/${slug}`
 
   function submit(values: PublicSettings) {
+    if (!isDirty) return onSaved?.()
     update.mutate(values, {
-      onSuccess: () =>
-        toast.success(values.isPublic ? "Portal kibica włączony" : "Portal kibica wyłączony"),
+      onSuccess: () => {
+        toast.success(values.isPublic ? "Portal kibica włączony" : "Portal kibica wyłączony")
+        onSaved?.()
+      },
     })
   }
 
@@ -149,8 +155,12 @@ export function PublicSettingsForm({
           !isPublic,
         )}
         <div>
-          <Button type="submit" disabled={disabled || !isDirty || update.isPending}>
-            {update.isPending ? "Zapisywanie…" : "Zapisz ustawienia portalu"}
+          <Button type="submit" disabled={disabled || update.isPending || (!isDirty && !onSaved)}>
+            {update.isPending
+              ? "Zapisywanie…"
+              : onSaved
+                ? "Zapisz i dalej"
+                : "Zapisz ustawienia portalu"}
           </Button>
         </div>
       </FieldGroup>

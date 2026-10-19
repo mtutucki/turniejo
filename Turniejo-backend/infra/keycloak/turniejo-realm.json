@@ -2314,5 +2314,5 @@
       }
     }
   ],
-  "passwordPolicy": "length(8) and maxLength(100)"
+  "passwordPolicy": "length(10) and maxLength(100) and lowerCase(1) and upperCase(1) and digits(1)"
 }
