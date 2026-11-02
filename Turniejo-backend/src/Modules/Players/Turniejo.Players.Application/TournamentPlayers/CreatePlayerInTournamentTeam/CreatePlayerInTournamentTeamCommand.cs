@@ -16,7 +16,10 @@ namespace Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamen
         PlayerPosition DefaultPosition,
         string? PhotoUrl,
         int? ShirtNumber,
-        PlayerPosition? Position) : ICommand<CreatePlayerInTournamentTeamResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
+        PlayerPosition? Position,
+        // Imię, nazwisko i data urodzenia jak u kogoś w składzie: domyślnie błąd (pewnie dubel),
+        // ale to mogą być dwie różne osoby — po potwierdzeniu w UI dodajemy mimo to.
+        bool AllowDuplicate = false) : ICommand<CreatePlayerInTournamentTeamResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

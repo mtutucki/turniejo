@@ -47,7 +47,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.UpdatePlayerInTournamen
             // Po zmianie danych zawodnik nie może stać się dublem innego wpisu w tym samym składzie.
             var squad = await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(tournamentTeam.Id, cancellationToken);
             var otherPlayerIds = squad.Where(tp => tp.Id != tournamentPlayer.Id).Select(tp => tp.PlayerId).ToList();
-            if (otherPlayerIds.Count > 0)
+            if (otherPlayerIds.Count > 0 && !request.AllowDuplicate)
             {
                 var others = await dbContext.GetPlayersByIdsAsync(otherPlayerIds, cancellationToken);
                 var duplicate = others.Any(p =>
@@ -56,7 +56,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.UpdatePlayerInTournamen
                     p.BirthDate.Date == request.BirthDate.Date);
 
                 if (duplicate)
-                    return Result.Failure<UpdatePlayerInTournamentTeamResponse>(Error.Validation("FirstName", "Player is already assigned to this team"));
+                    return Result.Failure<UpdatePlayerInTournamentTeamResponse>(Error.Validation("LastName", "A player with the same name and birth date is already in this team"));
             }
 
             if (request.ShirtNumber.HasValue && request.ShirtNumber != tournamentPlayer.ShirtNumber)

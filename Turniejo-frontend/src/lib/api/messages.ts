@@ -51,6 +51,8 @@ const EXACT: Record<string, string> = {
   "User is already a coach for this team": "Ta osoba jest już trenerem tej drużyny",
   // Zawodnicy
   "Player is already assigned to this team": "Ten zawodnik jest już w składzie",
+  "A player with the same name and birth date is already in this team":
+    "W składzie jest już zawodnik o tych samych danych",
   "Player is not part of the source squad": "Tego zawodnika nie ma w wybranym składzie",
   "Shirt numbers must be unique.": "Numery na koszulkach nie mogą się powtarzać",
   "Select at least one player.": "Zaznacz co najmniej jednego zawodnika",
