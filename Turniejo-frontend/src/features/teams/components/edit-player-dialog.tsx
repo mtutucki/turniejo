@@ -1,7 +1,19 @@
 "use client"
 
+import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,7 +25,7 @@ import {
 import type { TournamentPlayer } from "@/types/teams"
 import type { TournamentCategory } from "@/types/tournaments"
 
-import { useUpdatePlayerInSquad } from "../api"
+import { useRemovePlayerFromSquad, useUpdatePlayerInSquad } from "../api"
 import { PlayerForm } from "./player-form"
 
 /**
@@ -36,6 +48,8 @@ export function EditPlayerDialog({
   onClose: () => void
 }) {
   const update = useUpdatePlayerInSquad(tournamentId, tournamentTeamId)
+  const remove = useRemovePlayerFromSquad(tournamentId, tournamentTeamId)
+  const name = `${player.firstName} ${player.lastName}`
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -64,9 +78,48 @@ export function EditPlayerDialog({
             onClose()
           }}
           secondaryAction={
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Anuluj
-            </Button>
+            <>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive mr-auto"
+                    disabled={remove.isPending}
+                  >
+                    <Trash2 />
+                    Usuń ze składu
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Usunąć {name} ze składu?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Jeśli zawodnik ma gole lub kartki w meczach, zostaną one w historii.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() =>
+                        remove.mutate(player.id, {
+                          onSuccess: () => {
+                            toast.success(`${name} usunięty ze składu`)
+                            onClose()
+                          },
+                        })
+                      }
+                    >
+                      Usuń
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Anuluj
+              </Button>
+            </>
           }
         />
       </DialogContent>

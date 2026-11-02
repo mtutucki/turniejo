@@ -29,7 +29,10 @@ import {
 import type { TournamentCategory } from "@/types/tournaments"
 
 const POSITIONS = Object.keys(PLAYER_POSITION_LABELS) as PlayerPosition[]
-const STATUSES = Object.keys(PLAYER_STATUS_LABELS) as TournamentPlayerStatus[]
+// "Usunięty" ustawia przycisk "Usuń ze składu", nie lista statusów.
+const STATUSES = (Object.keys(PLAYER_STATUS_LABELS) as TournamentPlayerStatus[]).filter(
+  (s) => s !== "Removed",
+)
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, "Podaj imię").max(100, "Maksymalnie 100 znaków"),

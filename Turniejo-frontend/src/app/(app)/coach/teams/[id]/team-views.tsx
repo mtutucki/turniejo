@@ -29,10 +29,14 @@ export function CoachPlayersView() {
   // Skład zmienia tylko trener (AssistantCoach/Manager widzą go read-only — CoachOnly na backendzie).
   const isCoach = team.role === "Coach"
   const canEdit = isCoach && team.canEditSquad
-  const squad = [...(players.data ?? [])].sort(
-    (a, b) =>
-      (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) || a.lastName.localeCompare(b.lastName, "pl"),
-  )
+  // Usunięci ze składu (zostali w bazie przez gole lub kartki) nie są już w drużynie.
+  const squad = (players.data ?? [])
+    .filter((p) => p.status !== "Removed")
+    .sort(
+      (a, b) =>
+        (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) ||
+        a.lastName.localeCompare(b.lastName, "pl"),
+    )
 
   return (
     <div className="space-y-4">

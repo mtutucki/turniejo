@@ -7,6 +7,7 @@ using Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamentTea
 using Turniejo.Players.Application.TournamentPlayers.GetRosterSources;
 using Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayers;
 using Turniejo.Players.Application.TournamentPlayers.ImportSquad;
+using Turniejo.Players.Application.TournamentPlayers.RemovePlayerFromTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.UpdatePlayerInTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
 using Turniejo.Players.Domain.Enums;
@@ -391,6 +392,14 @@ namespace Turniejo.Api.Controllers
             var command = new UpdatePlayerInTournamentTeamCommand(
                 tournamentId, tournamentTeamId, tournamentPlayerId, request.FirstName, request.LastName, request.BirthDate,
                 request.PhotoUrl, request.ShirtNumber, request.Position, request.Status, request.AllowDuplicate);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpDelete("{tournamentId}/tournament-teams/{tournamentTeamId}/players/{tournamentPlayerId}")]
+        public async Task<IActionResult> RemovePlayerFromTournamentTeam([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromRoute] Guid tournamentPlayerId, CancellationToken cancellationToken)
+        {
+            var command = new RemovePlayerFromTournamentTeamCommand(tournamentId, tournamentTeamId, tournamentPlayerId);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }

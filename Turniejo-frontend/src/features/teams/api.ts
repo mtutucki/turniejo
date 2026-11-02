@@ -173,12 +173,15 @@ export function useTeamPlayers(tournamentId: string, tournamentTeamId: string) {
     queryFn: () =>
       request<TournamentPlayer[]>(`${tournamentTeamPath(tournamentId, tournamentTeamId)}/players`),
     enabled: isAuthenticated,
+    // Usunięci ze składu (z golami lub kartkami, więc zostali w bazie) nie są już w drużynie.
     select: (players) =>
-      [...players].sort(
-        (a, b) =>
-          (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) ||
-          a.lastName.localeCompare(b.lastName, "pl"),
-      ),
+      players
+        .filter((p) => p.status !== "Removed")
+        .sort(
+          (a, b) =>
+            (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) ||
+            a.lastName.localeCompare(b.lastName, "pl"),
+        ),
   })
 }
 
@@ -252,6 +255,22 @@ export function useUpdatePlayerInSquad(tournamentId: string, tournamentTeamId: s
         },
       ),
     meta: { handlesValidation: true },
+    onSuccess: useInvalidateSquad(tournamentTeamId),
+  })
+}
+
+/**
+ * Usunięcie ze składu. Zawodnik z golami lub kartkami zostaje w bazie ze statusem "Usunięty"
+ * (deleted = false), żeby nie zniknął z przebiegu meczów; reszta znika całkiem.
+ */
+export function useRemovePlayerFromSquad(tournamentId: string, tournamentTeamId: string) {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: (tournamentPlayerId: string) =>
+      request<{ tournamentPlayerId: string; deleted: boolean }>(
+        `${tournamentTeamPath(tournamentId, tournamentTeamId)}/players/${tournamentPlayerId}`,
+        { method: "DELETE" },
+      ),
     onSuccess: useInvalidateSquad(tournamentTeamId),
   })
 }

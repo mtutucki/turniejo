@@ -40,8 +40,11 @@ const NONE = "none"
 const playerName = (p: MatchPlayer) =>
   `${p.shirtNumber != null ? `${p.shirtNumber}. ` : ""}${p.firstName} ${p.lastName}`
 
+// Usuniętych ze składu nie da się wybrać do nowego gola czy kartki (ich stare wydarzenia zostają).
 const byShirt = (players: MatchPlayer[]) =>
-  [...players].sort((a, b) => (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999))
+  players
+    .filter((p) => p.status !== "Removed")
+    .sort((a, b) => (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999))
 
 /** Duże przyciski wyboru — pod kciuk, zamiast listy rozwijanej. */
 function Segmented<T extends string>({
