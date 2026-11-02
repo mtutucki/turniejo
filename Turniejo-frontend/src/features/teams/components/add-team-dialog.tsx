@@ -1,5 +1,6 @@
 "use client"
 
+import { CircleAlert } from "lucide-react"
 import Link from "next/link"
 import { type ReactNode, useState } from "react"
 import { toast } from "sonner"
@@ -218,6 +219,18 @@ export function AddTeamDialog({
                   onChange={(e) => setQuery(e.target.value)}
                 />
               )}
+              {!limitReached && !canSelectMore && (
+                <p
+                  role="status"
+                  className="border-live/40 bg-live/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+                >
+                  <CircleAlert className="text-live mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>
+                    Wybrano maksymalną liczbę drużyn ({freeSlots}). Żeby zaznaczyć inną, najpierw
+                    odznacz którąś.
+                  </span>
+                </p>
+              )}
               {available.length > 0 ? (
                 <ul className="max-h-72 divide-y overflow-y-auto rounded-md border">
                   {visible.length === 0 && (
@@ -228,15 +241,23 @@ export function AddTeamDialog({
                   {visible.map((team) => {
                     const previous = registrationOf(team.id)?.registrationStatus
                     const inputId = `add-team-${team.id}`
+                    const locked = !selected.has(team.id) && !canSelectMore
                     return (
                       <li key={team.id} className="flex items-center gap-3 px-3 py-2">
                         <Checkbox
                           id={inputId}
                           checked={selected.has(team.id)}
-                          disabled={!selected.has(team.id) && !canSelectMore}
+                          disabled={locked}
                           onCheckedChange={(checked) => toggle(team.id, checked === true)}
                         />
-                        <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer text-sm">
+                        <label
+                          htmlFor={inputId}
+                          className={
+                            locked
+                              ? "text-muted-foreground min-w-0 flex-1 cursor-not-allowed text-sm opacity-60"
+                              : "min-w-0 flex-1 cursor-pointer text-sm"
+                          }
+                        >
                           <span className="block truncate">{team.name}</span>
                           {previous && (
                             <span className="text-muted-foreground text-xs">
