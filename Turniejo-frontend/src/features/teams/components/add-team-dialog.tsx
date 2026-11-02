@@ -36,7 +36,7 @@ type AddTeamDialogProps = {
   organizationId: string
   categories: TournamentCategory[]
   registered: TournamentTeam[]
-  /** Ile drużyn można jeszcze zaakceptować. Przy 0 backend odrzuca też nowe zgłoszenia. */
+  /** Miejsca w limicie po odjęciu zaakceptowanych i oczekujących. Tyle można zaznaczyć. */
   freeSlots: number
   teamLimit: number
   trigger: ReactNode
@@ -77,6 +77,9 @@ export function AddTeamDialog({
     : available
   const allSelected = visible.length > 0 && visible.every((t) => selected.has(t.id))
   const limitReached = freeSlots === 0
+  // Nie da się zaznaczyć więcej drużyn, niż jest wolnych miejsc.
+  const canSelectMore = selected.size < freeSlots
+  const fitsAll = selected.size + visible.filter((t) => !selected.has(t.id)).length <= freeSlots
 
   function reset() {
     setSelected(new Set())
@@ -146,14 +149,8 @@ export function AddTeamDialog({
         </DialogHeader>
         <p className={limitReached ? "text-destructive text-sm" : "text-muted-foreground text-sm"}>
           {limitReached
-            ? `Limit drużyn jest wyczerpany (${teamLimit} z ${teamLimit}). Zwiększ go w ustawieniach turnieju, żeby zgłosić kolejne.`
-            : `Wolne miejsca: ${freeSlots} z ${teamLimit}.`}
-          {!limitReached && selected.size > freeSlots && (
-            <span className="text-live block">
-              Zaznaczono {selected.size}, a zaakceptować możesz tylko {freeSlots}. Resztę odrzucisz
-              albo zwiększysz limit.
-            </span>
-          )}
+            ? `Wszystkie miejsca w limicie (${teamLimit}) są zajęte przez zaakceptowane lub oczekujące drużyny. Zwiększ limit albo odrzuć któreś zgłoszenie.`
+            : `Wolne miejsca: ${freeSlots} z ${teamLimit}. Zaznaczono ${selected.size}.`}
         </p>
         <FieldGroup>
           <Field>
@@ -182,7 +179,7 @@ export function AddTeamDialog({
             <fieldset className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <legend className="text-sm font-medium">Drużyny</legend>
-                {visible.length > 1 && (
+                {visible.length > 1 && !limitReached && (
                   <Button
                     type="button"
                     variant="link"
@@ -191,15 +188,24 @@ export function AddTeamDialog({
                     onClick={() =>
                       setSelected((current) => {
                         const next = new Set(current)
+                        if (allSelected || !canSelectMore) {
+                          for (const t of visible) next.delete(t.id)
+                          return next
+                        }
+                        // Dobieramy tylko tyle, ile zmieści się w limicie.
                         for (const t of visible) {
-                          if (allSelected) next.delete(t.id)
-                          else next.add(t.id)
+                          if (next.size >= freeSlots) break
+                          next.add(t.id)
                         }
                         return next
                       })
                     }
                   >
-                    {allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
+                    {allSelected || !canSelectMore
+                      ? "Odznacz wszystkie"
+                      : fitsAll
+                        ? "Zaznacz wszystkie"
+                        : `Zaznacz ${freeSlots - selected.size}`}
                   </Button>
                 )}
               </div>
@@ -227,6 +233,7 @@ export function AddTeamDialog({
                         <Checkbox
                           id={inputId}
                           checked={selected.has(team.id)}
+                          disabled={!selected.has(team.id) && !canSelectMore}
                           onCheckedChange={(checked) => toggle(team.id, checked === true)}
                         />
                         <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer text-sm">

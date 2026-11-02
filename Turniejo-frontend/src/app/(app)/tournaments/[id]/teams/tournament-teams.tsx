@@ -41,7 +41,8 @@ export function TournamentTeamsView() {
         organizationId={organization.data.id}
         categories={categories.data}
         registered={teams.data ?? []}
-        freeSlots={freeSlots}
+        // Oczekujące też zajmują miejsce: każde zgłoszenie ma szansę na akceptację.
+        freeSlots={Math.max(teamLimit - (active?.length ?? 0), 0)}
         teamLimit={teamLimit}
         trigger={
           <Button>
