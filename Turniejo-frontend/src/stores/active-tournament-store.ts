@@ -12,7 +12,11 @@ export type ActiveTournament = {
 
 type ActiveTournamentState = {
   tournament: ActiveTournament | null
+  /** Użytkownik, dla którego zapamiętano turniej. Inny user w tej samej przeglądarce go nie dziedziczy. */
+  ownerId: string | null
   setTournament: (tournament: ActiveTournament | null) => void
+  /** Przypina store do zalogowanego usera (null = wylogowany); przy zmianie usera czyści turniej. */
+  syncOwner: (userId: string | null) => void
 }
 
 /**
@@ -23,7 +27,12 @@ export const useActiveTournamentStore = create<ActiveTournamentState>()(
   persist(
     (set) => ({
       tournament: null,
+      ownerId: null,
       setTournament: (tournament) => set({ tournament }),
+      syncOwner: (userId) =>
+        set((state) =>
+          state.ownerId === userId ? state : { ownerId: userId, tournament: null },
+        ),
     }),
     {
       name: "turniejo-active-tournament",

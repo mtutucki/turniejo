@@ -90,9 +90,19 @@ function SessionExpiryWatcher() {
 }
 
 function PersistedStoresHydration() {
+  const { data: session, status } = useSession()
+  const [hydrated, setHydrated] = useState(false)
   useEffect(() => {
-    void useActiveTournamentStore.persist.rehydrate()
+    void Promise.resolve(useActiveTournamentStore.persist.rehydrate()).then(() => setHydrated(true))
   }, [])
+
+  // Aktywny turniej należy do usera, który go wybrał — po wylogowaniu albo zalogowaniu kogoś
+  // innego w tej samej przeglądarce nie może zostać w nagłówku (brak dostępu do cudzego turnieju).
+  const userId = session?.user?.id ?? null
+  useEffect(() => {
+    if (!hydrated || status === "loading") return
+    useActiveTournamentStore.getState().syncOwner(status === "authenticated" ? userId : null)
+  }, [hydrated, status, userId])
   return null
 }
 

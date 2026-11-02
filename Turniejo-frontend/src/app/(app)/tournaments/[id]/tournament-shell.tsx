@@ -62,6 +62,7 @@ function TournamentTabs({ id }: { id: string }) {
 
 export function TournamentShell({ children }: { children: ReactNode }) {
   const { id, tournament, roles } = useTournamentContext()
+  const activeId = useActiveTournamentStore((state) => state.tournament?.id)
   const setActiveTournament = useActiveTournamentStore((state) => state.setTournament)
 
   // Wejście w turniej (także z linku) ustawia go jako aktywny kontekst nawigacji.
@@ -70,6 +71,13 @@ export function TournamentShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (name) setActiveTournament({ id, name, format })
   }, [id, name, format, setActiveTournament])
+
+  // Brak dostępu albo turniej usunięty: nie zostawiamy go jako aktywnego w nagłówku.
+  const errorStatus = isApiError(tournament.error) ? tournament.error.status : 0
+  const lostAccess = errorStatus === 403 || errorStatus === 404
+  useEffect(() => {
+    if (lostAccess && activeId?.toLowerCase() === id.toLowerCase()) setActiveTournament(null)
+  }, [lostAccess, activeId, id, setActiveTournament])
 
   // isPending, nie isLoading: przed załadowaniem sesji zapytanie jest wyłączone (isLoading = false).
   if (tournament.isPending) {
@@ -83,7 +91,7 @@ export function TournamentShell({ children }: { children: ReactNode }) {
   }
 
   if (tournament.isError) {
-    const status = isApiError(tournament.error) ? tournament.error.status : 0
+    const status = errorStatus
     return (
       <EmptyState
         icon={status === 403 ? ShieldAlert : SearchX}
