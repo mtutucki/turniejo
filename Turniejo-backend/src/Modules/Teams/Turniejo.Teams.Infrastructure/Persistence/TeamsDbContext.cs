@@ -101,8 +101,29 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             t.TournamentId == tournamentId && t.TeamId == teamId && t.CategoryId == categoryId,
             cancellationToken);
 
-    public async Task<bool> AnyTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
-        await TournamentTeams.AnyAsync(t => t.CategoryId == categoryId, cancellationToken);
+    public async Task<bool> AnyActiveTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AnyAsync(t =>
+            t.CategoryId == categoryId &&
+            (t.RegistrationStatus == RegistrationStatus.Pending || t.RegistrationStatus == RegistrationStatus.Accepted),
+            cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> GetInactiveTournamentTeamIdsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .Where(t => t.CategoryId == categoryId &&
+                (t.RegistrationStatus == RegistrationStatus.Rejected || t.RegistrationStatus == RegistrationStatus.Withdrawn))
+            .Select(t => t.Id)
+            .ToListAsync(cancellationToken);
+
+    // ExecuteDelete — od razu w bazie, bez SaveChanges (woła to moduł Tournaments przy usuwaniu kategorii).
+    public async Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentTeamIds.Count == 0)
+            return;
+
+        await TournamentTeams
+            .Where(t => tournamentTeamIds.Contains(t.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 
     public async Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.AnyAsync(t => t.GroupId == groupId, cancellationToken);

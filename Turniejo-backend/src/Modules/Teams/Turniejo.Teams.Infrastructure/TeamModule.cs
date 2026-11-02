@@ -56,8 +56,14 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         return staff.Select(s => s.UserId).Distinct().ToList();
     }
 
-    public async Task<bool> AnyTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
-        await dbContext.AnyTournamentTeamsByCategoryIdAsync(categoryId, cancellationToken);
+    public async Task<bool> AnyActiveTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyActiveTournamentTeamsByCategoryIdAsync(categoryId, cancellationToken);
+
+    public Task<IReadOnlyList<Guid>> GetInactiveTournamentTeamIdsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        dbContext.GetInactiveTournamentTeamIdsByCategoryIdAsync(categoryId, cancellationToken);
+
+    public Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default) =>
+        dbContext.RemoveTournamentTeamsAsync(tournamentTeamIds, cancellationToken);
 
     public async Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
         await dbContext.AnyTournamentTeamsByGroupIdAsync(groupId, cancellationToken);

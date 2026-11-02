@@ -11,9 +11,13 @@ public interface ITeamModule
     Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Guid>> GetTeamStaffUserIdsAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
 
-    // Cross-module istnienie-check dla blokad kasowania (np. kategorii turnieju) — TournamentTeam.CategoryId
-    // nie ma FK, więc bez tego usunięcie kategorii cicho osierocało zarejestrowane drużyny.
-    Task<bool> AnyTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    // Cross-module istnienie-check dla blokad kasowania kategorii turnieju — TournamentTeam.CategoryId
+    // nie ma FK. Blokują tylko oczekujące i zaakceptowane; odrzucone/wycofane znikają razem z kategorią.
+    Task<bool> AnyActiveTeamsInCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    /// <summary>Odrzucone i wycofane zgłoszenia kategorii (lista drużyn ich nie pokazuje).</summary>
+    Task<IReadOnlyList<Guid>> GetInactiveTournamentTeamIdsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    /// <summary>Usuwa zgłoszenia od razu w bazie (sztab znika kaskadą FK).</summary>
+    Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
     // Jak wyżej, dla TournamentTeam.GroupId — blokada kasowania grupy turnieju.
     Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
     /// <summary>Drużyny kategorii bez grupy (poza odrzuconymi/wycofanymi) trafiają do wskazanej grupy.</summary>

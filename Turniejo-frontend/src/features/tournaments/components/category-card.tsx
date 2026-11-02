@@ -106,8 +106,8 @@ export function CategoryCard({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Usunąć kategorię „{category.name}”?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Razem z kategorią zostaną usunięte jej grupy. Nie da się usunąć kategorii, do
-                    której są już zapisane drużyny lub zaplanowane mecze.
+                    Razem z kategorią znikną jej grupy oraz odrzucone i wycofane zgłoszenia. Nie da
+                    się usunąć kategorii z oczekującymi lub zaakceptowanymi drużynami albo meczami.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

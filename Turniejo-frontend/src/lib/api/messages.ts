@@ -28,7 +28,7 @@ const EXACT: Record<string, string> = {
   // Kategorie i grupy
   "Name already exists": "Ta nazwa jest już zajęta",
   "Cannot delete a category that still has teams registered to it":
-    "Nie można usunąć kategorii, do której są zgłoszone drużyny",
+    "Nie można usunąć kategorii z oczekującymi lub zaakceptowanymi drużynami",
   "Cannot delete a category that still has matches scheduled in it":
     "Nie można usunąć kategorii, w której są zaplanowane mecze",
   "Cannot delete a group that still has teams assigned to it":
