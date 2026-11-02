@@ -40,6 +40,8 @@ const EXACT: Record<string, string> = {
   "Team is already registered for this tournament and category":
     "Ta drużyna jest już zgłoszona do tej kategorii",
   "Tournament has reached its team limit": "Osiągnięto limit drużyn w turnieju",
+  "Team limit cannot be lower than the number of accepted teams":
+    "Limit nie może być mniejszy niż liczba zaakceptowanych drużyn. Najpierw wycofaj nadmiarowe.",
   "Team does not belong to the tournament's organization":
     "Drużyna nie należy do organizacji tego turnieju",
   "TournamentTeam payment status is already set to the specified value": "Opłata ma już ten status",

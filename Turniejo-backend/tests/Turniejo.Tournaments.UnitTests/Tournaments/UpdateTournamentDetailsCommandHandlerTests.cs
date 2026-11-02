@@ -1,5 +1,6 @@
 ﻿using FluentAssertions;
 using NSubstitute;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Tournaments.UpdateTournament;
@@ -10,12 +11,14 @@ namespace Turniejo.Tournaments.UnitTests.Tournaments;
 public sealed class UpdateTournamentDetailsCommandHandlerTests
 {
     private readonly ITournamentsDbContext _dbContext;
+    private readonly ITeamModule _teamModule;
     private readonly UpdateTournamentDetailsCommandHandler _handler;
 
     public UpdateTournamentDetailsCommandHandlerTests()
     {
         _dbContext = Substitute.For<ITournamentsDbContext>();
-        _handler = new UpdateTournamentDetailsCommandHandler(_dbContext);
+        _teamModule = Substitute.For<ITeamModule>();
+        _handler = new UpdateTournamentDetailsCommandHandler(_dbContext, _teamModule);
     }
 
     private static Tournament CreateFakeTournament()
@@ -109,5 +112,59 @@ public sealed class UpdateTournamentDetailsCommandHandlerTests
 
         // Assert
         await _dbContext.Received(1).AddOutboxMessageAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    private void SetupAcceptedTeams(Guid tournamentId, int accepted)
+    {
+        var teams = Enumerable.Range(0, accepted)
+            .Select(_ => new TournamentTeamDto(Guid.NewGuid(), tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Accepted"))
+            .Append(new TournamentTeamDto(Guid.NewGuid(), tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Pending"))
+            .ToList();
+        _teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+            .Returns(teams);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldFail_WhenLimitIsLoweredBelowAcceptedTeams()
+    {
+        // Arrange — limit 8, zaakceptowane 4, próba zmiany na 3
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>())
+            .Returns(tournament);
+        SetupAcceptedTeams(tournament.Id, 4);
+        var command = new UpdateTournamentDetailsCommand(
+            tournament.Id, "Nowa nazwa",
+            DateTimeOffset.UtcNow.AddDays(1), DateTimeOffset.UtcNow.AddDays(3),
+            3, null);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Validation.TeamLimit");
+        tournament.TeamLimit.Should().Be(8);
+        await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ShouldSucceed_WhenLimitIsLoweredToAcceptedTeams()
+    {
+        // Arrange — oczekujące się nie liczą, limit równy zaakceptowanym jest w porządku
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>())
+            .Returns(tournament);
+        SetupAcceptedTeams(tournament.Id, 4);
+        var command = new UpdateTournamentDetailsCommand(
+            tournament.Id, "Nowa nazwa",
+            DateTimeOffset.UtcNow.AddDays(1), DateTimeOffset.UtcNow.AddDays(3),
+            4, null);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        tournament.TeamLimit.Should().Be(4);
     }
 }
