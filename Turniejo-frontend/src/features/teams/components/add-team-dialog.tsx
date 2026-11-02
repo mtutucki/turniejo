@@ -36,6 +36,9 @@ type AddTeamDialogProps = {
   organizationId: string
   categories: TournamentCategory[]
   registered: TournamentTeam[]
+  /** Ile drużyn można jeszcze zaakceptować. Przy 0 backend odrzuca też nowe zgłoszenia. */
+  freeSlots: number
+  teamLimit: number
   trigger: ReactNode
 }
 
@@ -48,6 +51,8 @@ export function AddTeamDialog({
   organizationId,
   categories,
   registered,
+  freeSlots,
+  teamLimit,
   trigger,
 }: AddTeamDialogProps) {
   const [open, setOpen] = useState(false)
@@ -71,6 +76,7 @@ export function AddTeamDialog({
     ? available.filter((t) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
     : available
   const allSelected = visible.length > 0 && visible.every((t) => selected.has(t.id))
+  const limitReached = freeSlots === 0
 
   function reset() {
     setSelected(new Set())
@@ -138,6 +144,17 @@ export function AddTeamDialog({
             Wybierz kategorię i zaznacz drużyny z bazy organizacji — możesz kilka naraz.
           </DialogDescription>
         </DialogHeader>
+        <p className={limitReached ? "text-destructive text-sm" : "text-muted-foreground text-sm"}>
+          {limitReached
+            ? `Limit drużyn jest wyczerpany (${teamLimit} z ${teamLimit}). Zwiększ go w ustawieniach turnieju, żeby zgłosić kolejne.`
+            : `Wolne miejsca: ${freeSlots} z ${teamLimit}.`}
+          {!limitReached && selected.size > freeSlots && (
+            <span className="text-live block">
+              Zaznaczono {selected.size}, a zaakceptować możesz tylko {freeSlots}. Resztę odrzucisz
+              albo zwiększysz limit.
+            </span>
+          )}
+        </p>
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="add-team-category">Kategoria</FieldLabel>
@@ -245,7 +262,10 @@ export function AddTeamDialog({
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Anuluj
           </Button>
-          <Button onClick={submit} disabled={!categoryId || selected.size === 0 || pending}>
+          <Button
+            onClick={submit}
+            disabled={!categoryId || selected.size === 0 || pending || limitReached}
+          >
             {pending
               ? "Zgłaszanie…"
               : selected.size > 1

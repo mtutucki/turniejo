@@ -44,6 +44,8 @@ type TournamentTeamRowProps = {
   team: TournamentTeam
   groups: TournamentGroup[]
   canManage: boolean
+  /** Komplet zaakceptowanych drużyn: backend i tak odrzuci akceptację. */
+  limitReached?: boolean
 }
 
 export function TournamentTeamRow({
@@ -51,6 +53,7 @@ export function TournamentTeamRow({
   team,
   groups,
   canManage,
+  limitReached = false,
 }: TournamentTeamRowProps) {
   const changeStatus = useChangeRegistrationStatus(tournamentId)
   const changePayment = useChangePaymentStatus(tournamentId)
@@ -133,17 +136,21 @@ export function TournamentTeamRow({
               ))}
             </SelectContent>
           </Select>
-          {transitions.map((status) => (
-            <Button
-              key={status}
-              size="sm"
-              variant={TRANSITION_ACTIONS[status].variant}
-              disabled={changeStatus.isPending}
-              onClick={() => setStatus(status)}
-            >
-              {TRANSITION_ACTIONS[status].label}
-            </Button>
-          ))}
+          {transitions.map((status) => {
+            const blocked = status === "Accepted" && limitReached
+            return (
+              <Button
+                key={status}
+                size="sm"
+                variant={TRANSITION_ACTIONS[status].variant}
+                disabled={changeStatus.isPending || blocked}
+                title={blocked ? "Limit drużyn jest wyczerpany" : undefined}
+                onClick={() => setStatus(status)}
+              >
+                {TRANSITION_ACTIONS[status].label}
+              </Button>
+            )
+          })}
           <Button asChild size="sm" variant="ghost" className="hidden lg:inline-flex">
             <Link href={`/tournaments/${tournamentId}/teams/${team.id}`}>
               Skład
