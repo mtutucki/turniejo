@@ -767,6 +767,10 @@ function GenerateForm({
   // Dzień po ostatnim z listy — o ile turniej jeszcze wtedy trwa.
   const dateToAdd = lastDay?.date ? nextDate(lastDay.date) : bounds.startDate
   const canAddDay = dateToAdd <= bounds.endDate
+  // Ile meczów w ogóle mieści się w wpisanych dniach. Gdy mniej niż trzeba, a dnia nie da się
+  // już dodać, podpowiedź „zwiększ liczbę meczów” nic nie da — brakuje czasu.
+  const fitTotal = days.reduce((sum, day) => sum + dayCapacity(day, pitchCount, settings, bounds), 0)
+  const outOfTime = remaining > 0 && pitchCount > 0 && !canAddDay && fitTotal < totalMatches
 
   // Puchar: które rundy wypadają którego dnia — mecze rozdajemy dniom po kolei, według dat.
   const stagesOfDay: (string | null)[] = days.map(() => null)
@@ -1014,7 +1018,7 @@ function GenerateForm({
             )}
             {!canAddDay && (
               <span className="text-muted-foreground text-xs">
-                Turniej kończy się {formatDateTime(tournament.endAt)} — nie ma kolejnego dnia.
+                Turniej kończy się {formatDateTime(tournament.endAt)}, więc nie ma kolejnego dnia.
               </span>
             )}
           </div>
@@ -1038,7 +1042,27 @@ function GenerateForm({
               planOk ? "border-primary/40 bg-primary/5" : "border-live/50 bg-live/10",
             )}
           >
-            {remaining > 0 ? (
+            {outOfTime ? (
+              <>
+                <p className="font-medium">
+                  Brakuje czasu na{" "}
+                  {plural(totalMatches - fitTotal, ["mecz", "mecze", "meczów"])}.
+                </p>
+                <p className="text-muted-foreground">
+                  Do końca turnieju ({formatDateTime(tournament.endAt)}) zmieści się {fitTotal} z{" "}
+                  {totalMatches}. Przesuń koniec turnieju w{" "}
+                  <Link
+                    href={`/tournaments/${tournament.id}/settings`}
+                    className="text-primary underline"
+                  >
+                    ustawieniach
+                  </Link>
+                  , skróć mecz lub przerwę
+                  {pitchCount < pitches.length ? ", zaznacz więcej boisk" : ""} albo zacznij
+                  wcześniej.
+                </p>
+              </>
+            ) : remaining > 0 ? (
               <>
                 <p className="font-medium">
                   {plural(remaining, [
@@ -1049,8 +1073,8 @@ function GenerateForm({
                   .
                 </p>
                 <p className="text-muted-foreground">
-                  Rozplanowano {assigned} z {totalMatches}. Zwiększ liczbę meczów któregoś dnia albo
-                  dodaj kolejny dzień.
+                  Rozplanowano {assigned} z {totalMatches}. Zwiększ liczbę meczów któregoś dnia
+                  {canAddDay ? " albo dodaj kolejny dzień" : ""}.
                 </p>
               </>
             ) : remaining < 0 ? (
