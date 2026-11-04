@@ -25,6 +25,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             _tournamentModule = Substitute.For<ITournamentModule>();
             _matchModule = Substitute.For<IMatchModule>();
             _handler = new ResetBracketCommandHandler(_dbContext, _tournamentModule, _matchModule);
+            _matchModule.GetMatchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<TournamentMatchDto>());
         }
 
         private void SetupTournament(string status, string format = "Knockout") =>
@@ -70,6 +71,24 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             await _dbContext.Received(1).RemoveBracketAsync(bracket, Arg.Any<CancellationToken>());
             await _dbContext.Received(1).AddOutboxMessageAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
             await _tournamentModule.Received(1).RevertScheduleGenerationAsync(_tournamentId, Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldKeepStage_WhenOtherCategoriesStillHaveMatches()
+        {
+            // Usunięcie drabinki jednej kategorii nie może cofać terminarza całego turnieju.
+            SetupTournament("ScheduleGenerated");
+            SetupBracketWithMatch();
+            _matchModule.RemoveUnstartedMatchesAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(true);
+            _matchModule.GetMatchesByTournamentIdAsync(_tournamentId, Arg.Any<CancellationToken>()).Returns(new List<TournamentMatchDto>
+            {
+                new(Guid.NewGuid(), _tournamentId, "Scheduled", DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.NewGuid(), 0, 0),
+            });
+
+            var result = await _handler.Handle(new ResetBracketCommand(_tournamentId, _categoryId), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            await _tournamentModule.DidNotReceive().RevertScheduleGenerationAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
