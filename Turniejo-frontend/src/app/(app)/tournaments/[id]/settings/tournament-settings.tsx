@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSchedule } from "@/features/matches/api"
 import {
   usePublicSettings,
   useTournamentSettings,
@@ -119,6 +120,7 @@ const isSectionKey = (value: string): value is SectionKey =>
 export function TournamentSettingsView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
   const settings = useTournamentSettings(id)
+  const schedule = useSchedule(id)
   const updateDetails = useUpdateTournamentDetails(id)
   const publicSettings = usePublicSettings(id, isOrganizer)
   const data = tournament.data!
@@ -150,6 +152,15 @@ export function TournamentSettingsView() {
       : null)
   const detailsLock =
     notOrganizer ?? (isClosed ? "Zakończonego lub anulowanego turnieju nie można edytować." : null)
+
+  // Czas meczu z zasad gry — bez niego liczymy tylko początek meczu.
+  const matchMs = (settings.data?.matchDurationMinutes ?? 0) * 60_000
+  const scheduledMatches = (schedule.data ?? [])
+    .filter((m) => m.status !== "Cancelled")
+    .map((m) => {
+      const startAt = new Date(m.scheduledAt).getTime()
+      return { startAt, endAt: startAt + matchMs }
+    })
 
   async function saveDetails(input: TournamentDetailsInput) {
     await updateDetails.mutateAsync(input)
@@ -224,6 +235,7 @@ export function TournamentSettingsView() {
             submitLabel="Zapisz zmiany"
             pendingLabel="Zapisywanie…"
             disabled={!!detailsLock}
+            scheduledMatches={scheduledMatches}
             onSubmit={saveDetails}
           />
         </Section>

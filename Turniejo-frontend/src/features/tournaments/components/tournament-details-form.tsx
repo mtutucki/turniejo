@@ -12,7 +12,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { applyFieldErrors } from "@/lib/api/form-errors"
-import { toDateTimeLocal, zonedToIso } from "@/lib/format"
+import { formatDateTime, plural, toDateTimeLocal, zonedToIso } from "@/lib/format"
 import type { Tournament, TournamentDetailsInput } from "@/types/tournaments"
 
 // Limity 1:1 z CreateTournamentCommandValidator / UpdateTournamentDetailsValidator.
@@ -84,6 +84,8 @@ type TournamentDetailsFormProps = {
   submitLabel: string
   pendingLabel: string
   disabled?: boolean
+  /** Zaplanowane mecze (początek i koniec) — ostrzegamy, gdy nowy termin ich nie obejmuje. */
+  scheduledMatches?: { startAt: number; endAt: number }[]
   onSubmit: (input: TournamentDetailsInput) => Promise<unknown>
 }
 
@@ -92,6 +94,7 @@ export function TournamentDetailsForm({
   submitLabel,
   pendingLabel,
   disabled = false,
+  scheduledMatches = [],
   onSubmit,
 }: TournamentDetailsFormProps) {
   const start = tournament && toDateTimeLocal(tournament.startAt)
@@ -110,6 +113,15 @@ export function TournamentDetailsForm({
   })
   const { errors, isSubmitting } = form.formState
   const startDate = useWatch({ control: form.control, name: "startDate" })
+  const [startTime, endDate, endTime] = useWatch({
+    control: form.control,
+    name: ["startTime", "endDate", "endTime"],
+  })
+  const outsideWarning = outsideTermWarning(
+    scheduledMatches,
+    startDate && startTime ? zonedToIso(startDate, startTime) : null,
+    endDate && endTime ? zonedToIso(endDate, endTime) : null,
+  )
 
   // Zakończenie podąża za rozpoczęciem: puste albo wcześniejsze ustawiamy na ten sam dzień.
   function syncEndDate(nextStart: string) {
@@ -168,6 +180,11 @@ export function TournamentDetailsForm({
               timeProps={form.register("endTime")}
             />
           </div>
+          {outsideWarning && (
+            <p className="border-live/50 bg-live/10 rounded-lg border px-3 py-2 text-sm">
+              {outsideWarning}
+            </p>
+          )}
           <TextField
             id="teamLimit"
             label="Maksymalna liczba drużyn"
@@ -191,4 +208,33 @@ export function TournamentDetailsForm({
       </fieldset>
     </form>
   )
+}
+
+/**
+ * Mecze, które nie mieszczą się w nowym terminie. Zapis nadal jest dozwolony (terminarz się nie
+ * zmienia), ale organizator powinien o tym wiedzieć przed zapisaniem.
+ */
+function outsideTermWarning(
+  matches: { startAt: number; endAt: number }[],
+  startIso: string | null,
+  endIso: string | null,
+) {
+  if (matches.length === 0) return null
+  const start = startIso ? new Date(startIso).getTime() : -Infinity
+  const end = endIso ? new Date(endIso).getTime() : Infinity
+  const before = matches.filter((m) => m.startAt < start)
+  const after = matches.filter((m) => m.endAt > end)
+  const parts: string[] = []
+  if (before.length)
+    parts.push(
+      `${plural(before.length, ["mecz zaczyna się", "mecze zaczynają się", "meczów zaczyna się"])} przed rozpoczęciem`,
+    )
+  if (after.length) {
+    const lastEnd = Math.max(...after.map((m) => m.endAt))
+    parts.push(
+      `${plural(after.length, ["mecz kończy się", "mecze kończą się", "meczów kończy się"])} po zakończeniu (${after.length > 1 ? "ostatni " : ""}ok. ${formatDateTime(new Date(lastEnd))})`,
+    )
+  }
+  if (parts.length === 0) return null
+  return `${parts.join(", a ")}. Możesz zapisać, ale terminarz się nie zmieni. Te mecze przesuniesz w terminarzu.`
 }
