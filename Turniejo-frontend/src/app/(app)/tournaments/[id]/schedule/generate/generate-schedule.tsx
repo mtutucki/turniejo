@@ -94,6 +94,13 @@ type GenerateDraft = GenerateValues & { knownPitchIds: string[] }
 
 const draftKey = (tournamentId: string) => `turniejo:schedule-draft:${tournamentId}`
 
+/**
+ * Kategorie ("turniej:kategoria"), dla których już próbowaliśmy utworzyć drabinkę automatycznie.
+ * Poza komponentem, bo useRef nie przeżywa ponownego zamontowania (StrictMode w dev montuje dwa razy)
+ * i dwie drabinki szły do backendu równolegle.
+ */
+const autoBracketTried = new Set<string>()
+
 /** Organizator otworzył generator i go nie zamknął — sekcja "Mecze" wraca wtedy prosto do formularza. */
 export function hasScheduleDraft(tournamentId: string) {
   try {
@@ -1215,11 +1222,12 @@ export function GenerateScheduleView() {
   const autoKnockout =
     isOrganizer && knockout && tournament.data?.status === "RegistrationClosed" && !!teams.data
   const missingKey = missingBrackets.map((c) => c.id).join(",")
-  const autoTried = useRef(new Set<string>())
   useEffect(() => {
     if (!autoKnockout || !missingKey) return
-    const todo = missingKey.split(",").filter((categoryId) => !autoTried.current.has(categoryId))
-    todo.forEach((categoryId) => autoTried.current.add(categoryId))
+    const todo = missingKey
+      .split(",")
+      .filter((categoryId) => !autoBracketTried.has(`${id}:${categoryId}`))
+    todo.forEach((categoryId) => autoBracketTried.add(`${id}:${categoryId}`))
     // Po kolei, nie równolegle: backend daje meczom 1. rundy pierwszy wolny termin na boisku, więc dwie
     // drabinki tworzone naraz brały ten sam termin, druga padała w połowie ("na tym boisku trwa inny
     // mecz") i zostawała bez meczów.
@@ -1237,7 +1245,7 @@ export function GenerateScheduleView() {
         }
       }
     })()
-  }, [autoKnockout, missingKey, teams.data, createBracket])
+  }, [autoKnockout, missingKey, teams.data, createBracket, id])
 
   const backLink = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
