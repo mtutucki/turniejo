@@ -2,6 +2,7 @@
 
 import { CalendarCheck, GitBranch, Trash2, Trophy } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -113,8 +114,11 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     const canEditPairs = isOrganizer && !anyStarted && tournamentStatus !== "Finished"
     const editing = editingPairs && canEditPairs
     // Puchar po wygenerowaniu terminarza: usunięcie drabinki zabiera też terminarz (backend cofa etap).
+    // Gdy inne kategorie mają jeszcze mecze, terminarz zostaje (backend cofa etap tylko przy ostatniej).
     const scheduledKnockout =
-      tournamentFormat === "Knockout" && tournamentStatus === "ScheduleGenerated"
+      tournamentFormat === "Knockout" &&
+      tournamentStatus === "ScheduleGenerated" &&
+      !(schedule.data ?? []).some((m) => m.categoryId !== categoryId && m.status !== "Cancelled")
 
     function selectSlot(slot: BracketSlotRef) {
       if (!selectedSlot) return setSelectedSlot(slot)
@@ -390,7 +394,11 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
 export function TournamentBracketView() {
   const { id, tournament } = useTournamentContext()
   const categories = useCategories(id)
-  const [selected, setSelected] = useState<string | undefined>()
+  // ?category=… otwiera drabinkę konkretnej kategorii (np. link z usuwania kategorii).
+  const searchParams = useSearchParams()
+  const [selected, setSelected] = useState<string | undefined>(
+    () => searchParams.get("category") ?? undefined,
+  )
   const format = tournament.data?.format
 
   if (format !== "Knockout" && format !== "GroupAndKnockout") {
@@ -404,7 +412,7 @@ export function TournamentBracketView() {
   }
   if (categories.isPending) return <Skeleton className="h-64 w-full rounded-xl" />
   const list = categories.data ?? []
-  const categoryId = selected ?? list[0]?.id
+  const categoryId = list.some((c) => c.id === selected) ? selected : list[0]?.id
   if (!categoryId) return <EmptyState icon={GitBranch} title="Najpierw dodaj kategorię" />
 
   return (

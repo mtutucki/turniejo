@@ -24,6 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useSchedule } from "@/features/matches/api"
 import { formatBirthDate, plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
 import type { TournamentCategory, TournamentFormat, TournamentGroup } from "@/types/tournaments"
@@ -71,6 +72,16 @@ export function CategoryCard({
   const teamCount = (groupId: string) => teams.filter((t) => t.groupId === groupId).length
   const ungrouped = teams.filter((t) => !t.groupId).length
   const deleteCategory = useDeleteCategory(tournamentId)
+  // Co blokuje usunięcie (te same reguły co backend): aktywne drużyny i jakiekolwiek mecze, także
+  // odwołane. Pokazujemy to od razu, z linkiem do miejsca, gdzie da się to załatwić.
+  const schedule = useSchedule(tournamentId)
+  const categoryMatches = (schedule.data ?? []).filter((m) => m.categoryId === category.id)
+  const played = categoryMatches.some(
+    (m) => m.status === "Live" || m.status === "Paused" || m.status === "Finished",
+  )
+  const groupMatches = categoryMatches.filter((m) => m.stageType === "Group").length
+  const bracketMatches = categoryMatches.length - groupMatches
+  const blocked = played || teams.length > 0 || categoryMatches.length > 0
   const nextGroupOrder = Math.max(0, ...groups.map((g) => g.order)) + 1
 
   return (
@@ -104,24 +115,82 @@ export function CategoryCard({
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Usunąć kategorię „{category.name}”?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Razem z kategorią znikną jej grupy oraz odrzucone i wycofane zgłoszenia. Nie da
-                    się usunąć kategorii z oczekującymi lub zaakceptowanymi drużynami albo meczami.
+                  <AlertDialogTitle>
+                    {blocked
+                      ? `Kategorii „${category.name}” nie da się jeszcze usunąć`
+                      : `Usunąć kategorię „${category.name}”?`}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    {played ? (
+                      <p>W tej kategorii są rozegrane mecze, więc zostaje w historii turnieju.</p>
+                    ) : blocked ? (
+                      <div className="space-y-2">
+                        <p>Najpierw:</p>
+                        <ul className="list-disc space-y-1 pl-5">
+                          {teams.length > 0 && (
+                            <li>
+                              odrzuć albo wycofaj jej drużyny (
+                              {plural(teams.length, ["drużyna", "drużyny", "drużyn"])}).{" "}
+                              <Link
+                                href={`/tournaments/${tournamentId}/teams`}
+                                className="text-foreground underline"
+                              >
+                                Przejdź do Drużyn
+                              </Link>
+                            </li>
+                          )}
+                          {bracketMatches > 0 && (
+                            <li>
+                              usuń jej drabinkę (ma{" "}
+                              {plural(bracketMatches, ["mecz", "mecze", "meczów"])}).{" "}
+                              <Link
+                                href={`/tournaments/${tournamentId}/bracket?category=${category.id}`}
+                                className="text-foreground underline"
+                              >
+                                Przejdź do Drabinki
+                              </Link>
+                            </li>
+                          )}
+                          {groupMatches > 0 && (
+                            <li>
+                              wyczyść terminarz (
+                              {plural(groupMatches, [
+                                "mecz grupowy",
+                                "mecze grupowe",
+                                "meczów grupowych",
+                              ])}
+                              ).{" "}
+                              <Link
+                                href={`/tournaments/${tournamentId}/schedule`}
+                                className="text-foreground underline"
+                              >
+                                Przejdź do Terminarza
+                              </Link>
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p>
+                        Razem z kategorią znikną jej grupy oraz odrzucone i wycofane zgłoszenia.
+                      </p>
+                    )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Anuluj</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() =>
-                      deleteCategory.mutate(category.id, {
-                        onSuccess: () => toast.success("Kategoria usunięta"),
-                      })
-                    }
-                  >
-                    Usuń
-                  </AlertDialogAction>
+                  <AlertDialogCancel>{blocked ? "Zamknij" : "Anuluj"}</AlertDialogCancel>
+                  {!blocked && (
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() =>
+                        deleteCategory.mutate(category.id, {
+                          onSuccess: () => toast.success("Kategoria usunięta"),
+                        })
+                      }
+                    >
+                      Usuń
+                    </AlertDialogAction>
+                  )}
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
