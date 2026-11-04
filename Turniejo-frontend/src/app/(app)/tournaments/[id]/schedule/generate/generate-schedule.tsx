@@ -769,7 +769,10 @@ function GenerateForm({
   const canAddDay = dateToAdd <= bounds.endDate
   // Ile meczów w ogóle mieści się w wpisanych dniach. Gdy mniej niż trzeba, a dnia nie da się
   // już dodać, podpowiedź „zwiększ liczbę meczów” nic nie da — brakuje czasu.
-  const fitTotal = days.reduce((sum, day) => sum + dayCapacity(day, pitchCount, settings, bounds), 0)
+  const fitTotal = days.reduce(
+    (sum, day) => sum + dayCapacity(day, pitchCount, settings, bounds),
+    0,
+  )
   const outOfTime = remaining > 0 && pitchCount > 0 && !canAddDay && fitTotal < totalMatches
 
   // Puchar: które rundy wypadają którego dnia — mecze rozdajemy dniom po kolei, według dat.
@@ -785,22 +788,42 @@ function GenerateForm({
     }
   }
 
+  // Daty turnieju zmienia się w ustawieniach; szkic formularza zostaje w sessionStorage.
+  const datesLink = (
+    <Link
+      href={`/tournaments/${tournament.id}/settings#details`}
+      className="text-foreground ml-1 underline"
+    >
+      Zmień daty turnieju
+    </Link>
+  )
+
   /** Co jest nie tak z danym dniem (poza samymi polami) — blokuje generowanie. */
-  function dayProblem(day: DayValues, index: number) {
+  function dayProblem(day: DayValues, index: number): ReactNode {
     if (!day.date) return null
     if (day.date < bounds.startDate || day.date > bounds.endDate)
-      return `Turniej trwa ${formatDateTime(tournament.startAt)} – ${formatDateTime(tournament.endAt)}`
+      return (
+        <>
+          Turniej trwa {formatDateTime(tournament.startAt)} – {formatDateTime(tournament.endAt)}.
+          {datesLink}
+        </>
+      )
     if (days.findIndex((other) => other.date === day.date) !== index)
       return "Ten dzień jest już na liście"
     if (day.date === bounds.startDate && day.startTime && day.startTime < bounds.startTime)
       return `Turniej zaczyna się o ${bounds.startTime}`
     const capacity = dayCapacity(day, pitchCount, settings, bounds)
     if (pitchCount > 0 && count(day) > capacity)
-      return capacity === 0
-        ? "Tego dnia nie zmieści się już żaden mecz — wybierz wcześniejszą godzinę"
-        : `Tego dnia zmieści się najwyżej ${plural(capacity, ["mecz", "mecze", "meczów"])}${
-            day.date === bounds.endDate ? ` (turniej kończy się o ${bounds.endTime})` : ""
-          }`
+      return capacity === 0 ? (
+        "Tego dnia nie zmieści się już żaden mecz — wybierz wcześniejszą godzinę"
+      ) : day.date === bounds.endDate ? (
+        <>
+          Tego dnia zmieści się najwyżej {plural(capacity, ["mecz", "mecze", "meczów"])}, bo turniej
+          kończy się o {bounds.endTime}.{datesLink}
+        </>
+      ) : (
+        `Tego dnia zmieści się najwyżej ${plural(capacity, ["mecz", "mecze", "meczów"])}`
+      )
     return null
   }
   const problems = days.map(dayProblem)
@@ -1019,6 +1042,7 @@ function GenerateForm({
             {!canAddDay && (
               <span className="text-muted-foreground text-xs">
                 Turniej kończy się {formatDateTime(tournament.endAt)}, więc nie ma kolejnego dnia.
+                {datesLink}
               </span>
             )}
           </div>
@@ -1045,14 +1069,13 @@ function GenerateForm({
             {outOfTime ? (
               <>
                 <p className="font-medium">
-                  Brakuje czasu na{" "}
-                  {plural(totalMatches - fitTotal, ["mecz", "mecze", "meczów"])}.
+                  Brakuje czasu na {plural(totalMatches - fitTotal, ["mecz", "mecze", "meczów"])}.
                 </p>
                 <p className="text-muted-foreground">
                   Do końca turnieju ({formatDateTime(tournament.endAt)}) zmieści się {fitTotal} z{" "}
                   {totalMatches}. Przesuń koniec turnieju w{" "}
                   <Link
-                    href={`/tournaments/${tournament.id}/settings`}
+                    href={`/tournaments/${tournament.id}/settings#details`}
                     className="text-primary underline"
                   >
                     ustawieniach
