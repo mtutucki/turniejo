@@ -1204,15 +1204,25 @@ export function GenerateScheduleView() {
   const autoTried = useRef(new Set<string>())
   useEffect(() => {
     if (!autoKnockout || !missingKey) return
-    for (const categoryId of missingKey.split(",")) {
-      if (autoTried.current.has(categoryId)) continue
-      autoTried.current.add(categoryId)
-      const accepted = (teams.data ?? []).filter(
-        (team) => team.categoryId === categoryId && team.registrationStatus === "Accepted",
-      )
-      const pairs = autoBracketPairs([], accepted)
-      if (pairs) void createBracket({ categoryId, pairs }).catch(() => undefined)
-    }
+    const todo = missingKey.split(",").filter((categoryId) => !autoTried.current.has(categoryId))
+    todo.forEach((categoryId) => autoTried.current.add(categoryId))
+    // Po kolei, nie równolegle: backend daje meczom 1. rundy pierwszy wolny termin na boisku, więc dwie
+    // drabinki tworzone naraz brały ten sam termin, druga padała w połowie ("na tym boisku trwa inny
+    // mecz") i zostawała bez meczów.
+    void (async () => {
+      for (const categoryId of todo) {
+        const accepted = (teams.data ?? []).filter(
+          (team) => team.categoryId === categoryId && team.registrationStatus === "Accepted",
+        )
+        const pairs = autoBracketPairs([], accepted)
+        if (!pairs) continue
+        try {
+          await createBracket({ categoryId, pairs })
+        } catch {
+          // Błąd pokazuje globalny handler; organizator ułoży tę drabinkę ręcznie.
+        }
+      }
+    })()
   }, [autoKnockout, missingKey, teams.data, createBracket])
 
   const backLink = (
