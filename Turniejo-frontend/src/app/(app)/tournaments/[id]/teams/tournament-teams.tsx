@@ -117,7 +117,7 @@ export function TournamentTeamsView() {
             </span>
           </p>
           <Button asChild size="sm" variant="outline">
-            <Link href={`/tournaments/${id}/settings`}>Zmień limit</Link>
+            <Link href={`/tournaments/${id}/settings#details`}>Zmień limit</Link>
           </Button>
         </div>
       )}
