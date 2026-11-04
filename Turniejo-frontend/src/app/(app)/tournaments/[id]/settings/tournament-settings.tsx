@@ -216,7 +216,7 @@ export function TournamentSettingsView() {
   const current = sections.some((s) => s.key === active) ? active : "status"
 
   return (
-    <div className="grid max-w-5xl gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
+    <div className="grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
       <div className="space-y-3 lg:sticky lg:top-4">
         <SectionNav sections={sections} active={current} onSelect={select} />
         {isOrganizer && data.status === "Draft" && (
