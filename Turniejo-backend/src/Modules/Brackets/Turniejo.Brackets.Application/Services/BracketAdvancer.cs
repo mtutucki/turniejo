@@ -104,7 +104,7 @@ namespace Turniejo.Brackets.Application.Services
 
             var matchId = await matchModule.CreateBracketMatchAsync(
                 tournamentId, categoryId, node.HomeTournamentTeamId!.Value, node.AwayTournamentTeamId!.Value, stageType,
-                node.PlannedPitchId, node.PlannedAt, cancellationToken);
+                node.PlannedPitchId, node.PlannedAt, node.PlannedRefereeId, cancellationToken);
 
             return node.AssignMatch(matchId);
         }

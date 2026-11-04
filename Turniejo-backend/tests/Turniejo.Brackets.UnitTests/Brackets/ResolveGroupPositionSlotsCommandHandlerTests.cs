@@ -70,7 +70,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             _standingModule.GetGroupStandingsAsync(groupId, Arg.Any<CancellationToken>())
                 .Returns([new GroupStandingDto(winnerTeamId, 1, 12)]);
             _matchModule.CreateBracketMatchAsync(
-                tournamentId, categoryId, winnerTeamId, fixedOpponentId, Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>())
+                tournamentId, categoryId, winnerTeamId, fixedOpponentId, Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
                 .Returns(Guid.NewGuid());
 
             var command = new ResolveGroupPositionSlotsCommand(tournamentId, categoryId, groupId);
@@ -83,7 +83,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             result.Value.ResolvedAny.Should().BeTrue();
             node.HomeTournamentTeamId.Should().Be(winnerTeamId);
             await _matchModule.Received(1).CreateBracketMatchAsync(
-                tournamentId, categoryId, winnerTeamId, fixedOpponentId, Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
+                tournamentId, categoryId, winnerTeamId, fixedOpponentId, Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).AddOutboxMessageAsync(Arg.Any<OutboxMessage>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         }
@@ -121,7 +121,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             result.Value.ResolvedAny.Should().BeFalse();
             node.HomeTournamentTeamId.Should().BeNull();
             await _matchModule.DidNotReceive().CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -200,7 +200,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             byeNode.HomeTournamentTeamId.Should().Be(advancingTeamId);
             finalNode.AwayTournamentTeamId.Should().Be(advancingTeamId);
             await _matchModule.DidNotReceive().CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
         }
     }
 }

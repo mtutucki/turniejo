@@ -20,7 +20,7 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
                 roundById[n.BracketRoundId].RoundType == BracketRoundType.ThirdPlace,
                 n.MatchId, n.HomeSourceNodeId, n.AwaySourceNodeId,
                 n.HomeSourceType == BracketSourceType.Bye || n.AwaySourceType == BracketSourceType.Bye,
-                n.PlannedPitchId, n.PlannedAt))
+                n.PlannedPitchId, n.PlannedAt, n.PlannedRefereeId))
             .ToList();
     }
 
@@ -49,6 +49,14 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
 
         foreach (var node in await dbContext.GetTrackedBracketNodesByIdsAsync(nodeIds, cancellationToken))
             node.ClearPlannedSlot();
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetPlannedRefereeAsync(Guid nodeId, Guid? refereeId, CancellationToken cancellationToken = default)
+    {
+        foreach (var node in await dbContext.GetTrackedBracketNodesByIdsAsync([nodeId], cancellationToken))
+            node.PlanReferee(refereeId);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

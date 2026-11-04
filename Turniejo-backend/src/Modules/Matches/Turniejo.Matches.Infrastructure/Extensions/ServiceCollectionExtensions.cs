@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MatchAccessGuard>();
         services.AddScoped<ScheduleConflictChecker>();
         services.AddScoped<PlannedSlotShifter>();
+        services.AddScoped<PlannedMatchContext>();
         services.AddScoped<SendOffRules>();
         services.AddScoped<RefereeIdVisibility>();
 

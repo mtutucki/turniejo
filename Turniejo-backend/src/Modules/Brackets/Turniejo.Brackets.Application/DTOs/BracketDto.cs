@@ -20,7 +20,9 @@ namespace Turniejo.Brackets.Application.DTOs
         int? AwaySourcePosition = null,
         // Termin zaplanowany dla meczu, który jeszcze nie powstał (czeka na drużyny z poprzedniej rundy).
         Guid? PlannedPitchId = null,
-        DateTimeOffset? PlannedAt = null);
+        DateTimeOffset? PlannedAt = null,
+        // Sędzia wskazany z góry dla tego meczu (przejdzie na mecz, gdy powstanie).
+        Guid? PlannedRefereeId = null);
 
     public sealed record BracketRoundDto(
         Guid Id,

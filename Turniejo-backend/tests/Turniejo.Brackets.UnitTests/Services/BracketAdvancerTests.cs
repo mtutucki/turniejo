@@ -40,7 +40,7 @@ namespace Turniejo.Brackets.UnitTests.Services
             _dbContext.GetBracketNodeByIdAsync(node.Id, Arg.Any<CancellationToken>()).Returns(node);
             _dbContext.GetBracketRoundByIdAsync(round.Id, Arg.Any<CancellationToken>()).Returns(round);
             _matchModule.CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>())
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
                 .Returns(Guid.NewGuid());
 
             var result = await _advancer.AdvanceIntoAsync(node.Id, BracketSlot.Home, teamId, Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -88,7 +88,7 @@ namespace Turniejo.Brackets.UnitTests.Services
             result.Should().BeFalse();
             node.HomeTournamentTeamId.Should().Be(oldTeamId);
             await _matchModule.DidNotReceive().CreateBracketMatchAsync(
-                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
+                Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
         }
 
         [Fact]

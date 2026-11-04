@@ -13,12 +13,14 @@ namespace Turniejo.Matches.UnitTests.Matches
         private readonly IMatchesDbContext _dbContext;
         private readonly ITournamentModule _tournamentModule = Substitute.For<ITournamentModule>();
         private readonly ITeamModule _teamModule = Substitute.For<ITeamModule>();
+        private readonly IUserModule _userModule = Substitute.For<IUserModule>();
+        private readonly IAuthorizationService _authorizationService = Substitute.For<IAuthorizationService>();
         private readonly CreateBracketMatchCommandHandler _handler;
 
         public CreateBracketMatchCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
-            _handler = new CreateBracketMatchCommandHandler(_dbContext, _tournamentModule, _teamModule);
+            _handler = new CreateBracketMatchCommandHandler(_dbContext, _tournamentModule, _teamModule, _userModule, _authorizationService);
             _dbContext.GetMatchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<Match>());
             _dbContext.GetPitchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<Pitch>());
             _tournamentModule.GetTournamentSettingsAsync(default, default).ReturnsForAnyArgs(
@@ -161,6 +163,53 @@ namespace Turniejo.Matches.UnitTests.Matches
 
             await _dbContext.Received(1).AddMatchAsync(
                 Arg.Is<Match>(m => m.ScheduledAt == tournamentStart), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotTakeAPitch_BeforeTheScheduleIsGenerated()
+        {
+            // Dwie drabinki tworzone naraz brały ten sam wolny termin na boisku i jedna padała na
+            // unikalnym indeksie (boisko, godzina). Przed terminarzem boisko nada dopiero generator.
+            var tournamentId = Guid.NewGuid();
+            var pitch = Pitch.Create(Guid.NewGuid(), tournamentId, "Boisko 1", null, Guid.NewGuid()).Value;
+            _dbContext.GetPitchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(new List<Pitch> { pitch });
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "Puchar", "RegistrationClosed", "Knockout", Guid.NewGuid(), 8, null, null));
+
+            await _handler.Handle(new CreateBracketMatchCommand(tournamentId, null, Guid.NewGuid(), Guid.NewGuid(), StageType.Knockout), CancellationToken.None);
+
+            await _dbContext.Received(1).AddMatchAsync(Arg.Is<Match>(m => m.PitchId == null), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldAssignPlannedReferee_WhenStillTournamentReferee()
+        {
+            var tournamentId = Guid.NewGuid();
+            var refereeId = Guid.NewGuid();
+            _authorizationService.HasAnyRoleAsync(refereeId, "Tournament", tournamentId, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+                .ReturnsForAnyArgs(true);
+
+            var result = await _handler.Handle(
+                new CreateBracketMatchCommand(tournamentId, null, Guid.NewGuid(), Guid.NewGuid(), StageType.Final, PlannedRefereeId: refereeId),
+                CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            await _dbContext.Received(1).AddMatchAsync(Arg.Is<Match>(m => m.RefereeId == refereeId), Arg.Any<CancellationToken>());
+            await _userModule.Received(1).AssignRoleAsync(refereeId, "Referee", "Match", result.Value.MatchId, Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSkipPlannedReferee_WhenNoLongerTournamentReferee()
+        {
+            var refereeId = Guid.NewGuid();
+            _authorizationService.HasAnyRoleAsync(default, default!, default, default!, default).ReturnsForAnyArgs(false);
+
+            await _handler.Handle(
+                new CreateBracketMatchCommand(Guid.NewGuid(), null, Guid.NewGuid(), Guid.NewGuid(), StageType.Final, PlannedRefereeId: refereeId),
+                CancellationToken.None);
+
+            await _dbContext.Received(1).AddMatchAsync(Arg.Is<Match>(m => m.RefereeId == null), Arg.Any<CancellationToken>());
+            await _userModule.DidNotReceiveWithAnyArgs().AssignRoleAsync(default, default!, default!, default, default);
         }
     }
 }

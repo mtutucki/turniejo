@@ -5,7 +5,8 @@ public interface IMatchModule
     Task<IReadOnlyList<GroupMatchDto>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
     Task<Guid> CreateBracketMatchAsync(
         Guid tournamentId, Guid? categoryId, Guid homeTournamentTeamId, Guid awayTournamentTeamId,
-        string stageType, Guid? plannedPitchId, DateTimeOffset? plannedAt, CancellationToken cancellationToken = default);
+        string stageType, Guid? plannedPitchId, DateTimeOffset? plannedAt, Guid? plannedRefereeId = null,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TournamentMatchDto>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task<MatchInfoDto?> GetMatchAsync(Guid matchId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PitchInfoDto>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);

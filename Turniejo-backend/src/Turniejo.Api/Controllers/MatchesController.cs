@@ -5,6 +5,7 @@ using Turniejo.Matches.Application.Matches.AddAssist;
 using Turniejo.Matches.Application.Matches.AddCard;
 using Turniejo.Matches.Application.Matches.AddGoal;
 using Turniejo.Matches.Application.Matches.AssignMatchPitch;
+using Turniejo.Matches.Application.Matches.AssignPlannedMatchReferee;
 using Turniejo.Matches.Application.Matches.AssignRefereeToMatch;
 using Turniejo.Matches.Application.Matches.ClaimMatch;
 using Turniejo.Matches.Application.Matches.CorrectFinishedMatchScore;
@@ -28,6 +29,7 @@ using Turniejo.Matches.Application.Matches.SelectMatchMvp;
 using Turniejo.Matches.Application.Matches.SetMatchScore;
 using Turniejo.Matches.Application.Matches.StartMatch;
 using Turniejo.Matches.Application.Matches.UpdateMatchEvent;
+using Turniejo.Matches.Application.Matches.UpdatePlannedMatchSchedule;
 using Turniejo.Matches.Application.Matches.UpdateMatchSchedule;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.Matches.Application.Pitches.AddPitch;
@@ -141,6 +143,23 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> AssignRefereeToMatch([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] AssignRefereeToMatchRequest request, CancellationToken cancellationToken)
         {
             var command = new AssignRefereeToMatchCommand(tournamentId, matchId, request.RefereeId);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        // Mecz pucharu, który jeszcze nie powstał (czeka na zwycięzców), to węzeł drabinki z planowanym terminem.
+        [HttpPut("bracket-nodes/{nodeId}/schedule")]
+        public async Task<IActionResult> UpdatePlannedMatchSchedule([FromRoute] Guid tournamentId, [FromRoute] Guid nodeId, [FromBody] UpdatePlannedMatchScheduleRequest request, CancellationToken cancellationToken)
+        {
+            var command = new UpdatePlannedMatchScheduleCommand(tournamentId, nodeId, request.PitchId, request.ScheduledAt);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpPatch("bracket-nodes/{nodeId}/referee")]
+        public async Task<IActionResult> AssignPlannedMatchReferee([FromRoute] Guid tournamentId, [FromRoute] Guid nodeId, [FromBody] AssignRefereeToMatchRequest request, CancellationToken cancellationToken)
+        {
+            var command = new AssignPlannedMatchRefereeCommand(tournamentId, nodeId, request.RefereeId);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -340,6 +359,8 @@ namespace Turniejo.Api.Controllers
             IReadOnlyList<Guid> PitchIds,
             IReadOnlyList<ScheduleWindowRequest>? Windows = null);
         public sealed record UpdateMatchScheduleRequest(Guid? PitchId, DateTimeOffset ScheduledAt);
+
+        public sealed record UpdatePlannedMatchScheduleRequest(Guid PitchId, DateTimeOffset ScheduledAt);
         public sealed record AssignMatchPitchRequest(Guid? PitchId);
         public sealed record RescheduleMatchRequest(DateTimeOffset ScheduledAt);
         public sealed record AssignRefereeToMatchRequest(Guid? RefereeId);
