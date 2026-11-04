@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import Link from "next/link"
 import { type ReactNode, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -25,8 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useTournament } from "@/features/tournaments/api"
 import { applyFieldErrors } from "@/lib/api/form-errors"
-import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/format"
+import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from "@/lib/format"
 import type { Match, Pitch } from "@/types/matches"
 
 import { useUpdateMatchSchedule } from "../api"
@@ -58,6 +60,8 @@ export function RescheduleMatchDialog({
 }: RescheduleMatchDialogProps) {
   const [open, setOpen] = useState(false)
   const update = useUpdateMatchSchedule(tournamentId)
+  // Turniej jest już w cache (layout turnieju) — bierzemy z niego daty do podpowiedzi.
+  const tournament = useTournament(tournamentId).data
   const defaults: RescheduleValues = {
     scheduledAt: toDateTimeLocal(match.scheduledAt),
     pitchId: match.pitchId ?? NO_PITCH,
@@ -106,6 +110,18 @@ export function RescheduleMatchDialog({
               error={errors.scheduledAt}
               {...form.register("scheduledAt")}
             />
+            {tournament && (
+              <p className="text-muted-foreground -mt-5 text-xs">
+                Turniej trwa {formatDateTime(tournament.startAt)} –{" "}
+                {formatDateTime(tournament.endAt)}.{" "}
+                <Link
+                  href={`/tournaments/${tournamentId}/settings#details`}
+                  className="text-foreground underline"
+                >
+                  Zmień daty turnieju
+                </Link>
+              </p>
+            )}
             <Controller
               control={form.control}
               name="pitchId"
