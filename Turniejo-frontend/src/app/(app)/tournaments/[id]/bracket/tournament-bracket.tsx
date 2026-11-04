@@ -34,6 +34,7 @@ import { bracketChampion } from "@/features/public/components/champion-banner"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups, useTournamentSettings } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { CategoryPicker } from "@/features/tournaments/components/category-picker"
 import { cn } from "@/lib/utils"
 import type { BracketSlotRef } from "@/types/public"
 
@@ -402,27 +403,7 @@ export function TournamentBracketView() {
 
   return (
     <div className="space-y-4">
-      {list.length > 1 && (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Kategoria">
-          <span className="text-muted-foreground mr-1 text-sm">Kategoria:</span>
-          {list.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={c.id === categoryId}
-              onClick={() => setSelected(c.id)}
-              className={cn(
-                "h-9 rounded-full border px-4 text-sm font-medium",
-                c.id === categoryId
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground",
-              )}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <CategoryPicker categories={list} value={categoryId} onChange={setSelected} />
       <CategoryBracket key={categoryId} categoryId={categoryId} />
     </div>
   )
