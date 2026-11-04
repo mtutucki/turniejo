@@ -1,11 +1,22 @@
 "use client"
 
-import { GitBranch, Trophy } from "lucide-react"
+import { GitBranch, Trash2, Trophy } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -99,6 +110,9 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     // Zamiana par ma sens, dopóki nic nie zagrano — potem trzeba by cofać awanse i wyniki.
     const canEditPairs = isOrganizer && !anyStarted && tournamentStatus !== "Finished"
     const editing = editingPairs && canEditPairs
+    // Puchar po wygenerowaniu terminarza: usunięcie drabinki zabiera też terminarz (backend cofa etap).
+    const scheduledKnockout =
+      tournamentFormat === "Knockout" && tournamentStatus === "ScheduleGenerated"
 
     function selectSlot(slot: BracketSlotRef) {
       if (!selectedSlot) return setSelectedSlot(slot)
@@ -121,16 +135,57 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
                   ? "Teraz kliknij drugi slot — zamienią się miejscami."
                   : "Kliknij dwa sloty pierwszej rundy, żeby zamienić je miejscami. Terminy meczów zostają.")}
             </p>
-            <Button
-              size="sm"
-              variant={editing ? "default" : "outline"}
-              onClick={() => {
-                setEditingPairs(!editing)
-                setSelectedSlot(null)
-              }}
-            >
-              {editing ? "Gotowe" : "Edytuj pary"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {!editing && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 />
+                      Usuń drabinkę
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Usunąć drabinkę?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {scheduledKnockout
+                          ? "Znikną pary i mecze drabinki z terminarza, a turniej wróci do etapu „Zapisy zamknięte”. Potem ułożysz pary i wygenerujesz terminarz od nowa."
+                          : "Znikną pary i mecze drabinki. Potem ułożysz pary od nowa."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        disabled={resetBracket.isPending}
+                        onClick={() =>
+                          resetBracket.mutate(
+                            { categoryId },
+                            { onSuccess: () => toast.success("Drabinka usunięta") },
+                          )
+                        }
+                      >
+                        Usuń drabinkę
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <Button
+                size="sm"
+                variant={editing ? "default" : "outline"}
+                onClick={() => {
+                  setEditingPairs(!editing)
+                  setSelectedSlot(null)
+                }}
+              >
+                {editing ? "Gotowe" : "Edytuj pary"}
+              </Button>
+            </div>
           </div>
         )}
         {needsRegeneration && (
