@@ -29,6 +29,7 @@ import {
 } from "@/features/matches/api"
 import { BracketBoard } from "@/features/matches/components/bracket-board"
 import { GenerateBracketForm } from "@/features/matches/components/generate-bracket-form"
+import { autoBracketPairs } from "@/features/matches/suggest-bracket"
 import { bracketChampion } from "@/features/public/components/champion-banner"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups, useTournamentSettings } from "@/features/tournaments/api"
@@ -285,6 +286,11 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     )
   }
 
+  // Do wygenerowania terminarza brakującą drabinkę tworzy generator (z tej samej propozycji par).
+  const beforeSchedule =
+    tournamentStatus === "Draft" ||
+    tournamentStatus === "RegistrationOpen" ||
+    tournamentStatus === "RegistrationClosed"
   const acceptedTeams = (teams.data ?? []).filter(
     (t) => t.categoryId === categoryId && t.registrationStatus === "Accepted",
   )
@@ -313,7 +319,9 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
       <CardHeader>
         <CardTitle className="text-base">Utwórz drabinkę</CardTitle>
         <CardDescription>
-          Wybierz pary pierwszej rundy — z miejsc w grupach albo konkretne drużyny.
+          {beforeSchedule && autoBracketPairs(categoryGroups, acceptedTeams)
+            ? "Nie musisz nic robić: drabinka z tą propozycją par powstanie sama przy generowaniu terminarza. Jeśli chcesz inne pary, ustaw je tutaj i kliknij Utwórz."
+            : "Wybierz pary pierwszej rundy z miejsc w grupach albo konkretnych drużyn."}
         </CardDescription>
       </CardHeader>
       <CardContent>

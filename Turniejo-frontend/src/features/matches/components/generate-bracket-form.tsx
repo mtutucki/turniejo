@@ -18,8 +18,9 @@ import type { TournamentTeam } from "@/types/teams"
 import type { TournamentGroup } from "@/types/tournaments"
 
 import { type BracketSlotInput, useGenerateBracket } from "../api"
+import { type BracketPair, defaultPairCount, suggestPairs } from "../suggest-bracket"
 
-type Pair = { home: BracketSlotInput | null; away: BracketSlotInput | null }
+type Pair = BracketPair
 
 const SIZES = [
   { pairs: 1, label: "Finał (2 drużyny)" },
@@ -46,54 +47,6 @@ const decode = (value: string): BracketSlotInput | null => {
     return { kind: "group", groupId: id, position: Number(position) }
   if (kind === "t" && id) return { kind: "team", tournamentTeamId: id }
   return null
-}
-
-/**
- * Propozycja par "na krzyż": przy 2 grupach A1–B2, B1–A2; przy jednej grupie 1–4, 2–3; w ogólności
- * zwycięzcy grup z drugimi miejscami sąsiednich grup. Organizator może każdą parę zmienić.
- */
-function suggestPairs(
-  groups: TournamentGroup[],
-  teams: TournamentTeam[],
-  pairCount: number,
-): Pair[] {
-  // Puchar bez grup: drużyny w kolejności rozstawienia (numer rozstawienia, potem nazwa) —
-  // 1. z ostatnią, 2. z przedostatnią. Gdy drużyn jest mniej niż miejsc (np. 5 w ćwierćfinałach),
-  // najwyżej rozstawione dostają wolny los. Para bez żadnej drużyny zostaje do wybrania.
-  if (groups.length === 0) {
-    const seeded = [...teams].sort(
-      (a, b) =>
-        (a.seedNumber ?? 999) - (b.seedNumber ?? 999) || a.teamName.localeCompare(b.teamName, "pl"),
-    )
-    const slot = (i: number): BracketSlotInput | null => {
-      const team = seeded[i]
-      return team ? { kind: "team", tournamentTeamId: team.id } : null
-    }
-    return Array.from({ length: pairCount }, (_, i) => {
-      const home = slot(i)
-      return { home, away: slot(pairCount * 2 - 1 - i) ?? (home ? { kind: "bye" } : null) }
-    })
-  }
-  const slots: BracketSlotInput[] = []
-  if (groups.length === 1) {
-    for (let i = 1; i <= pairCount * 2; i++)
-      slots.push({ kind: "group", groupId: groups[0]!.id, position: i })
-    return Array.from({ length: pairCount }, (_, i) => ({
-      home: slots[i]!,
-      away: slots[pairCount * 2 - 1 - i]!,
-    }))
-  }
-  const pairs: Pair[] = []
-  for (let i = 0; i < pairCount; i++) {
-    const g = groups[i % groups.length]
-    const opponent = groups[(i + 1) % groups.length] ?? g
-    const round = Math.floor(i / groups.length)
-    pairs.push({
-      home: g ? { kind: "group", groupId: g.id, position: 1 + round * 2 } : null,
-      away: opponent ? { kind: "group", groupId: opponent.id, position: 2 + round * 2 } : null,
-    })
-  }
-  return pairs
 }
 
 function SlotSelect({
@@ -151,12 +104,7 @@ export function GenerateBracketForm({
   teams: TournamentTeam[]
   thirdPlaceEnabled: boolean
 }) {
-  // Z grupami: tyle par, ile grup (max ćwierćfinały). Bez grup: najmniejsza drabinka, w której
-  // mieszczą się wszystkie drużyny (np. 5 drużyn → ćwierćfinały z trzema wolnymi losami).
-  const defaultSize =
-    groups.length > 0
-      ? Math.min(4, Math.max(1, groups.length))
-      : Math.max(1, Math.min(8, 2 ** Math.ceil(Math.log2(Math.max(2, teams.length))) / 2))
+  const defaultSize = defaultPairCount(groups, teams)
   const [pairCount, setPairCount] = useState(defaultSize)
   const [pairs, setPairs] = useState<Pair[]>(() => suggestPairs(groups, teams, defaultSize))
   const [error, setError] = useState<string | null>(null)
