@@ -86,6 +86,8 @@ export type BracketNode = {
   /** Termin zaplanowany dla meczu, który jeszcze nie powstał (czeka na drużyny z poprzedniej rundy). */
   plannedPitchId: string | null
   plannedAt: string | null
+  /** Sędzia wskazany z góry. Mecz dostanie go, gdy powstanie. */
+  plannedRefereeId?: string | null
 }
 
 export type BracketRound = {

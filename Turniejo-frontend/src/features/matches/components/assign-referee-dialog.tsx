@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils"
 import type { Match } from "@/types/matches"
 import type { TournamentMember } from "@/types/teams"
 
-import { useAssignReferee, useSchedule } from "../api"
+import { useAssignPlannedReferee, useAssignReferee, useSchedule } from "../api"
 
 const NO_REFEREE = "none"
 /** Od tylu sędziów pokazujemy wyszukiwarkę, mniejszą listę widać od razu w całości. */
@@ -54,9 +54,14 @@ type RefereeOption = {
   busyWith: Match | null
 }
 
+/** Mecz pucharu, który jeszcze nie powstał (węzeł drabinki z planowanym terminem). */
+export type PlannedRefereeTarget = { nodeId: string; scheduledAt: string; refereeId: string | null }
+
 type AssignRefereeDialogProps = {
   tournamentId: string
-  match: Match
+  /** Istniejący mecz albo `planned`: mecz, który czeka na wyniki wcześniejszych. */
+  match?: Match
+  planned?: PlannedRefereeTarget
   title: string
   /** Członkowie turnieju z rolą Referee (dołączyli kodem sędziego). */
   referees: TournamentMember[]
@@ -67,29 +72,34 @@ type AssignRefereeDialogProps = {
 export function AssignRefereeDialog({
   tournamentId,
   match,
+  planned,
   title,
   referees,
   refereeCode,
   trigger,
 }: AssignRefereeDialogProps) {
+  const currentRefereeId = match?.refereeId ?? planned?.refereeId ?? null
+  const scheduledAt = match?.scheduledAt ?? planned?.scheduledAt ?? ""
   const [open, setOpen] = useState(false)
-  const [refereeId, setRefereeId] = useState(match.refereeId ?? NO_REFEREE)
+  const [refereeId, setRefereeId] = useState(currentRefereeId ?? NO_REFEREE)
   const [query, setQuery] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const assign = useAssignReferee(tournamentId)
+  const assignMatch = useAssignReferee(tournamentId)
+  const assignPlanned = useAssignPlannedReferee(tournamentId)
+  const isPending = assignMatch.isPending || assignPlanned.isPending
   // Te same zapytania co terminarz i ustawienia, więc dane są już w cache.
   const schedule = useSchedule(tournamentId)
   const settings = useTournamentSettings(tournamentId)
 
   const durationMs = Math.max(settings.data?.matchDurationMinutes ?? 1, 1) * 60_000
-  const start = Date.parse(match.scheduledAt)
+  const start = Date.parse(scheduledAt)
   // Ta sama reguła co ScheduleConflictChecker w backendzie: mecze nachodzą na siebie w czasie.
   const overlaps = (other: Match) => {
     const otherStart = Date.parse(other.scheduledAt)
     return otherStart < start + durationMs && start < otherStart + durationMs
   }
   const others = (schedule.data ?? []).filter(
-    (m) => m.id !== match.id && m.status !== "Cancelled" && m.refereeId,
+    (m) => m.id !== match?.id && m.status !== "Cancelled" && m.refereeId,
   )
 
   const options: RefereeOption[] = referees
@@ -104,7 +114,7 @@ export function AssignRefereeDialog({
     !needle ||
     normalize(`${o.member.firstName} ${o.member.lastName} ${o.member.email}`).includes(needle)
   // Obecny sędzia stoi na górze, zaraz pod "Dowolny sędzia", żeby nie szukać go wśród 50 osób.
-  const current = needle ? undefined : options.find((o) => o.member.userId === match.refereeId)
+  const current = needle ? undefined : options.find((o) => o.member.userId === currentRefereeId)
   const listed = options.filter((o) => o !== current && matches(o))
   // Wolni najpierw, zajęci o tej godzinie na końcu: i tak nie da się ich przypisać.
   const free = listed.filter((o) => !o.busyWith)
@@ -112,20 +122,20 @@ export function AssignRefereeDialog({
 
   function save() {
     setError(null)
-    assign.mutate(
-      { matchId: match.id, refereeId: refereeId === NO_REFEREE ? null : refereeId },
-      {
-        onSuccess: () => {
-          toast.success(
-            refereeId === NO_REFEREE ? "Mecz może wziąć dowolny sędzia" : "Sędzia przypisany",
-          )
-          setOpen(false)
-        },
-        onError: (e) => {
-          if (isApiError(e) && e.fieldErrors.length) setError(e.fieldErrors[0]!.message)
-        },
+    const chosen = refereeId === NO_REFEREE ? null : refereeId
+    const callbacks = {
+      onSuccess: () => {
+        toast.success(
+          refereeId === NO_REFEREE ? "Mecz może wziąć dowolny sędzia" : "Sędzia przypisany",
+        )
+        setOpen(false)
       },
-    )
+      onError: (e: unknown) => {
+        if (isApiError(e) && e.fieldErrors.length) setError(e.fieldErrors[0]!.message)
+      },
+    }
+    if (planned) assignPlanned.mutate({ nodeId: planned.nodeId, refereeId: chosen }, callbacks)
+    else if (match) assignMatch.mutate({ matchId: match.id, refereeId: chosen }, callbacks)
   }
 
   return (
@@ -134,7 +144,7 @@ export function AssignRefereeDialog({
       onOpenChange={(next) => {
         setOpen(next)
         if (next) {
-          setRefereeId(match.refereeId ?? NO_REFEREE)
+          setRefereeId(currentRefereeId ?? NO_REFEREE)
           setQuery("")
           setError(null)
         }
@@ -231,8 +241,8 @@ export function AssignRefereeDialog({
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Anuluj
           </Button>
-          <Button onClick={save} disabled={assign.isPending}>
-            {assign.isPending ? "Zapisywanie…" : "Zapisz"}
+          <Button onClick={save} disabled={isPending}>
+            {isPending ? "Zapisywanie…" : "Zapisz"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -125,6 +125,12 @@ const EXACT: Record<string, string> = {
   "Pitch is inactive": "To boisko jest nieaktywne",
   "Pitch does not belong to this tournament": "To boisko nie należy do tego turnieju",
   "Match must take place within the tournament dates": "Mecz musi się odbyć w trakcie turnieju",
+  "Match must start after the matches its teams come from":
+    "Ten mecz musi się zacząć po meczach, z których przyjdą drużyny",
+  "This match already exists, change it in the schedule":
+    "Ten mecz już powstał. Zmień go w terminarzu",
+  "A pair with a bye has no match": "Para z wolnym losem nie ma meczu",
+  "The tournament has finished or been cancelled": "Turniej się zakończył albo został anulowany",
   "Schedule must fit within the tournament dates": "Terminarz musi mieścić się w datach turnieju",
   "Tournament already has group matches — clear the schedule first":
     "Turniej ma już mecze grupowe — najpierw wyczyść terminarz",

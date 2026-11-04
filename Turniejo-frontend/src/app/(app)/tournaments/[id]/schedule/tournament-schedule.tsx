@@ -290,43 +290,98 @@ function MatchRow({
 
 /** Zapowiedź meczu kolejnej rundy: termin już jest, pary jeszcze nie (czeka na wcześniejsze mecze). */
 function PlannedRow({
+  tournamentId,
   planned,
-  pitch,
+  lookups,
+  isOrganizer,
+  pitches,
+  referees,
+  refereeCode,
   unscheduled = false,
 }: {
+  tournamentId: string
   planned: PlannedBracketMatch
-  pitch: string | null
+  lookups: Lookups
+  isOrganizer: boolean
+  pitches: Pitch[]
+  referees: TournamentMember[]
+  refereeCode: string | null
   /** Terminarz jeszcze nie powstał — sama para, bez godziny i boiska. */
   unscheduled?: boolean
 }) {
   const sideClass = (known: boolean) => cn("truncate", !known && "text-muted-foreground italic")
+  const title = `${planned.stage}: ${planned.home.label} – ${planned.away.label}`
+  const pitch = lookups.pitchName(planned.pitchId)
   return (
-    <li className="flex items-start gap-4 py-3" data-testid="planned-bracket-match">
-      {!unscheduled && (
-        <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
-          {formatTime(planned.scheduledAt)}
-        </span>
-      )}
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="flex flex-wrap items-center gap-x-2 font-medium">
-          <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
-          <span className="text-muted-foreground text-sm">vs</span>
-          <span className={sideClass(planned.away.known)}>{planned.away.label}</span>
-        </p>
-        <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5">
-            <Hourglass className="size-3" />
-            Czeka na wynik wcześniejszych meczów
+    <li
+      className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center"
+      data-testid="planned-bracket-match"
+    >
+      <div className="flex min-w-0 flex-1 items-start gap-4">
+        {!unscheduled && (
+          <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
+            {formatTime(planned.scheduledAt)}
           </span>
-          {!unscheduled && (
-            <span className="flex items-center gap-1">
-              <MapPin className="size-3" />
-              {pitch ?? "Bez boiska"}
+        )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="flex flex-wrap items-center gap-x-2 font-medium">
+            <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
+            <span className="text-muted-foreground text-sm">vs</span>
+            <span className={sideClass(planned.away.known)}>{planned.away.label}</span>
+          </p>
+          <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5">
+              <Hourglass className="size-3" />
+              Czeka na wynik wcześniejszych meczów
             </span>
-          )}
-          <span>{planned.stage}</span>
-        </p>
+            {!unscheduled && (
+              <span className="flex items-center gap-1">
+                <MapPin className="size-3" />
+                {pitch ?? "Bez boiska"}
+              </span>
+            )}
+            <span>{planned.stage}</span>
+            {isOrganizer && !unscheduled && (
+              <RefereeChip
+                refereeId={planned.refereeId}
+                referee={lookups.referee(planned.refereeId)}
+                actionable
+              />
+            )}
+          </p>
+        </div>
       </div>
+
+      {/* Termin i sędzia zapisują się na drabince; mecz dostanie je, gdy będzie wiadomo, kto gra. */}
+      {isOrganizer && !unscheduled && (
+        <div className="flex flex-wrap items-center gap-2 pl-16 lg:pl-0">
+          <RescheduleMatchDialog
+            tournamentId={tournamentId}
+            planned={planned}
+            title={title}
+            pitches={pitches}
+            trigger={
+              <Button size="sm" variant="outline" aria-label={`Zmień termin: ${title}`}>
+                <Clock />
+                Termin
+              </Button>
+            }
+          />
+          <AssignRefereeDialog
+            tournamentId={tournamentId}
+            planned={planned}
+            title={title}
+            referees={referees}
+            refereeCode={refereeCode}
+            trigger={
+              <Button size="sm" variant="outline" aria-label={`Sędzia: ${title}`}>
+                <Whistle />
+                Sędzia
+              </Button>
+            }
+          />
+        </div>
+      )}
     </li>
   )
 }
@@ -450,7 +505,7 @@ export function TournamentScheduleView() {
         ),
     )
   // Mecze, które jeszcze się nie skończyły, a nikt ich nie prowadzi — organizator powinien je obsadzić.
-  const withoutReferee = (schedule.data ?? []).filter(
+  const matchesWithoutReferee = (schedule.data ?? []).filter(
     (m) =>
       !m.refereeId &&
       (SCHEDULABLE_STATUSES.includes(m.status) || m.status === "Live" || m.status === "Paused"),
@@ -474,25 +529,27 @@ export function TournamentScheduleView() {
 
   // Mecze kolejnych rund pucharu, które jeszcze nie istnieją (czekają na zwycięzców). Przed
   // wygenerowaniem terminarza nie mają terminu — pokazujemy je i tak, żeby było widać całą drabinkę.
-  const planned = brackets
-    .flatMap((bracket, i) =>
-      bracket.data
-        ? plannedBracketMatches(
-            bracket.data,
-            bracketCategoryIds[i]!,
-            lookups.teamName,
-            awaitingSchedule,
-          )
-        : [],
-    )
-    .filter(
-      (p) =>
-        (categoryId === ALL || p.categoryId === categoryId) &&
-        groupId === ALL &&
-        // Zapowiedziane mecze nie mają jeszcze sędziego — filtr po sędzi je chowa.
-        refereeId === ALL &&
-        (pitchId === ALL || p.pitchId === pitchId),
-    )
+  const allPlanned = brackets.flatMap((bracket, i) =>
+    bracket.data
+      ? plannedBracketMatches(
+          bracket.data,
+          bracketCategoryIds[i]!,
+          lookups.teamName,
+          awaitingSchedule,
+        )
+      : [],
+  )
+  const planned = allPlanned.filter(
+    (p) =>
+      (categoryId === ALL || p.categoryId === categoryId) &&
+      groupId === ALL &&
+      (refereeId === ALL || (p.refereeId ?? NO_REFEREE) === refereeId) &&
+      (pitchId === ALL || p.pitchId === pitchId),
+  )
+
+  // Zapowiedziane mecze też da się obsadzić z góry, więc liczą się do "bez sędziego".
+  const withoutReferee =
+    matchesWithoutReferee + (awaitingSchedule ? 0 : allPlanned.filter((p) => !p.refereeId).length)
 
   type Row =
     | { kind: "match"; at: string; match: Match }
@@ -689,8 +746,13 @@ export function TournamentScheduleView() {
                   row.kind === "planned" ? (
                     <PlannedRow
                       key={row.planned.nodeId}
+                      tournamentId={id}
                       planned={row.planned}
-                      pitch={lookups.pitchName(row.planned.pitchId)}
+                      lookups={lookups}
+                      isOrganizer={isOrganizer}
+                      pitches={pitches.data ?? []}
+                      referees={referees}
+                      refereeCode={tournament.data?.refereeCode ?? null}
                       unscheduled={awaitingSchedule}
                     />
                   ) : (

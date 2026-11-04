@@ -31,7 +31,7 @@ import { applyFieldErrors } from "@/lib/api/form-errors"
 import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from "@/lib/format"
 import type { Match, Pitch } from "@/types/matches"
 
-import { useUpdateMatchSchedule } from "../api"
+import { useUpdateMatchSchedule, useUpdatePlannedMatchSchedule } from "../api"
 
 const NO_PITCH = "none"
 
@@ -42,9 +42,14 @@ const schema = z.object({
 
 type RescheduleValues = z.infer<typeof schema>
 
+/** Mecz pucharu, który jeszcze nie powstał (węzeł drabinki z planowanym terminem). */
+export type PlannedScheduleTarget = { nodeId: string; scheduledAt: string; pitchId: string | null }
+
 type RescheduleMatchDialogProps = {
   tournamentId: string
-  match: Match
+  /** Istniejący mecz albo `planned`: mecz, który czeka na wyniki wcześniejszych. */
+  match?: Match
+  planned?: PlannedScheduleTarget
   /** "Gospodarz – Gość" do nagłówka. */
   title: string
   pitches: Pitch[]
@@ -54,36 +59,42 @@ type RescheduleMatchDialogProps = {
 export function RescheduleMatchDialog({
   tournamentId,
   match,
+  planned,
   title,
   pitches,
   trigger,
 }: RescheduleMatchDialogProps) {
   const [open, setOpen] = useState(false)
-  const update = useUpdateMatchSchedule(tournamentId)
+  const updateMatch = useUpdateMatchSchedule(tournamentId)
+  const updatePlanned = useUpdatePlannedMatchSchedule(tournamentId)
+  const isPending = updateMatch.isPending || updatePlanned.isPending
   // Turniej jest już w cache (layout turnieju) — bierzemy z niego daty do podpowiedzi.
   const tournament = useTournament(tournamentId).data
+  const current = match ?? planned
   const defaults: RescheduleValues = {
-    scheduledAt: toDateTimeLocal(match.scheduledAt),
-    pitchId: match.pitchId ?? NO_PITCH,
+    scheduledAt: current ? toDateTimeLocal(current.scheduledAt) : "",
+    pitchId: current?.pitchId ?? NO_PITCH,
   }
   const form = useForm<RescheduleValues>({ resolver: zodResolver(schema), defaultValues: defaults })
   const { errors } = form.formState
 
   function submit(values: RescheduleValues) {
-    update.mutate(
-      {
-        matchId: match.id,
-        scheduledAt: fromDateTimeLocal(values.scheduledAt),
-        pitchId: values.pitchId === NO_PITCH ? null : values.pitchId,
+    const scheduledAt = fromDateTimeLocal(values.scheduledAt)
+    const pitchId = values.pitchId === NO_PITCH ? null : values.pitchId
+    const callbacks = {
+      onSuccess: () => {
+        toast.success("Termin meczu zapisany")
+        setOpen(false)
       },
-      {
-        onSuccess: () => {
-          toast.success("Termin meczu zapisany")
-          setOpen(false)
-        },
-        onError: (error) => applyFieldErrors(error, form),
-      },
-    )
+      onError: (error: unknown) => applyFieldErrors(error, form),
+    }
+    if (planned) {
+      // Planowany mecz musi mieć boisko — generator i przesuwanie terminów liczą na nim kolizje.
+      if (!pitchId) return form.setError("pitchId", { message: "Wybierz boisko" })
+      updatePlanned.mutate({ nodeId: planned.nodeId, scheduledAt, pitchId }, callbacks)
+    } else if (match) {
+      updateMatch.mutate({ matchId: match.id, scheduledAt, pitchId }, callbacks)
+    }
   }
 
   return (
@@ -133,10 +144,10 @@ export function RescheduleMatchDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NO_PITCH}>Bez boiska</SelectItem>
+                      {!planned && <SelectItem value={NO_PITCH}>Bez boiska</SelectItem>}
                       {/* Nieaktywnych boisk nie da się wybrać — poza obecnym boiskiem meczu. */}
                       {pitches
-                        .filter((pitch) => pitch.isActive || pitch.id === match.pitchId)
+                        .filter((pitch) => pitch.isActive || pitch.id === current?.pitchId)
                         .map((pitch) => (
                           <SelectItem key={pitch.id} value={pitch.id}>
                             {pitch.name}
@@ -156,8 +167,8 @@ export function RescheduleMatchDialog({
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Anuluj
           </Button>
-          <Button type="submit" form="reschedule-form" disabled={update.isPending}>
-            {update.isPending ? "Zapisywanie…" : "Zapisz"}
+          <Button type="submit" form="reschedule-form" disabled={isPending}>
+            {isPending ? "Zapisywanie…" : "Zapisz"}
           </Button>
         </DialogFooter>
       </DialogContent>
