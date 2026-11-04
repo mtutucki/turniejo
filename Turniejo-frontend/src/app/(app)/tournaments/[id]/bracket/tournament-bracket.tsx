@@ -1,6 +1,6 @@
 "use client"
 
-import { GitBranch, Trash2, Trophy } from "lucide-react"
+import { CalendarCheck, GitBranch, Trash2, Trophy } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -349,6 +349,12 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
                 Nie musisz nic tu robić. Jeśli chcesz inne pary, zmień je i kliknij „Utwórz
                 drabinkę”.
               </p>
+              <Button asChild size="sm" className="mt-3">
+                <Link href={`/tournaments/${id}/schedule/generate`}>
+                  <CalendarCheck />
+                  Generuj terminarz
+                </Link>
+              </Button>
             </>
           ) : (
             <p>{autoReason}</p>
