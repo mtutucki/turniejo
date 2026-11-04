@@ -762,12 +762,15 @@ function GenerateForm({
     added.forEach((id) => knownPitches.current.add(id))
     form.setValue("pitchIds", [...form.getValues("pitchIds"), ...added], { shouldValidate: true })
   }, [pitches, form])
-  // Liczba meczów zmienia się, gdy organizator na tej samej stronie domyka warunki (np. przypisuje
-  // drużyny do grup). Dopóki nie ruszył dni, jedyny dzień ma zawsze komplet meczów.
+  // Jeden dzień gra wszystkie mecze — liczby nie ma czego wpisywać (pole jest ukryte). Dotyczy też
+  // szkicu sprzed zmiany liczby meczów i powrotu do jednego dnia po usunięciu pozostałych.
+  const singleDay = days.length === 1
   useEffect(() => {
-    if (draft || form.formState.isDirty || form.getValues("days").length !== 1) return
-    form.setValue("days.0.matches", Math.max(totalMatches, 1))
-  }, [totalMatches, draft, form])
+    if (!singleDay) return
+    const all = Math.max(totalMatches, 1)
+    if (form.getValues("days.0.matches") !== all)
+      form.setValue("days.0.matches", all, { shouldValidate: true })
+  }, [singleDay, totalMatches, form])
 
   const pitchCount = pitchIds.length
   const count = (day: DayValues) => (Number.isFinite(day.matches) ? day.matches : 0)
@@ -954,9 +957,10 @@ function GenerateForm({
         <FieldSet>
           <FieldLegend variant="label">Dni gry</FieldLegend>
           <FieldDescription>
-            Dla każdego dnia podaj, od której godziny i ile meczów gracie. Dni, których nie dodasz
-            (np. weekend), zostają bez meczów. Ostatni mecz musi się skończyć do{" "}
-            {formatDateTime(tournament.endAt)}.
+            {singleDay
+              ? "Podaj dzień i godzinę pierwszego meczu. Jeśli gracie kilka dni, dodaj kolejny dzień i rozdziel mecze."
+              : "Dla każdego dnia podaj, od której godziny i ile meczów gracie. Dni, których nie dodasz (np. weekend), zostają bez meczów."}{" "}
+            Ostatni mecz musi się skończyć do {formatDateTime(tournament.endAt)}.
           </FieldDescription>
           <ul className="space-y-3">
             {dayFields.fields.map((field, index) => {
@@ -966,7 +970,14 @@ function GenerateForm({
               const problem = problems[index]
               return (
                 <li key={field.id} className="rounded-lg border p-3">
-                  <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto]">
+                  <div
+                    className={cn(
+                      "grid grid-cols-2 items-start gap-3",
+                      singleDay
+                        ? "sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+                        : "sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto]",
+                    )}
+                  >
                     <div className="col-span-2 sm:col-span-1">
                       <TextField
                         id={`schedule-date-${index}`}
@@ -991,28 +1002,31 @@ function GenerateForm({
                       error={dayErrors?.startTime}
                       {...form.register(`days.${index}.startTime`)}
                     />
-                    <TextField
-                      id={`schedule-matches-${index}`}
-                      label="Meczów"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      className="font-mono tabular-nums"
-                      error={dayErrors?.matches}
-                      {...form.register(`days.${index}.matches`, { valueAsNumber: true })}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground col-span-2 justify-self-end sm:col-span-1 sm:mt-6"
-                      disabled={dayFields.fields.length === 1}
-                      aria-label={`Usuń dzień ${index + 1}`}
-                      title="Usuń dzień"
-                      onClick={() => dayFields.remove(index)}
-                    >
-                      <X />
-                    </Button>
+                    {!singleDay && (
+                      <>
+                        <TextField
+                          id={`schedule-matches-${index}`}
+                          label="Meczów"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          className="font-mono tabular-nums"
+                          error={dayErrors?.matches}
+                          {...form.register(`days.${index}.matches`, { valueAsNumber: true })}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground col-span-2 justify-self-end sm:col-span-1 sm:mt-6"
+                          aria-label={`Usuń dzień ${index + 1}`}
+                          title="Usuń dzień"
+                          onClick={() => dayFields.remove(index)}
+                        >
+                          <X />
+                        </Button>
+                      </>
+                    )}
                   </div>
                   {problem ? (
                     <p className="text-destructive mt-2 text-sm">{problem}</p>
