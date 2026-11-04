@@ -2,7 +2,7 @@
 
 import { FileText, Flag, Globe, ListChecks, Lock, type LucideIcon, Network } from "lucide-react"
 import Link from "next/link"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -117,6 +117,12 @@ function SectionNav({
 const isSectionKey = (value: string): value is SectionKey =>
   ["status", "details", "format", "rules", "portal"].includes(value)
 
+function sectionFromHash(): SectionKey | null {
+  if (typeof window === "undefined") return null
+  const hash = window.location.hash.slice(1)
+  return isSectionKey(hash) ? hash : null
+}
+
 export function TournamentSettingsView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
   const settings = useTournamentSettings(id)
@@ -126,10 +132,19 @@ export function TournamentSettingsView() {
   const data = tournament.data!
   // Link może wskazać sekcję (np. "zmień" czas meczu w generatorze → #rules). Widok renderuje się
   // dopiero po załadowaniu turnieju w przeglądarce, więc odczyt hasha nie rozjeżdża hydracji.
-  const [active, setActive] = useState<SectionKey>(() => {
-    const hash = typeof window === "undefined" ? "" : window.location.hash.slice(1)
-    return isSectionKey(hash) ? hash : "status"
-  })
+  const [active, setActive] = useState<SectionKey>(() => sectionFromHash() ?? "status")
+  // Przy przejściu linkiem w aplikacji Next podmienia adres dopiero po pierwszym renderze, więc
+  // initializer widzi jeszcze stary adres (bez #details). Czytamy hash ponownie po zamontowaniu
+  // i przy każdej jego zmianie.
+  useEffect(() => {
+    const sync = () => {
+      const key = sectionFromHash()
+      if (key) setActive(key)
+    }
+    sync()
+    window.addEventListener("hashchange", sync)
+    return () => window.removeEventListener("hashchange", sync)
+  }, [])
 
   function select(key: SectionKey) {
     setActive(key)
