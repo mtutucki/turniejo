@@ -101,6 +101,12 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
                     .Select(End).DefaultIfEmpty(now).Max()
             }.Max();
 
+            // Puchar przed terminarzem: godzinę i boisko nada generator terminarza, więc boiska jeszcze nie
+            // rezerwujemy. Inaczej dwie drabinki tworzone naraz (dwie kategorie) brały ten sam wolny termin,
+            // unikalny indeks (boisko, godzina) odrzucał jeden mecz, a drabinka zostawała bez meczów.
+            if (tournament?.Status is "Draft" or "RegistrationOpen" or "RegistrationClosed")
+                return (null, notBefore);
+
             var pitches = (await dbContext.GetPitchesByTournamentIdAsync(request.TournamentId, cancellationToken))
                 .Where(p => p.IsActive)
                 .ToList();
