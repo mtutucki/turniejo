@@ -541,18 +541,25 @@ export function TournamentScheduleView() {
         description={
           isOrganizer
             ? knockout
-              ? "Puchar: najpierw utwórz drabinkę (pary 1. rundy), potem wygeneruj terminarz."
+              ? "Puchar: pary 1. rundy ułożą się same według rozstawienia, gdy wygenerujesz terminarz. Jeśli chcesz, możesz je wcześniej ułożyć sam."
               : "Wygeneruj terminarz, gdy zapisy są zamknięte, a drużyny przypisane do grup."
             : "Organizator nie wygenerował jeszcze terminarza."
         }
         action={
           canGenerate ? (
-            <Button asChild>
-              <Link href={`/tournaments/${id}/${knockout ? "bracket" : "schedule/generate"}`}>
-                <CalendarCheck />
-                {knockout ? "Utwórz drabinkę" : "Generuj terminarz"}
-              </Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild>
+                <Link href={`/tournaments/${id}/schedule/generate`}>
+                  <CalendarCheck />
+                  Generuj terminarz
+                </Link>
+              </Button>
+              {knockout && (
+                <Button asChild variant="outline">
+                  <Link href={`/tournaments/${id}/bracket`}>Ułóż pary sam</Link>
+                </Button>
+              )}
+            </div>
           ) : undefined
         }
       />

@@ -314,29 +314,69 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     )
   }
 
+  // Czy generator terminarza ułoży tę drabinkę sam. Puchar: wszystkie drużyny muszą się zmieścić
+  // (do 16). Grupy + puchar: propozycja "na krzyż" działa przy 1, 2, 4 albo 8 grupach (grup może
+  // jeszcze nie być, wtedy zakładamy, że się uda).
+  const groupCount = categoryGroups.length
+  const autoReason =
+    tournamentFormat === "Knockout"
+      ? autoBracketPairs([], acceptedTeams)
+        ? null
+        : "Przy więcej niż 16 drużynach pary trzeba ułożyć samodzielnie."
+      : groupCount === 0 || [1, 2, 4, 8].includes(groupCount)
+        ? null
+        : `Przy ${groupCount} grupach pary trzeba ułożyć samodzielnie.`
+  const autoCreates = beforeSchedule && !autoReason
+
   return (
-    <Card className="max-w-3xl">
-      <CardHeader>
-        <CardTitle className="text-base">Utwórz drabinkę</CardTitle>
-        <CardDescription>
-          {beforeSchedule && autoBracketPairs(categoryGroups, acceptedTeams)
-            ? "Nie musisz nic robić: drabinka z tą propozycją par powstanie sama przy generowaniu terminarza. Jeśli chcesz inne pary, ustaw je tutaj i kliknij Utwórz."
-            : "Wybierz pary pierwszej rundy z miejsc w grupach albo konkretnych drużyn."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <GenerateBracketForm
-          // Propozycja par i wielkość drabinki liczą się przy montowaniu — zmiana składu drużyn albo
-          // grup (np. świeższe dane po usunięciu zgłoszeń) ma je przeliczyć od nowa.
-          key={[...acceptedTeams.map((t) => t.id), ...categoryGroups.map((g) => g.id)].join(",")}
-          tournamentId={id}
-          categoryId={categoryId}
-          groups={categoryGroups}
-          teams={acceptedTeams}
-          thirdPlaceEnabled={settings.data?.isThirdPlaceMatchEnabled ?? false}
-        />
-      </CardContent>
-    </Card>
+    <div className="max-w-3xl space-y-4">
+      {beforeSchedule && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-xl border px-4 py-3 text-sm",
+            autoCreates ? "border-primary/40 bg-primary/10" : "border-live/50 bg-live/10",
+          )}
+        >
+          {autoCreates ? (
+            <>
+              <p className="font-medium">Drabinka utworzy się sama</p>
+              <p className="text-muted-foreground">
+                {tournamentFormat === "Knockout"
+                  ? "Gdy wygenerujesz terminarz, pary ułożą się według rozstawienia, tak jak poniżej."
+                  : "Po wygenerowaniu terminarza pary ułożą się z miejsc w grupach, tak jak poniżej."}{" "}
+                Nie musisz nic tu robić. Jeśli chcesz inne pary, zmień je i kliknij „Utwórz
+                drabinkę”.
+              </p>
+            </>
+          ) : (
+            <p>{autoReason}</p>
+          )}
+        </div>
+      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {autoCreates ? "Własne pary (opcjonalnie)" : "Utwórz drabinkę"}
+          </CardTitle>
+          <CardDescription>
+            Pary pierwszej rundy z miejsc w grupach albo konkretnych drużyn.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GenerateBracketForm
+            // Propozycja par i wielkość drabinki liczą się przy montowaniu — zmiana składu drużyn albo
+            // grup (np. świeższe dane po usunięciu zgłoszeń) ma je przeliczyć od nowa.
+            key={[...acceptedTeams.map((t) => t.id), ...categoryGroups.map((g) => g.id)].join(",")}
+            tournamentId={id}
+            categoryId={categoryId}
+            groups={categoryGroups}
+            teams={acceptedTeams}
+            thirdPlaceEnabled={settings.data?.isThirdPlaceMatchEnabled ?? false}
+          />
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -363,7 +403,8 @@ export function TournamentBracketView() {
   return (
     <div className="space-y-4">
       {list.length > 1 && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Kategoria">
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Kategoria">
+          <span className="text-muted-foreground mr-1 text-sm">Kategoria:</span>
           {list.map((c) => (
             <button
               key={c.id}

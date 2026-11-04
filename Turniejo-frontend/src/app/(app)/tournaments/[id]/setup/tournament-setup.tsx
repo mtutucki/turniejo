@@ -446,15 +446,23 @@ export function TournamentSetupView() {
               ) : needsBracket ? (
                 <div className="space-y-3">
                   <p className="text-muted-foreground text-sm">
-                    Puchar zaczyna się od drabinki: ułóż pary 1. rundy, a potem nadasz im godziny i
-                    boiska.
+                    Pary 1. rundy ułożą się same według rozstawienia, gdy wygenerujesz terminarz.
+                    Jeśli chcesz, możesz je wcześniej ułożyć sam.
                   </p>
-                  <Button asChild>
-                    <Link href={`${base}/bracket`}>
-                      <Network />
-                      Utwórz drabinkę
-                    </Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild>
+                      <Link href={`${base}/schedule/generate`}>
+                        <CalendarCheck />
+                        Generuj terminarz
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href={`${base}/bracket`}>
+                        <Network />
+                        Ułóż pary sam
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
