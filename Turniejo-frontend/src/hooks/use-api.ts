@@ -42,6 +42,8 @@ export function useApi() {
   // Sesja z błędem odświeżenia (np. po restarcie Keycloaka) ma nieważny token — zapytania wysłane z nim
   // kończyły się 401 i przekierowaniem na logowanie w kółko. Traktujemy ją jak brak zalogowania,
   // a SessionExpiryWatcher ją czyści.
-  const isAuthenticated = status === "authenticated" && !session?.error && !!session?.accessToken
+  // Odświeżanie tokenu (update()) przełącza status na "loading", ale sesja dalej jest. Gdyby to
+  // liczyło się jako wylogowanie, AuthSync czyściłby role i na chwilę znikały wszystkie przyciski.
+  const isAuthenticated = status !== "unauthenticated" && !session?.error && !!session?.accessToken
   return { request, getToken, isAuthenticated }
 }
