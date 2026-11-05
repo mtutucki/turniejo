@@ -1,5 +1,6 @@
 import {
   Baby,
+  BarChart3,
   Bell,
   CalendarDays,
   CircleHelp,
@@ -52,6 +53,7 @@ export function tournamentNavItems(tournament: ActiveTournament | null): NavItem
       ? { href: `${base}/bracket`, label: "Drabinka", icon: Network }
       : { href: base ? `${base}/standings` : "/tournaments", label: "Tabela", icon: ListOrdered },
     { href: base ? `${base}/teams` : "/tournaments", label: "Drużyny", icon: Shield },
+    { href: base ? `${base}/stats` : "/tournaments", label: "Statystyki", icon: BarChart3 },
   ]
 }
 

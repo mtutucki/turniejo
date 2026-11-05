@@ -5,7 +5,9 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { tournamentKeys } from "@/features/tournaments/api"
 import { useApi } from "@/hooks/use-api"
 import type { GenerateScheduleInput, Match, Pitch, PitchInput } from "@/types/matches"
-import type { Bracket, BracketSlotRef, Standing } from "@/types/public"
+import type { Bracket, BracketSlotRef, RankingEntry, Standing } from "@/types/public"
+
+import type { PlayerRankingKind } from "./components/player-rankings"
 
 export const matchKeys = {
   pitches: (tournamentId: string) => ["tournaments", tournamentId, "pitches"] as const,
@@ -14,6 +16,8 @@ export const matchKeys = {
     ["tournaments", tournamentId, "bracket", categoryId] as const,
   standings: (tournamentId: string, groupId: string) =>
     ["tournaments", tournamentId, "standings", groupId] as const,
+  ranking: (tournamentId: string, kind: PlayerRankingKind) =>
+    ["tournaments", tournamentId, "ranking", kind] as const,
 }
 
 const base = (tournamentId: string) => `/api/tournaments/${tournamentId}`
@@ -296,6 +300,25 @@ export function useSwapBracketSlots(tournamentId: string) {
       // Mecze pierwszej rundy dostają inne drużyny, a przy wolnym losie powstają albo znikają.
       void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
     },
+  })
+}
+
+// --- Statystyki zawodników ----------------------------------------------------------------
+
+const RANKING_PATH: Record<PlayerRankingKind, string> = {
+  scorers: "top-scorers",
+  assists: "top-assists",
+  mvp: "mvp",
+}
+
+/** Ranking zawodników turnieju (pełne nazwiska, bez skracania jak w portalu publicznym). */
+export function useTournamentRanking(tournamentId: string, kind: PlayerRankingKind) {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: matchKeys.ranking(tournamentId, kind),
+    queryFn: () =>
+      request<RankingEntry[]>(`${base(tournamentId)}/stats/${RANKING_PATH[kind]}?top=10`),
+    enabled: isAuthenticated,
   })
 }
 
