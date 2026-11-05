@@ -374,11 +374,11 @@ namespace Turniejo.Api.Controllers
 
         // Zmiana rozstrzygnięcia zakończonego meczu (walkower, karne). Sędzia w oknie poprawek, organizator zawsze.
         [HttpPatch("matches/{matchId}/result")]
-        public async Task<IActionResult> ChangeFinishedMatchResult([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] FinishMatchRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> ChangeFinishedMatchResult([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] ChangeMatchResultRequest request, CancellationToken cancellationToken)
         {
             var command = new ChangeFinishedMatchResultCommand(
                 tournamentId, matchId, request.ResultType, request.WinnerTournamentTeamId,
-                request.HomePenaltyScore, request.AwayPenaltyScore);
+                request.HomePenaltyScore, request.AwayPenaltyScore, request.HomeScore, request.AwayScore);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -406,6 +406,9 @@ namespace Turniejo.Api.Controllers
         public sealed record UpdateMatchEventRequest(MatchEventType Type, int Minute, int? Second, Guid? PlayerId, Guid? RelatedPlayerId);
         public sealed record SetMatchScoreRequest(int HomeScore, int AwayScore);
         public sealed record SetGoalPlayersRequest(Guid? PlayerId, Guid? AssistPlayerId);
+        public sealed record ChangeMatchResultRequest(
+            MatchResultType ResultType, Guid? WinnerTournamentTeamId,
+            int? HomePenaltyScore = null, int? AwayPenaltyScore = null, int? HomeScore = null, int? AwayScore = null);
         public sealed record CorrectFinishedMatchScoreRequest(int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId);
         public sealed record RecordMatchResultRequest(
             int HomeScore, int AwayScore, MatchResultType ResultType, Guid? WinnerTournamentTeamId,

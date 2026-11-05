@@ -128,5 +128,41 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Match.NotFound");
         }
+
+        [Fact]
+        public async Task Handle_ShouldRevertGoalWithoutScorerFirst_WhenScoreIsLowered()
+        {
+            var match = ArrangeFinishedMatch(60, isOrganizer: false, (true, MatchEventType.Goal), (true, MatchEventType.Goal));
+            var withScorer = MatchEvent.Create(Guid.NewGuid(), match.Id, MatchEventType.Goal, 30, Guid.NewGuid(), match.HomeTournamentTeamId, Guid.NewGuid()).Value;
+            var withoutScorer = MatchEvent.Create(Guid.NewGuid(), match.Id, MatchEventType.Goal, 5, Guid.NewGuid(), match.HomeTournamentTeamId).Value;
+            _dbContext.GetMatchEventsByMatchIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(new[] { withScorer, withoutScorer });
+            _dbContext.GetMatchEventByIdAsync(withScorer.Id, Arg.Any<CancellationToken>()).Returns(withScorer);
+            _dbContext.GetMatchEventByIdAsync(withoutScorer.Id, Arg.Any<CancellationToken>()).Returns(withoutScorer);
+            var command = new ChangeFinishedMatchResultCommand(
+                match.TournamentId, match.Id, MatchResultType.Regular, null, HomeScore: 1, AwayScore: 0);
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.HomeScore.Should().Be(1);
+            withoutScorer.IsDeleted.Should().BeTrue();
+            withScorer.IsDeleted.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task Handle_ShouldAddGoalsWithoutScorer_WhenScoreIsRaised()
+        {
+            var match = ArrangeFinishedMatch(60, isOrganizer: false, (true, MatchEventType.Goal));
+            var command = new ChangeFinishedMatchResultCommand(
+                match.TournamentId, match.Id, MatchResultType.Regular, null, HomeScore: 2, AwayScore: 1);
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.HomeScore.Should().Be(2);
+            result.Value.AwayScore.Should().Be(1);
+            await _dbContext.Received(2).AddMatchEventAsync(
+                Arg.Is<MatchEvent>(e => e.Type == MatchEventType.Goal && e.PlayerId == null), Arg.Any<CancellationToken>());
+        }
     }
 }

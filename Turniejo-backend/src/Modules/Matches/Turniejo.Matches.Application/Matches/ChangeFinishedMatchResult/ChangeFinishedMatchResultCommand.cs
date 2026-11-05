@@ -7,7 +7,8 @@ namespace Turniejo.Matches.Application.Matches.ChangeFinishedMatchResult
 {
     /// <summary>
     /// Zmiana rozstrzygnięcia zakończonego meczu (np. na walkower albo karne). Sędzia może to zrobić
-    /// w oknie poprawek, organizator także później.
+    /// w oknie poprawek, organizator także później. Opcjonalny nowy wynik: brakujące gole dopisujemy
+    /// bez strzelca, nadmiarowe cofamy (najpierw te bez strzelca).
     /// </summary>
     public sealed record ChangeFinishedMatchResultCommand(
         Guid TournamentId,
@@ -15,7 +16,9 @@ namespace Turniejo.Matches.Application.Matches.ChangeFinishedMatchResult
         MatchResultType ResultType,
         Guid? WinnerTournamentTeamId,
         int? HomePenaltyScore = null,
-        int? AwayPenaltyScore = null) : ICommand<ChangeFinishedMatchResultResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
+        int? AwayPenaltyScore = null,
+        int? HomeScore = null,
+        int? AwayScore = null) : ICommand<ChangeFinishedMatchResultResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

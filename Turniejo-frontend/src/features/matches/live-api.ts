@@ -427,7 +427,7 @@ function useMatchResultMutation(
           winnerTournamentTeamId: input.winnerTournamentTeamId,
           homePenaltyScore: input.homePenaltyScore ?? null,
           awayPenaltyScore: input.awayPenaltyScore ?? null,
-          ...(mode === "record" ? { homeScore: input.homeScore, awayScore: input.awayScore } : {}),
+          ...(mode !== "finish" ? { homeScore: input.homeScore, awayScore: input.awayScore } : {}),
         },
       }),
     meta: { handlesValidation: true },
