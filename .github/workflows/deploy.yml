@@ -29,6 +29,11 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
+          # Serwer jeszcze nieskonfigurowany (brak sekretów) → pomijamy zamiast czerwonego błędu.
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_KNOWN_HOSTS" ]; then
+            echo "::warning::Brak sekretów VPS_HOST / VPS_USER / VPS_SSH_KEY / VPS_KNOWN_HOSTS. Wdrożenie pominięte (deploy/README.md)."
+            exit 0
+          fi
           install -m 700 -d ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
