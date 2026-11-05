@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
+import { ANALYTICS_ENABLED } from "@/components/analytics"
 import { Fill, LegalDocument, LegalSection } from "@/components/legal/legal-document"
 import { LEGAL } from "@/lib/legal"
 
@@ -61,10 +62,12 @@ export default function PrivacyPage() {
           <li>
             <strong>Dane techniczne:</strong> adres IP, czas i adres żądania w logach serwera.
           </li>
-          <li>
-            <strong>Statystyki odwiedzin:</strong> zagregowane, anonimowe dane o odwiedzanych
-            stronach — patrz punkt 8.
-          </li>
+          {ANALYTICS_ENABLED && (
+            <li>
+              <strong>Statystyki odwiedzin:</strong> zagregowane, anonimowe dane o odwiedzanych
+              stronach — patrz punkt 8.
+            </li>
+          )}
         </ul>
       </LegalSection>
 
@@ -75,9 +78,9 @@ export default function PrivacyPage() {
             umowy o świadczenie usług drogą elektroniczną (art. 6 ust. 1 lit. b RODO).
           </li>
           <li>
-            Bezpieczeństwo serwisu, zapobieganie nadużyciom, dochodzenie i obrona roszczeń oraz
-            anonimowe statystyki odwiedzin — prawnie uzasadniony interes administratora (art. 6 ust.
-            1 lit. f RODO).
+            Bezpieczeństwo serwisu, zapobieganie nadużyciom, dochodzenie i obrona roszczeń
+            {ANALYTICS_ENABLED && " oraz anonimowe statystyki odwiedzin"} — prawnie uzasadniony
+            interes administratora (art. 6 ust. 1 lit. f RODO).
           </li>
           <li>
             Wykazanie zgodności z przepisami, w tym zapis akceptacji regulaminu — obowiązek prawny
@@ -188,12 +191,19 @@ export default function PrivacyPage() {
             wybrany turniej, żeby nawigacja od razu go pokazywała.
           </li>
         </ul>
-        <p>
-          Statystyki odwiedzin zbieramy narzędziem Umami, które nie używa ciasteczek ani pamięci
-          przeglądarki, nie śledzi użytkowników między stronami i nie pozwala ich zidentyfikować.
-          Adresy stron są zapisywane bez parametrów (np. bez kodów zaproszeń). Dlatego serwis nie
-          wyświetla banera cookies — nie ma na co wyrażać zgody.
-        </p>
+        {ANALYTICS_ENABLED ? (
+          <p>
+            Statystyki odwiedzin zbieramy narzędziem Umami, które nie używa ciasteczek ani pamięci
+            przeglądarki, nie śledzi użytkowników między stronami i nie pozwala ich zidentyfikować.
+            Adresy stron są zapisywane bez parametrów (np. bez kodów zaproszeń). Dlatego serwis nie
+            wyświetla banera cookies — nie ma na co wyrażać zgody.
+          </p>
+        ) : (
+          <p>
+            Nie zbieramy statystyk odwiedzin i nie używamy ciasteczek śledzących ani reklamowych.
+            Dlatego serwis nie wyświetla banera cookies — nie ma na co wyrażać zgody.
+          </p>
+        )}
       </LegalSection>
 
       <LegalSection title="9. Bezpieczeństwo">
