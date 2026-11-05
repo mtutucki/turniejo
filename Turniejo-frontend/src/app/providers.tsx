@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { handleApiError } from "@/lib/api/error-handler"
 import { isApiError } from "@/lib/api/errors"
+import { isStartPath } from "@/lib/auth/public-paths"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 
 declare module "@tanstack/react-query" {
@@ -32,7 +33,7 @@ function loginUrl() {
   const { pathname, search } = window.location
   // Już na logowaniu: zostaw obecny adres (z jego callbackUrl), zamiast zagnieżdżać /login w /login.
   if (pathname === "/login") return pathname + search
-  if (onAuthPage()) return "/login"
+  if (onAuthPage() || isStartPath(pathname)) return "/login"
   return `/login?callbackUrl=${encodeURIComponent(pathname + search)}`
 }
 

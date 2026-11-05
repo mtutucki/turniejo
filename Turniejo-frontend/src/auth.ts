@@ -10,7 +10,7 @@ import {
   readAccessTokenClaims,
   refreshGrant,
 } from "@/lib/auth/keycloak"
-import { isPublicPath } from "@/lib/auth/public-paths"
+import { isPublicPath, isStartPath } from "@/lib/auth/public-paths"
 
 // Odświeżamy z zapasem, żeby token nie wygasł "w locie" między proxy a backendem.
 const REFRESH_MARGIN_MS = 30_000
@@ -72,8 +72,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     // Wywoływany przez proxy.ts — decyduje, czy strona wymaga zalogowania.
     authorized({ auth, request }) {
-      if (isPublicPath(request.nextUrl.pathname)) return true
-      return !!auth?.user && !auth.error
+      const { pathname } = request.nextUrl
+      if (isPublicPath(pathname)) return true
+      if (auth?.user && !auth.error) return true
+      // Ze strony startowej i tak wracamy na start, więc callbackUrl tylko zaśmieca adres.
+      if (isStartPath(pathname)) return Response.redirect(new URL("/login", request.nextUrl))
+      return false
     },
     async jwt({ token, user, trigger, session }) {
       // useSession().update({ name }) po zmianie danych osobowych: nowe imię i nazwisko bez

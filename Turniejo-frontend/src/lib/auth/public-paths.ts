@@ -22,6 +22,11 @@ export function isPublicPath(pathname: string) {
   )
 }
 
+/** Strona główna i /start: po zalogowaniu i tak trafia się na start, więc bez callbackUrl. */
+export function isStartPath(pathname: string) {
+  return pathname === "/" || pathname === DEFAULT_APP_PATH
+}
+
 /**
  * Tylko ścieżka (bez domeny) z ?callbackUrl=, żeby nie dało się go użyć jako open redirect na obcą
  * domenę. Pętle na /login i /register wracają do strony startowej.
