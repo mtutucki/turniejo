@@ -1,5 +1,5 @@
-# Automatyczne wdrożenie na VPS po każdym pushu (merge'u PR) na master. Da się też odpalić ręcznie:
-# Actions → Deploy → Run workflow.
+# Testy przy każdym pull requeście i pushu na master. Po pushu (merge'u PR) na master, jeśli testy
+# przeszły, automatyczne wdrożenie na VPS. Da się też odpalić ręcznie: Actions → Deploy → Run workflow.
 #
 # Klucz z sekretu VPS_SSH_KEY jest na serwerze zapisany w authorized_keys z command="…/deploy.sh",restrict,
 # więc nawet po wycieku pozwala wyłącznie uruchomić wdrożenie (bez shella). Opis: deploy/README.md.
@@ -8,19 +8,61 @@ name: Deploy
 on:
   push:
     branches: [master]
+  pull_request:
   workflow_dispatch:
 
-# Kolejne pushe czekają, aż poprzednie wdrożenie się skończy (nie przerywamy trwającego buildu).
-concurrency:
-  group: deploy
-  cancel-in-progress: false
-
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
+  backend:
+    name: Testy backendu
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+      # Testy integracyjne stawiają Postgresa przez Testcontainers (Docker jest na runnerze).
+      - run: dotnet test Turniejo-backend/Turniejo.slnx --nologo
+      # Nie ma go w Turniejo.slnx — sprawdza, że każdy endpoint ma autoryzację.
+      - run: dotnet test Turniejo-backend/tests/Turniejo.Architecture.UnitTests --nologo
+
+  frontend:
+    name: Testy frontendu
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Turniejo-frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Turniejo-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # Globalne typy PageProps/LayoutProps generuje Next (lokalnie robi to `next dev`).
+      - run: npx next typegen
+        env:
+          # next.config wymaga API_URL przy starcie; wartość nie ma znaczenia dla typów.
+          API_URL: http://localhost:8080
+      - run: npm run typecheck
+      - run: npm test
+
   deploy:
+    name: Wdrożenie
+    needs: [backend, frontend]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    # Kolejne pushe czekają, aż poprzednie wdrożenie się skończy (nie przerywamy trwającego buildu).
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
     steps:
       - name: Wdrożenie przez SSH
         env:
