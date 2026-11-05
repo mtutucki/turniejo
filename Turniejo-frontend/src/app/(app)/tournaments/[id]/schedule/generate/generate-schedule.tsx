@@ -1,7 +1,16 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, CalendarCheck, Check, Info, Plus, ShieldAlert, X } from "lucide-react"
+import {
+  ArrowLeft,
+  CalendarCheck,
+  Check,
+  Info,
+  Plus,
+  ShieldAlert,
+  TriangleAlert,
+  X,
+} from "lucide-react"
 import Link from "next/link"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -257,10 +266,21 @@ function planGroups(groups: TournamentGroup[], teams: TournamentTeam[]): GroupPl
   })
 }
 
-function Requirement({ ok, children }: { ok: boolean; children: ReactNode }) {
+function Requirement({
+  ok,
+  warn = false,
+  children,
+}: {
+  ok: boolean
+  /** Nie blokuje generowania, ale warto to sprawdzić przed nim. */
+  warn?: boolean
+  children: ReactNode
+}) {
   return (
     <li className="flex items-start gap-2 text-sm">
-      {ok ? (
+      {warn ? (
+        <TriangleAlert className="text-live mt-0.5 size-4 shrink-0" aria-label="Uwaga" />
+      ) : ok ? (
         <Check className="text-primary mt-0.5 size-4 shrink-0" aria-label="Spełnione" />
       ) : (
         <X className="text-destructive mt-0.5 size-4 shrink-0" aria-label="Niespełnione" />
@@ -576,12 +596,6 @@ function Requirements({
                 </Link>
               </span>
             )}
-            {waiting.length > 0 && (
-              <span className="text-muted-foreground block text-xs">
-                {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
-                akceptację zgłoszenia — nie zagra, dopóki jej nie zaakceptujesz.
-              </span>
-            )}
           </Requirement>
           <Requirement ok={bracketMatches > 0}>
             {bracketMatches > 0 ? (
@@ -634,12 +648,6 @@ function Requirements({
               </Link>
             </span>
           )}
-          {waiting.length > 0 && (
-            <span className="text-muted-foreground block text-xs">
-              {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
-              akceptację zgłoszenia — nie zagra, dopóki jej nie zaakceptujesz.
-            </span>
-          )}
           {tournament.format &&
             playable.length === 0 &&
             quickSetup.map(({ category, teams: categoryTeams }) => (
@@ -680,6 +688,19 @@ function Requirements({
           ))}
         </Requirement>
       )}
+      {waiting.length > 0 && (
+        <Requirement ok={false} warn>
+          {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
+          akceptację: {waiting.map((t) => t.teamName).join(", ")}
+          <span className="text-muted-foreground block text-xs">
+            Nie dostaną meczów, a terminarz generuje się raz. Zaakceptuj je przed generowaniem albo
+            odrzuć, jeśli nie zagrają.{" "}
+            <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
+              Przejdź do Drużyn
+            </Link>
+          </span>
+        </Requirement>
+      )}
       <Requirement ok={activePitches > 0}>
         {activePitches > 0 ? (
           plural(activePitches, ["aktywne boisko", "aktywne boiska", "aktywnych boisk"])
@@ -700,6 +721,8 @@ function GenerateForm({
   pitches,
   workload,
   ready,
+  acceptedTeams,
+  waitingTeams,
   notReadyReason,
   afterGenerate,
 }: {
@@ -708,6 +731,9 @@ function GenerateForm({
   pitches: Pitch[]
   workload: Workload
   ready: boolean
+  acceptedTeams: number
+  /** Nazwy drużyn czekających na akceptację: nie dostaną meczów. */
+  waitingTeams: string[]
   /** Dlaczego przycisk jest wyłączony, gdy warunki nie są spełnione. */
   notReadyReason: string
   /** Grupy + puchar: po terminarzu tworzymy brakujące drabinki (miejsca w grupach). */
@@ -883,6 +909,9 @@ function GenerateForm({
     if (remaining <= 0) splitEvenly(days.length + 1)
   }
 
+  // Generowanie jest jednorazowe, więc przed wysłaniem pytamy jeszcze raz.
+  const [confirming, setConfirming] = useState<GenerateValues | null>(null)
+
   function submit(values: GenerateValues) {
     const windows = [...values.days]
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -920,7 +949,48 @@ function GenerateForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(setConfirming)} noValidate>
+      <AlertDialog open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Wygenerować terminarz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isKnockout(tournament)
+                ? `${plural(totalMatches, ["mecz", "mecze", "meczów"])} 1. rundy dostanie godziny i boiska.`
+                : `Powstanie ${plural(totalMatches, ["mecz", "mecze", "meczów"])} dla ${plural(acceptedTeams, ["zaakceptowanej drużyny", "zaakceptowanych drużyn", "zaakceptowanych drużyn"])}.`}{" "}
+              Terminarz generuje się raz, a turniej przejdzie do etapu „Harmonogram gotowy”.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {waitingTeams.length > 0 && (
+            <div
+              role="alert"
+              className="border-live/50 bg-live/10 rounded-xl border px-4 py-3 text-sm"
+            >
+              <p className="font-medium">
+                {plural(waitingTeams.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])}{" "}
+                na akceptację i nie dostanie meczów
+              </p>
+              <p className="text-muted-foreground">{waitingTeams.join(", ")}</p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            {waitingTeams.length > 0 && (
+              <Button asChild variant="outline">
+                <Link href={`/tournaments/${tournament.id}/teams`}>Przejdź do Drużyn</Link>
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                if (confirming) submit(confirming)
+                setConfirming(null)
+              }}
+            >
+              Generuj terminarz
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <FieldGroup>
         <p className="bg-muted/40 rounded-lg border px-3 py-2 text-sm">
           <span className="font-medium">{plural(totalMatches, ["mecz", "mecze", "meczów"])}</span>{" "}
@@ -1182,7 +1252,10 @@ function GenerateForm({
         <FieldError errors={[errors.root]} />
 
         {!ready && (
-          <p role="status" className="border-live/50 bg-live/10 rounded-xl border px-4 py-3 text-sm">
+          <p
+            role="status"
+            className="border-live/50 bg-live/10 rounded-xl border px-4 py-3 text-sm"
+          >
             {notReadyReason}
           </p>
         )}
@@ -1415,6 +1488,12 @@ export function GenerateScheduleView() {
               pitches={activePitches}
               workload={workload}
               ready={ready}
+              acceptedTeams={
+                (teams.data ?? []).filter((team) => team.registrationStatus === "Accepted").length
+              }
+              waitingTeams={(teams.data ?? [])
+                .filter((team) => team.registrationStatus === "Pending")
+                .map((team) => team.teamName)}
               notReadyReason={
                 registrationClosed
                   ? "Najpierw spełnij warunki z listy powyżej."
