@@ -15,9 +15,9 @@ import {
 import { FieldLegend, FieldSet } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { isApiError } from "@/lib/api/errors"
-import type { MatchLivePanel } from "@/types/matches"
+import { type MatchLivePanel, isGoal } from "@/types/matches"
 
-import { type FinishResultKind, useFinishMatch } from "../live-api"
+import { type FinishResultKind, scoringTeamId, useChangeMatchResult, useFinishMatch } from "../live-api"
 
 const LABELS: Record<FinishResultKind, string> = {
   Regular: "Normalny",
@@ -26,27 +26,46 @@ const LABELS: Record<FinishResultKind, string> = {
   Walkover: "Walkower",
 }
 
+/** Gole z zapisanych zdarzeń. Po walkowerze homeScore/awayScore trzymają wynik z regulaminu. */
+function goalScore(panel: MatchLivePanel) {
+  const goals = panel.events.filter((e) => isGoal(e.type))
+  const home = goals.filter((e) => scoringTeamId(panel, e) === panel.homeTeam.tournamentTeamId).length
+  return { homeScore: home, awayScore: goals.length - home }
+}
+
+/**
+ * Kończenie meczu, a w trybie "change" zmiana rozstrzygnięcia meczu już zakończonego (np. na walkower
+ * albo karne). Te same reguły w obu przypadkach (backend: Match.Finish / ChangeFinishedResult).
+ */
 export function FinishMatchDialog({
   tournamentId,
   panel,
   editWindowMinutes,
   trigger,
+  mode = "finish",
 }: {
   tournamentId: string
   panel: MatchLivePanel
-  editWindowMinutes: number | undefined
+  editWindowMinutes?: number
   trigger: ReactNode
+  mode?: "finish" | "change"
 }) {
-  const { homeTeam, awayTeam, homeScore, awayScore } = panel
+  const changing = mode === "change"
+  const { homeTeam, awayTeam } = panel
+  const { homeScore, awayScore } = changing
+    ? goalScore(panel)
+    : { homeScore: panel.homeScore, awayScore: panel.awayScore }
   // Mecz pucharowy musi wyłonić zwycięzcę — remis rozstrzygają karne (backend: Match.Finish).
   const knockout = panel.stageType !== "Group"
   const draw = homeScore === awayScore
-  const defaultKind: FinishResultKind = knockout && draw ? "Penalties" : "Regular"
   const kinds: FinishResultKind[] = knockout
     ? draw
       ? ["Penalties", "Walkover"]
       : ["Regular", "ExtraTime", "Walkover"]
     : ["Regular", "Walkover"]
+  const current = kinds.find((k) => k === panel.resultType)
+  const defaultKind: FinishResultKind =
+    changing && current ? current : knockout && draw ? "Penalties" : "Regular"
 
   const [open, setOpen] = useState(false)
   const [kind, setKind] = useState<FinishResultKind>(defaultKind)
@@ -54,7 +73,9 @@ export function FinishMatchDialog({
   const [homePens, setHomePens] = useState("")
   const [awayPens, setAwayPens] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const finish = useFinishMatch(tournamentId, panel.matchId)
+  const finishMatch = useFinishMatch(tournamentId, panel.matchId)
+  const changeResult = useChangeMatchResult(tournamentId, panel.matchId)
+  const finish = changing ? changeResult : finishMatch
 
   const scoreWinner =
     homeScore > awayScore
@@ -112,9 +133,11 @@ export function FinishMatchDialog({
         setOpen(next)
         if (next) {
           setKind(defaultKind)
-          setWalkoverWinner(null)
-          setHomePens("")
-          setAwayPens("")
+          setWalkoverWinner(
+            changing && panel.resultType === "Walkover" ? panel.winnerTournamentTeamId : null,
+          )
+          setHomePens(changing ? (panel.homePenaltyScore?.toString() ?? "") : "")
+          setAwayPens(changing ? (panel.awayPenaltyScore?.toString() ?? "") : "")
           setError(null)
         }
       }}
@@ -122,11 +145,13 @@ export function FinishMatchDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Zakończyć mecz?</DialogTitle>
+          <DialogTitle>{changing ? "Zmień rozstrzygnięcie" : "Zakończyć mecz?"}</DialogTitle>
           <DialogDescription>
-            {editWindowMinutes != null
-              ? `Po zakończeniu przez ${editWindowMinutes} min możesz jeszcze poprawiać zdarzenia, potem wynik jest zablokowany.`
-              : "Po zakończeniu wynik zostanie zablokowany po czasie na poprawki."}
+            {changing
+              ? "Tabela i drabinka przeliczą się same."
+              : editWindowMinutes != null
+                ? `Po zakończeniu przez ${editWindowMinutes} min możesz jeszcze poprawiać zdarzenia, potem wynik jest zablokowany.`
+                : "Po zakończeniu wynik zostanie zablokowany po czasie na poprawki."}
           </DialogDescription>
         </DialogHeader>
 
@@ -214,10 +239,16 @@ export function FinishMatchDialog({
 
         <DialogFooter>
           <Button variant="ghost" className="h-12" onClick={() => setOpen(false)}>
-            Wróć do meczu
+            {changing ? "Anuluj" : "Wróć do meczu"}
           </Button>
           <Button className="h-12" onClick={confirm} disabled={finish.isPending}>
-            {finish.isPending ? "Kończenie…" : "Zakończ mecz"}
+            {changing
+              ? finish.isPending
+                ? "Zapisywanie…"
+                : "Zapisz"
+              : finish.isPending
+                ? "Kończenie…"
+                : "Zakończ mecz"}
           </Button>
         </DialogFooter>
       </DialogContent>

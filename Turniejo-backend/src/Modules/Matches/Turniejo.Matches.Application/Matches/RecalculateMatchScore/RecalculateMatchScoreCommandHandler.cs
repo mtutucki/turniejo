@@ -19,23 +19,7 @@ namespace Turniejo.Matches.Application.Matches.RecalculateMatchScore
 
             var events = await dbContext.GetMatchEventsByMatchIdAsync(request.MatchId, cancellationToken);
 
-            var homeScore = 0;
-            var awayScore = 0;
-
-            foreach (var matchEvent in events)
-            {
-                if (matchEvent.Type is not (MatchEventType.Goal or MatchEventType.OwnGoal or MatchEventType.PenaltyGoal))
-                    continue;
-
-                var scoringTeamId = matchEvent.Type == MatchEventType.OwnGoal
-                    ? OpposingTeam(match, matchEvent.TournamentTeamId)
-                    : matchEvent.TournamentTeamId;
-
-                if (scoringTeamId == match.HomeTournamentTeamId)
-                    homeScore++;
-                else if (scoringTeamId == match.AwayTournamentTeamId)
-                    awayScore++;
-            }
+            var (homeScore, awayScore) = MatchGoalScore.FromEvents(match, events);
 
             var result = match.UpdateScore(homeScore, awayScore);
             if (result.IsFailure)
@@ -53,17 +37,6 @@ namespace Turniejo.Matches.Application.Matches.RecalculateMatchScore
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new RecalculateMatchScoreResponse(homeScore, awayScore));
-        }
-
-        private static Guid? OpposingTeam(Match match, Guid? teamId)
-        {
-            if (teamId == match.HomeTournamentTeamId)
-                return match.AwayTournamentTeamId;
-
-            if (teamId == match.AwayTournamentTeamId)
-                return match.HomeTournamentTeamId;
-
-            return null;
         }
     }
 }

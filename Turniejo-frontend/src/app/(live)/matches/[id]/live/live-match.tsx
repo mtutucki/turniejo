@@ -322,12 +322,29 @@ function LivePanel({
       )}
 
       {status === "Finished" && (
-        <p className="bg-muted/40 flex items-start gap-2 rounded-lg border p-3 text-sm">
-          <Flag className="text-primary mt-0.5 size-4 shrink-0" />
-          {canEdit && panel.editLockedAt
-            ? `Mecz zakończony. Poprawki możliwe do ${formatTime(panel.editLockedAt)}.`
-            : "Mecz zakończony - wynik jest zablokowany."}
-        </p>
+        <div className="bg-muted/40 space-y-3 rounded-lg border p-3 text-sm">
+          <p className="flex items-start gap-2">
+            <Flag className="text-primary mt-0.5 size-4 shrink-0" />
+            {canEdit && panel.editLockedAt
+              ? `Mecz zakończony. Poprawki możliwe do ${formatTime(panel.editLockedAt)}.`
+              : isOrganizer
+                ? "Mecz zakończony. Jako organizator nadal możesz zmienić rozstrzygnięcie."
+                : "Mecz zakończony - wynik jest zablokowany."}
+          </p>
+          {/* Sędzia w czasie na poprawki, organizator zawsze (backend: ChangeFinishedMatchResult). */}
+          {(canEdit || isOrganizer) && (
+            <FinishMatchDialog
+              mode="change"
+              tournamentId={tournamentId}
+              panel={panel}
+              trigger={
+                <Button variant="outline" className="h-12 w-full">
+                  Zmień rozstrzygnięcie (karne, walkower)
+                </Button>
+              }
+            />
+          )}
+        </div>
       )}
 
       {status !== "Scheduled" && status !== "Cancelled" && (

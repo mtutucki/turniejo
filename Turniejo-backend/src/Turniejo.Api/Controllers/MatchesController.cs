@@ -8,6 +8,7 @@ using Turniejo.Matches.Application.Matches.AssignMatchPitch;
 using Turniejo.Matches.Application.Matches.AssignPlannedMatchReferee;
 using Turniejo.Matches.Application.Matches.AssignRefereeToMatch;
 using Turniejo.Matches.Application.Matches.ClaimMatch;
+using Turniejo.Matches.Application.Matches.ChangeFinishedMatchResult;
 using Turniejo.Matches.Application.Matches.CorrectFinishedMatchScore;
 using Turniejo.Matches.Application.Matches.FinishMatch;
 using Turniejo.Matches.Application.Matches.GetAssignedMatches;
@@ -346,6 +347,17 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> CorrectFinishedMatchScore([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] CorrectFinishedMatchScoreRequest request, CancellationToken cancellationToken)
         {
             var command = new CorrectFinishedMatchScoreCommand(tournamentId, matchId, request.HomeScore, request.AwayScore, request.WinnerTournamentTeamId);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        // Zmiana rozstrzygnięcia zakończonego meczu (walkower, karne). Sędzia w oknie poprawek, organizator zawsze.
+        [HttpPatch("matches/{matchId}/result")]
+        public async Task<IActionResult> ChangeFinishedMatchResult([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] FinishMatchRequest request, CancellationToken cancellationToken)
+        {
+            var command = new ChangeFinishedMatchResultCommand(
+                tournamentId, matchId, request.ResultType, request.WinnerTournamentTeamId,
+                request.HomePenaltyScore, request.AwayPenaltyScore);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }

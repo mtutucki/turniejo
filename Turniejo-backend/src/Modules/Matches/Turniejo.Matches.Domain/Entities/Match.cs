@@ -250,38 +250,108 @@ namespace Turniejo.Matches.Domain.Entities
             if (Status is not (MatchStatus.Live or MatchStatus.Paused))
                 return Result.Failure(Error.Conflict("Status", "Match can only be finished from Live or Paused status"));
 
+            var decided = DecideResult(
+                resultType, winnerTournamentTeamId, HomeScore, AwayScore,
+                walkoverWinnerScore, walkoverLoserScore, homePenaltyScore, awayPenaltyScore);
+            if (decided.IsFailure)
+                return Result.Failure(decided.Error);
+
+            ApplyResult(resultType, decided.Value);
+            Status = MatchStatus.Finished;
+            FinishedAt = DateTimeOffset.UtcNow;
+            EditLockedAt = FinishedAt.Value.AddMinutes(refereeEditWindowMinutes);
+            Version++;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new MatchFinished(Id, TournamentId, GroupId, resultType.ToString(), WinnerTournamentTeamId, FinishedAt.Value, changedByUserId, HomeScore, AwayScore));
+
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Zmiana rozstrzygnięcia zakończonego meczu, np. na walkower albo karne. Te same reguły co
+        /// w <see cref="Finish"/>. Wynik z goli podaje wywołujący (liczony ze zdarzeń), bo po walkowerze
+        /// HomeScore/AwayScore trzymają wynik z regulaminu, a nie z boiska.
+        /// </summary>
+        public Result ChangeFinishedResult(
+            MatchResultType resultType, Guid? winnerTournamentTeamId, int goalsHomeScore, int goalsAwayScore,
+            bool ignoreEditWindow, Guid changedByUserId,
+            int? walkoverWinnerScore = null, int? walkoverLoserScore = null,
+            int? homePenaltyScore = null, int? awayPenaltyScore = null)
+        {
+            if (Status != MatchStatus.Finished)
+                return Result.Failure(Error.Conflict("Status", "Match must be finished to change its result"));
+
+            if (!ignoreEditWindow && EditLockedAt.HasValue && DateTimeOffset.UtcNow > EditLockedAt.Value)
+                return Result.Failure(Error.Conflict("EditLockedAt", "The post-match edit window has closed"));
+
+            var decided = DecideResult(
+                resultType, winnerTournamentTeamId, goalsHomeScore, goalsAwayScore,
+                walkoverWinnerScore, walkoverLoserScore, homePenaltyScore, awayPenaltyScore);
+            if (decided.IsFailure)
+                return Result.Failure(decided.Error);
+
+            ApplyResult(resultType, decided.Value);
+            Version++;
+            SetUpdatedAt();
+
+            // Tabela i drabinka słuchają MatchScoreCorrected (przeliczenie grupy, awans nowego zwycięzcy).
+            _domainEvents.Add(new MatchScoreCorrected(Id, TournamentId, GroupId, HomeScore, AwayScore, WinnerTournamentTeamId, changedByUserId));
+
+            return Result.Success();
+        }
+
+        private sealed record DecidedResult(int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId, int? HomePenaltyScore, int? AwayPenaltyScore);
+
+        private void ApplyResult(MatchResultType resultType, DecidedResult decided)
+        {
+            HomeScore = decided.HomeScore;
+            AwayScore = decided.AwayScore;
+            ResultType = resultType;
+            WinnerTournamentTeamId = decided.WinnerTournamentTeamId;
+            HomePenaltyScore = decided.HomePenaltyScore;
+            AwayPenaltyScore = decided.AwayPenaltyScore;
+        }
+
+        private Result<DecidedResult> DecideResult(
+            MatchResultType resultType, Guid? winnerTournamentTeamId, int homeScore, int awayScore,
+            int? walkoverWinnerScore, int? walkoverLoserScore, int? homePenaltyScore, int? awayPenaltyScore)
+        {
             if (resultType == MatchResultType.NotPlayed)
-                return Result.Failure(Error.Validation("ResultType", "ResultType must indicate how the match was decided"));
+                return Result.Failure<DecidedResult>(Error.Validation("ResultType", "ResultType must indicate how the match was decided"));
+
+            int? homePenalties = null;
+            int? awayPenalties = null;
 
             if (resultType == MatchResultType.Penalties)
             {
                 // Karne rozstrzygają tylko remis; zwycięzca wynika z karnych (wyliczany, jeśli nie podano).
-                if (HomeScore != AwayScore)
-                    return Result.Failure(Error.Validation("ResultType", "Penalties can only decide a drawn match"));
+                if (homeScore != awayScore)
+                    return Result.Failure<DecidedResult>(Error.Validation("ResultType", "Penalties can only decide a drawn match"));
                 if (!homePenaltyScore.HasValue || !awayPenaltyScore.HasValue || homePenaltyScore < 0 || awayPenaltyScore < 0)
-                    return Result.Failure(Error.Validation("HomePenaltyScore", "Penalty shootout score is required"));
+                    return Result.Failure<DecidedResult>(Error.Validation("HomePenaltyScore", "Penalty shootout score is required"));
                 if (homePenaltyScore == awayPenaltyScore)
-                    return Result.Failure(Error.Validation("HomePenaltyScore", "Penalty shootout cannot end in a draw"));
+                    return Result.Failure<DecidedResult>(Error.Validation("HomePenaltyScore", "Penalty shootout cannot end in a draw"));
 
                 var penaltyWinner = homePenaltyScore > awayPenaltyScore ? HomeTournamentTeamId : AwayTournamentTeamId;
                 if (winnerTournamentTeamId.HasValue && winnerTournamentTeamId != penaltyWinner)
-                    return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be the team that won the penalty shootout"));
+                    return Result.Failure<DecidedResult>(Error.Validation("WinnerTournamentTeamId", "Winner must be the team that won the penalty shootout"));
 
                 winnerTournamentTeamId = penaltyWinner;
-                HomePenaltyScore = homePenaltyScore;
-                AwayPenaltyScore = awayPenaltyScore;
+                homePenalties = homePenaltyScore;
+                awayPenalties = awayPenaltyScore;
             }
 
             // Mecz pucharowy musi mieć zwycięzcę (awans w drabince), a w zwykłym czasie i dogrywce
             // zwycięzcą jest drużyna z większą liczbą goli — remis rozstrzygają karne.
             if (StageType != StageType.Group && resultType is MatchResultType.Regular or MatchResultType.ExtraTime)
             {
-                if (HomeScore == AwayScore)
-                    return Result.Failure(Error.Validation("ResultType", "A knockout match cannot end in a draw — decide it by penalties"));
+                if (homeScore == awayScore)
+                    return Result.Failure<DecidedResult>(Error.Validation("ResultType", "A knockout match cannot end in a draw — decide it by penalties"));
 
-                var scoreWinner = HomeScore > AwayScore ? HomeTournamentTeamId : AwayTournamentTeamId;
+                var scoreWinner = homeScore > awayScore ? HomeTournamentTeamId : AwayTournamentTeamId;
                 if (winnerTournamentTeamId.HasValue && winnerTournamentTeamId != scoreWinner)
-                    return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be the team with more goals"));
+                    return Result.Failure<DecidedResult>(Error.Validation("WinnerTournamentTeamId", "Winner must be the team with more goals"));
 
                 winnerTournamentTeamId = scoreWinner;
             }
@@ -289,43 +359,26 @@ namespace Turniejo.Matches.Domain.Entities
             if (winnerTournamentTeamId.HasValue &&
                 winnerTournamentTeamId.Value != HomeTournamentTeamId &&
                 winnerTournamentTeamId.Value != AwayTournamentTeamId)
-                return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Winner must be one of the two teams playing"));
+                return Result.Failure<DecidedResult>(Error.Validation("WinnerTournamentTeamId", "Winner must be one of the two teams playing"));
 
             if (resultType == MatchResultType.Walkover)
             {
                 if (!winnerTournamentTeamId.HasValue)
-                    return Result.Failure(Error.Validation("WinnerTournamentTeamId", "Walkover requires a winner"));
+                    return Result.Failure<DecidedResult>(Error.Validation("WinnerTournamentTeamId", "Walkover requires a winner"));
 
                 if (!walkoverWinnerScore.HasValue || !walkoverLoserScore.HasValue)
-                    return Result.Failure(Error.Validation("ResultType", "Walkover requires the tournament's walkover scores"));
+                    return Result.Failure<DecidedResult>(Error.Validation("ResultType", "Walkover requires the tournament's walkover scores"));
 
                 // WalkoverHomeScore/WalkoverAwayScore w ustawieniach turnieju to wynik zwycięzcy/przegranego
                 // walkoweru, nie dosłownie gospodarza/gościa — drużyna, która nie stawiła się na mecz, może
                 // równie dobrze być stroną "domową" w terminarzu. Bez tego HomeScore/AwayScore zostawałoby
                 // 0:0 i tabela liczyłaby walkower jako remis, ignorując WinnerTournamentTeamId.
-                if (winnerTournamentTeamId.Value == HomeTournamentTeamId)
-                {
-                    HomeScore = walkoverWinnerScore.Value;
-                    AwayScore = walkoverLoserScore.Value;
-                }
-                else
-                {
-                    HomeScore = walkoverLoserScore.Value;
-                    AwayScore = walkoverWinnerScore.Value;
-                }
+                var homeWins = winnerTournamentTeamId.Value == HomeTournamentTeamId;
+                homeScore = homeWins ? walkoverWinnerScore.Value : walkoverLoserScore.Value;
+                awayScore = homeWins ? walkoverLoserScore.Value : walkoverWinnerScore.Value;
             }
 
-            Status = MatchStatus.Finished;
-            FinishedAt = DateTimeOffset.UtcNow;
-            ResultType = resultType;
-            WinnerTournamentTeamId = winnerTournamentTeamId;
-            EditLockedAt = FinishedAt.Value.AddMinutes(refereeEditWindowMinutes);
-            Version++;
-            SetUpdatedAt();
-
-            _domainEvents.Add(new MatchFinished(Id, TournamentId, GroupId, resultType.ToString(), winnerTournamentTeamId, FinishedAt.Value, changedByUserId, HomeScore, AwayScore));
-
-            return Result.Success();
+            return Result.Success(new DecidedResult(homeScore, awayScore, winnerTournamentTeamId, homePenalties, awayPenalties));
         }
 
         // Walkower bez rozegrania meczu: rywal wycofał się z turnieju. Finish() wymaga Live/Paused, a ten
@@ -378,6 +431,11 @@ namespace Turniejo.Matches.Domain.Entities
         {
             if (homeScore < 0 || awayScore < 0)
                 return Result.Failure(Error.Validation("Score", "Score cannot be negative"));
+
+            // Walkower ma wynik z regulaminu, nie z goli. Poprawka gola w oknie edycji nadpisywała go
+            // wynikiem z boiska, choć mecz dalej był walkowerem.
+            if (Status == MatchStatus.Finished && ResultType == MatchResultType.Walkover)
+                return Result.Success();
 
             // Ten wynik jest liczony od nowa z eventów meczowych (goli/rzutów karnych), więc jeśli
             // ResultType był ManualDecision (ustawiony przez SetManualScore), przestaje być aktualny —

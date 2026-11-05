@@ -355,18 +355,29 @@ export function useMatchLifecycle(tournamentId: string, matchId: string) {
 
 export type FinishResultKind = "Regular" | "ExtraTime" | "Penalties" | "Walkover"
 
+export type MatchResultInput = {
+  resultType: FinishResultKind
+  winnerTournamentTeamId: string | null
+  homePenaltyScore?: number | null
+  awayPenaltyScore?: number | null
+}
+
 export function useFinishMatch(tournamentId: string, matchId: string) {
+  return useMatchResultMutation(tournamentId, matchId, "finish")
+}
+
+/** Zmiana rozstrzygnięcia zakończonego meczu: sędzia w czasie na poprawki, organizator zawsze. */
+export function useChangeMatchResult(tournamentId: string, matchId: string) {
+  return useMatchResultMutation(tournamentId, matchId, "change")
+}
+
+function useMatchResultMutation(tournamentId: string, matchId: string, mode: "finish" | "change") {
   const { request } = useApi()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: {
-      resultType: FinishResultKind
-      winnerTournamentTeamId: string | null
-      homePenaltyScore?: number | null
-      awayPenaltyScore?: number | null
-    }) =>
-      request(`${matchPath(tournamentId, matchId)}/finish`, {
-        method: "POST",
+    mutationFn: (input: MatchResultInput) =>
+      request(`${matchPath(tournamentId, matchId)}/${mode === "finish" ? "finish" : "result"}`, {
+        method: mode === "finish" ? "POST" : "PATCH",
         body: {
           resultType: MatchResultType[input.resultType],
           winnerTournamentTeamId: input.winnerTournamentTeamId,

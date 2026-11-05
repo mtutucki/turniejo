@@ -122,6 +122,10 @@ const EXACT: Record<string, string> = {
     "Drabinka wymaga formatu z fazą pucharową",
   "Match events can only be recorded while the match is live, paused, or within the post-match edit window":
     "Czas na poprawki minął - wynik meczu jest zablokowany",
+  "The post-match edit window has closed":
+    "Czas na poprawki minął. Rozstrzygnięcie może teraz zmienić tylko organizator",
+  "Match must be finished to change its result": "Ten mecz nie jest jeszcze zakończony",
+  "Walkover requires a winner": "Wybierz drużynę, która wygrywa walkowerem",
   "Pitch is inactive": "To boisko jest nieaktywne",
   "Pitch does not belong to this tournament": "To boisko nie należy do tego turnieju",
   "Match must take place within the tournament dates": "Mecz musi się odbyć w trakcie turnieju",
