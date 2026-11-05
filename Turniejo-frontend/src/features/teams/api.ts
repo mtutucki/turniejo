@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { matchKeys } from "@/features/matches/api"
 import { tournamentKeys } from "@/features/tournaments/api"
 import { useApi } from "@/hooks/use-api"
 import { myRolesQueryKey } from "@/hooks/use-my-roles"
@@ -109,7 +110,13 @@ export function useAddTeamToTournament(tournamentId: string) {
 
 export function useChangeRegistrationStatus(tournamentId: string) {
   const { request } = useApi()
-  const invalidate = useInvalidateTournamentTeams(tournamentId)
+  const queryClient = useQueryClient()
+  const invalidateTeams = useInvalidateTournamentTeams(tournamentId)
+  // Wycofanie drużyny odwołuje jej mecze. Terminarz z cache pokazywałby je dalej po przejściu do niego.
+  const invalidate = () => {
+    invalidateTeams()
+    void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+  }
   return useMutation({
     mutationFn: ({
       tournamentTeamId,
