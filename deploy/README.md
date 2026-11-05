@@ -40,6 +40,18 @@ ssh -L 8081:127.0.0.1:8081 user@vps
 # potem w przeglądarce: http://localhost:8081/admin
 ```
 
+## pgAdmin (podgląd bazy)
+
+Postgres słucha tylko na `127.0.0.1:5432` serwera, więc z internetu go nie widać. pgAdmin na
+własnym komputerze łączy się przez tunel SSH:
+
+- **Connection**: host `127.0.0.1`, port `5432`, user `turniejo_app` (hasło `APP_DB_PASSWORD`) do
+  przeglądania danych aplikacji albo `postgres` (`POSTGRES_PASSWORD`) do administracji.
+- **SSH Tunnel**: włączony, host = IP serwera, user `deploy`, Identity file = prywatny klucz SSH.
+
+Bez pgAdmina: `ssh -L 5432:127.0.0.1:5432 deploy@IP_SERWERA` i dowolny klient na `localhost:5432`
+(jeśli lokalnie działa już Postgres na 5432, użyj np. `-L 5433:127.0.0.1:5432`).
+
 ## Aktualizacja
 
 `deploy.sh` robi backup baz, ustawia kod na `origin/master`, przebudowuje kontenery i czeka, aż
