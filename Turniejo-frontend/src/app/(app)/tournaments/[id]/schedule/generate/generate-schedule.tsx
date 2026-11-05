@@ -535,10 +535,16 @@ function Requirements({
   return (
     <ul className="space-y-2">
       <Requirement ok={tournament.status === "RegistrationClosed"}>
-        Zapisy zamknięte
+        {tournament.status === "RegistrationClosed"
+          ? "Zapisy zamknięte"
+          : tournament.status === "Draft"
+            ? "Zapisy jeszcze nie ruszyły"
+            : "Zapisy są wciąż otwarte"}
         {tournament.status !== "RegistrationClosed" && (
           <span className="text-muted-foreground block text-xs">
-            Terminarz układa się dla ostatecznej listy drużyn — najpierw zamknij zapisy.
+            {tournament.status === "Draft"
+              ? "Terminarz układa się dla ostatecznej listy drużyn. Otwórz zapisy, a gdy wszystkie drużyny się zgłoszą, zamknij je."
+              : "Terminarz układa się dla ostatecznej listy drużyn. Zamknij zapisy, gdy wszystkie drużyny się zgłoszą."}
           </span>
         )}
         <RegistrationAction tournament={tournament} />
@@ -694,6 +700,7 @@ function GenerateForm({
   pitches,
   workload,
   ready,
+  notReadyReason,
   afterGenerate,
 }: {
   tournament: Tournament
@@ -701,6 +708,8 @@ function GenerateForm({
   pitches: Pitch[]
   workload: Workload
   ready: boolean
+  /** Dlaczego przycisk jest wyłączony, gdy warunki nie są spełnione. */
+  notReadyReason: string
   /** Grupy + puchar: po terminarzu tworzymy brakujące drabinki (miejsca w grupach). */
   afterGenerate?: () => Promise<void>
 }) {
@@ -1172,6 +1181,12 @@ function GenerateForm({
 
         <FieldError errors={[errors.root]} />
 
+        {!ready && (
+          <p role="status" className="border-live/50 bg-live/10 rounded-xl border px-4 py-3 text-sm">
+            {notReadyReason}
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={!ready || !planOk || generate.isPending}>
             <CalendarCheck />
@@ -1351,8 +1366,9 @@ export function GenerateScheduleView() {
   const teamsWithoutGroup = (teams.data ?? []).some(
     (team) => team.registrationStatus === "Accepted" && !team.groupId,
   )
+  const registrationClosed = t.status === "RegistrationClosed"
   const ready =
-    t.status === "RegistrationClosed" &&
+    registrationClosed &&
     (isKnockout(t)
       ? bracketMatches > 0
       : hasGroupStage(t) && plan.some((p) => p.matches > 0) && !teamsWithoutGroup) &&
@@ -1399,6 +1415,13 @@ export function GenerateScheduleView() {
               pitches={activePitches}
               workload={workload}
               ready={ready}
+              notReadyReason={
+                registrationClosed
+                  ? "Najpierw spełnij warunki z listy powyżej."
+                  : t.status === "Draft"
+                    ? "Zapisy jeszcze nie ruszyły. Otwórz je, a potem zamknij, żeby wygenerować terminarz."
+                    : "Zapisy są wciąż otwarte. Zamknij je, żeby wygenerować terminarz."
+              }
               afterGenerate={t.format === "GroupAndKnockout" ? createGroupBrackets : undefined}
             />
           )}
