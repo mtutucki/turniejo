@@ -64,8 +64,9 @@ export function FinishMatchDialog({
   const changing = mode === "change"
   const recording = mode === "record"
   const { homeTeam, awayTeam } = panel
-  const [homeGoals, setHomeGoals] = useState("0")
-  const [awayGoals, setAwayGoals] = useState("0")
+  const [homeGoals, setHomeGoals] = useState("")
+  const [awayGoals, setAwayGoals] = useState("")
+  const scoresFilled = parseGoals(homeGoals) != null && parseGoals(awayGoals) != null
   const { homeScore, awayScore } = recording
     ? { homeScore: parseGoals(homeGoals) ?? 0, awayScore: parseGoals(awayGoals) ?? 0 }
     : changing
@@ -87,6 +88,12 @@ export function FinishMatchDialog({
   const [chosenKind, setKind] = useState<FinishResultKind>(defaultKind)
   // Przy wpisywaniu wyniku lista sposobów zmienia się razem z wynikiem (np. remis w pucharze → karne).
   const kind = kinds.includes(chosenKind) ? chosenKind : kinds[0]!
+  // Przy wpisywaniu wyniku walkower to osobna ścieżka (bez goli), a rozstrzygnięcie pokazujemy
+  // dopiero po wpisaniu wyniku. Remis w pucharze daje tylko karne, więc wtedy bez przycisków.
+  const recordingWalkover = recording && kind === "Walkover"
+  const kindButtons = recording ? kinds.filter((k) => k !== "Walkover") : kinds
+  const showKinds = !recording || (scoresFilled && kindButtons.length > 1)
+  const showPenalties = kind === "Penalties" && (!recording || scoresFilled)
   const [walkoverWinner, setWalkoverWinner] = useState<string | null>(null)
   const [homePens, setHomePens] = useState("")
   const [awayPens, setAwayPens] = useState("")
@@ -157,8 +164,8 @@ export function FinishMatchDialog({
       onOpenChange={(next) => {
         setOpen(next)
         if (next) {
-          setHomeGoals("0")
-          setAwayGoals("0")
+          setHomeGoals("")
+          setAwayGoals("")
           setKind(defaultKind)
           setWalkoverWinner(
             changing && panel.resultType === "Walkover" ? panel.winnerTournamentTeamId : null,
@@ -186,7 +193,7 @@ export function FinishMatchDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {recording && (
+        {recording && !recordingWalkover && (
           <FieldSet>
             <FieldLegend variant="label">Wynik</FieldLegend>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
@@ -202,6 +209,7 @@ export function FinishMatchDialog({
                     min={0}
                     max={99}
                     className="h-14 text-center font-mono text-2xl tabular-nums"
+                    placeholder="0"
                     value={value}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => set(e.target.value)}
@@ -211,33 +219,42 @@ export function FinishMatchDialog({
               ))}
               <span className="text-muted-foreground order-2 pb-6 text-2xl">:</span>
             </div>
+            <Button
+              variant="link"
+              className="text-muted-foreground h-auto p-0 text-sm"
+              onClick={() => setKind("Walkover")}
+            >
+              Mecz się nie odbył? Wpisz walkower
+            </Button>
           </FieldSet>
         )}
 
-        <FieldSet>
-          <FieldLegend variant="label">Rozstrzygnięcie</FieldLegend>
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${kinds.length}, minmax(0, 1fr))` }}
-          >
-            {kinds.map((k) => (
-              <Button
-                key={k}
-                variant={kind === k ? "default" : "outline"}
-                aria-pressed={kind === k}
-                className="h-12 px-2"
-                onClick={() => setKind(k)}
-              >
-                {LABELS[k]}
-              </Button>
-            ))}
-          </div>
-          {knockout && draw && (
-            <p className="text-muted-foreground text-xs">
-              Mecz pucharowy nie może zakończyć się remisem - rozstrzygnij go karnymi.
-            </p>
-          )}
-        </FieldSet>
+        {showKinds && (
+          <FieldSet>
+            <FieldLegend variant="label">Rozstrzygnięcie</FieldLegend>
+            <div
+              className="grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${kindButtons.length}, minmax(0, 1fr))` }}
+            >
+              {kindButtons.map((k) => (
+                <Button
+                  key={k}
+                  variant={kind === k ? "default" : "outline"}
+                  aria-pressed={kind === k}
+                  className="h-12 px-2"
+                  onClick={() => setKind(k)}
+                >
+                  {LABELS[k]}
+                </Button>
+              ))}
+            </div>
+            {knockout && draw && !recording && (
+              <p className="text-muted-foreground text-xs">
+                Mecz pucharowy nie może zakończyć się remisem - rozstrzygnij go karnymi.
+              </p>
+            )}
+          </FieldSet>
+        )}
 
         {kind === "Walkover" ? (
           <FieldSet>
@@ -258,8 +275,17 @@ export function FinishMatchDialog({
             <p className="text-muted-foreground text-xs">
               Wynik walkowera ustawia się z ustawień turnieju.
             </p>
+            {recording && (
+              <Button
+                variant="link"
+                className="text-muted-foreground h-auto justify-start p-0 text-sm"
+                onClick={() => setKind("Regular")}
+              >
+                Wróć do wpisywania wyniku
+              </Button>
+            )}
           </FieldSet>
-        ) : recording && kind !== "Penalties" ? null : (
+        ) : recording && !showPenalties ? null : (
           <div className="bg-muted/40 rounded-lg border p-3">
             {/* Przy wpisywaniu wyniku gole są już w polach wyżej. */}
             {!recording && (
@@ -271,7 +297,10 @@ export function FinishMatchDialog({
                 <span className="truncate text-sm">{awayTeam.name}</span>
               </div>
             )}
-            {kind === "Penalties" && (
+            {recording && (
+              <p className="mb-2 text-sm">Remis w meczu pucharowym. Wpisz wynik rzutów karnych.</p>
+            )}
+            {showPenalties && (
               <div
                 className={`grid grid-cols-[1fr_auto_1fr] items-center gap-2 ${recording ? "" : "mt-3"}`}
               >
