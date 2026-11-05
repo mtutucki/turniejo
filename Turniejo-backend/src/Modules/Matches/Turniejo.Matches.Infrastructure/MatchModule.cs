@@ -26,11 +26,12 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, I
 
     public async Task<Guid> CreateBracketMatchAsync(
         Guid tournamentId, Guid? categoryId, Guid homeTournamentTeamId, Guid awayTournamentTeamId,
-        string stageType, Guid? plannedPitchId, DateTimeOffset? plannedAt, CancellationToken cancellationToken = default)
+        string stageType, Guid? plannedPitchId, DateTimeOffset? plannedAt, Guid? plannedRefereeId = null,
+        CancellationToken cancellationToken = default)
     {
         var command = new CreateBracketMatchCommand(
             tournamentId, categoryId, homeTournamentTeamId, awayTournamentTeamId, Enum.Parse<StageType>(stageType),
-            plannedPitchId, plannedAt);
+            plannedPitchId, plannedAt, plannedRefereeId);
 
         var result = await sender.Send(command, cancellationToken);
 
@@ -120,6 +121,22 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, I
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return true;
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, Guid?>> RefreshKnockoutWinnersAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default)
+    {
+        var finished = (await dbContext.GetTrackedMatchesByIdsAsync(matchIds, cancellationToken))
+            .Where(m => m.Status == MatchStatus.Finished)
+            .ToList();
+
+        var changed = false;
+        foreach (var match in finished)
+            changed |= match.RefreshKnockoutWinner();
+
+        if (changed)
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+        return finished.ToDictionary(m => m.Id, m => m.WinnerTournamentTeamId);
     }
 
     private static TournamentMatchDto ToTournamentMatchDto(Turniejo.Matches.Domain.Entities.Match m) =>

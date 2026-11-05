@@ -20,7 +20,17 @@ export default function PrivacyPage() {
           <strong>
             <Fill value={LEGAL.controllerName} />
           </strong>
-          , <Fill value={LEGAL.controllerAddress} />, <Fill value={LEGAL.controllerRegistry} />.
+          {LEGAL.controllerAddress && (
+            <>
+              , <Fill value={LEGAL.controllerAddress} />
+            </>
+          )}
+          {LEGAL.controllerRegistry && (
+            <>
+              , <Fill value={LEGAL.controllerRegistry} />
+            </>
+          )}
+          .
         </p>
         <p>
           W sprawach danych osobowych napisz na <Fill value={LEGAL.contactEmail} />.

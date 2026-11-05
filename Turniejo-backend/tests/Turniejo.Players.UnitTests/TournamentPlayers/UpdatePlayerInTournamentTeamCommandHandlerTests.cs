@@ -164,8 +164,24 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             var result = await _handler.Handle(Command(firstName: "piotr"), CancellationToken.None);
 
             result.IsFailure.Should().BeTrue();
-            result.Error.Message.Should().Be("Player is already assigned to this team");
+            result.Error.Message.Should().Be("A player with the same name and birth date is already in this team");
             await ShouldNotSave();
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSave_WhenDuplicateOfSquadMateIsConfirmed()
+        {
+            var mate = Player.Create(Guid.NewGuid(), "Piotr", "Kowalski", new DateTime(2012, 5, 1), PlayerPosition.Defender, null, null, Guid.NewGuid()).Value;
+            var mateEntry = TournamentPlayer.Create(Guid.NewGuid(), _tournamentTeamId, mate.Id, 5, null, Guid.NewGuid()).Value;
+            _dbContext.GetTournamentPlayersByTournamentTeamIdAsync(_tournamentTeamId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentPlayer> { _tournamentPlayer, mateEntry });
+            _dbContext.GetPlayersByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(new List<Player> { mate });
+
+            var result = await _handler.Handle(Command(firstName: "piotr") with { AllowDuplicate = true }, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]

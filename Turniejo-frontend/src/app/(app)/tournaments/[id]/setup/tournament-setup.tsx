@@ -115,9 +115,12 @@ function StepIndicator({
 function AcceptPendingTeams({
   tournamentId,
   teams,
+  freeSlots,
 }: {
   tournamentId: string
   teams: TournamentTeam[]
+  /** Ile drużyn zmieści się jeszcze w limicie. */
+  freeSlots: number
 }) {
   const changeStatus = useChangeRegistrationStatus(tournamentId)
   const [pending, setPending] = useState(false)
@@ -126,7 +129,7 @@ function AcceptPendingTeams({
     setPending(true)
     let accepted = 0
     // Po kolei — limit drużyn backend sprawdza przy każdej akceptacji (błąd pokazuje globalny toast).
-    for (const team of teams) {
+    for (const team of teams.slice(0, freeSlots)) {
       try {
         await changeStatus.mutateAsync({ tournamentTeamId: team.id, status: "Accepted" })
         accepted++
@@ -143,12 +146,25 @@ function AcceptPendingTeams({
   return (
     <div className="border-primary/40 bg-primary/5 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
       <p>
-        {plural(teams.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na akceptację —
-        dopóki jej nie zaakceptujesz, nie zagra w turnieju.
+        {plural(teams.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na akceptację.
+        Dopóki jej nie zaakceptujesz, nie zagra w turnieju.
+        {freeSlots < teams.length && (
+          <span className="text-muted-foreground block text-xs">
+            {freeSlots === 0
+              ? "Limit drużyn jest wyczerpany."
+              : `W limicie zmieści się jeszcze ${plural(freeSlots, ["drużyna", "drużyny", "drużyn"])}.`}
+          </span>
+        )}
       </p>
-      <Button size="sm" onClick={acceptAll} disabled={pending}>
-        {pending ? "Akceptowanie…" : "Akceptuj wszystkie"}
-      </Button>
+      {freeSlots > 0 && (
+        <Button size="sm" onClick={acceptAll} disabled={pending}>
+          {pending
+            ? "Akceptowanie…"
+            : freeSlots < teams.length
+              ? `Akceptuj ${plural(freeSlots, ["drużynę", "drużyny", "drużyn"])}`
+              : "Akceptuj wszystkie"}
+        </Button>
+      )}
     </div>
   )
 }
@@ -298,7 +314,14 @@ export function TournamentSetupView() {
     body = (
       <div className="space-y-4">
         {progress.pendingTeams.length > 0 && (
-          <AcceptPendingTeams tournamentId={id} teams={progress.pendingTeams} />
+          <AcceptPendingTeams
+            tournamentId={id}
+            teams={progress.pendingTeams}
+            freeSlots={Math.max(
+              (tournament.data?.teamLimit ?? 0) - progress.acceptedTeams.length,
+              0,
+            )}
+          />
         )}
         <TournamentTeamsView />
         {organization.data && progress.done.categories && (
@@ -423,15 +446,23 @@ export function TournamentSetupView() {
               ) : needsBracket ? (
                 <div className="space-y-3">
                   <p className="text-muted-foreground text-sm">
-                    Puchar zaczyna się od drabinki: ułóż pary 1. rundy, a potem nadasz im godziny i
-                    boiska.
+                    Pary 1. rundy ułożą się same według rozstawienia, gdy wygenerujesz terminarz.
+                    Jeśli chcesz, możesz je wcześniej ułożyć sam.
                   </p>
-                  <Button asChild>
-                    <Link href={`${base}/bracket`}>
-                      <Network />
-                      Utwórz drabinkę
-                    </Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild>
+                      <Link href={`${base}/schedule/generate`}>
+                        <CalendarCheck />
+                        Generuj terminarz
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href={`${base}/bracket`}>
+                        <Network />
+                        Ułóż pary sam
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">

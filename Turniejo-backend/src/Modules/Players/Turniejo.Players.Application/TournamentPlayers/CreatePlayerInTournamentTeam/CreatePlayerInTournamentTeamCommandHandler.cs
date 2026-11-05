@@ -35,8 +35,9 @@ namespace Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamen
             }
 
             // Nowy profil nie może być "już w składzie" po id, więc duplikat łapiemy po imieniu, nazwisku i dacie urodzenia.
+            // Po potwierdzeniu (AllowDuplicate) dodajemy: dwie różne osoby mogą mieć te same dane.
             var squad = await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(request.TournamentTeamId, cancellationToken);
-            if (squad.Count > 0)
+            if (squad.Count > 0 && !request.AllowDuplicate)
             {
                 var squadPlayers = await dbContext.GetPlayersByIdsAsync(squad.Select(tp => tp.PlayerId).ToList(), cancellationToken);
                 var duplicate = squadPlayers.Any(p =>
@@ -45,7 +46,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamen
                     p.BirthDate.Date == request.BirthDate.Date);
 
                 if (duplicate)
-                    return Result.Failure<CreatePlayerInTournamentTeamResponse>(Error.Validation("FirstName", "Player is already assigned to this team"));
+                    return Result.Failure<CreatePlayerInTournamentTeamResponse>(Error.Validation("LastName", "A player with the same name and birth date is already in this team"));
             }
 
             if (request.ShirtNumber.HasValue)

@@ -18,13 +18,6 @@ namespace Turniejo.Brackets.Application.Brackets.AdvanceBracketWinner
             if (node == null || !request.WinnerTournamentTeamId.HasValue)
                 return Result.Success(new AdvanceBracketWinnerResponse(false));
 
-            var winnerId = request.WinnerTournamentTeamId.Value;
-            Guid? loserId = null;
-            if (node.HomeTournamentTeamId == winnerId)
-                loserId = node.AwayTournamentTeamId;
-            else if (node.AwayTournamentTeamId == winnerId)
-                loserId = node.HomeTournamentTeamId;
-
             var round = await dbContext.GetBracketRoundByIdAsync(node.BracketRoundId, cancellationToken);
             if (round == null)
                 return Result.Success(new AdvanceBracketWinnerResponse(false));
@@ -33,19 +26,8 @@ namespace Turniejo.Brackets.Application.Brackets.AdvanceBracketWinner
             if (bracket == null)
                 return Result.Success(new AdvanceBracketWinnerResponse(false));
 
-            var advanced = false;
-
-            if (node.WinnerGoesToNodeId.HasValue && node.WinnerGoesToSlot.HasValue)
-            {
-                advanced |= await bracketAdvancer.AdvanceIntoAsync(
-                    node.WinnerGoesToNodeId.Value, node.WinnerGoesToSlot.Value, winnerId, bracket.TournamentId, bracket.CategoryId, cancellationToken);
-            }
-
-            if (node.LoserGoesToNodeId.HasValue && node.LoserGoesToSlot.HasValue && loserId.HasValue)
-            {
-                advanced |= await bracketAdvancer.AdvanceIntoAsync(
-                    node.LoserGoesToNodeId.Value, node.LoserGoesToSlot.Value, loserId.Value, bracket.TournamentId, bracket.CategoryId, cancellationToken);
-            }
+            var advanced = await bracketAdvancer.AdvanceFromNodeAsync(
+                node, request.WinnerTournamentTeamId.Value, bracket.TournamentId, bracket.CategoryId, cancellationToken);
 
             if (advanced)
             {

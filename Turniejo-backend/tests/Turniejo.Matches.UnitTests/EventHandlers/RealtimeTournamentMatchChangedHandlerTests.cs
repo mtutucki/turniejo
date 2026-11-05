@@ -42,5 +42,33 @@ namespace Turniejo.Matches.UnitTests.EventHandlers
                 CancellationToken.None);
             await ShouldHavePublished();
         }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task RefereeAssignedOrReleased_ShouldNotifyTournamentGroup(bool assigned)
+        {
+            var refereeId = Guid.NewGuid();
+            await _handler.Handle(
+                new RefereeAssignedToMatch(_matchId, _tournamentId, assigned ? refereeId : null, refereeId),
+                CancellationToken.None);
+            await ShouldHavePublished();
+        }
+
+        [Fact]
+        public async Task Cancelled_ShouldNotifyTournamentGroup()
+        {
+            await _handler.Handle(
+                new MatchCancelled(_matchId, _tournamentId, null, "Drużyna wycofała się z turnieju.", Guid.NewGuid()),
+                CancellationToken.None);
+            await ShouldHavePublished();
+        }
+
+        [Fact]
+        public async Task TimeChanged_ShouldNotifyTournamentGroup()
+        {
+            await _handler.Handle(new MatchTimeChanged(_matchId, _tournamentId, DateTimeOffset.UtcNow, Guid.NewGuid()), CancellationToken.None);
+            await ShouldHavePublished();
+        }
     }
 }

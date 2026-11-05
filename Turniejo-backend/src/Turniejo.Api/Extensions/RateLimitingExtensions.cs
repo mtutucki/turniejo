@@ -11,6 +11,7 @@ public static class RateLimitingExtensions
 {
     public const string AuthAnonymous = "auth-anonymous";
     public const string JoinTournament = "join-tournament";
+    public const string ChangePassword = "change-password";
 
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
     {
@@ -47,6 +48,20 @@ public static class RateLimitingExtensions
                         Window = TimeSpan.FromMinutes(10),
                         SegmentsPerWindow = 5,
                         PermitLimit = 10,
+                        QueueLimit = 0,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    }));
+
+            // Zmiana hasła sprawdza obecne hasło logowaniem do Keycloaka — kilka prób na kwadrans wystarczy
+            // na literówki, a nie pozwala zgadywać.
+            options.AddPolicy(ChangePassword, httpContext =>
+                RateLimitPartition.GetSlidingWindowLimiter(
+                    GetUserIdOrClientIp(httpContext),
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(15),
+                        SegmentsPerWindow = 5,
+                        PermitLimit = 5,
                         QueueLimit = 0,
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst
                     }));

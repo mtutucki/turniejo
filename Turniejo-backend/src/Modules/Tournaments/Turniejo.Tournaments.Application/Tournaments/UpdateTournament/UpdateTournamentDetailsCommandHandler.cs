@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
@@ -6,7 +7,7 @@ using Turniejo.Tournaments.Application.Abstractions;
 
 namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
 {
-    internal sealed class UpdateTournamentDetailsCommandHandler(ITournamentsDbContext dbContext) : ICommandHandler<UpdateTournamentDetailsCommand, UpdateTournamentDetailsResponse>
+    internal sealed class UpdateTournamentDetailsCommandHandler(ITournamentsDbContext dbContext, ITeamModule teamModule) : ICommandHandler<UpdateTournamentDetailsCommand, UpdateTournamentDetailsResponse>
     {
         public async Task<Result<UpdateTournamentDetailsResponse>> Handle(UpdateTournamentDetailsCommand request, CancellationToken cancellationToken)
         {
@@ -14,6 +15,16 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
 
             if (result == null)
                 return Result.Failure<UpdateTournamentDetailsResponse>(Error.NotFound("Tournament", request.TournamentId));
+
+            // Limit nie może spaść poniżej liczby już zaakceptowanych drużyn, inaczej turniej ma ich więcej,
+            // niż pozwala. Sprawdzamy tylko przy obniżaniu, żeby zwykła edycja nie pytała modułu Teams.
+            if (request.TeamLimit < result.TeamLimit)
+            {
+                var tournamentTeams = await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken);
+                var acceptedCount = tournamentTeams.Count(t => t.RegistrationStatus == "Accepted");
+                if (request.TeamLimit < acceptedCount)
+                    return Result.Failure<UpdateTournamentDetailsResponse>(Error.Validation("TeamLimit", "Team limit cannot be lower than the number of accepted teams"));
+            }
 
             var updateResult = result.UpdateDetails(request.Name, request.StartAt, request.EndAt, request.TeamLimit, request.Description);
 

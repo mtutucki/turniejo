@@ -42,9 +42,20 @@ ssh -L 8081:127.0.0.1:8081 user@vps
 
 ## Aktualizacja
 
+`deploy.sh` robi backup baz, ustawia kod na `origin/master`, przebudowuje kontenery i czeka, aż
+`/backend/health` odpowie. Ręcznie na serwerze:
+
 ```sh
-git pull
-docker compose -f docker-compose.prod.yml up -d --build
+~/turniejo/deploy/deploy.sh
+```
+
+Automatycznie: `.github/workflows/deploy.yml` uruchamia go po każdym pushu na `master` (albo ręcznie
+z zakładki Actions). Workflow loguje się kluczem z sekretów repo (`VPS_HOST`, `VPS_USER`,
+`VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`). Na serwerze ten klucz jest w `~/.ssh/authorized_keys` z
+ograniczeniem, więc może tylko uruchomić wdrożenie:
+
+```
+command="/home/deploy/turniejo/deploy/deploy.sh",restrict ssh-ed25519 AAAA... github-actions
 ```
 
 Migracje nakładają się same przy starcie API.
@@ -59,11 +70,18 @@ późniejsza zmiana wymaga `ALTER ROLE ... PASSWORD` w Postgresie.
 
 ## Backup
 
-Minimum: codzienny dump obu baz poza serwer, np. z crona:
+`backup.sh` zrzuca obie bazy do `~/backups` i usuwa zrzuty starsze niż 14 dni. Uruchamia go
+`deploy.sh` przed każdym wdrożeniem, a codziennie cron (`crontab -e`):
 
-```sh
-docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres -Fc turniejo > turniejo-$(date +%F).dump
-docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres -Fc keycloak > keycloak-$(date +%F).dump
+```
+30 3 * * * /home/deploy/turniejo/deploy/backup.sh >> /home/deploy/backups/cron.log 2>&1
 ```
 
-Raz przetestuj odtworzenie (`pg_restore`) na czystej bazie.
+Te pliki leżą na tym samym serwerze, więc włącz też kopie zapasowe/snapshoty u dostawcy VPS.
+Odtworzenie bazy z pliku (przykład dla aplikacji):
+
+```sh
+docker compose -f docker-compose.prod.yml exec -T postgres   pg_restore -U postgres -d turniejo --clean --if-exists < ~/backups/turniejo-RRRR-MM-DD_GGMM.dump
+```
+
+Raz przetestuj odtworzenie na czystej bazie.

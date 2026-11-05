@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 import { Fill, LegalDocument, LegalSection } from "@/components/legal/legal-document"
+import { IS_DEMO } from "@/lib/demo"
 import { LEGAL } from "@/lib/legal"
 
 export const metadata: Metadata = {
@@ -14,6 +15,37 @@ const linkClass = "text-primary font-medium hover:underline"
 export default function TermsPage() {
   return (
     <LegalDocument title="Regulamin serwisu Turniejo">
+      {IS_DEMO && (
+        <LegalSection id="demo" title="Wersja demonstracyjna">
+          <ol>
+            <li>
+              Ta instancja Serwisu jest wersją demonstracyjną, udostępnioną wyłącznie do zapoznania
+              się z jego funkcjami. Nie jest przeznaczona do organizowania prawdziwych turniejów.
+            </li>
+            <li>
+              Serwis jest udostępniany w stanie, w jakim jest. Może zawierać błędy, działać z
+              przerwami albo zostać wyłączony w dowolnym momencie.
+            </li>
+            <li>
+              Konta, organizacje, turnieje i wszystkie inne dane mogą zostać zmienione lub usunięte
+              w każdej chwili, bez uprzedzenia i bez możliwości odzyskania.
+            </li>
+            <li>
+              <strong>Nie wprowadzaj prawdziwych danych osobowych</strong>, w szczególności danych
+              dzieci. Używaj danych wymyślonych. Adres e-mail jest potrzebny tylko do logowania i
+              resetu hasła.
+            </li>
+            <li>
+              W granicach dopuszczalnych przez prawo Usługodawca nie odpowiada za utratę danych ani
+              za szkody wynikające z korzystania z wersji demonstracyjnej.
+            </li>
+            <li>
+              Postanowienia tej sekcji mają pierwszeństwo przed pozostałymi postanowieniami
+              Regulaminu.
+            </li>
+          </ol>
+        </LegalSection>
+      )}
       <LegalSection title="§1. Postanowienia ogólne">
         <ol>
           <li>
@@ -25,8 +57,17 @@ export default function TermsPage() {
             <strong>
               <Fill value={LEGAL.controllerName} />
             </strong>
-            , <Fill value={LEGAL.controllerAddress} />, <Fill value={LEGAL.controllerRegistry} />,
-            e-mail: <Fill value={LEGAL.contactEmail} /> (dalej „Usługodawca”).
+            {LEGAL.controllerAddress && (
+              <>
+                , <Fill value={LEGAL.controllerAddress} />
+              </>
+            )}
+            {LEGAL.controllerRegistry && (
+              <>
+                , <Fill value={LEGAL.controllerRegistry} />
+              </>
+            )}
+            , e-mail: <Fill value={LEGAL.contactEmail} /> (dalej „Usługodawca”).
           </li>
           <li>
             Pojęcia: <strong>Użytkownik</strong> — osoba z kontem w Serwisie;{" "}

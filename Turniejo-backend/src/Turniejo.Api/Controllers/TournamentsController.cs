@@ -7,6 +7,7 @@ using Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamentTea
 using Turniejo.Players.Application.TournamentPlayers.GetRosterSources;
 using Turniejo.Players.Application.TournamentPlayers.GetTournamentTeamPlayers;
 using Turniejo.Players.Application.TournamentPlayers.ImportSquad;
+using Turniejo.Players.Application.TournamentPlayers.RemovePlayerFromTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.UpdatePlayerInTournamentTeam;
 using Turniejo.Players.Application.TournamentPlayers.UpdateTournamentPlayer;
 using Turniejo.Players.Domain.Enums;
@@ -368,7 +369,7 @@ namespace Turniejo.Api.Controllers
         {
             var command = new CreatePlayerInTournamentTeamCommand(
                 tournamentId, tournamentTeamId, request.FirstName, request.LastName, request.BirthDate,
-                request.DefaultPosition, request.PhotoUrl, request.ShirtNumber, request.Position);
+                request.DefaultPosition, request.PhotoUrl, request.ShirtNumber, request.Position, request.AllowDuplicate);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -390,7 +391,15 @@ namespace Turniejo.Api.Controllers
         {
             var command = new UpdatePlayerInTournamentTeamCommand(
                 tournamentId, tournamentTeamId, tournamentPlayerId, request.FirstName, request.LastName, request.BirthDate,
-                request.PhotoUrl, request.ShirtNumber, request.Position, request.Status);
+                request.PhotoUrl, request.ShirtNumber, request.Position, request.Status, request.AllowDuplicate);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpDelete("{tournamentId}/tournament-teams/{tournamentTeamId}/players/{tournamentPlayerId}")]
+        public async Task<IActionResult> RemovePlayerFromTournamentTeam([FromRoute] Guid tournamentId, [FromRoute] Guid tournamentTeamId, [FromRoute] Guid tournamentPlayerId, CancellationToken cancellationToken)
+        {
+            var command = new RemovePlayerFromTournamentTeamCommand(tournamentId, tournamentTeamId, tournamentPlayerId);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -435,9 +444,9 @@ namespace Turniejo.Api.Controllers
         public sealed record AssignUserToTournamentTeamRequest(Guid UserId, TeamStaffRole Role);
         public sealed record AssignCoachToTeamRequest(Guid UserId);
         public sealed record AssignPlayerToTournamentTeamRequest(Guid PlayerId, int? ShirtNumber, PlayerPosition? Position);
-        public sealed record CreatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position);
+        public sealed record CreatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position, bool AllowDuplicate = false);
         public sealed record UpdateTournamentPlayerRequest(int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status);
-        public sealed record UpdatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status);
+        public sealed record UpdatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status, bool AllowDuplicate = false);
         public sealed record ImportSquadRequest(Guid SourceTournamentTeamId, IReadOnlyList<ImportSquadPlayer>? Players);
     }
 }

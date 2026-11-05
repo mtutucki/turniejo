@@ -116,11 +116,15 @@ export function RefereeMatchCard(props: RefereeMatchCardProps) {
   )
 }
 
-/** Mecz bez sędziego: bierze go pierwszy sędzia, który kliknie — od razu ląduje w panelu meczu. */
+/**
+ * Mecz bez sędziego: bierze go pierwszy sędzia, który kliknie. Sędzia zostaje na liście, żeby móc
+ * wziąć kilka meczów z rzędu. Tylko trwający mecz otwiera od razu, bo ktoś musi go przejąć teraz.
+ */
 export function OpenMatchCard(props: RefereeMatchCardProps) {
   const { match, homeName, awayName } = props
   const router = useRouter()
   const claim = useMatchRefereeSelf("claim")
+  const panelHref = `/matches/${match.id}/live`
   return (
     <Card className={cn("py-4", isLive(match) && "border-live/60")}>
       <CardContent className="flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:gap-4">
@@ -135,8 +139,15 @@ export function OpenMatchCard(props: RefereeMatchCardProps) {
               { tournamentId: match.tournamentId, matchId: match.id },
               {
                 onSuccess: () => {
-                  toast.success("Mecz jest Twój")
-                  router.push(`/matches/${match.id}/live`)
+                  if (isLive(match)) {
+                    toast.success("Mecz jest Twój")
+                    router.push(panelHref)
+                    return
+                  }
+                  toast.success(`Mecz jest Twój: ${homeName} – ${awayName}`, {
+                    description: "Znajdziesz go w sekcji „Nadchodzące”.",
+                    action: { label: "Otwórz panel", onClick: () => router.push(panelHref) },
+                  })
                 },
               },
             )

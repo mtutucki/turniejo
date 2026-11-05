@@ -63,6 +63,19 @@ public sealed class PlayersDbContext(DbContextOptions<PlayersDbContext> options)
             p.TournamentTeamId == tournamentTeamId && p.ShirtNumber == shirtNumber,
             cancellationToken);
 
+    // Śledzone usunięcie — trafia do bazy przy SaveChanges wywołującego.
+    public Task RemoveTournamentPlayerAsync(TournamentPlayer tournamentPlayer, CancellationToken cancellationToken = default)
+    {
+        TournamentPlayers.Remove(tournamentPlayer);
+        return Task.CompletedTask;
+    }
+
+    public Task RemovePlayerAsync(Player player, CancellationToken cancellationToken = default)
+    {
+        Players.Remove(player);
+        return Task.CompletedTask;
+    }
+
     public async Task AddPlayerGuardianAsync(PlayerGuardian playerGuardian, CancellationToken cancellationToken = default) =>
         await PlayerGuardians.AddAsync(playerGuardian, cancellationToken);
 

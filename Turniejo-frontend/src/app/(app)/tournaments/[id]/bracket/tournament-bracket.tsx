@@ -1,27 +1,42 @@
 "use client"
 
-import { GitBranch, Trophy } from "lucide-react"
+import { CalendarCheck, GitBranch, RefreshCw, Trash2, Trophy } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   useBracket,
   usePitches,
+  useRecalculateBracket,
   useResetBracket,
   useSchedule,
   useSwapBracketSlots,
 } from "@/features/matches/api"
 import { BracketBoard } from "@/features/matches/components/bracket-board"
 import { GenerateBracketForm } from "@/features/matches/components/generate-bracket-form"
+import { autoBracketPairs } from "@/features/matches/suggest-bracket"
 import { bracketChampion } from "@/features/public/components/champion-banner"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups, useTournamentSettings } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { CategoryPicker } from "@/features/tournaments/components/category-picker"
 import { cn } from "@/lib/utils"
 import type { BracketSlotRef } from "@/types/public"
 
@@ -37,6 +52,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
   const settings = useTournamentSettings(id)
   const resetBracket = useResetBracket(id)
   const swapSlots = useSwapBracketSlots(id)
+  const recalculate = useRecalculateBracket(id)
   const [editingPairs, setEditingPairs] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<BracketSlotRef | null>(null)
 
@@ -99,6 +115,12 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     // Zamiana par ma sens, dopóki nic nie zagrano — potem trzeba by cofać awanse i wyniki.
     const canEditPairs = isOrganizer && !anyStarted && tournamentStatus !== "Finished"
     const editing = editingPairs && canEditPairs
+    // Puchar po wygenerowaniu terminarza: usunięcie drabinki zabiera też terminarz (backend cofa etap).
+    // Gdy inne kategorie mają jeszcze mecze, terminarz zostaje (backend cofa etap tylko przy ostatniej).
+    const scheduledKnockout =
+      tournamentFormat === "Knockout" &&
+      tournamentStatus === "ScheduleGenerated" &&
+      !(schedule.data ?? []).some((m) => m.categoryId !== categoryId && m.status !== "Cancelled")
 
     function selectSlot(slot: BracketSlotRef) {
       if (!selectedSlot) return setSelectedSlot(slot)
@@ -121,15 +143,89 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
                   ? "Teraz kliknij drugi slot — zamienią się miejscami."
                   : "Kliknij dwa sloty pierwszej rundy, żeby zamienić je miejscami. Terminy meczów zostają.")}
             </p>
+            <div className="flex flex-wrap gap-2">
+              {!editing && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 />
+                      Usuń drabinkę
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Usunąć drabinkę?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {scheduledKnockout
+                          ? "Znikną pary i mecze drabinki z terminarza, a turniej wróci do etapu „Zapisy zamknięte”. Potem ułożysz pary i wygenerujesz terminarz od nowa."
+                          : "Znikną pary i mecze drabinki. Potem ułożysz pary od nowa."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        disabled={resetBracket.isPending}
+                        onClick={() =>
+                          resetBracket.mutate(
+                            { categoryId },
+                            { onSuccess: () => toast.success("Drabinka usunięta") },
+                          )
+                        }
+                      >
+                        Usuń drabinkę
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <Button
+                size="sm"
+                variant={editing ? "default" : "outline"}
+                onClick={() => {
+                  setEditingPairs(!editing)
+                  setSelectedSlot(null)
+                }}
+              >
+                {editing ? "Gotowe" : "Edytuj pary"}
+              </Button>
+            </div>
+          </div>
+        )}
+        {isOrganizer && anyStarted && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="text-muted-foreground">
+              Poprawiony wynik nie trafił dalej? Przelicz drabinkę.
+            </p>
             <Button
               size="sm"
-              variant={editing ? "default" : "outline"}
-              onClick={() => {
-                setEditingPairs(!editing)
-                setSelectedSlot(null)
-              }}
+              variant="outline"
+              disabled={recalculate.isPending}
+              onClick={() =>
+                recalculate.mutate(
+                  { categoryId },
+                  {
+                    onSuccess: ({ changed, blockedMatchIds }) => {
+                      if (blockedMatchIds.length > 0) {
+                        toast.warning(
+                          blockedMatchIds.length === 1
+                            ? "Kolejny mecz już się zaczął, więc nie dało się w nim zmienić drużyny."
+                            : `Kolejne mecze (${blockedMatchIds.length}) już się zaczęły, więc nie dało się w nich zmienić drużyn.`,
+                        )
+                      } else {
+                        toast.success(changed ? "Drabinka przeliczona" : "Drabinka jest aktualna")
+                      }
+                    },
+                  },
+                )
+              }
             >
-              {editing ? "Gotowe" : "Edytuj pary"}
+              <RefreshCw className={cn(recalculate.isPending && "animate-spin")} />
+              Przelicz drabinkę
             </Button>
           </div>
         )}
@@ -230,6 +326,11 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     )
   }
 
+  // Do wygenerowania terminarza brakującą drabinkę tworzy generator (z tej samej propozycji par).
+  const beforeSchedule =
+    tournamentStatus === "Draft" ||
+    tournamentStatus === "RegistrationOpen" ||
+    tournamentStatus === "RegistrationClosed"
   const acceptedTeams = (teams.data ?? []).filter(
     (t) => t.categoryId === categoryId && t.registrationStatus === "Accepted",
   )
@@ -253,34 +354,86 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     )
   }
 
+  // Czy generator terminarza ułoży tę drabinkę sam. Puchar: wszystkie drużyny muszą się zmieścić
+  // (do 16). Grupy + puchar: propozycja "na krzyż" działa przy 1, 2, 4 albo 8 grupach (grup może
+  // jeszcze nie być, wtedy zakładamy, że się uda).
+  const groupCount = categoryGroups.length
+  const autoReason =
+    tournamentFormat === "Knockout"
+      ? autoBracketPairs([], acceptedTeams)
+        ? null
+        : "Przy więcej niż 16 drużynach pary trzeba ułożyć samodzielnie."
+      : groupCount === 0 || [1, 2, 4, 8].includes(groupCount)
+        ? null
+        : `Przy ${groupCount} grupach pary trzeba ułożyć samodzielnie.`
+  const autoCreates = beforeSchedule && !autoReason
+
   return (
-    <Card className="max-w-3xl">
-      <CardHeader>
-        <CardTitle className="text-base">Utwórz drabinkę</CardTitle>
-        <CardDescription>
-          Wybierz pary pierwszej rundy — z miejsc w grupach albo konkretne drużyny.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <GenerateBracketForm
-          // Propozycja par i wielkość drabinki liczą się przy montowaniu — zmiana składu drużyn albo
-          // grup (np. świeższe dane po usunięciu zgłoszeń) ma je przeliczyć od nowa.
-          key={[...acceptedTeams.map((t) => t.id), ...categoryGroups.map((g) => g.id)].join(",")}
-          tournamentId={id}
-          categoryId={categoryId}
-          groups={categoryGroups}
-          teams={acceptedTeams}
-          thirdPlaceEnabled={settings.data?.isThirdPlaceMatchEnabled ?? false}
-        />
-      </CardContent>
-    </Card>
+    <div className="max-w-3xl space-y-4">
+      {beforeSchedule && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-xl border px-4 py-3 text-sm",
+            autoCreates ? "border-primary/40 bg-primary/10" : "border-live/50 bg-live/10",
+          )}
+        >
+          {autoCreates ? (
+            <>
+              <p className="font-medium">Drabinka utworzy się sama</p>
+              <p className="text-muted-foreground">
+                {tournamentFormat === "Knockout"
+                  ? "Gdy wygenerujesz terminarz, pary ułożą się według rozstawienia, tak jak poniżej."
+                  : "Po wygenerowaniu terminarza pary ułożą się z miejsc w grupach, tak jak poniżej."}{" "}
+                Nie musisz nic tu robić. Jeśli chcesz inne pary, zmień je i kliknij „Utwórz
+                drabinkę”.
+              </p>
+              <Button asChild size="sm" className="mt-3">
+                <Link href={`/tournaments/${id}/schedule/generate`}>
+                  <CalendarCheck />
+                  Generuj terminarz
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <p>{autoReason}</p>
+          )}
+        </div>
+      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {autoCreates ? "Własne pary (opcjonalnie)" : "Utwórz drabinkę"}
+          </CardTitle>
+          <CardDescription>
+            Pary pierwszej rundy z miejsc w grupach albo konkretnych drużyn.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GenerateBracketForm
+            // Propozycja par i wielkość drabinki liczą się przy montowaniu — zmiana składu drużyn albo
+            // grup (np. świeższe dane po usunięciu zgłoszeń) ma je przeliczyć od nowa.
+            key={[...acceptedTeams.map((t) => t.id), ...categoryGroups.map((g) => g.id)].join(",")}
+            tournamentId={id}
+            categoryId={categoryId}
+            groups={categoryGroups}
+            teams={acceptedTeams}
+            thirdPlaceEnabled={settings.data?.isThirdPlaceMatchEnabled ?? false}
+          />
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
 export function TournamentBracketView() {
   const { id, tournament } = useTournamentContext()
   const categories = useCategories(id)
-  const [selected, setSelected] = useState<string | undefined>()
+  // ?category=… otwiera drabinkę konkretnej kategorii (np. link z usuwania kategorii).
+  const searchParams = useSearchParams()
+  const [selected, setSelected] = useState<string | undefined>(
+    () => searchParams.get("category") ?? undefined,
+  )
   const format = tournament.data?.format
 
   if (format !== "Knockout" && format !== "GroupAndKnockout") {
@@ -294,31 +447,12 @@ export function TournamentBracketView() {
   }
   if (categories.isPending) return <Skeleton className="h-64 w-full rounded-xl" />
   const list = categories.data ?? []
-  const categoryId = selected ?? list[0]?.id
+  const categoryId = list.some((c) => c.id === selected) ? selected : list[0]?.id
   if (!categoryId) return <EmptyState icon={GitBranch} title="Najpierw dodaj kategorię" />
 
   return (
     <div className="space-y-4">
-      {list.length > 1 && (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Kategoria">
-          {list.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={c.id === categoryId}
-              onClick={() => setSelected(c.id)}
-              className={cn(
-                "h-9 rounded-full border px-4 text-sm font-medium",
-                c.id === categoryId
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground",
-              )}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <CategoryPicker categories={list} value={categoryId} onChange={setSelected} />
       <CategoryBracket key={categoryId} categoryId={categoryId} />
     </div>
   )

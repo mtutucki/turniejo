@@ -18,7 +18,9 @@ namespace Turniejo.Players.Application.TournamentPlayers.UpdatePlayerInTournamen
         string? PhotoUrl,
         int? ShirtNumber,
         PlayerPosition? Position,
-        TournamentPlayerStatus Status) : ICommand<UpdatePlayerInTournamentTeamResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
+        TournamentPlayerStatus Status,
+        // Jak w CreatePlayerInTournamentTeam: potwierdzony "dubel" to dwie różne osoby o tych samych danych.
+        bool AllowDuplicate = false) : ICommand<UpdatePlayerInTournamentTeamResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

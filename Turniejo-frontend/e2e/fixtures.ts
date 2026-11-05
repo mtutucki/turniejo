@@ -24,6 +24,8 @@ export const mock = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ side }),
     }),
+  release: (matchId: string) =>
+    fetch(`${MOCK_URL}/__control/matches/${matchId}/release`, { method: "POST" }),
 }
 
 export async function login(page: Page, email: string, password = PASSWORD) {

@@ -44,7 +44,10 @@ namespace Turniejo.Brackets.Application.Brackets.ResetBracket
 
             // Puchar: terminarz to mecze drabinki — bez nich "harmonogram gotowy" byłby pusty, a generator
             // terminarza wymaga etapu RegistrationClosed.
-            if (tournament.Format == "Knockout" && tournament.Status == "ScheduleGenerated" &&
+            // Inne kategorie mogą mieć swoje drabinki z zaplanowanymi meczami — wtedy terminarz zostaje.
+            var otherMatchesLeft = (await matchModule.GetMatchesByTournamentIdAsync(request.TournamentId, cancellationToken))
+                .Any(m => m.Status != "Cancelled");
+            if (tournament.Format == "Knockout" && tournament.Status == "ScheduleGenerated" && !otherMatchesLeft &&
                 !await tournamentModule.RevertScheduleGenerationAsync(request.TournamentId, cancellationToken))
                 return Result.Failure<ResetBracketResponse>(Error.Conflict("Status", "The bracket was removed, but the tournament stage could not be reverted — clear the schedule"));
 

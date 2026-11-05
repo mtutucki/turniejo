@@ -1,7 +1,16 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, CalendarCheck, Check, Info, Plus, ShieldAlert, X } from "lucide-react"
+import {
+  ArrowLeft,
+  CalendarCheck,
+  Check,
+  Info,
+  Plus,
+  ShieldAlert,
+  TriangleAlert,
+  X,
+} from "lucide-react"
 import Link from "next/link"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -37,12 +46,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   useBrackets,
+  useGenerateBracket,
   useGenerateSchedule,
   usePitches,
   useSavePitch,
   useSchedule,
 } from "@/features/matches/api"
 import { bracketStages } from "@/features/matches/planned-bracket-matches"
+import { autoBracketPairs } from "@/features/matches/suggest-bracket"
 import { useAssignTeamToGroup, useTournamentTeams } from "@/features/teams/api"
 import {
   useCategories,
@@ -53,6 +64,7 @@ import {
   useTournamentSettings,
 } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { isApiError } from "@/lib/api/errors"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import { formatDateTime, formatDayLong, plural, toDateTimeLocal, zonedToIso } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -90,6 +102,13 @@ type DayValues = GenerateValues["days"][number]
 type GenerateDraft = GenerateValues & { knownPitchIds: string[] }
 
 const draftKey = (tournamentId: string) => `turniejo:schedule-draft:${tournamentId}`
+
+/**
+ * Kategorie ("turniej:kategoria"), dla których już próbowaliśmy utworzyć drabinkę automatycznie.
+ * Poza komponentem, bo useRef nie przeżywa ponownego zamontowania (StrictMode w dev montuje dwa razy)
+ * i dwie drabinki szły do backendu równolegle.
+ */
+const autoBracketTried = new Set<string>()
 
 /** Organizator otworzył generator i go nie zamknął — sekcja "Mecze" wraca wtedy prosto do formularza. */
 export function hasScheduleDraft(tournamentId: string) {
@@ -247,10 +266,21 @@ function planGroups(groups: TournamentGroup[], teams: TournamentTeam[]): GroupPl
   })
 }
 
-function Requirement({ ok, children }: { ok: boolean; children: ReactNode }) {
+function Requirement({
+  ok,
+  warn = false,
+  children,
+}: {
+  ok: boolean
+  /** Nie blokuje generowania, ale warto to sprawdzić przed nim. */
+  warn?: boolean
+  children: ReactNode
+}) {
   return (
     <li className="flex items-start gap-2 text-sm">
-      {ok ? (
+      {warn ? (
+        <TriangleAlert className="text-live mt-0.5 size-4 shrink-0" aria-label="Uwaga" />
+      ) : ok ? (
         <Check className="text-primary mt-0.5 size-4 shrink-0" aria-label="Spełnione" />
       ) : (
         <X className="text-destructive mt-0.5 size-4 shrink-0" aria-label="Niespełnione" />
@@ -525,10 +555,16 @@ function Requirements({
   return (
     <ul className="space-y-2">
       <Requirement ok={tournament.status === "RegistrationClosed"}>
-        Zapisy zamknięte
+        {tournament.status === "RegistrationClosed"
+          ? "Zapisy zamknięte"
+          : tournament.status === "Draft"
+            ? "Zapisy jeszcze nie ruszyły"
+            : "Zapisy są wciąż otwarte"}
         {tournament.status !== "RegistrationClosed" && (
           <span className="text-muted-foreground block text-xs">
-            Terminarz układa się dla ostatecznej listy drużyn — najpierw zamknij zapisy.
+            {tournament.status === "Draft"
+              ? "Terminarz układa się dla ostatecznej listy drużyn. Otwórz zapisy, a gdy wszystkie drużyny się zgłoszą, zamknij je."
+              : "Terminarz układa się dla ostatecznej listy drużyn. Zamknij zapisy, gdy wszystkie drużyny się zgłoszą."}
           </span>
         )}
         <RegistrationAction tournament={tournament} />
@@ -560,16 +596,16 @@ function Requirements({
                 </Link>
               </span>
             )}
-            {waiting.length > 0 && (
-              <span className="text-muted-foreground block text-xs">
-                {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
-                akceptację zgłoszenia — nie zagra, dopóki jej nie zaakceptujesz.
-              </span>
-            )}
           </Requirement>
           <Requirement ok={bracketMatches > 0}>
             {bracketMatches > 0 ? (
-              `Drabinka gotowa — ${plural(bracketMatches, ["mecz", "mecze", "meczów"])} 1. rundy do rozstawienia`
+              <>
+                Drabinka gotowa: {plural(bracketMatches, ["mecz", "mecze", "meczów"])} 1. rundy do
+                rozstawienia{" "}
+                <Link href={`/tournaments/${id}/bracket`} className="text-primary underline">
+                  (zobacz pary)
+                </Link>
+              </>
             ) : accepted.length >= 2 ? (
               <>
                 Drabinka z parami 1. rundy{" "}
@@ -612,12 +648,6 @@ function Requirements({
               </Link>
             </span>
           )}
-          {waiting.length > 0 && (
-            <span className="text-muted-foreground block text-xs">
-              {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
-              akceptację zgłoszenia — nie zagra, dopóki jej nie zaakceptujesz.
-            </span>
-          )}
           {tournament.format &&
             playable.length === 0 &&
             quickSetup.map(({ category, teams: categoryTeams }) => (
@@ -658,6 +688,19 @@ function Requirements({
           ))}
         </Requirement>
       )}
+      {waiting.length > 0 && (
+        <Requirement ok={false} warn>
+          {plural(waiting.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na
+          akceptację: {waiting.map((t) => t.teamName).join(", ")}
+          <span className="text-muted-foreground block text-xs">
+            Nie dostaną meczów, a terminarz generuje się raz. Zaakceptuj je przed generowaniem albo
+            odrzuć, jeśli nie zagrają.{" "}
+            <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
+              Przejdź do Drużyn
+            </Link>
+          </span>
+        </Requirement>
+      )}
       <Requirement ok={activePitches > 0}>
         {activePitches > 0 ? (
           plural(activePitches, ["aktywne boisko", "aktywne boiska", "aktywnych boisk"])
@@ -678,12 +721,23 @@ function GenerateForm({
   pitches,
   workload,
   ready,
+  acceptedTeams,
+  waitingTeams,
+  notReadyReason,
+  afterGenerate,
 }: {
   tournament: Tournament
   settings: TournamentSettings
   pitches: Pitch[]
   workload: Workload
   ready: boolean
+  acceptedTeams: number
+  /** Nazwy drużyn czekających na akceptację: nie dostaną meczów. */
+  waitingTeams: string[]
+  /** Dlaczego przycisk jest wyłączony, gdy warunki nie są spełnione. */
+  notReadyReason: string
+  /** Grupy + puchar: po terminarzu tworzymy brakujące drabinki (miejsca w grupach). */
+  afterGenerate?: () => Promise<void>
 }) {
   const router = useRouter()
   const generate = useGenerateSchedule(tournament.id)
@@ -750,12 +804,15 @@ function GenerateForm({
     added.forEach((id) => knownPitches.current.add(id))
     form.setValue("pitchIds", [...form.getValues("pitchIds"), ...added], { shouldValidate: true })
   }, [pitches, form])
-  // Liczba meczów zmienia się, gdy organizator na tej samej stronie domyka warunki (np. przypisuje
-  // drużyny do grup). Dopóki nie ruszył dni, jedyny dzień ma zawsze komplet meczów.
+  // Jeden dzień gra wszystkie mecze — liczby nie ma czego wpisywać (pole jest ukryte). Dotyczy też
+  // szkicu sprzed zmiany liczby meczów i powrotu do jednego dnia po usunięciu pozostałych.
+  const singleDay = days.length === 1
   useEffect(() => {
-    if (draft || form.formState.isDirty || form.getValues("days").length !== 1) return
-    form.setValue("days.0.matches", Math.max(totalMatches, 1))
-  }, [totalMatches, draft, form])
+    if (!singleDay) return
+    const all = Math.max(totalMatches, 1)
+    if (form.getValues("days.0.matches") !== all)
+      form.setValue("days.0.matches", all, { shouldValidate: true })
+  }, [singleDay, totalMatches, form])
 
   const pitchCount = pitchIds.length
   const count = (day: DayValues) => (Number.isFinite(day.matches) ? day.matches : 0)
@@ -767,6 +824,13 @@ function GenerateForm({
   // Dzień po ostatnim z listy — o ile turniej jeszcze wtedy trwa.
   const dateToAdd = lastDay?.date ? nextDate(lastDay.date) : bounds.startDate
   const canAddDay = dateToAdd <= bounds.endDate
+  // Ile meczów w ogóle mieści się w wpisanych dniach. Gdy mniej niż trzeba, a dnia nie da się
+  // już dodać, podpowiedź „zwiększ liczbę meczów” nic nie da — brakuje czasu.
+  const fitTotal = days.reduce(
+    (sum, day) => sum + dayCapacity(day, pitchCount, settings, bounds),
+    0,
+  )
+  const outOfTime = remaining > 0 && pitchCount > 0 && !canAddDay && fitTotal < totalMatches
 
   // Puchar: które rundy wypadają którego dnia — mecze rozdajemy dniom po kolei, według dat.
   const stagesOfDay: (string | null)[] = days.map(() => null)
@@ -781,22 +845,42 @@ function GenerateForm({
     }
   }
 
+  // Daty turnieju zmienia się w ustawieniach; szkic formularza zostaje w sessionStorage.
+  const datesLink = (
+    <Link
+      href={`/tournaments/${tournament.id}/settings#details`}
+      className="text-foreground ml-1 underline"
+    >
+      Zmień daty turnieju
+    </Link>
+  )
+
   /** Co jest nie tak z danym dniem (poza samymi polami) — blokuje generowanie. */
-  function dayProblem(day: DayValues, index: number) {
+  function dayProblem(day: DayValues, index: number): ReactNode {
     if (!day.date) return null
     if (day.date < bounds.startDate || day.date > bounds.endDate)
-      return `Turniej trwa ${formatDateTime(tournament.startAt)} – ${formatDateTime(tournament.endAt)}`
+      return (
+        <>
+          Turniej trwa {formatDateTime(tournament.startAt)} – {formatDateTime(tournament.endAt)}.
+          {datesLink}
+        </>
+      )
     if (days.findIndex((other) => other.date === day.date) !== index)
       return "Ten dzień jest już na liście"
     if (day.date === bounds.startDate && day.startTime && day.startTime < bounds.startTime)
       return `Turniej zaczyna się o ${bounds.startTime}`
     const capacity = dayCapacity(day, pitchCount, settings, bounds)
     if (pitchCount > 0 && count(day) > capacity)
-      return capacity === 0
-        ? "Tego dnia nie zmieści się już żaden mecz — wybierz wcześniejszą godzinę"
-        : `Tego dnia zmieści się najwyżej ${plural(capacity, ["mecz", "mecze", "meczów"])}${
-            day.date === bounds.endDate ? ` (turniej kończy się o ${bounds.endTime})` : ""
-          }`
+      return capacity === 0 ? (
+        "Tego dnia nie zmieści się już żaden mecz — wybierz wcześniejszą godzinę"
+      ) : day.date === bounds.endDate ? (
+        <>
+          Tego dnia zmieści się najwyżej {plural(capacity, ["mecz", "mecze", "meczów"])}, bo turniej
+          kończy się o {bounds.endTime}.{datesLink}
+        </>
+      ) : (
+        `Tego dnia zmieści się najwyżej ${plural(capacity, ["mecz", "mecze", "meczów"])}`
+      )
     return null
   }
   const problems = days.map(dayProblem)
@@ -825,6 +909,9 @@ function GenerateForm({
     if (remaining <= 0) splitEvenly(days.length + 1)
   }
 
+  // Generowanie jest jednorazowe, więc przed wysłaniem pytamy jeszcze raz.
+  const [confirming, setConfirming] = useState<GenerateValues | null>(null)
+
   function submit(values: GenerateValues) {
     const windows = [...values.days]
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -846,13 +933,14 @@ function GenerateForm({
         pitchIds: values.pitchIds,
       },
       {
-        onSuccess: ({ matchesCreated }) => {
+        onSuccess: async ({ matchesCreated }) => {
           clearScheduleDraft(tournament.id)
           toast.success(
             isKnockout(tournament)
               ? `Rozstawiono ${plural(matchesCreated, ["mecz", "mecze", "meczów"])} 1. rundy`
               : `Wygenerowano ${plural(matchesCreated, ["mecz", "mecze", "meczów"])}`,
           )
+          await afterGenerate?.()
           router.push(`/tournaments/${tournament.id}/schedule`)
         },
         onError: (error) => applyFieldErrors(error, form),
@@ -861,7 +949,48 @@ function GenerateForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(setConfirming)} noValidate>
+      <AlertDialog open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Wygenerować terminarz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isKnockout(tournament)
+                ? `${plural(totalMatches, ["mecz", "mecze", "meczów"])} 1. rundy dostanie godziny i boiska.`
+                : `Powstanie ${plural(totalMatches, ["mecz", "mecze", "meczów"])} dla ${plural(acceptedTeams, ["zaakceptowanej drużyny", "zaakceptowanych drużyn", "zaakceptowanych drużyn"])}.`}{" "}
+              Terminarz generuje się raz, a turniej przejdzie do etapu „Harmonogram gotowy”.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {waitingTeams.length > 0 && (
+            <div
+              role="alert"
+              className="border-live/50 bg-live/10 rounded-xl border px-4 py-3 text-sm"
+            >
+              <p className="font-medium">
+                {plural(waitingTeams.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])}{" "}
+                na akceptację i nie dostanie meczów
+              </p>
+              <p className="text-muted-foreground">{waitingTeams.join(", ")}</p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            {waitingTeams.length > 0 && (
+              <Button asChild variant="outline">
+                <Link href={`/tournaments/${tournament.id}/teams`}>Przejdź do Drużyn</Link>
+              </Button>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                if (confirming) submit(confirming)
+                setConfirming(null)
+              }}
+            >
+              Generuj terminarz
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <FieldGroup>
         <p className="bg-muted/40 rounded-lg border px-3 py-2 text-sm">
           <span className="font-medium">{plural(totalMatches, ["mecz", "mecze", "meczów"])}</span>{" "}
@@ -914,9 +1043,10 @@ function GenerateForm({
         <FieldSet>
           <FieldLegend variant="label">Dni gry</FieldLegend>
           <FieldDescription>
-            Dla każdego dnia podaj, od której godziny i ile meczów gracie. Dni, których nie dodasz
-            (np. weekend), zostają bez meczów. Ostatni mecz musi się skończyć do{" "}
-            {formatDateTime(tournament.endAt)}.
+            {singleDay
+              ? "Podaj dzień i godzinę pierwszego meczu. Jeśli gracie kilka dni, dodaj kolejny dzień i rozdziel mecze."
+              : "Dla każdego dnia podaj, od której godziny i ile meczów gracie. Dni, których nie dodasz (np. weekend), zostają bez meczów."}{" "}
+            Ostatni mecz musi się skończyć do {formatDateTime(tournament.endAt)}.
           </FieldDescription>
           <ul className="space-y-3">
             {dayFields.fields.map((field, index) => {
@@ -926,7 +1056,14 @@ function GenerateForm({
               const problem = problems[index]
               return (
                 <li key={field.id} className="rounded-lg border p-3">
-                  <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto]">
+                  <div
+                    className={cn(
+                      "grid grid-cols-2 items-start gap-3",
+                      singleDay
+                        ? "sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
+                        : "sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto]",
+                    )}
+                  >
                     <div className="col-span-2 sm:col-span-1">
                       <TextField
                         id={`schedule-date-${index}`}
@@ -951,28 +1088,31 @@ function GenerateForm({
                       error={dayErrors?.startTime}
                       {...form.register(`days.${index}.startTime`)}
                     />
-                    <TextField
-                      id={`schedule-matches-${index}`}
-                      label="Meczów"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      className="font-mono tabular-nums"
-                      error={dayErrors?.matches}
-                      {...form.register(`days.${index}.matches`, { valueAsNumber: true })}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground col-span-2 justify-self-end sm:col-span-1 sm:mt-6"
-                      disabled={dayFields.fields.length === 1}
-                      aria-label={`Usuń dzień ${index + 1}`}
-                      title="Usuń dzień"
-                      onClick={() => dayFields.remove(index)}
-                    >
-                      <X />
-                    </Button>
+                    {!singleDay && (
+                      <>
+                        <TextField
+                          id={`schedule-matches-${index}`}
+                          label="Meczów"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          className="font-mono tabular-nums"
+                          error={dayErrors?.matches}
+                          {...form.register(`days.${index}.matches`, { valueAsNumber: true })}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground col-span-2 justify-self-end sm:col-span-1 sm:mt-6"
+                          aria-label={`Usuń dzień ${index + 1}`}
+                          title="Usuń dzień"
+                          onClick={() => dayFields.remove(index)}
+                        >
+                          <X />
+                        </Button>
+                      </>
+                    )}
                   </div>
                   {problem ? (
                     <p className="text-destructive mt-2 text-sm">{problem}</p>
@@ -1014,7 +1154,8 @@ function GenerateForm({
             )}
             {!canAddDay && (
               <span className="text-muted-foreground text-xs">
-                Turniej kończy się {formatDateTime(tournament.endAt)} — nie ma kolejnego dnia.
+                Turniej kończy się {formatDateTime(tournament.endAt)}, więc nie ma kolejnego dnia.
+                {datesLink}
               </span>
             )}
           </div>
@@ -1038,7 +1179,26 @@ function GenerateForm({
               planOk ? "border-primary/40 bg-primary/5" : "border-live/50 bg-live/10",
             )}
           >
-            {remaining > 0 ? (
+            {outOfTime ? (
+              <>
+                <p className="font-medium">
+                  Brakuje czasu na {plural(totalMatches - fitTotal, ["mecz", "mecze", "meczów"])}.
+                </p>
+                <p className="text-muted-foreground">
+                  Do końca turnieju ({formatDateTime(tournament.endAt)}) zmieści się {fitTotal} z{" "}
+                  {totalMatches}. Przesuń koniec turnieju w{" "}
+                  <Link
+                    href={`/tournaments/${tournament.id}/settings#details`}
+                    className="text-primary underline"
+                  >
+                    ustawieniach
+                  </Link>
+                  , skróć mecz lub przerwę
+                  {pitchCount < pitches.length ? ", zaznacz więcej boisk" : ""} albo zacznij
+                  wcześniej.
+                </p>
+              </>
+            ) : remaining > 0 ? (
               <>
                 <p className="font-medium">
                   {plural(remaining, [
@@ -1049,8 +1209,8 @@ function GenerateForm({
                   .
                 </p>
                 <p className="text-muted-foreground">
-                  Rozplanowano {assigned} z {totalMatches}. Zwiększ liczbę meczów któregoś dnia albo
-                  dodaj kolejny dzień.
+                  Rozplanowano {assigned} z {totalMatches}. Zwiększ liczbę meczów któregoś dnia
+                  {canAddDay ? " albo dodaj kolejny dzień" : ""}.
                 </p>
               </>
             ) : remaining < 0 ? (
@@ -1091,6 +1251,15 @@ function GenerateForm({
 
         <FieldError errors={[errors.root]} />
 
+        {!ready && (
+          <p
+            role="status"
+            className="border-live/50 bg-live/10 rounded-xl border px-4 py-3 text-sm"
+          >
+            {notReadyReason}
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={!ready || !planOk || generate.isPending}>
             <CalendarCheck />
@@ -1119,11 +1288,52 @@ export function GenerateScheduleView() {
   const schedule = useSchedule(id)
   const categories = useCategories(id)
   const knockout = tournament.data?.format === "Knockout"
+  const withBracket = knockout || tournament.data?.format === "GroupAndKnockout"
   const brackets = useBrackets(
     id,
     (categories.data ?? []).map((c) => c.id),
-    knockout,
+    withBracket,
   )
+  const { mutateAsync: createBracket, isPending: creatingBracket } = useGenerateBracket(id)
+  // Kategorie bez drabinki (GET zwraca 404) — drabinka powstaje sama z propozycji par.
+  const missingBrackets = (categories.data ?? []).filter((_, index) => {
+    const bracket = brackets[index]
+    return !!bracket?.isError && isApiError(bracket.error) && bracket.error.status === 404
+  })
+  const acceptedIn = (categoryId: string) =>
+    (teams.data ?? []).filter(
+      (team) => team.categoryId === categoryId && team.registrationStatus === "Accepted",
+    )
+
+  // Puchar: terminarz rozstawia mecze 1. rundy, więc drabinka musi powstać przed generowaniem.
+  // Tworzymy ją po wejściu tutaj (zapisy zamknięte, drużyny ustalone), każdą kategorię raz.
+  const autoKnockout =
+    isOrganizer && knockout && tournament.data?.status === "RegistrationClosed" && !!teams.data
+  const missingKey = missingBrackets.map((c) => c.id).join(",")
+  useEffect(() => {
+    if (!autoKnockout || !missingKey) return
+    const todo = missingKey
+      .split(",")
+      .filter((categoryId) => !autoBracketTried.has(`${id}:${categoryId}`))
+    todo.forEach((categoryId) => autoBracketTried.add(`${id}:${categoryId}`))
+    // Po kolei, nie równolegle: backend daje meczom 1. rundy pierwszy wolny termin na boisku, więc dwie
+    // drabinki tworzone naraz brały ten sam termin, druga padała w połowie ("na tym boisku trwa inny
+    // mecz") i zostawała bez meczów.
+    void (async () => {
+      for (const categoryId of todo) {
+        const accepted = (teams.data ?? []).filter(
+          (team) => team.categoryId === categoryId && team.registrationStatus === "Accepted",
+        )
+        const pairs = autoBracketPairs([], accepted)
+        if (!pairs) continue
+        try {
+          await createBracket({ categoryId, pairs })
+        } catch {
+          // Błąd pokazuje globalny handler; organizator ułoży tę drabinkę ręcznie.
+        }
+      }
+    })()
+  }, [autoKnockout, missingKey, teams.data, createBracket, id])
 
   const backLink = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
@@ -1153,7 +1363,8 @@ export function GenerateScheduleView() {
     schedule.isPending ||
     categories.isPending ||
     // Kategoria bez drabinki kończy się błędem 404, nie wiecznym ładowaniem.
-    (knockout && brackets.some((bracket) => bracket.isPending))
+    (withBracket && brackets.some((bracket) => bracket.isPending)) ||
+    creatingBracket
   if (loading) return <Skeleton className="h-96 w-full max-w-3xl rounded-xl" />
 
   const t = tournament.data!
@@ -1195,12 +1406,42 @@ export function GenerateScheduleView() {
     )
   }
 
+  // Grupy + puchar: drabinka z miejsc w grupach (A1–B2, B1–A2). Kategorie, w których propozycji nie da
+  // się zapisać bez poprawek, zostają dla organizatora.
+  async function createGroupBrackets() {
+    let skipped = 0
+    for (const category of missingBrackets) {
+      const categoryGroups = plan
+        .filter((p) => p.group.categoryId === category.id && p.matches > 0)
+        .map((p) => p.group)
+        .sort((a, b) => a.order - b.order)
+      const pairs =
+        categoryGroups.length > 0 ? autoBracketPairs(categoryGroups, acceptedIn(category.id)) : null
+      if (!pairs) {
+        skipped++
+        continue
+      }
+      try {
+        await createBracket({ categoryId: category.id, pairs })
+      } catch {
+        skipped++
+      }
+    }
+    if (missingBrackets.length > skipped)
+      toast.success("Drabinka utworzona z miejsc w grupach. Pary zmienisz w zakładce Drabinka.")
+    if (skipped > 0)
+      toast.message(
+        "Nie każdą drabinkę dało się ułożyć automatycznie. Ułóż pary w zakładce Drabinka.",
+      )
+  }
+
   // Zaakceptowana drużyna bez grupy zostałaby po cichu pominięta — a generowanie jest jednorazowe.
   const teamsWithoutGroup = (teams.data ?? []).some(
     (team) => team.registrationStatus === "Accepted" && !team.groupId,
   )
+  const registrationClosed = t.status === "RegistrationClosed"
   const ready =
-    t.status === "RegistrationClosed" &&
+    registrationClosed &&
     (isKnockout(t)
       ? bracketMatches > 0
       : hasGroupStage(t) && plan.some((p) => p.matches > 0) && !teamsWithoutGroup) &&
@@ -1214,7 +1455,7 @@ export function GenerateScheduleView() {
           <CardTitle className="text-base">Warunki</CardTitle>
           <CardDescription>
             {isKnockout(t)
-              ? "Puchar: najpierw ułóż pary 1. rundy w drabince — tu dostaną godziny i boiska. Kolejne rundy zaplanują się same po rozstrzygnięciu meczów."
+              ? "Puchar: pary 1. rundy układają się same według rozstawienia (zmienisz je w zakładce Drabinka). Tu dostaną godziny i boiska. Kolejne rundy zaplanują się same po rozstrzygnięciu meczów."
               : "Mecze „każdy z każdym” w grupach, dla drużyn zaakceptowanych i przypisanych do grupy."}
           </CardDescription>
         </CardHeader>
@@ -1247,6 +1488,20 @@ export function GenerateScheduleView() {
               pitches={activePitches}
               workload={workload}
               ready={ready}
+              acceptedTeams={
+                (teams.data ?? []).filter((team) => team.registrationStatus === "Accepted").length
+              }
+              waitingTeams={(teams.data ?? [])
+                .filter((team) => team.registrationStatus === "Pending")
+                .map((team) => team.teamName)}
+              notReadyReason={
+                registrationClosed
+                  ? "Najpierw spełnij warunki z listy powyżej."
+                  : t.status === "Draft"
+                    ? "Zapisy jeszcze nie ruszyły. Otwórz je, a potem zamknij, żeby wygenerować terminarz."
+                    : "Zapisy są wciąż otwarte. Zamknij je, żeby wygenerować terminarz."
+              }
+              afterGenerate={t.format === "GroupAndKnockout" ? createGroupBrackets : undefined}
             />
           )}
         </CardContent>

@@ -52,6 +52,7 @@ services:
         API_URL: http://api:8080
         NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
         NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
+        NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-}
     <<: [*restart, *logging]
     environment:
       # Logowanie grant_type=password idzie z serwera Next do Keycloaka siecią wewnętrzną.

@@ -1,7 +1,9 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { CircleAlert } from "lucide-react"
+import { useState } from "react"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 
 import { TextField } from "@/components/forms/text-field"
@@ -27,7 +29,10 @@ import {
 import type { TournamentCategory } from "@/types/tournaments"
 
 const POSITIONS = Object.keys(PLAYER_POSITION_LABELS) as PlayerPosition[]
-const STATUSES = Object.keys(PLAYER_STATUS_LABELS) as TournamentPlayerStatus[]
+// "Usunięty" ustawia przycisk "Usuń ze składu", nie lista statusów.
+const STATUSES = (Object.keys(PLAYER_STATUS_LABELS) as TournamentPlayerStatus[]).filter(
+  (s) => s !== "Removed",
+)
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, "Podaj imię").max(100, "Maksymalnie 100 znaków"),
@@ -49,10 +54,29 @@ const baseSchema = z.object({
 
 type PlayerValues = z.infer<typeof baseSchema>
 
+/** Ktoś ze składu z tym samym imieniem, nazwiskiem i datą urodzenia (pomijając edytowanego). */
+function findNamesake(
+  squad: TournamentPlayer[],
+  editing: TournamentPlayer | undefined,
+  v: Pick<PlayerValues, "firstName" | "lastName" | "birthDate">,
+) {
+  return squad.find(
+    (p) =>
+      p.id !== editing?.id &&
+      p.firstName.trim().localeCompare(v.firstName.trim(), "pl", { sensitivity: "base" }) === 0 &&
+      p.lastName.trim().localeCompare(v.lastName.trim(), "pl", { sensitivity: "base" }) === 0 &&
+      toDateInput(p.birthDate) === v.birthDate,
+  )
+}
+
+const namesakeKey = (v: Pick<PlayerValues, "firstName" | "lastName" | "birthDate">) =>
+  `${v.firstName.trim().toLowerCase()}|${v.lastName.trim().toLowerCase()}|${v.birthDate}`
+
 /**
  * Reguły z backendu (Create/UpdatePlayerInTournamentTeam: walidator + handler) sprawdzane już
  * w formularzu, żeby błąd pojawił się od razu przy polu. Backend sprawdza je ponownie.
- * `editing` — edytowany zawodnik: nie jest własnym dublem ani nie zajmuje sobie numeru.
+ * `editing` — edytowany zawodnik nie zajmuje sobie numeru. Dubel (te same dane) nie jest błędem
+ * schematu: formularz pyta, czy to inna osoba, i pozwala zapisać.
  */
 function buildSchema(
   category: TournamentCategory | undefined,
@@ -84,20 +108,6 @@ function buildSchema(
         code: "custom",
         path: ["birthDate"],
         message: `Za młody na kategorię ${category!.name}`,
-      })
-    }
-
-    const duplicate = others.some(
-      (p) =>
-        p.firstName.localeCompare(v.firstName, "pl", { sensitivity: "base" }) === 0 &&
-        p.lastName.localeCompare(v.lastName, "pl", { sensitivity: "base" }) === 0 &&
-        toDateInput(p.birthDate) === v.birthDate,
-    )
-    if (duplicate) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["lastName"],
-        message: "Ten zawodnik jest już w składzie",
       })
     }
 
@@ -143,8 +153,22 @@ export function PlayerForm({
     },
   })
   const { errors, isSubmitting } = form.formState
+  // Dane, dla których zapytaliśmy "czy to inna osoba?". Zmiana imienia, nazwiska lub daty chowa pytanie.
+  const [askedFor, setAskedFor] = useState<string | null>(null)
+  const [firstName, lastName, birthDate] = useWatch({
+    control: form.control,
+    name: ["firstName", "lastName", "birthDate"],
+  })
+  const current = { firstName, lastName, birthDate }
+  const namesake =
+    askedFor === namesakeKey(current) ? findNamesake(squad, player, current) : undefined
 
-  async function submit(values: PlayerValues) {
+  async function submit(values: PlayerValues, allowDuplicate = false) {
+    if (!allowDuplicate && findNamesake(squad, player, values)) {
+      setAskedFor(namesakeKey(values))
+      return
+    }
+    setAskedFor(null)
     try {
       await onSubmit({
         firstName: values.firstName,
@@ -154,6 +178,7 @@ export function PlayerForm({
         status: values.status,
         shirtNumber: values.shirtNumber ? Number(values.shirtNumber) : null,
         photoUrl: values.photoUrl || null,
+        allowDuplicate,
       })
     } catch (error) {
       applyFieldErrors(error, form)
@@ -166,7 +191,7 @@ export function PlayerForm({
       : undefined
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit((values) => submit(values))} noValidate>
       <FieldGroup>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
@@ -254,12 +279,47 @@ export function PlayerForm({
           {...form.register("photoUrl")}
         />
         <FieldError errors={[errors.root]} />
-        <div className="flex justify-end gap-2">
-          {secondaryAction}
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Zapisywanie…" : submitLabel}
-          </Button>
-        </div>
+        {namesake ? (
+          <div
+            role="alert"
+            className="border-live/40 bg-live/10 space-y-3 rounded-md border px-3 py-3 text-sm"
+          >
+            <p className="flex items-start gap-2">
+              <CircleAlert className="text-live mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                W składzie jest już {namesake.firstName} {namesake.lastName}
+                {namesake.birthDate && `, ur. ${formatBirthDate(namesake.birthDate)}`}. Na pewno to
+                inna osoba?
+              </span>
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setAskedFor(null)
+                  form.setFocus("firstName")
+                }}
+              >
+                Popraw dane
+              </Button>
+              <Button
+                type="button"
+                disabled={isSubmitting}
+                onClick={form.handleSubmit((values) => submit(values, true))}
+              >
+                {isSubmitting ? "Zapisywanie…" : player ? "Tak, zapisz" : "Tak, dodaj"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2">
+            {secondaryAction}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Zapisywanie…" : submitLabel}
+            </Button>
+          </div>
+        )}
       </FieldGroup>
     </form>
   )

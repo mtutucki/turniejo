@@ -30,6 +30,8 @@ namespace Turniejo.Brackets.Domain.Entities
         // wyłoni poprzednia runda). Mecz powstaje potem w tym terminie.
         public Guid? PlannedPitchId { get; private set; }
         public DateTimeOffset? PlannedAt { get; private set; }
+        // Sędzia wskazany z góry przez organizatora — mecz dostaje go, gdy powstanie.
+        public Guid? PlannedRefereeId { get; private set; }
 
         public bool IsFullyResolved => HomeTournamentTeamId.HasValue && AwayTournamentTeamId.HasValue;
 
@@ -163,6 +165,13 @@ namespace Turniejo.Brackets.Domain.Entities
         {
             PlannedPitchId = null;
             PlannedAt = null;
+            PlannedRefereeId = null;
+            SetUpdatedAt();
+        }
+
+        public void PlanReferee(Guid? refereeId)
+        {
+            PlannedRefereeId = refereeId;
             SetUpdatedAt();
         }
 

@@ -72,4 +72,14 @@ internal sealed class UserModule(
 
         return assignments.Select(a => a.UserId).Distinct().ToList();
     }
+
+    public Task RemoveRolesByScopesAsync(
+        string scopeType,
+        IReadOnlyCollection<Guid> scopeIds,
+        CancellationToken cancellationToken = default)
+    {
+        var roleScopeType = Enum.Parse<RoleScopeType>(scopeType);
+        // Guid.Empty: żaden user nie jest wyłączony z usuwania.
+        return dbContext.RemoveUserRoleAssignmentsByScopeAsync(roleScopeType, scopeIds, Guid.Empty, cancellationToken);
+    }
 }

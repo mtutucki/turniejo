@@ -68,6 +68,25 @@ public sealed class User : BaseEntity
     }
 
     /// <summary>
+    /// Zmiana danych osobowych przez samego usera (prawo do sprostowania danych). E-mail zostaje,
+    /// bo jest loginem w Keycloaku — jego zmiana wymagałaby potwierdzenia nowego adresu.
+    /// </summary>
+    public Result UpdateProfile(string firstName, string lastName, string? phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(firstName))
+            return Result.Failure(Error.Validation("FirstName", "First name cannot be empty."));
+
+        if (string.IsNullOrWhiteSpace(lastName))
+            return Result.Failure(Error.Validation("LastName", "Last name cannot be empty."));
+
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+        PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+        SetUpdatedAt();
+        return Result.Success();
+    }
+
+    /// <summary>
     /// Usunięcie konta (prawo do usunięcia danych). Rekord zostaje, bo inne moduły trzymają jego Id
     /// (sędzia meczu, autor zdarzenia) — znikają tylko dane osobowe. Akceptacja regulaminu zostaje
     /// jako dowód zgodności.

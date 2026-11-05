@@ -6,6 +6,8 @@ const EXACT: Record<string, string> = {
   // Auth / konto
   "User with this email already exists.": "Konto z tym adresem email już istnieje",
   "You already have an organization.": "Masz już organizację",
+  "Current password is incorrect.": "Obecne hasło jest nieprawidłowe",
+  "New password must be different from the current one.": "Nowe hasło musi się różnić od obecnego",
   // Dołączanie kodem
   "Invalid tournament code.": "Nieprawidłowy kod turnieju",
   // Turniej
@@ -26,7 +28,7 @@ const EXACT: Record<string, string> = {
   // Kategorie i grupy
   "Name already exists": "Ta nazwa jest już zajęta",
   "Cannot delete a category that still has teams registered to it":
-    "Nie można usunąć kategorii, do której są zgłoszone drużyny",
+    "Nie można usunąć kategorii z oczekującymi lub zaakceptowanymi drużynami",
   "Cannot delete a category that still has matches scheduled in it":
     "Nie można usunąć kategorii, w której są zaplanowane mecze",
   "Cannot delete a group that still has teams assigned to it":
@@ -38,6 +40,8 @@ const EXACT: Record<string, string> = {
   "Team is already registered for this tournament and category":
     "Ta drużyna jest już zgłoszona do tej kategorii",
   "Tournament has reached its team limit": "Osiągnięto limit drużyn w turnieju",
+  "Team limit cannot be lower than the number of accepted teams":
+    "Limit nie może być mniejszy niż liczba zaakceptowanych drużyn. Najpierw wycofaj nadmiarowe.",
   "Team does not belong to the tournament's organization":
     "Drużyna nie należy do organizacji tego turnieju",
   "TournamentTeam payment status is already set to the specified value": "Opłata ma już ten status",
@@ -47,6 +51,8 @@ const EXACT: Record<string, string> = {
   "User is already a coach for this team": "Ta osoba jest już trenerem tej drużyny",
   // Zawodnicy
   "Player is already assigned to this team": "Ten zawodnik jest już w składzie",
+  "A player with the same name and birth date is already in this team":
+    "W składzie jest już zawodnik o tych samych danych",
   "Player is not part of the source squad": "Tego zawodnika nie ma w wybranym składzie",
   "Shirt numbers must be unique.": "Numery na koszulkach nie mogą się powtarzać",
   "Select at least one player.": "Zaznacz co najmniej jednego zawodnika",
@@ -119,6 +125,12 @@ const EXACT: Record<string, string> = {
   "Pitch is inactive": "To boisko jest nieaktywne",
   "Pitch does not belong to this tournament": "To boisko nie należy do tego turnieju",
   "Match must take place within the tournament dates": "Mecz musi się odbyć w trakcie turnieju",
+  "Match must start after the matches its teams come from":
+    "Ten mecz musi się zacząć po meczach, z których przyjdą drużyny",
+  "This match already exists, change it in the schedule":
+    "Ten mecz już powstał. Zmień go w terminarzu",
+  "A pair with a bye has no match": "Para z wolnym losem nie ma meczu",
+  "The tournament has finished or been cancelled": "Turniej się zakończył albo został anulowany",
   "Schedule must fit within the tournament dates": "Terminarz musi mieścić się w datach turnieju",
   "Tournament already has group matches — clear the schedule first":
     "Turniej ma już mecze grupowe — najpierw wyczyść terminarz",

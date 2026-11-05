@@ -12,6 +12,8 @@ export type PlannedBracketMatch = {
   /** Pusty, gdy terminarz jeszcze nie powstał (tylko z includeUnplanned). */
   scheduledAt: string
   pitchId: string | null
+  /** Sędzia wskazany z góry przez organizatora. */
+  refereeId: string | null
   /** "Finał", "Półfinał", "Mecz o 3. miejsce"… */
   stage: string
   home: PlannedSide
@@ -122,6 +124,7 @@ export function plannedBracketMatches(
       categoryId,
       scheduledAt: node.plannedAt ?? "",
       pitchId: node.plannedPitchId,
+      refereeId: node.plannedRefereeId ?? null,
       stage: stageOf(round, standardRounds)[0],
       home: side(node, "Home"),
       away: side(node, "Away"),

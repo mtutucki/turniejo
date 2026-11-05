@@ -39,4 +39,15 @@ test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => 
     await mock.goal(MATCH_ID, "away")
     await expect(page.getByLabel("Lwy E2E: 1", { exact: true })).toHaveText("1")
   })
+
+  test("mecz oddany z innego urządzenia od razu wraca do wolnych", async ({ page }) => {
+    await loginAs(page, REFEREE)
+    await page.goto("/referee/matches")
+    await expect(page.getByRole("link", { name: /Orły E2E/ })).toBeVisible()
+    await expect.poll(async () => (await mock.state()).connections.tournaments).toBeGreaterThan(0)
+
+    await mock.release(MATCH_ID)
+    await expect(page.getByText("Trwają bez sędziego")).toBeVisible()
+    await expect(page.getByRole("button", { name: /Sędziuję ten mecz: Orły E2E/ })).toBeVisible()
+  })
 })

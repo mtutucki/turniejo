@@ -159,6 +159,8 @@ export type NewPlayerInput = {
   position: PlayerPosition
   shirtNumber: number | null
   photoUrl: string | null
+  /** Potwierdzone w formularzu: ktoś w składzie ma te same dane, ale to inna osoba. */
+  allowDuplicate?: boolean
 }
 
 /** Pełna edycja zawodnika w składzie: profil + numer/pozycja/status (PUT …/players/{id}). */

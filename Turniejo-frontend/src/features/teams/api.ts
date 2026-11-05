@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { matchKeys } from "@/features/matches/api"
 import { tournamentKeys } from "@/features/tournaments/api"
 import { useApi } from "@/hooks/use-api"
 import { myRolesQueryKey } from "@/hooks/use-my-roles"
@@ -109,7 +110,13 @@ export function useAddTeamToTournament(tournamentId: string) {
 
 export function useChangeRegistrationStatus(tournamentId: string) {
   const { request } = useApi()
-  const invalidate = useInvalidateTournamentTeams(tournamentId)
+  const queryClient = useQueryClient()
+  const invalidateTeams = useInvalidateTournamentTeams(tournamentId)
+  // Wycofanie drużyny odwołuje jej mecze. Terminarz z cache pokazywałby je dalej po przejściu do niego.
+  const invalidate = () => {
+    invalidateTeams()
+    void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+  }
   return useMutation({
     mutationFn: ({
       tournamentTeamId,
@@ -173,12 +180,15 @@ export function useTeamPlayers(tournamentId: string, tournamentTeamId: string) {
     queryFn: () =>
       request<TournamentPlayer[]>(`${tournamentTeamPath(tournamentId, tournamentTeamId)}/players`),
     enabled: isAuthenticated,
+    // Usunięci ze składu (z golami lub kartkami, więc zostali w bazie) nie są już w drużynie.
     select: (players) =>
-      [...players].sort(
-        (a, b) =>
-          (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) ||
-          a.lastName.localeCompare(b.lastName, "pl"),
-      ),
+      players
+        .filter((p) => p.status !== "Removed")
+        .sort(
+          (a, b) =>
+            (a.shirtNumber ?? 999) - (b.shirtNumber ?? 999) ||
+            a.lastName.localeCompare(b.lastName, "pl"),
+        ),
   })
 }
 
@@ -203,6 +213,7 @@ export function useAddNewPlayerToSquad(tournamentId: string, tournamentTeamId: s
             photoUrl: input.photoUrl,
             shirtNumber: input.shirtNumber,
             position: PlayerPosition[input.position],
+            allowDuplicate: input.allowDuplicate ?? false,
           },
         },
       ),
@@ -246,10 +257,27 @@ export function useUpdatePlayerInSquad(tournamentId: string, tournamentTeamId: s
             shirtNumber: input.shirtNumber,
             position: position ? PlayerPosition[position] : null,
             status: TOURNAMENT_PLAYER_STATUS_VALUES[input.status],
+            allowDuplicate: input.allowDuplicate ?? false,
           },
         },
       ),
     meta: { handlesValidation: true },
+    onSuccess: useInvalidateSquad(tournamentTeamId),
+  })
+}
+
+/**
+ * Usunięcie ze składu. Zawodnik z golami lub kartkami zostaje w bazie ze statusem "Usunięty"
+ * (deleted = false), żeby nie zniknął z przebiegu meczów; reszta znika całkiem.
+ */
+export function useRemovePlayerFromSquad(tournamentId: string, tournamentTeamId: string) {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: (tournamentPlayerId: string) =>
+      request<{ tournamentPlayerId: string; deleted: boolean }>(
+        `${tournamentTeamPath(tournamentId, tournamentTeamId)}/players/${tournamentPlayerId}`,
+        { method: "DELETE" },
+      ),
     onSuccess: useInvalidateSquad(tournamentTeamId),
   })
 }

@@ -2,6 +2,8 @@ using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
+using Turniejo.Matches.Domain.Events;
+using Turniejo.SharedKernel.Enums;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -13,7 +15,12 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
     // jako zaplanowany na moment utworzenia. Teraz dostaje propozycję terminu: nie wcześniej niż po fazie
     // grupowej i po ostatnich meczach obu drużyn, na boisku, które najwcześniej się zwalnia. Organizator
     // może go potem przesunąć w terminarzu (UpdateMatchSchedule).
-    internal sealed class CreateBracketMatchCommandHandler(IMatchesDbContext dbContext, ITournamentModule tournamentModule, ITeamModule teamModule)
+    internal sealed class CreateBracketMatchCommandHandler(
+        IMatchesDbContext dbContext,
+        ITournamentModule tournamentModule,
+        ITeamModule teamModule,
+        IUserModule userModule,
+        IAuthorizationService authorizationService)
         : ICommandHandler<CreateBracketMatchCommand, CreateBracketMatchResponse>
     {
         public async Task<Result<CreateBracketMatchResponse>> Handle(CreateBracketMatchCommand request, CancellationToken cancellationToken)
@@ -28,11 +35,36 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
                 return Result.Failure<CreateBracketMatchResponse>(result.Error);
 
             await AwardWalkoverIfOpponentWithdrewAsync(result.Value, cancellationToken);
+            await AssignPlannedRefereeAsync(result.Value, request.PlannedRefereeId, cancellationToken);
 
             await dbContext.AddMatchAsync(result.Value, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new CreateBracketMatchResponse(result.Value.Id));
+        }
+
+        // Organizator wskazał sędziego, zanim było wiadomo, kto zagra (węzeł drabinki). Mecz dostaje go
+        // razem z rolą sędziego w meczu — o ile ta osoba nadal jest sędzią turnieju.
+        private async Task AssignPlannedRefereeAsync(Match match, Guid? refereeId, CancellationToken cancellationToken)
+        {
+            if (refereeId is not { } id)
+                return;
+
+            var isTournamentReferee = await authorizationService.HasAnyRoleAsync(
+                id, nameof(RoleScopeType.Tournament), match.TournamentId, [nameof(UserRole.Referee)], cancellationToken);
+            if (!isTournamentReferee || match.AssignReferee(id, Guid.Empty).IsFailure)
+                return;
+
+            await userModule.AssignRoleAsync(id, nameof(UserRole.Referee), nameof(RoleScopeType.Match), match.Id, cancellationToken);
+
+            foreach (var domainEvent in match.DomainEvents.OfType<RefereeAssignedToMatch>())
+            {
+                await dbContext.AddOutboxMessageAsync(
+                    OutboxMessage.Create(
+                        domainEvent.GetType().AssemblyQualifiedName!,
+                        JsonSerializer.Serialize(domainEvent, domainEvent.GetType())),
+                    cancellationToken);
+            }
         }
 
         // Drużyna, która wycofała się, czekając w drabince na rywala (np. już w półfinale, a ćwierćfinał
@@ -100,6 +132,12 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
                                 m.HomeTournamentTeamId == request.AwayTournamentTeamId || m.AwayTournamentTeamId == request.AwayTournamentTeamId)
                     .Select(End).DefaultIfEmpty(now).Max()
             }.Max();
+
+            // Puchar przed terminarzem: godzinę i boisko nada generator terminarza, więc boiska jeszcze nie
+            // rezerwujemy. Inaczej dwie drabinki tworzone naraz (dwie kategorie) brały ten sam wolny termin,
+            // unikalny indeks (boisko, godzina) odrzucał jeden mecz, a drabinka zostawała bez meczów.
+            if (tournament?.Status is "Draft" or "RegistrationOpen" or "RegistrationClosed")
+                return (null, notBefore);
 
             var pitches = (await dbContext.GetPitchesByTournamentIdAsync(request.TournamentId, cancellationToken))
                 .Where(p => p.IsActive)

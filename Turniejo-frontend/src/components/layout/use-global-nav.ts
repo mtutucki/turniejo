@@ -5,10 +5,15 @@ import { useAuthStore } from "@/stores/auth-store"
 
 import { GLOBAL_NAV_ITEMS } from "./nav-items"
 
-/** Globalne pozycje nawigacji odfiltrowane po rolach zalogowanego usera (panel rodzica/trenera). */
+/**
+ * Globalne pozycje nawigacji odfiltrowane po rolach zalogowanego usera (panel rodzica/trenera).
+ * Pozycje z warunkiem czekają na role: inaczej organizatorowi mignęłoby "Zostań organizatorem".
+ */
 export function useGlobalNavItems() {
   const assignments = useAuthStore((state) => state.roleAssignments)
-  return GLOBAL_NAV_ITEMS.filter((item) => !item.requires || item.requires(assignments ?? []))
+  return GLOBAL_NAV_ITEMS.filter(
+    (item) => !item.requires || (assignments !== null && item.requires(assignments)),
+  )
 }
 
 /**

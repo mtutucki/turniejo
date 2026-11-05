@@ -25,13 +25,19 @@ namespace Turniejo.Brackets.Application.Services
 
             var currentTeamId = slot == BracketSlot.Home ? targetNode.HomeTournamentTeamId : targetNode.AwayTournamentTeamId;
 
-            // Węzeł, dla którego mecz już powstał, ma zamrożone drużyny — Match.HomeTournamentTeamId/
-            // AwayTournamentTeamId są niemutowalne po utworzeniu (Match.cs), więc ciche nadpisanie samego
-            // węzła zostawiłoby węzeł i już istniejący mecz w sprzecznych stanach. Dotyczy to głównie
-            // korekty wyniku poprzedniego meczu, która zmieniła zwycięzcę PO tym, jak kolejny mecz już
-            // powstał — to wymaga ręcznej interwencji, nie automatycznej podmianki.
-            if (targetNode.MatchId.HasValue && currentTeamId.HasValue && currentTeamId != tournamentTeamId)
-                return false;
+            // Mecz kolejnej rundy już powstał, a poprawka wyniku zmieniła zwycięzcę poprzedniego meczu.
+            // Dopóki ten mecz się nie zaczął, podmieniamy w nim drużynę (termin, boisko i sędzia zostają).
+            // Po starcie ma już zdarzenia i wynik, więc drużyny zostają, a organizator musi to rozwiązać sam.
+            if (targetNode.MatchId is { } existingMatchId && currentTeamId.HasValue && currentTeamId != tournamentTeamId)
+            {
+                var home = slot == BracketSlot.Home ? tournamentTeamId : targetNode.HomeTournamentTeamId;
+                var away = slot == BracketSlot.Away ? tournamentTeamId : targetNode.AwayTournamentTeamId;
+                if (home is not { } homeId || away is not { } awayId ||
+                    !await matchModule.ChangeUnstartedMatchTeamsAsync(existingMatchId, homeId, awayId, cancellationToken))
+                    return false;
+
+                return targetNode.ResolveSlot(slot, tournamentTeamId).IsSuccess;
+            }
 
             var resolveResult = targetNode.ResolveSlot(slot, tournamentTeamId);
             if (resolveResult.IsFailure)
@@ -42,6 +48,34 @@ namespace Turniejo.Brackets.Application.Services
             await TryCreateMatchAsync(targetNode, tournamentId, categoryId, stageType, cancellationToken);
 
             return true;
+        }
+
+        // Zwycięzca idzie dalej, a w półfinale przegrany trafia do meczu o 3. miejsce. Wołane po meczu,
+        // po korekcie jego wyniku i przy ręcznym przeliczeniu drabinki przez organizatora.
+        public async Task<bool> AdvanceFromNodeAsync(
+            BracketNode node, Guid winnerId, Guid tournamentId, Guid categoryId, CancellationToken cancellationToken)
+        {
+            Guid? loserId = null;
+            if (node.HomeTournamentTeamId == winnerId)
+                loserId = node.AwayTournamentTeamId;
+            else if (node.AwayTournamentTeamId == winnerId)
+                loserId = node.HomeTournamentTeamId;
+
+            var advanced = false;
+
+            if (node.WinnerGoesToNodeId.HasValue && node.WinnerGoesToSlot.HasValue)
+            {
+                advanced |= await AdvanceIntoAsync(
+                    node.WinnerGoesToNodeId.Value, node.WinnerGoesToSlot.Value, winnerId, tournamentId, categoryId, cancellationToken);
+            }
+
+            if (node.LoserGoesToNodeId.HasValue && node.LoserGoesToSlot.HasValue && loserId.HasValue)
+            {
+                advanced |= await AdvanceIntoAsync(
+                    node.LoserGoesToNodeId.Value, node.LoserGoesToSlot.Value, loserId.Value, tournamentId, categoryId, cancellationToken);
+            }
+
+            return advanced;
         }
 
         public async Task<string> ResolveStageTypeAsync(BracketNode node, CancellationToken cancellationToken)
@@ -104,7 +138,7 @@ namespace Turniejo.Brackets.Application.Services
 
             var matchId = await matchModule.CreateBracketMatchAsync(
                 tournamentId, categoryId, node.HomeTournamentTeamId!.Value, node.AwayTournamentTeamId!.Value, stageType,
-                node.PlannedPitchId, node.PlannedAt, cancellationToken);
+                node.PlannedPitchId, node.PlannedAt, node.PlannedRefereeId, cancellationToken);
 
             return node.AssignMatch(matchId);
         }

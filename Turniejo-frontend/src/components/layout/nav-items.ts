@@ -13,6 +13,7 @@ import {
   Ticket,
   Timer,
   Trophy,
+  UserPlus,
 } from "lucide-react"
 
 import {
@@ -92,6 +93,13 @@ export const GLOBAL_NAV_ITEMS: NavItem[] = [
   },
   { href: "/notifications", label: "Powiadomienia", icon: Bell, showsUnread: true },
   { href: "/join", label: "Dołącz kodem", icon: Ticket },
+  // Konto założone jako sędzia, trener albo rodzic może w każdej chwili zacząć organizować turnieje.
+  {
+    href: "/organizer",
+    label: "Zostań organizatorem",
+    icon: UserPlus,
+    requires: (assignments) => !hasOrganization(assignments),
+  },
   { href: "/help", label: "Pomoc", icon: CircleHelp },
 ]
 

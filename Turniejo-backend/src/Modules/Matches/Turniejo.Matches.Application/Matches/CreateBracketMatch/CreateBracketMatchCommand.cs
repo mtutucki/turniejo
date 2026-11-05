@@ -11,5 +11,7 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
         StageType StageType,
         // Termin zaplanowany wcześniej przez generator terminarza (IBracketModule) — brak = propozycja.
         Guid? PlannedPitchId = null,
-        DateTimeOffset? PlannedAt = null) : ICommand<CreateBracketMatchResponse>, IPublicRequest;
+        DateTimeOffset? PlannedAt = null,
+        // Sędzia wskazany przez organizatora na węźle drabinki, zanim mecz powstał.
+        Guid? PlannedRefereeId = null) : ICommand<CreateBracketMatchResponse>, IPublicRequest;
 }

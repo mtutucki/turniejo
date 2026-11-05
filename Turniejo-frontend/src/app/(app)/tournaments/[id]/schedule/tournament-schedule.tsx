@@ -51,6 +51,7 @@ import {
   plannedBracketMatches,
 } from "@/features/matches/planned-bracket-matches"
 import { RescheduleMatchDialog } from "@/features/matches/components/reschedule-match-dialog"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { useTournamentMembers, useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
@@ -63,6 +64,7 @@ import { UserRole } from "@/types/roles"
 import { hasScheduleDraft } from "./generate/generate-schedule"
 
 const ALL = "all"
+const NO_REFEREE = "none"
 
 type Lookups = {
   teamName: (tournamentTeamId: string) => string
@@ -98,6 +100,52 @@ function FilterSelect({
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+function RefereeChip({
+  refereeId,
+  referee,
+  actionable,
+}: {
+  refereeId: string | null
+  referee: TournamentMember | undefined
+  /** Mecz jeszcze się nie skończył — brak sędziego wymaga uwagi organizatora. */
+  actionable: boolean
+}) {
+  if (refereeId) {
+    return (
+      <span className="bg-primary/15 text-primary flex items-center gap-1 rounded-full px-2 py-0.5 font-medium">
+        <Whistle className="size-3" />
+        {/* Sędzia mógł opuścić turniej — przypisanie zostaje, choć nie znamy już nazwiska. */}
+        {referee ? memberName(referee) : "Sędzia przypisany"}
+      </span>
+    )
+  }
+  if (!actionable) {
+    return (
+      <span className="flex items-center gap-1">
+        <UserRound className="size-3" />
+        Bez sędziego
+      </span>
+    )
+  }
+  // Bursztyn (--live) jest zarezerwowany dla trwających meczów — brak sędziego to obrys, nie alarm.
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="border-muted-foreground/60 text-foreground flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5"
+        >
+          <UserRound className="size-3" />
+          Bez sędziego
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        Mecz może wziąć dowolny sędzia turnieju albo poprowadzić go organizator.
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -165,10 +213,11 @@ function MatchRow({
             )}
             {group && <span>{group}</span>}
             {isOrganizer && !unscheduled && (
-              <span className="flex items-center gap-1">
-                <UserRound className="size-3" />
-                {referee ? memberName(referee) : "Dowolny sędzia"}
-              </span>
+              <RefereeChip
+                refereeId={match.refereeId}
+                referee={referee}
+                actionable={editable || inProgress}
+              />
             )}
           </p>
         </div>
@@ -241,43 +290,98 @@ function MatchRow({
 
 /** Zapowiedź meczu kolejnej rundy: termin już jest, pary jeszcze nie (czeka na wcześniejsze mecze). */
 function PlannedRow({
+  tournamentId,
   planned,
-  pitch,
+  lookups,
+  isOrganizer,
+  pitches,
+  referees,
+  refereeCode,
   unscheduled = false,
 }: {
+  tournamentId: string
   planned: PlannedBracketMatch
-  pitch: string | null
+  lookups: Lookups
+  isOrganizer: boolean
+  pitches: Pitch[]
+  referees: TournamentMember[]
+  refereeCode: string | null
   /** Terminarz jeszcze nie powstał — sama para, bez godziny i boiska. */
   unscheduled?: boolean
 }) {
   const sideClass = (known: boolean) => cn("truncate", !known && "text-muted-foreground italic")
+  const title = `${planned.stage}: ${planned.home.label} – ${planned.away.label}`
+  const pitch = lookups.pitchName(planned.pitchId)
   return (
-    <li className="flex items-start gap-4 py-3" data-testid="planned-bracket-match">
-      {!unscheduled && (
-        <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
-          {formatTime(planned.scheduledAt)}
-        </span>
-      )}
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="flex flex-wrap items-center gap-x-2 font-medium">
-          <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
-          <span className="text-muted-foreground text-sm">vs</span>
-          <span className={sideClass(planned.away.known)}>{planned.away.label}</span>
-        </p>
-        <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5">
-            <Hourglass className="size-3" />
-            Czeka na wynik wcześniejszych meczów
+    <li
+      className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center"
+      data-testid="planned-bracket-match"
+    >
+      <div className="flex min-w-0 flex-1 items-start gap-4">
+        {!unscheduled && (
+          <span className="text-muted-foreground w-12 shrink-0 pt-0.5 font-mono text-sm font-semibold tabular-nums">
+            {formatTime(planned.scheduledAt)}
           </span>
-          {!unscheduled && (
-            <span className="flex items-center gap-1">
-              <MapPin className="size-3" />
-              {pitch ?? "Bez boiska"}
+        )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="flex flex-wrap items-center gap-x-2 font-medium">
+            <span className={sideClass(planned.home.known)}>{planned.home.label}</span>
+            <span className="text-muted-foreground text-sm">vs</span>
+            <span className={sideClass(planned.away.known)}>{planned.away.label}</span>
+          </p>
+          <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5">
+              <Hourglass className="size-3" />
+              Czeka na wynik wcześniejszych meczów
             </span>
-          )}
-          <span>{planned.stage}</span>
-        </p>
+            {!unscheduled && (
+              <span className="flex items-center gap-1">
+                <MapPin className="size-3" />
+                {pitch ?? "Bez boiska"}
+              </span>
+            )}
+            <span>{planned.stage}</span>
+            {isOrganizer && !unscheduled && (
+              <RefereeChip
+                refereeId={planned.refereeId}
+                referee={lookups.referee(planned.refereeId)}
+                actionable
+              />
+            )}
+          </p>
+        </div>
       </div>
+
+      {/* Termin i sędzia zapisują się na drabince; mecz dostanie je, gdy będzie wiadomo, kto gra. */}
+      {isOrganizer && !unscheduled && (
+        <div className="flex flex-wrap items-center gap-2 pl-16 lg:pl-0">
+          <RescheduleMatchDialog
+            tournamentId={tournamentId}
+            planned={planned}
+            title={title}
+            pitches={pitches}
+            trigger={
+              <Button size="sm" variant="outline" aria-label={`Zmień termin: ${title}`}>
+                <Clock />
+                Termin
+              </Button>
+            }
+          />
+          <AssignRefereeDialog
+            tournamentId={tournamentId}
+            planned={planned}
+            title={title}
+            referees={referees}
+            refereeCode={refereeCode}
+            trigger={
+              <Button size="sm" variant="outline" aria-label={`Sędzia: ${title}`}>
+                <Whistle />
+                Sędzia
+              </Button>
+            }
+          />
+        </div>
+      )}
     </li>
   )
 }
@@ -337,6 +441,8 @@ export function TournamentScheduleView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
   const router = useRouter()
   const schedule = useSchedule(id)
+  // Sędziowie biorą i oddają mecze, wyniki się zmieniają: terminarz odświeża się sam.
+  useTournamentMatchesRealtime([id])
   const pitches = usePitches(id)
   const teams = useTournamentTeams(id)
   const categories = useCategories(id)
@@ -350,6 +456,7 @@ export function TournamentScheduleView() {
   const [categoryId, setCategoryId] = useState(ALL)
   const [groupId, setGroupId] = useState(ALL)
   const [pitchId, setPitchId] = useState(ALL)
+  const [refereeId, setRefereeId] = useState(ALL)
 
   const lookups = useMemo<Lookups>(() => {
     const teamById = new Map((teams.data ?? []).map((t) => [t.id, t.teamName]))
@@ -381,7 +488,8 @@ export function TournamentScheduleView() {
       (m) =>
         (categoryId === ALL || m.categoryId === categoryId) &&
         (groupId === ALL || m.groupId === groupId) &&
-        (pitchId === ALL || m.pitchId === pitchId),
+        (pitchId === ALL || m.pitchId === pitchId) &&
+        (refereeId === ALL || (m.refereeId ?? NO_REFEREE) === refereeId),
     )
     // Backend sortuje tylko po godzinie — mecze z tego samego slotu układamy po boisku,
     // inaczej wiersze zmieniają kolejność przy każdym odświeżeniu.
@@ -396,6 +504,12 @@ export function TournamentScheduleView() {
           },
         ),
     )
+  // Mecze, które jeszcze się nie skończyły, a nikt ich nie prowadzi — organizator powinien je obsadzić.
+  const matchesWithoutReferee = (schedule.data ?? []).filter(
+    (m) =>
+      !m.refereeId &&
+      (SCHEDULABLE_STATUSES.includes(m.status) || m.status === "Live" || m.status === "Paused"),
+  ).length
   const anyStarted = (schedule.data ?? []).some(
     (m) => !SCHEDULABLE_STATUSES.includes(m.status) && m.status !== "Cancelled",
   )
@@ -415,23 +529,27 @@ export function TournamentScheduleView() {
 
   // Mecze kolejnych rund pucharu, które jeszcze nie istnieją (czekają na zwycięzców). Przed
   // wygenerowaniem terminarza nie mają terminu — pokazujemy je i tak, żeby było widać całą drabinkę.
-  const planned = brackets
-    .flatMap((bracket, i) =>
-      bracket.data
-        ? plannedBracketMatches(
-            bracket.data,
-            bracketCategoryIds[i]!,
-            lookups.teamName,
-            awaitingSchedule,
-          )
-        : [],
-    )
-    .filter(
-      (p) =>
-        (categoryId === ALL || p.categoryId === categoryId) &&
-        groupId === ALL &&
-        (pitchId === ALL || p.pitchId === pitchId),
-    )
+  const allPlanned = brackets.flatMap((bracket, i) =>
+    bracket.data
+      ? plannedBracketMatches(
+          bracket.data,
+          bracketCategoryIds[i]!,
+          lookups.teamName,
+          awaitingSchedule,
+        )
+      : [],
+  )
+  const planned = allPlanned.filter(
+    (p) =>
+      (categoryId === ALL || p.categoryId === categoryId) &&
+      groupId === ALL &&
+      (refereeId === ALL || (p.refereeId ?? NO_REFEREE) === refereeId) &&
+      (pitchId === ALL || p.pitchId === pitchId),
+  )
+
+  // Zapowiedziane mecze też da się obsadzić z góry, więc liczą się do "bez sędziego".
+  const withoutReferee =
+    matchesWithoutReferee + (awaitingSchedule ? 0 : allPlanned.filter((p) => !p.refereeId).length)
 
   type Row =
     | { kind: "match"; at: string; match: Match }
@@ -454,6 +572,7 @@ export function TournamentScheduleView() {
   // Puchar nie ma grup; pary bez terminu nie mają jeszcze boisk.
   const showGroupFilter = !knockout && groupOptions.length > 1
   const showPitchFilter = !awaitingSchedule && (pitches.data?.length ?? 0) > 1
+  const showRefereeFilter = isOrganizer && !awaitingSchedule
 
   // Organizator jest w trakcie generowania (otworzył formularz i wyszedł np. dodać drużyny) —
   // wraca prosto do formularza. "Anuluj" i "← Terminarz" kończą ten tryb.
@@ -479,18 +598,25 @@ export function TournamentScheduleView() {
         description={
           isOrganizer
             ? knockout
-              ? "Puchar: najpierw utwórz drabinkę (pary 1. rundy), potem wygeneruj terminarz."
+              ? "Puchar: pary 1. rundy ułożą się same według rozstawienia, gdy wygenerujesz terminarz. Jeśli chcesz, możesz je wcześniej ułożyć sam."
               : "Wygeneruj terminarz, gdy zapisy są zamknięte, a drużyny przypisane do grup."
             : "Organizator nie wygenerował jeszcze terminarza."
         }
         action={
           canGenerate ? (
-            <Button asChild>
-              <Link href={`/tournaments/${id}/${knockout ? "bracket" : "schedule/generate"}`}>
-                <CalendarCheck />
-                {knockout ? "Utwórz drabinkę" : "Generuj terminarz"}
-              </Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild>
+                <Link href={`/tournaments/${id}/schedule/generate`}>
+                  <CalendarCheck />
+                  Generuj terminarz
+                </Link>
+              </Button>
+              {knockout && (
+                <Button asChild variant="outline">
+                  <Link href={`/tournaments/${id}/bracket`}>Ułóż pary sam</Link>
+                </Button>
+              )}
+            </div>
           ) : undefined
         }
       />
@@ -511,6 +637,22 @@ export function TournamentScheduleView() {
             {!awaitingSchedule &&
               filtered.length !== schedule.data.length &&
               ` z ${schedule.data.length}`}
+            {isOrganizer && !awaitingSchedule && (
+              <>
+                {" · "}
+                {withoutReferee === 0 ? (
+                  "wszystkie mają sędziego"
+                ) : (
+                  <button
+                    type="button"
+                    className="text-foreground font-medium underline underline-offset-2"
+                    onClick={() => setRefereeId(NO_REFEREE)}
+                  >
+                    {plural(withoutReferee, ["mecz", "mecze", "meczów"])} bez sędziego
+                  </button>
+                )}
+              </>
+            )}
           </p>
         </div>
         {isOrganizer && (
@@ -541,7 +683,7 @@ export function TournamentScheduleView() {
       </div>
 
       {/* Filtr z jedną opcją niczego nie filtruje — pokazujemy tylko te, w których jest wybór. */}
-      {(showCategoryFilter || showGroupFilter || showPitchFilter) && (
+      {(showCategoryFilter || showGroupFilter || showPitchFilter || showRefereeFilter) && (
         <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
           {showCategoryFilter && (
             <FilterSelect
@@ -573,6 +715,18 @@ export function TournamentScheduleView() {
               allLabel="Wszystkie boiska"
             />
           )}
+          {showRefereeFilter && (
+            <FilterSelect
+              label="Sędzia"
+              value={refereeId}
+              onChange={setRefereeId}
+              options={[
+                { id: NO_REFEREE, name: "Bez sędziego" },
+                ...referees.map((r) => ({ id: r.userId, name: memberName(r) })),
+              ]}
+              allLabel="Wszyscy sędziowie"
+            />
+          )}
         </div>
       )}
 
@@ -592,8 +746,13 @@ export function TournamentScheduleView() {
                   row.kind === "planned" ? (
                     <PlannedRow
                       key={row.planned.nodeId}
+                      tournamentId={id}
                       planned={row.planned}
-                      pitch={lookups.pitchName(row.planned.pitchId)}
+                      lookups={lookups}
+                      isOrganizer={isOrganizer}
+                      pitches={pitches.data ?? []}
+                      referees={referees}
+                      refereeCode={tournament.data?.refereeCode ?? null}
                       unscheduled={awaitingSchedule}
                     />
                   ) : (

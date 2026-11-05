@@ -144,7 +144,7 @@ function PublicPortalCard({
             </p>
             {canManage && (
               <Link
-                href={`/tournaments/${tournament.id}/settings`}
+                href={`/tournaments/${tournament.id}/settings#portal`}
                 className="text-primary font-medium underline-offset-4 hover:underline"
               >
                 Włącz w ustawieniach

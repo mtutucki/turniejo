@@ -1,6 +1,6 @@
 "use client"
 
-import { Layers, Plus, Shield, UserPlus } from "lucide-react"
+import { CircleAlert, Layers, Plus, Shield, UserPlus } from "lucide-react"
 import Link from "next/link"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -28,6 +28,9 @@ export function TournamentTeamsView() {
   const inactiveCount = (teams.data?.length ?? 0) - (active?.length ?? 0)
   const accepted = teams.data?.filter((t) => t.registrationStatus === "Accepted").length ?? 0
   const teamLimit = tournament.data?.teamLimit ?? 0
+  // Backend liczy limit po zaakceptowanych: przy komplecie odrzuca akceptację i nowe zgłoszenia.
+  const freeSlots = Math.max(teamLimit - accepted, 0)
+  const limitReached = !!tournament.data && freeSlots === 0
 
   const addButton = isOrganizer &&
     organization.data &&
@@ -38,6 +41,9 @@ export function TournamentTeamsView() {
         organizationId={organization.data.id}
         categories={categories.data}
         registered={teams.data ?? []}
+        // Oczekujące też zajmują miejsce: każde zgłoszenie ma szansę na akceptację.
+        freeSlots={Math.max(teamLimit - (active?.length ?? 0), 0)}
+        teamLimit={teamLimit}
         trigger={
           <Button>
             <Plus />
@@ -101,6 +107,21 @@ export function TournamentTeamsView() {
         </div>
       </div>
 
+      {isOrganizer && limitReached && (
+        <div className="border-live/40 bg-live/5 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
+          <p className="flex items-start gap-2">
+            <CircleAlert className="text-live mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              Limit drużyn jest wyczerpany ({accepted} z {teamLimit}). Żeby przyjąć kolejną, zwiększ
+              limit albo wycofaj którąś z zaakceptowanych.
+            </span>
+          </p>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/tournaments/${id}/settings#details`}>Zmień limit</Link>
+          </Button>
+        </div>
+      )}
+
       {!active?.length ? (
         <EmptyState
           icon={Shield}
@@ -134,6 +155,7 @@ export function TournamentTeamsView() {
                           : (groups.data ?? []).filter((g) => g.categoryId === category.id)
                       }
                       canManage={isOrganizer}
+                      limitReached={limitReached}
                     />
                   ))}
                 </ul>

@@ -115,7 +115,7 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             var matchB = SetupMatch(semiB);
             var newMatchId = Guid.NewGuid();
             _matchModule.CreateBracketMatchAsync(
-                    _tournamentId, _categoryId, a, c, "Knockout", matchB.PitchId, matchB.ScheduledAt, Arg.Any<CancellationToken>())
+                    _tournamentId, _categoryId, a, c, "Knockout", matchB.PitchId, matchB.ScheduledAt, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
                 .Returns(newMatchId);
 
             // Act: wolny los przechodzi do pary B.

@@ -9,6 +9,7 @@ public interface IBracketModule
     Task<IReadOnlyList<BracketNodeInfoDto>> GetNodesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task SetPlannedSlotsAsync(IReadOnlyCollection<BracketPlannedSlotDto> slots, CancellationToken cancellationToken = default);
     Task ClearPlannedSlotsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+    Task SetPlannedRefereeAsync(Guid nodeId, Guid? refereeId, CancellationToken cancellationToken = default);
 }
 
 // HasBye: węzeł z wolnym losem nigdy nie dostaje meczu, więc nie potrzebuje terminu.
@@ -21,6 +22,7 @@ public record BracketNodeInfoDto(
     Guid? AwaySourceNodeId,
     bool HasBye,
     Guid? PlannedPitchId = null,
-    DateTimeOffset? PlannedAt = null);
+    DateTimeOffset? PlannedAt = null,
+    Guid? PlannedRefereeId = null);
 
 public record BracketPlannedSlotDto(Guid NodeId, Guid PitchId, DateTimeOffset ScheduledAt);

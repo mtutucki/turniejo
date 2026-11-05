@@ -2,7 +2,7 @@
 
 import { Download, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
-import { signOut, useSession } from "next-auth/react"
+import { signOut } from "next-auth/react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -24,6 +24,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useDeleteMyAccount, useExportMyData } from "@/features/account/api"
+import { ChangePasswordForm } from "@/features/account/components/change-password-form"
+import { ProfileForm } from "@/features/account/components/profile-form"
 import { useMyOrganization } from "@/features/tournaments/api"
 import { RenameOrganizationDialog } from "@/features/tournaments/components/rename-organization-dialog"
 import { isApiError } from "@/lib/api/errors"
@@ -187,21 +189,17 @@ function OrganizationCard() {
   )
 }
 
-/** Ustawienia konta: dane profilu, eksport danych i usunięcie konta (prawa z RODO). */
+/** Ustawienia konta: dane osobowe, hasło, organizacja, eksport danych i usunięcie konta (RODO). */
 export function AccountView() {
-  const { data: session } = useSession()
   const exportData = useExportMyData()
 
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Moje konto" />
       <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{session?.user?.name ?? "Użytkownik"}</CardTitle>
-            <CardDescription>{session?.user?.email}</CardDescription>
-          </CardHeader>
-        </Card>
+        <ProfileForm />
+
+        <ChangePasswordForm />
 
         <OrganizationCard />
 

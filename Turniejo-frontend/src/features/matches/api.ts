@@ -150,6 +150,43 @@ export function useAssignReferee(tournamentId: string) {
   })
 }
 
+// Mecz kolejnej rundy pucharu, który jeszcze nie powstał: termin i sędzia zapisują się na węźle drabinki.
+export function useUpdatePlannedMatchSchedule(tournamentId: string) {
+  const { request } = useApi()
+  const invalidate = useInvalidateMatches(tournamentId)
+  return useMutation({
+    mutationFn: ({
+      nodeId,
+      pitchId,
+      scheduledAt,
+    }: {
+      nodeId: string
+      pitchId: string
+      scheduledAt: string
+    }) =>
+      request(`${base(tournamentId)}/bracket-nodes/${nodeId}/schedule`, {
+        method: "PUT",
+        body: { pitchId, scheduledAt },
+      }),
+    meta: { handlesValidation: true },
+    onSuccess: invalidate,
+  })
+}
+
+export function useAssignPlannedReferee(tournamentId: string) {
+  const { request } = useApi()
+  const invalidate = useInvalidateMatches(tournamentId)
+  return useMutation({
+    mutationFn: ({ nodeId, refereeId }: { nodeId: string; refereeId: string | null }) =>
+      request(`${base(tournamentId)}/bracket-nodes/${nodeId}/referee`, {
+        method: "PATCH",
+        body: { refereeId },
+      }),
+    meta: { handlesValidation: true },
+    onSuccess: invalidate,
+  })
+}
+
 // --- Drabinka ------------------------------------------------------------------------------
 
 export function useBracket(tournamentId: string, categoryId: string | undefined) {
@@ -200,6 +237,26 @@ export function useResetBracket(tournamentId: string) {
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) })
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.dashboard(tournamentId) })
       void queryClient.invalidateQueries({ queryKey: ["tournaments", "list"] })
+    },
+  })
+}
+
+/**
+ * Przelicza drabinkę po poprawce wyniku: zwycięzca każdego zakończonego meczu trafia tam, gdzie
+ * powinien. Mecze, które już się zaczęły, zostają bez zmian i wracają w blockedMatchIds.
+ */
+export function useRecalculateBracket(tournamentId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ categoryId }: { categoryId: string }) =>
+      request<{ changed: boolean; blockedMatchIds: string[] }>(
+        `${base(tournamentId)}/bracket/recalculate?categoryId=${encodeURIComponent(categoryId)}`,
+        { method: "POST" },
+      ),
+    onSuccess: (_data, { categoryId }) => {
+      void queryClient.invalidateQueries({ queryKey: matchKeys.bracket(tournamentId, categoryId) })
+      void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
     },
   })
 }

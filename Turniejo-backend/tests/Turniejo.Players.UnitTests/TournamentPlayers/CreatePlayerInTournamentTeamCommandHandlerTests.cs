@@ -129,8 +129,26 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             var result = await _handler.Handle(Command(), CancellationToken.None);
 
             result.IsFailure.Should().BeTrue();
-            result.Error.Message.Should().Be("Player is already assigned to this team");
+            result.Error.Message.Should().Be("A player with the same name and birth date is already in this team");
             await ShouldNotPersistAnything();
+        }
+
+        [Fact]
+        public async Task Handle_ShouldCreatePlayer_WhenDuplicateIsConfirmed()
+        {
+            // Dwie różne osoby mogą mieć to samo imię, nazwisko i datę urodzenia — po potwierdzeniu dodajemy.
+            var existing = Player.Create(Guid.NewGuid(), "Jan", "Kowalski", new DateTime(2012, 5, 1), PlayerPosition.Defender, null, null, Guid.NewGuid()).Value;
+            var squadEntry = TournamentPlayer.Create(Guid.NewGuid(), _tournamentTeamId, existing.Id, 5, null, Guid.NewGuid()).Value;
+            _dbContext.GetTournamentPlayersByTournamentTeamIdAsync(_tournamentTeamId, Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentPlayer> { squadEntry });
+            _dbContext.GetPlayersByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(new List<Player> { existing });
+
+            var result = await _handler.Handle(Command() with { AllowDuplicate = true }, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            await _dbContext.Received(1).AddPlayerAsync(Arg.Any<Player>(), Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]

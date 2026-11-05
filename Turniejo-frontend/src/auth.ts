@@ -75,7 +75,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (isPublicPath(request.nextUrl.pathname)) return true
       return !!auth?.user && !auth.error
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // useSession().update({ name }) po zmianie danych osobowych: nowe imię i nazwisko bez
+      // ponownego logowania. Nic innego z klienta do tokenu nie wpuszczamy.
+      if (trigger === "update" && typeof session?.name === "string") {
+        return { ...token, name: session.name.slice(0, 201) }
+      }
+
       if (user) {
         return {
           ...token,

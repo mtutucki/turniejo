@@ -74,3 +74,5 @@ Turniejo_V2_swagger.json
 docs_gen/
 turniejo_frontend_plan.md
 dev.bat
+# Blokada równoległych wdrożeń (deploy/deploy.sh)
+deploy/.deploy.lock

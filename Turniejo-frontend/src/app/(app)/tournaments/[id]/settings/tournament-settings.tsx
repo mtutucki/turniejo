@@ -2,11 +2,12 @@
 
 import { FileText, Flag, Globe, ListChecks, Lock, type LucideIcon, Network } from "lucide-react"
 import Link from "next/link"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSchedule } from "@/features/matches/api"
 import {
   usePublicSettings,
   useTournamentSettings,
@@ -116,18 +117,34 @@ function SectionNav({
 const isSectionKey = (value: string): value is SectionKey =>
   ["status", "details", "format", "rules", "portal"].includes(value)
 
+function sectionFromHash(): SectionKey | null {
+  if (typeof window === "undefined") return null
+  const hash = window.location.hash.slice(1)
+  return isSectionKey(hash) ? hash : null
+}
+
 export function TournamentSettingsView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
   const settings = useTournamentSettings(id)
+  const schedule = useSchedule(id)
   const updateDetails = useUpdateTournamentDetails(id)
   const publicSettings = usePublicSettings(id, isOrganizer)
   const data = tournament.data!
   // Link może wskazać sekcję (np. "zmień" czas meczu w generatorze → #rules). Widok renderuje się
   // dopiero po załadowaniu turnieju w przeglądarce, więc odczyt hasha nie rozjeżdża hydracji.
-  const [active, setActive] = useState<SectionKey>(() => {
-    const hash = typeof window === "undefined" ? "" : window.location.hash.slice(1)
-    return isSectionKey(hash) ? hash : "status"
-  })
+  const [active, setActive] = useState<SectionKey>(() => sectionFromHash() ?? "status")
+  // Przy przejściu linkiem w aplikacji Next podmienia adres dopiero po pierwszym renderze, więc
+  // initializer widzi jeszcze stary adres (bez #details). Czytamy hash ponownie po zamontowaniu
+  // i przy każdej jego zmianie.
+  useEffect(() => {
+    const sync = () => {
+      const key = sectionFromHash()
+      if (key) setActive(key)
+    }
+    sync()
+    window.addEventListener("hashchange", sync)
+    return () => window.removeEventListener("hashchange", sync)
+  }, [])
 
   function select(key: SectionKey) {
     setActive(key)
@@ -150,6 +167,15 @@ export function TournamentSettingsView() {
       : null)
   const detailsLock =
     notOrganizer ?? (isClosed ? "Zakończonego lub anulowanego turnieju nie można edytować." : null)
+
+  // Czas meczu z zasad gry — bez niego liczymy tylko początek meczu.
+  const matchMs = (settings.data?.matchDurationMinutes ?? 0) * 60_000
+  const scheduledMatches = (schedule.data ?? [])
+    .filter((m) => m.status !== "Cancelled")
+    .map((m) => {
+      const startAt = new Date(m.scheduledAt).getTime()
+      return { startAt, endAt: startAt + matchMs }
+    })
 
   async function saveDetails(input: TournamentDetailsInput) {
     await updateDetails.mutateAsync(input)
@@ -190,7 +216,7 @@ export function TournamentSettingsView() {
   const current = sections.some((s) => s.key === active) ? active : "status"
 
   return (
-    <div className="grid max-w-5xl gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
+    <div className="grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
       <div className="space-y-3 lg:sticky lg:top-4">
         <SectionNav sections={sections} active={current} onSelect={select} />
         {isOrganizer && data.status === "Draft" && (
@@ -224,6 +250,7 @@ export function TournamentSettingsView() {
             submitLabel="Zapisz zmiany"
             pendingLabel="Zapisywanie…"
             disabled={!!detailsLock}
+            scheduledMatches={scheduledMatches}
             onSubmit={saveDetails}
           />
         </Section>
