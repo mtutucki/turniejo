@@ -399,7 +399,39 @@ namespace Turniejo.Matches.Domain.Entities
 
             _domainEvents.Add(new MatchScoreChanged(Id, TournamentId, GroupId, homeScore, awayScore));
 
+            // Poprawka goli w oknie edycji po meczu pucharowym może odwrócić wynik — wtedy drabinka
+            // (słuchająca MatchScoreCorrected) musi przesunąć dalej nowego zwycięzcę.
+            if (RefreshKnockoutWinner())
+                _domainEvents.Add(new MatchScoreCorrected(Id, TournamentId, GroupId, HomeScore, AwayScore, WinnerTournamentTeamId, Guid.Empty));
+
             return Result.Success();
+        }
+
+        // Zwycięzca meczu pucharowego zapisywał się tylko w Finish, więc późniejsza poprawka goli zmieniała
+        // wynik, a dalej w drabince zostawała stara drużyna. Zwraca true, gdy zwycięzca się zmienił.
+        // Remis bez karnych (np. w trakcie poprawiania 2:1 na 1:2) zostawia dotychczasowego zwycięzcę.
+        public bool RefreshKnockoutWinner()
+        {
+            if (Status != MatchStatus.Finished || StageType == StageType.Group || ResultType == MatchResultType.Walkover)
+                return false;
+
+            Guid winner;
+            if (HomeScore != AwayScore)
+                winner = HomeScore > AwayScore ? HomeTournamentTeamId : AwayTournamentTeamId;
+            else if (ResultType == MatchResultType.Penalties &&
+                     HomePenaltyScore is { } homePenalties && AwayPenaltyScore is { } awayPenalties && homePenalties != awayPenalties)
+                winner = homePenalties > awayPenalties ? HomeTournamentTeamId : AwayTournamentTeamId;
+            else
+                return false;
+
+            if (WinnerTournamentTeamId == winner)
+                return false;
+
+            WinnerTournamentTeamId = winner;
+            Version++;
+            SetUpdatedAt();
+
+            return true;
         }
 
         public Result SetManualScore(int homeScore, int awayScore, Guid changedByUserId)

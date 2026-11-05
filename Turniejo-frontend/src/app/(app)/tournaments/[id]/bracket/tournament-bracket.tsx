@@ -1,6 +1,6 @@
 "use client"
 
-import { CalendarCheck, GitBranch, Trash2, Trophy } from "lucide-react"
+import { CalendarCheck, GitBranch, RefreshCw, Trash2, Trophy } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   useBracket,
   usePitches,
+  useRecalculateBracket,
   useResetBracket,
   useSchedule,
   useSwapBracketSlots,
@@ -51,6 +52,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
   const settings = useTournamentSettings(id)
   const resetBracket = useResetBracket(id)
   const swapSlots = useSwapBracketSlots(id)
+  const recalculate = useRecalculateBracket(id)
   const [editingPairs, setEditingPairs] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState<BracketSlotRef | null>(null)
 
@@ -192,6 +194,39 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
                 {editing ? "Gotowe" : "Edytuj pary"}
               </Button>
             </div>
+          </div>
+        )}
+        {isOrganizer && anyStarted && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="text-muted-foreground">
+              Poprawiony wynik nie trafił dalej? Przelicz drabinkę.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={recalculate.isPending}
+              onClick={() =>
+                recalculate.mutate(
+                  { categoryId },
+                  {
+                    onSuccess: ({ changed, blockedMatchIds }) => {
+                      if (blockedMatchIds.length > 0) {
+                        toast.warning(
+                          blockedMatchIds.length === 1
+                            ? "Kolejny mecz już się zaczął, więc nie dało się w nim zmienić drużyny."
+                            : `Kolejne mecze (${blockedMatchIds.length}) już się zaczęły, więc nie dało się w nich zmienić drużyn.`,
+                        )
+                      } else {
+                        toast.success(changed ? "Drabinka przeliczona" : "Drabinka jest aktualna")
+                      }
+                    },
+                  },
+                )
+              }
+            >
+              <RefreshCw className={cn(recalculate.isPending && "animate-spin")} />
+              Przelicz drabinkę
+            </Button>
           </div>
         )}
         {needsRegeneration && (

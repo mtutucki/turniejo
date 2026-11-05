@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Brackets.Application.Brackets.GenerateBracket;
 using Turniejo.Brackets.Application.Brackets.GetBracket;
+using Turniejo.Brackets.Application.Brackets.RecalculateBracket;
 using Turniejo.Brackets.Application.Brackets.ResetBracket;
 using Turniejo.Brackets.Application.Brackets.SwapBracketSlots;
 using Turniejo.Brackets.Domain.Enums;
@@ -49,6 +50,13 @@ namespace Turniejo.Api.Controllers
                 tournamentId, request.CategoryId,
                 request.FirstNodeId, request.FirstSlot, request.SecondNodeId, request.SecondSlot);
             var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpPost("recalculate")]
+        public async Task<IActionResult> RecalculateBracket([FromRoute] Guid tournamentId, [FromQuery] Guid categoryId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new RecalculateBracketCommand(tournamentId, categoryId), cancellationToken);
             return result.ToActionResult();
         }
 

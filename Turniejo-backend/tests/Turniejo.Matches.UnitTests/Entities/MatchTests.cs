@@ -1121,5 +1121,50 @@ namespace Turniejo.Matches.UnitTests.Entities
             match.Finish(MatchResultType.Penalties, null, 10, ValidUserId, homePenaltyScore: homePens, awayPenaltyScore: awayPens)
                 .IsFailure.Should().BeTrue();
         }
-    }
+    
+        [Fact]
+        public void UpdateScore_AfterKnockoutFinish_ShouldChangeWinnerAndRaiseCorrection_WhenScoreFlips()
+        {
+            var match = LiveKnockout(2, 1);
+            match.Finish(MatchResultType.Regular, null, 10, ValidUserId);
+            match.ClearDomainEvents();
+
+            match.UpdateScore(1, 1);
+            match.WinnerTournamentTeamId.Should().Be(match.HomeTournamentTeamId);
+            match.DomainEvents.Should().NotContain(e => e is MatchScoreCorrected);
+
+            match.UpdateScore(1, 2);
+
+            match.WinnerTournamentTeamId.Should().Be(match.AwayTournamentTeamId);
+            match.DomainEvents.OfType<MatchScoreCorrected>().Should().ContainSingle()
+                .Which.WinnerTournamentTeamId.Should().Be(match.AwayTournamentTeamId);
+        }
+
+        [Fact]
+        public void UpdateScore_AfterKnockoutFinish_ShouldNotRaiseCorrection_WhenWinnerStaysTheSame()
+        {
+            var match = LiveKnockout(2, 1);
+            match.Finish(MatchResultType.Regular, null, 10, ValidUserId);
+            match.ClearDomainEvents();
+
+            match.UpdateScore(3, 1);
+
+            match.WinnerTournamentTeamId.Should().Be(match.HomeTournamentTeamId);
+            match.DomainEvents.Should().NotContain(e => e is MatchScoreCorrected);
+        }
+
+        [Fact]
+        public void RefreshKnockoutWinner_ShouldIgnoreGroupMatches()
+        {
+            var match = CreateValidMatch();
+            match.Start(ValidUserId);
+            match.UpdateScore(1, 0);
+            match.Finish(MatchResultType.Regular, null, 10, ValidUserId);
+
+            match.UpdateScore(0, 1);
+
+            match.WinnerTournamentTeamId.Should().BeNull();
+            match.DomainEvents.Should().NotContain(e => e is MatchScoreCorrected);
+        }
+}
 }

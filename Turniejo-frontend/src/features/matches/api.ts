@@ -241,6 +241,26 @@ export function useResetBracket(tournamentId: string) {
   })
 }
 
+/**
+ * Przelicza drabinkę po poprawce wyniku: zwycięzca każdego zakończonego meczu trafia tam, gdzie
+ * powinien. Mecze, które już się zaczęły, zostają bez zmian i wracają w blockedMatchIds.
+ */
+export function useRecalculateBracket(tournamentId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ categoryId }: { categoryId: string }) =>
+      request<{ changed: boolean; blockedMatchIds: string[] }>(
+        `${base(tournamentId)}/bracket/recalculate?categoryId=${encodeURIComponent(categoryId)}`,
+        { method: "POST" },
+      ),
+    onSuccess: (_data, { categoryId }) => {
+      void queryClient.invalidateQueries({ queryKey: matchKeys.bracket(tournamentId, categoryId) })
+      void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+    },
+  })
+}
+
 // BracketSlot: Home = 1, Away = 2.
 const slotNumber = (slot: BracketSlotRef["slot"]) => (slot === "Home" ? 1 : 2)
 

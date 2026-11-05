@@ -30,6 +30,10 @@ public interface IMatchModule
     // Zamiana par w drabince (moduł Brackets): podmienia drużyny meczu, który się jeszcze nie zaczął —
     // termin, boisko i sędzia zostają. Zwraca false i nic nie zmienia, gdy meczu nie ma albo już ruszył.
     Task<bool> ChangeUnstartedMatchTeamsAsync(Guid matchId, Guid homeTournamentTeamId, Guid awayTournamentTeamId, CancellationToken cancellationToken = default);
+
+    // Ręczne przeliczenie drabinki (moduł Brackets): ustawia zwycięzcę zakończonych meczów pucharowych
+    // zgodnie z ich wynikiem i zwraca go (mecz id -> zwycięzca). Mecze niezakończone są pomijane.
+    Task<IReadOnlyDictionary<Guid, Guid?>> RefreshKnockoutWinnersAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
 }
 
 public record GroupMatchDto(

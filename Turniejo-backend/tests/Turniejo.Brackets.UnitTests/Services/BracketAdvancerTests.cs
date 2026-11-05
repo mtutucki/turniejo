@@ -71,9 +71,7 @@ namespace Turniejo.Brackets.UnitTests.Services
         [Fact]
         public async Task AdvanceIntoAsync_ShouldRefuseToOverwriteSlot_WhenTargetNodeAlreadyHasAMatch_AndTeamDiffers()
         {
-            // Zamyka lukę z audytu: Match.HomeTournamentTeamId/AwayTournamentTeamId są niemutowalne po
-            // utworzeniu, więc ciche nadpisanie samego węzła zostawiłoby węzeł i już istniejący mecz w
-            // sprzecznych stanach — musi wymagać ręcznej interwencji, nie automatycznej podmianki.
+            // Kolejny mecz już ruszył (ChangeUnstartedMatchTeamsAsync zwraca false) — drużyn nie ruszamy.
             var round = BracketRound.Create(Guid.NewGuid(), Guid.NewGuid(), 2, BracketRoundType.Standard, "Final").Value;
             var node = CreateEmptyNode(round.Id);
             var oldTeamId = Guid.NewGuid();
@@ -89,6 +87,27 @@ namespace Turniejo.Brackets.UnitTests.Services
             node.HomeTournamentTeamId.Should().Be(oldTeamId);
             await _matchModule.DidNotReceive().CreateBracketMatchAsync(
                 Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task AdvanceIntoAsync_ShouldSwapTeamInNextMatch_WhenItHasNotStarted()
+        {
+            var round = BracketRound.Create(Guid.NewGuid(), Guid.NewGuid(), 2, BracketRoundType.Standard, "Final").Value;
+            var node = CreateEmptyNode(round.Id);
+            var otherTeamId = Guid.NewGuid();
+            var newTeamId = Guid.NewGuid();
+            var matchId = Guid.NewGuid();
+            node.ResolveSlot(BracketSlot.Home, Guid.NewGuid());
+            node.ResolveSlot(BracketSlot.Away, otherTeamId);
+            node.AssignMatch(matchId);
+            _dbContext.GetBracketNodeByIdAsync(node.Id, Arg.Any<CancellationToken>()).Returns(node);
+            _matchModule.ChangeUnstartedMatchTeamsAsync(matchId, newTeamId, otherTeamId, Arg.Any<CancellationToken>()).Returns(true);
+
+            var result = await _advancer.AdvanceIntoAsync(node.Id, BracketSlot.Home, newTeamId, Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+            result.Should().BeTrue();
+            node.HomeTournamentTeamId.Should().Be(newTeamId);
+            node.MatchId.Should().Be(matchId);
         }
 
         [Fact]
