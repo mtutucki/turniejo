@@ -120,7 +120,7 @@ export function AddTeamDialog({
 
     if (added > 0) {
       toast.success(
-        `Zgłoszono ${plural(added, ["drużynę", "drużyny", "drużyn"])} — czekają na akceptację`,
+        `Zgłoszono ${plural(added, ["drużynę", "drużyny", "drużyn"])} - czekają na akceptację`,
       )
     }
     if (failed.length === 0) {
@@ -145,7 +145,7 @@ export function AddTeamDialog({
         <DialogHeader>
           <DialogTitle>Zgłoś drużyny</DialogTitle>
           <DialogDescription>
-            Wybierz kategorię i zaznacz drużyny z bazy organizacji — możesz kilka naraz.
+            Wybierz kategorię i zaznacz drużyny z bazy organizacji - możesz kilka naraz.
           </DialogDescription>
         </DialogHeader>
         <p className={limitReached ? "text-destructive text-sm" : "text-muted-foreground text-sm"}>
@@ -261,7 +261,7 @@ export function AddTeamDialog({
                           <span className="block truncate">{team.name}</span>
                           {previous && (
                             <span className="text-muted-foreground text-xs">
-                              {previous === "Rejected" ? "Odrzucona" : "Wycofana"} — zgłoś ponownie
+                              {previous === "Rejected" ? "Odrzucona" : "Wycofana"} - zgłoś ponownie
                             </span>
                           )}
                         </label>

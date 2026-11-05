@@ -572,7 +572,7 @@ function Requirements({
       <Requirement ok={!!tournament.format}>
         {tournament.format
           ? `Format: ${TOURNAMENT_FORMAT_LABELS[tournament.format]}`
-          : "Format turnieju — wybierz, jak grają drużyny:"}
+          : "Format turnieju - wybierz, jak grają drużyny:"}
         {!tournament.format && <FormatAction tournamentId={id} />}
       </Requirement>
       {isKnockout(tournament) ? (
@@ -590,7 +590,7 @@ function Requirements({
                 {accepted.length === 0
                   ? "Turniej nie ma jeszcze żadnej zaakceptowanej drużyny"
                   : "Turniej ma tylko jedną zaakceptowaną drużynę"}{" "}
-                — drabinka nie ma z kogo ułożyć par.{" "}
+                - drabinka nie ma z kogo ułożyć par.{" "}
                 <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
                   Przejdź do Drużyn
                 </Link>
@@ -641,7 +641,7 @@ function Requirements({
           )}
           {tournament.format && groups.length === 0 && (
             <span className="text-muted-foreground block text-xs">
-              Turniej nie ma jeszcze żadnej grupy — mecze grają drużyny przypisane do tej samej
+              Turniej nie ma jeszcze żadnej grupy - mecze grają drużyny przypisane do tej samej
               grupy.{" "}
               <Link href={`/tournaments/${id}/categories`} className="text-primary underline">
                 Dodaj grupę
@@ -670,7 +670,7 @@ function Requirements({
           ])}{" "}
           grupy: {unassigned.map((t) => t.teamName).join(", ")}
           <span className="text-muted-foreground block text-xs">
-            Mecze grają tylko drużyny przypisane do grupy — te nie dostałyby żadnego, a terminarz
+            Mecze grają tylko drużyny przypisane do grupy - te nie dostałyby żadnego, a terminarz
             generuje się raz.{" "}
             <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
               Przypisz ręcznie w Drużynach
@@ -872,7 +872,7 @@ function GenerateForm({
     const capacity = dayCapacity(day, pitchCount, settings, bounds)
     if (pitchCount > 0 && count(day) > capacity)
       return capacity === 0 ? (
-        "Tego dnia nie zmieści się już żaden mecz — wybierz wcześniejszą godzinę"
+        "Tego dnia nie zmieści się już żaden mecz - wybierz wcześniejszą godzinę"
       ) : day.date === bounds.endDate ? (
         <>
           Tego dnia zmieści się najwyżej {plural(capacity, ["mecz", "mecze", "meczów"])}, bo turniej
@@ -1069,7 +1069,7 @@ function GenerateForm({
                         id={`schedule-date-${index}`}
                         label={
                           day?.date
-                            ? `Dzień — ${formatDayLong(`${day.date}T12:00:00Z`).split(",")[0]}`
+                            ? `Dzień - ${formatDayLong(`${day.date}T12:00:00Z`).split(",")[0]}`
                             : "Dzień"
                         }
                         type="date"
@@ -1166,7 +1166,7 @@ function GenerateForm({
               Godzina końca dnia to szacunek. Drużyna nie gra dwóch meczów naraz, więc przy kilku
               boiskach dzień może skończyć się trochę później, niż pokazuje formularz.
               {isKnockout(tournament) &&
-                " Mecze trafiają do dni w kolejności rund — żeby np. finał wypadł innego dnia, zostaw na ten dzień tylko tyle meczów, ile ma się w nim odbyć."}
+                " Mecze trafiają do dni w kolejności rund - żeby np. finał wypadł innego dnia, zostaw na ten dzień tylko tyle meczów, ile ma się w nim odbyć."}
             </span>
           </p>
         </FieldSet>
@@ -1230,7 +1230,7 @@ function GenerateForm({
                 <p className="font-medium">
                   Wszystkie {plural(totalMatches, ["mecz", "mecze", "meczów"])}{" "}
                   {totalMatches === 1 ? "ma" : "mają"} swój dzień
-                  {days.length > 1 && ` — ${plural(days.length, ["dzień", "dni", "dni"])} gry`}.
+                  {days.length > 1 && ` - ${plural(days.length, ["dzień", "dni", "dni"])} gry`}.
                 </p>
                 {lastDay && lastEnd !== null && (
                   <p className="text-muted-foreground">
@@ -1476,7 +1476,7 @@ export function GenerateScheduleView() {
         <CardHeader>
           <CardTitle className="text-base">Generuj terminarz</CardTitle>
           <CardDescription>
-            Po wygenerowaniu turniej przejdzie do etapu „Harmonogram gotowy” — generowanie jest
+            Po wygenerowaniu turniej przejdzie do etapu „Harmonogram gotowy” - generowanie jest
             jednorazowe.
           </CardDescription>
         </CardHeader>

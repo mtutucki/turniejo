@@ -49,7 +49,7 @@ export default function TermsPage() {
       <LegalSection title="§1. Postanowienia ogólne">
         <ol>
           <li>
-            Regulamin określa zasady korzystania z serwisu Turniejo (dalej „Serwis”) — aplikacji do
+            Regulamin określa zasady korzystania z serwisu Turniejo (dalej „Serwis”) - aplikacji do
             organizowania turniejów piłkarskich, dostępnej przez przeglądarkę.
           </li>
           <li>
@@ -70,11 +70,11 @@ export default function TermsPage() {
             , e-mail: <Fill value={LEGAL.contactEmail} /> (dalej „Usługodawca”).
           </li>
           <li>
-            Pojęcia: <strong>Użytkownik</strong> — osoba z kontem w Serwisie;{" "}
-            <strong>Organizator</strong> — Użytkownik prowadzący organizację i jej turnieje;{" "}
-            <strong>Uczestnik</strong> — Użytkownik, który dołączył do turnieju kodem (trener,
-            sędzia, rodzic, kibic); <strong>Zawodnik</strong> — osoba grająca w turnieju, której
-            dane wprowadza Organizator lub trener; <strong>Portal</strong> — publiczna strona
+            Pojęcia: <strong>Użytkownik</strong> - osoba z kontem w Serwisie;{" "}
+            <strong>Organizator</strong> - Użytkownik prowadzący organizację i jej turnieje;{" "}
+            <strong>Uczestnik</strong> - Użytkownik, który dołączył do turnieju kodem (trener,
+            sędzia, rodzic, kibic); <strong>Zawodnik</strong> - osoba grająca w turnieju, której
+            dane wprowadza Organizator lub trener; <strong>Portal</strong> - publiczna strona
             turnieju dostępna bez logowania.
           </li>
           <li>
@@ -126,7 +126,7 @@ export default function TermsPage() {
             innych osób, w tym danych osobowych bez podstawy prawnej.
           </li>
           <li>
-            Kody zaproszeń do turnieju są poufne — Użytkownik przekazuje je tylko osobom, które mają
+            Kody zaproszeń do turnieju są poufne - Użytkownik przekazuje je tylko osobom, które mają
             uczestniczyć w turnieju.
           </li>
           <li>
@@ -144,7 +144,7 @@ export default function TermsPage() {
           </li>
           <li>
             Organizator oświadcza, że ma podstawę prawną do przetwarzania danych Zawodników, a w
-            przypadku dzieci — zgodę rodziców lub opiekunów, w tym na publikację imion, nazwisk,
+            przypadku dzieci - zgodę rodziców lub opiekunów, w tym na publikację imion, nazwisk,
             zdjęć i wyników na Portalu, jeśli go włącza.
           </li>
           <li>
@@ -168,7 +168,7 @@ export default function TermsPage() {
           </li>
           <li>
             <strong>Przedmiot i cel:</strong> przechowywanie i udostępnianie danych w Serwisie w
-            celu organizacji turnieju, prowadzenia terminarza, wyników, statystyk i Portalu — przez
+            celu organizacji turnieju, prowadzenia terminarza, wyników, statystyk i Portalu - przez
             czas korzystania z Serwisu przez Organizatora.
           </li>
           <li>
@@ -177,7 +177,7 @@ export default function TermsPage() {
             tym dzieci), ich opiekunowie, trenerzy i sędziowie.
           </li>
           <li>
-            Usługodawca przetwarza dane wyłącznie na udokumentowane polecenie Organizatora —
+            Usługodawca przetwarza dane wyłącznie na udokumentowane polecenie Organizatora -
             poleceniami są Regulamin oraz czynności wykonywane przez Organizatora w Serwisie.
           </li>
           <li>
@@ -232,14 +232,14 @@ export default function TermsPage() {
         <p>
           W razie rażącego naruszenia Regulaminu Usługodawca może zablokować konto po bezskutecznym
           wezwaniu do zaprzestania naruszeń, a w przypadkach niecierpiących zwłoki (np. zagrożenie
-          bezpieczeństwa danych) — od razu, informując o przyczynie.
+          bezpieczeństwa danych) - od razu, informując o przyczynie.
         </p>
       </LegalSection>
 
       <LegalSection title="§10. Usunięcie organizacji">
         <p>
           Organizacja z turniejami, drużynami i danymi Zawodników jest usuwana razem z kontem jej
-          jedynego Organizatora — po dodatkowym potwierdzeniu w zakładce „Moje konto”. Operacja jest
+          jedynego Organizatora - po dodatkowym potwierdzeniu w zakładce „Moje konto”. Operacja jest
           nieodwracalna i odbiera dostęp do tych turniejów wszystkim Użytkownikom.
         </p>
       </LegalSection>

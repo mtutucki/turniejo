@@ -52,7 +52,7 @@ function NextSteps({ result }: { result: JoinResult }) {
     return (
       <>
         <p className="text-muted-foreground text-sm">
-          Organizator przypisze Cię teraz do drużyny — pojawi się w menu „Moje drużyny”.
+          Organizator przypisze Cię teraz do drużyny - pojawi się w menu „Moje drużyny”.
         </p>
         <Button asChild>
           <Link href={`/tournaments/${tournamentId}/dashboard`}>Przejdź do turnieju</Link>
@@ -63,11 +63,11 @@ function NextSteps({ result }: { result: JoinResult }) {
   return (
     <>
       <p className="text-muted-foreground text-sm">
-        Jesteś rodzicem? Organizator przypisze Cię do dziecka — wtedy w menu pojawi się „Moje
+        Jesteś rodzicem? Organizator przypisze Cię do dziecka - wtedy w menu pojawi się „Moje
         dzieci” z terminarzem i wynikami.{" "}
         {isPublic
           ? "Do tego czasu śledź turniej na portalu."
-          : "Organizator nie udostępnił jeszcze portalu kibica — link pojawi się na stronie startowej, gdy to zrobi."}
+          : "Organizator nie udostępnił jeszcze portalu kibica - link pojawi się na stronie startowej, gdy to zrobi."}
       </p>
       {isPublic && (
         <Button asChild>
@@ -145,7 +145,7 @@ export function JoinTournament({ initialCode = "" }: { initialCode?: string }) {
         <CardHeader>
           <CardTitle className="text-base">Kod dostępu</CardTitle>
           <CardDescription>
-            Kod dostaniesz od organizatora — określa, czy dołączysz jako sędzia, trener czy kibic.
+            Kod dostaniesz od organizatora - określa, czy dołączysz jako sędzia, trener czy kibic.
           </CardDescription>
         </CardHeader>
         <CardContent>

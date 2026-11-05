@@ -184,7 +184,7 @@ export function GenerateBracketForm({
 
       <FieldDescription>
         Miejsca z grup wypełnią się same, gdy grupa rozegra wszystkie mecze. Mecze pucharowe dostaną
-        propozycję terminu po fazie grupowej — możesz je przesunąć w terminarzu.
+        propozycję terminu po fazie grupowej - możesz je przesunąć w terminarzu.
         {thirdPlaceEnabled && " Mecz o 3. miejsce zostanie dodany (ustawienia sportowe)."}
         {hasBye && " Drużyna z wolnym losem przechodzi do kolejnej rundy bez meczu."}
       </FieldDescription>

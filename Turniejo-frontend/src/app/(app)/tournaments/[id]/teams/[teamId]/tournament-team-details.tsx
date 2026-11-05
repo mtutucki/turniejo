@@ -113,7 +113,7 @@ function Squad({
 }
 
 const staffName = (s: TeamStaffMember) =>
-  s.firstName || s.lastName ? `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() : "—"
+  s.firstName || s.lastName ? `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() : "-"
 
 function RemoveStaffButton({
   tournamentId,
@@ -145,7 +145,7 @@ function RemoveStaffButton({
           <AlertDialogTitle>Usunąć ze sztabu?</AlertDialogTitle>
           <AlertDialogDescription>
             {name} straci dostęp do tej drużyny jako{" "}
-            {TEAM_STAFF_ROLE_LABELS[member.role].toLowerCase()}. W turnieju zostaje — możesz
+            {TEAM_STAFF_ROLE_LABELS[member.role].toLowerCase()}. W turnieju zostaje - możesz
             przypisać tę osobę ponownie.
           </AlertDialogDescription>
         </AlertDialogHeader>

@@ -52,7 +52,7 @@ export function TeamsView() {
                       {tournament.settings.showSchedule ? (
                         <Link
                           href={`/t/${slug}/schedule?team=${team.tournamentTeamId}`}
-                          aria-label={`${team.name} — mecze drużyny`}
+                          aria-label={`${team.name} - mecze drużyny`}
                           className="hover:bg-accent focus-visible:ring-ring -mx-2 flex items-center gap-3 rounded-lg px-2 py-1 outline-none focus-visible:ring-2"
                         >
                           <TeamLogo name={team.name} logoUrl={team.logoUrl} size={32} />

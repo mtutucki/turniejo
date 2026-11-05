@@ -29,7 +29,7 @@ function CodeRow({ label, code }: { label: string; code: string }) {
       )
       setTimeout(() => setCopied(null), 1500)
     } catch {
-      toast.error("Nie udało się skopiować — zaznacz kod ręcznie")
+      toast.error("Nie udało się skopiować - zaznacz kod ręcznie")
     }
   }
 
@@ -72,7 +72,7 @@ export function AccessCodesPanel({ tournament }: { tournament: Tournament }) {
       <CardHeader>
         <CardTitle className="text-base">Kody dostępu</CardTitle>
         <CardDescription>
-          Wyślij kod albo link zaproszenia osobie, która ma dołączyć w danej roli — link poprowadzi
+          Wyślij kod albo link zaproszenia osobie, która ma dołączyć w danej roli - link poprowadzi
           ją też przez założenie konta.
         </CardDescription>
       </CardHeader>

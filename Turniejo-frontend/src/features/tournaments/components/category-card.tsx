@@ -201,7 +201,7 @@ export function CategoryCard({
         {format === "Knockout" ? (
           // Puchar: pary ustala drabinka, grupy są zbędne.
           <p className="text-muted-foreground text-sm">
-            Puchar — pary 1. rundy ustalasz w zakładce{" "}
+            Puchar - pary 1. rundy ustalasz w zakładce{" "}
             <Link href={`/tournaments/${tournamentId}/bracket`} className="text-primary underline">
               Drabinka
             </Link>
@@ -209,7 +209,7 @@ export function CategoryCard({
           </p>
         ) : !format ? (
           <p className="text-muted-foreground text-sm">
-            Wybierz format turnieju — przy formacie z grupami kategoria dostanie od razu „Grupa A”.
+            Wybierz format turnieju - przy formacie z grupami kategoria dostanie od razu „Grupa A”.
           </p>
         ) : groups.length === 0 ? (
           <p className="text-muted-foreground text-sm">Brak grup w tej kategorii.</p>
@@ -250,13 +250,13 @@ export function CategoryCard({
         )}
         {format && format !== "Knockout" && groups.length === 1 && (
           <p className="text-muted-foreground text-xs">
-            Jedna grupa — wszystkie drużyny kategorii grają każdy z każdym. Drugą grupę dodaj, gdy
+            Jedna grupa - wszystkie drużyny kategorii grają każdy z każdym. Drugą grupę dodaj, gdy
             drużyn jest tyle, że wszystkie mecze by się nie zmieściły.
           </p>
         )}
         {format && format !== "Knockout" && groups.length > 0 && ungrouped > 0 && (
           <p className="text-destructive text-xs">
-            {plural(ungrouped, ["drużyna nie ma", "drużyny nie mają", "drużyn nie ma"])} grupy —
+            {plural(ungrouped, ["drużyna nie ma", "drużyny nie mają", "drużyn nie ma"])} grupy -
             przypisz{" "}
             <Link href={`/tournaments/${tournamentId}/teams`} className="underline">
               w Drużynach

@@ -86,7 +86,7 @@ export function TeamFormDialog({ organizationId, team, trigger }: TeamFormDialog
         <DialogHeader>
           <DialogTitle>{team ? "Edytuj drużynę" : "Nowa drużyna"}</DialogTitle>
           <DialogDescription>
-            Drużyna trafia do bazy organizacji — potem zgłosisz ją do dowolnego turnieju.
+            Drużyna trafia do bazy organizacji - potem zgłosisz ją do dowolnego turnieju.
           </DialogDescription>
         </DialogHeader>
         <form id="team-form" onSubmit={form.handleSubmit(submit)} noValidate>

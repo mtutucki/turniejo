@@ -99,7 +99,7 @@ function RankingCard({ kind, title, unit }: (typeof RANKINGS)[number]) {
       ) : rows.length === 0 ? (
         <p className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
           <BarChart3 className="size-4" />
-          Brak danych — ranking pojawi się po pierwszych meczach.
+          Brak danych - ranking pojawi się po pierwszych meczach.
         </p>
       ) : (
         <>

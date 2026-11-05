@@ -32,7 +32,7 @@ export function NewTournament() {
     <>
       <PageHeader
         title="Nowy turniej"
-        description="Zacznij od nazwy i terminu — kreator przeprowadzi Cię potem krok po kroku aż do terminarza."
+        description="Zacznij od nazwy i terminu - kreator przeprowadzi Cię potem krok po kroku aż do terminarza."
       />
       <Card className="max-w-2xl">
         <CardContent>

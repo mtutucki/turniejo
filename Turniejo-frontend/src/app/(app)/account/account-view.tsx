@@ -117,7 +117,7 @@ function DeleteAccount() {
                     {organization.data
                       ? ` organizacji „${organization.data.name}”`
                       : " organizacji"}
-                    , więc razem z kontem usuniemy ją w całości — nie tylko dla Ciebie, ale dla
+                    , więc razem z kontem usuniemy ją w całości - nie tylko dla Ciebie, ale dla
                     wszystkich:
                   </p>
                   <ul className="list-disc space-y-1 pl-5">
@@ -171,7 +171,7 @@ function OrganizationCard() {
         <CardDescription>Organizacja</CardDescription>
         <CardTitle className="text-base">{organization.data.name}</CardTitle>
         <CardDescription>
-          Pod tą nazwą prowadzisz turnieje i bazę drużyn — może to być klub, szkoła albo Ty sam.
+          Pod tą nazwą prowadzisz turnieje i bazę drużyn - może to być klub, szkoła albo Ty sam.
         </CardDescription>
       </CardHeader>
       <CardContent>

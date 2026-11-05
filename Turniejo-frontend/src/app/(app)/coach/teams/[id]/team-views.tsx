@@ -48,7 +48,7 @@ export function CoachPlayersView() {
         >
           <Lock className="mt-0.5 size-4 shrink-0" />
           <p>
-            Turniej już trwa — organizator zablokował zmiany w składzie. O zmianę (np. kontuzję)
+            Turniej już trwa - organizator zablokował zmiany w składzie. O zmianę (np. kontuzję)
             poproś organizatora.
           </p>
         </div>

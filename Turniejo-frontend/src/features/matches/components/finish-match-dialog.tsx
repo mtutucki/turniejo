@@ -150,7 +150,7 @@ export function FinishMatchDialog({
           </div>
           {knockout && draw && (
             <p className="text-muted-foreground text-xs">
-              Mecz pucharowy nie może zakończyć się remisem — rozstrzygnij go karnymi.
+              Mecz pucharowy nie może zakończyć się remisem - rozstrzygnij go karnymi.
             </p>
           )}
         </FieldSet>

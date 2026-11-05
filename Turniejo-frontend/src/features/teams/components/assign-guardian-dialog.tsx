@@ -97,7 +97,7 @@ export function AssignGuardianDialog({
         <DialogHeader>
           <DialogTitle>Opiekun zawodnika</DialogTitle>
           <DialogDescription>
-            {name} — rodzic zobaczy terminarz, wyniki i tabelę w panelu „Moje dzieci” i dostanie
+            {name} - rodzic zobaczy terminarz, wyniki i tabelę w panelu „Moje dzieci” i dostanie
             powiadomienia. Rodzic musi najpierw dołączyć do turnieju kodem.
           </DialogDescription>
         </DialogHeader>
@@ -118,7 +118,7 @@ export function AssignGuardianDialog({
             </Select>
             {members.data?.length === 0 && (
               <p className="text-muted-foreground text-sm">
-                Nikt jeszcze nie dołączył do turnieju — przekaż rodzicowi kod widza.
+                Nikt jeszcze nie dołączył do turnieju - przekaż rodzicowi kod widza.
               </p>
             )}
           </Field>

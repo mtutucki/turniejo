@@ -68,7 +68,7 @@ function DateTimeField({
         <Input id={id} type="date" aria-invalid={!!dateError} {...dateProps} />
         <Input
           type="time"
-          aria-label={`${label} — godzina`}
+          aria-label={`${label} - godzina`}
           aria-invalid={!!timeError}
           className="w-28 shrink-0 font-mono tabular-nums"
           {...timeProps}

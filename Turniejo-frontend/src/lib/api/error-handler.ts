@@ -59,7 +59,7 @@ export function handleApiError(error: unknown, context: ErrorContext) {
         if (!context.handlesConflict) toast.error(error.detail)
         return
       }
-      toast.error("Konflikt edycji — dane zostały zmodyfikowane w innym miejscu", {
+      toast.error("Konflikt edycji - dane zostały zmodyfikowane w innym miejscu", {
         description: "Odśwież stronę i spróbuj ponownie.",
       })
       return

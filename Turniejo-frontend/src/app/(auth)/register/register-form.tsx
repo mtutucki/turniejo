@@ -64,7 +64,7 @@ const ACCOUNT_TYPES: {
   {
     value: "participant",
     title: "Dołączam do turnieju",
-    description: "Rodzic, trener albo sędzia — z kodem od organizatora.",
+    description: "Rodzic, trener albo sędzia - z kodem od organizatora.",
     icon: Ticket,
   },
   {
@@ -190,7 +190,7 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
             label="Nazwa organizacji (opcjonalnie)"
             placeholder="np. UKS Orły Warszawa"
             autoComplete="organization"
-            description="Klub, szkoła albo Ty sam. Bez nazwy użyjemy Twojego imienia i nazwiska — zmienisz ją w „Moje konto”."
+            description="Klub, szkoła albo Ty sam. Bez nazwy użyjemy Twojego imienia i nazwiska - zmienisz ją w „Moje konto”."
             error={errors.organizationName}
             {...form.register("organizationName")}
           />

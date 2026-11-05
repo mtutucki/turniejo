@@ -96,7 +96,7 @@ export function CategoryFormDialog({
         <DialogHeader>
           <DialogTitle>{category ? "Edytuj kategorię" : "Nowa kategoria"}</DialogTitle>
           <DialogDescription>
-            Kategoria to osobne rozgrywki, np. rocznik albo poziom — drużyny z różnych kategorii nie
+            Kategoria to osobne rozgrywki, np. rocznik albo poziom - drużyny z różnych kategorii nie
             grają ze sobą i mają osobne tabele. Zakres dat urodzenia jest opcjonalny (sprawdza wiek
             zawodników w składach).
           </DialogDescription>

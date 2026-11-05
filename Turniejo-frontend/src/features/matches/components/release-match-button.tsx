@@ -55,7 +55,7 @@ export function ReleaseMatchButton({
           <AlertDialogTitle>Oddać ten mecz?</AlertDialogTitle>
           <AlertDialogDescription>
             {inProgress
-              ? "Mecz trwa dalej — zegar się nie zatrzyma. Trafi do wolnych meczów i dokończy go inny sędzia albo organizator."
+              ? "Mecz trwa dalej - zegar się nie zatrzyma. Trafi do wolnych meczów i dokończy go inny sędzia albo organizator."
               : "Mecz wróci do wolnych meczów i będzie mógł go wziąć inny sędzia turnieju."}
           </AlertDialogDescription>
         </AlertDialogHeader>

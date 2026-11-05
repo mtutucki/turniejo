@@ -40,7 +40,7 @@ export function ErrorFallback({
       <div className="space-y-1">
         <h1 className="text-lg font-semibold">Coś poszło nie tak</h1>
         <p className="text-muted-foreground text-sm">
-          Nie udało się wyświetlić tej strony. Sprawdź połączenie i spróbuj ponownie — jeśli problem
+          Nie udało się wyświetlić tej strony. Sprawdź połączenie i spróbuj ponownie - jeśli problem
           wraca, daj znać organizatorowi.
         </p>
         {error.digest && (

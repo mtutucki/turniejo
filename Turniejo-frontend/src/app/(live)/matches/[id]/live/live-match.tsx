@@ -326,7 +326,7 @@ function LivePanel({
           <Flag className="text-primary mt-0.5 size-4 shrink-0" />
           {canEdit && panel.editLockedAt
             ? `Mecz zakończony. Poprawki możliwe do ${formatTime(panel.editLockedAt)}.`
-            : "Mecz zakończony — wynik jest zablokowany."}
+            : "Mecz zakończony - wynik jest zablokowany."}
         </p>
       )}
 

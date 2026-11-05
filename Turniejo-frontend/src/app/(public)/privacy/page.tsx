@@ -38,7 +38,7 @@ export default function PrivacyPage() {
         </p>
         <p>
           Dane zawodników (w tym dzieci) wprowadza organizator turnieju i to on jest ich
-          administratorem — szczegóły w punkcie 5.
+          administratorem - szczegóły w punkcie 5.
         </p>
       </LegalSection>
 
@@ -56,7 +56,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Dane zawodników:</strong> imię, nazwisko, data urodzenia, numer, pozycja,
-            zdjęcie (jeśli zostało dodane) i statystyki meczowe — wprowadzane przez organizatora
+            zdjęcie (jeśli zostało dodane) i statystyki meczowe - wprowadzane przez organizatora
             albo trenera.
           </li>
           <li>
@@ -65,7 +65,7 @@ export default function PrivacyPage() {
           {ANALYTICS_ENABLED && (
             <li>
               <strong>Statystyki odwiedzin:</strong> zagregowane, anonimowe dane o odwiedzanych
-              stronach — patrz punkt 8.
+              stronach - patrz punkt 8.
             </li>
           )}
         </ul>
@@ -74,16 +74,16 @@ export default function PrivacyPage() {
       <LegalSection title="3. Cele i podstawy prawne">
         <ul>
           <li>
-            Założenie i prowadzenie konta, obsługa turniejów, wyników i powiadomień — wykonanie
+            Założenie i prowadzenie konta, obsługa turniejów, wyników i powiadomień - wykonanie
             umowy o świadczenie usług drogą elektroniczną (art. 6 ust. 1 lit. b RODO).
           </li>
           <li>
             Bezpieczeństwo serwisu, zapobieganie nadużyciom, dochodzenie i obrona roszczeń
-            {ANALYTICS_ENABLED && " oraz anonimowe statystyki odwiedzin"} — prawnie uzasadniony
+            {ANALYTICS_ENABLED && " oraz anonimowe statystyki odwiedzin"} - prawnie uzasadniony
             interes administratora (art. 6 ust. 1 lit. f RODO).
           </li>
           <li>
-            Wykazanie zgodności z przepisami, w tym zapis akceptacji regulaminu — obowiązek prawny
+            Wykazanie zgodności z przepisami, w tym zapis akceptacji regulaminu - obowiązek prawny
             (art. 6 ust. 1 lit. c w zw. z art. 5 ust. 2 RODO).
           </li>
         </ul>
@@ -97,16 +97,16 @@ export default function PrivacyPage() {
       <LegalSection title="4. Komu przekazujemy dane">
         <ul>
           <li>
-            Dostawcom usług, którzy przetwarzają dane w naszym imieniu: hosting —{" "}
-            <Fill value={LEGAL.hostingProvider} />, wysyłka e-maili —{" "}
+            Dostawcom usług, którzy przetwarzają dane w naszym imieniu: hosting -{" "}
+            <Fill value={LEGAL.hostingProvider} />, wysyłka e-maili -{" "}
             <Fill value={LEGAL.emailProvider} />.
           </li>
           <li>
-            Innym uczestnikom turnieju w zakresie potrzebnym do jego prowadzenia — np. organizator
+            Innym uczestnikom turnieju w zakresie potrzebnym do jego prowadzenia - np. organizator
             widzi listę osób, które dołączyły do jego turnieju, a trener skład swojej drużyny.
           </li>
           <li>
-            Kibicom na portalu publicznym — tylko to, co organizator zdecydował się udostępnić
+            Kibicom na portalu publicznym - tylko to, co organizator zdecydował się udostępnić
             (punkt 5).
           </li>
         </ul>
@@ -116,7 +116,7 @@ export default function PrivacyPage() {
       <LegalSection id="zawodnicy" title="5. Dane zawodników i portal publiczny">
         <p>
           Organizator turnieju decyduje, jakie dane zawodników wprowadza i czy publikuje je na
-          portalu kibica — jest więc administratorem tych danych. Turniejo przetwarza je w jego
+          portalu kibica - jest więc administratorem tych danych. Turniejo przetwarza je w jego
           imieniu na podstawie umowy powierzenia zawartej w{" "}
           <Link href="/terms#powierzenie" className={linkClass}>
             §6 Regulaminu
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
         <p>
           Organizator odpowiada za posiadanie podstawy prawnej do przetwarzania danych dzieci, w
           szczególności zgody rodziców lub opiekunów na publikację wizerunku i wyników. Domyślnie
-          portal pokazuje zawodników w formie „Jan K.” — pełne nazwiska organizator musi świadomie
+          portal pokazuje zawodników w formie „Jan K.” - pełne nazwiska organizator musi świadomie
           włączyć.
         </p>
         <p>
@@ -137,13 +137,13 @@ export default function PrivacyPage() {
 
       <LegalSection title="6. Jak długo przechowujemy dane">
         <ul>
-          <li>Dane konta — do czasu jego usunięcia.</li>
+          <li>Dane konta - do czasu jego usunięcia.</li>
           <li>
             Po usunięciu konta dane osobowe są natychmiast anonimizowane. W kopiach zapasowych
             znikają najpóźniej po <Fill value={LEGAL.backupRetention} />.
           </li>
           <li>
-            Logi serwera — <Fill value={LEGAL.logRetention} />.
+            Logi serwera - <Fill value={LEGAL.logRetention} />.
           </li>
           <li>
             Wyniki i zdarzenia meczowe zostają w historii turnieju bez danych usuniętego konta (np.
@@ -164,11 +164,11 @@ export default function PrivacyPage() {
         </ul>
         <p>
           Kopię danych w pliku JSON pobierzesz i konto usuniesz samodzielnie w zakładce „Moje konto”
-          po zalogowaniu. W pozostałych sprawach napisz na <Fill value={LEGAL.contactEmail} /> —
+          po zalogowaniu. W pozostałych sprawach napisz na <Fill value={LEGAL.contactEmail} /> -
           odpowiemy w ciągu miesiąca.
         </p>
         <p>
-          Jeśli jesteś jedynym organizatorem organizacji, usunięcie konta usuwa także ją — wraz z
+          Jeśli jesteś jedynym organizatorem organizacji, usunięcie konta usuwa także ją - wraz z
           turniejami, drużynami i danymi zawodników. Wymaga to dodatkowego potwierdzenia, żeby nie
           usunąć przez pomyłkę danych innych osób.
         </p>
@@ -183,11 +183,11 @@ export default function PrivacyPage() {
         <ul>
           <li>
             <strong>Ciasteczka sesji</strong> (<code>authjs.session-token</code>,{" "}
-            <code>authjs.csrf-token</code>, <code>authjs.callback-url</code>) — utrzymują
+            <code>authjs.csrf-token</code>, <code>authjs.callback-url</code>) - utrzymują
             zalogowanie i chronią formularze. Znikają po wylogowaniu lub wygaśnięciu sesji.
           </li>
           <li>
-            <strong>Pamięć lokalna</strong> (<code>turniejo-active-tournament</code>) — ostatnio
+            <strong>Pamięć lokalna</strong> (<code>turniejo-active-tournament</code>) - ostatnio
             wybrany turniej, żeby nawigacja od razu go pokazywała.
           </li>
         </ul>
@@ -196,12 +196,12 @@ export default function PrivacyPage() {
             Statystyki odwiedzin zbieramy narzędziem Umami, które nie używa ciasteczek ani pamięci
             przeglądarki, nie śledzi użytkowników między stronami i nie pozwala ich zidentyfikować.
             Adresy stron są zapisywane bez parametrów (np. bez kodów zaproszeń). Dlatego serwis nie
-            wyświetla banera cookies — nie ma na co wyrażać zgody.
+            wyświetla banera cookies - nie ma na co wyrażać zgody.
           </p>
         ) : (
           <p>
             Nie zbieramy statystyk odwiedzin i nie używamy ciasteczek śledzących ani reklamowych.
-            Dlatego serwis nie wyświetla banera cookies — nie ma na co wyrażać zgody.
+            Dlatego serwis nie wyświetla banera cookies - nie ma na co wyrażać zgody.
           </p>
         )}
       </LegalSection>

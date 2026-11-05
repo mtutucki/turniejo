@@ -51,7 +51,7 @@ const STEPS: Record<SetupStepKey, { title: string; description: string }> = {
   rules: {
     title: "Zasady gry",
     description:
-      "Punktacja i czas meczu. Domyślne wartości pasują do większości turniejów — zmień tylko to, co trzeba.",
+      "Punktacja i czas meczu. Domyślne wartości pasują do większości turniejów - zmień tylko to, co trzeba.",
   },
   portal: {
     title: "Portal kibica",
@@ -282,14 +282,14 @@ export function TournamentSetupView() {
       : {
           missing: "Dodaj co najmniej jedną kategorię",
           consequence:
-            "Drużyny zgłasza się do kategorii — bez niej nie dodasz w następnych krokach żadnej drużyny.",
+            "Drużyny zgłasza się do kategorii - bez niej nie dodasz w następnych krokach żadnej drużyny.",
         },
     pitches: progress.done.pitches
       ? null
       : {
           missing: "Dodaj co najmniej jedno boisko",
           consequence:
-            "Generator ustawia mecze na boiskach — bez boiska nie wygenerujesz terminarza.",
+            "Generator ustawia mecze na boiskach - bez boiska nie wygenerujesz terminarza.",
         },
     teams: progress.done.teams
       ? null
@@ -297,7 +297,7 @@ export function TournamentSetupView() {
           missing: "Potrzeba co najmniej 2 zaakceptowanych drużyn",
           consequence:
             progress.pendingTeams.length > 0
-              ? "Zgłoszone drużyny czekają na akceptację i na razie nie zagrają — bez dwóch zaakceptowanych nie ułożysz żadnego meczu."
+              ? "Zgłoszone drużyny czekają na akceptację i na razie nie zagrają - bez dwóch zaakceptowanych nie ułożysz żadnego meczu."
               : "Bez dwóch zaakceptowanych drużyn nie ułożysz żadnego meczu ani terminarza.",
         },
   }
@@ -398,7 +398,7 @@ export function TournamentSetupView() {
                   detail={
                     progress.categoryCount
                       ? plural(progress.categoryCount, ["kategoria", "kategorie", "kategorii"])
-                      : "Brak kategorii — drużyny zgłasza się do kategorii"
+                      : "Brak kategorii - drużyny zgłasza się do kategorii"
                   }
                   onFix={() => goToKey("categories")}
                 />
@@ -412,7 +412,7 @@ export function TournamentSetupView() {
                           "aktywne boiska",
                           "aktywnych boisk",
                         ])
-                      : "Brak boisk — generator nie ma gdzie ustawić meczów"
+                      : "Brak boisk - generator nie ma gdzie ustawić meczów"
                   }
                   onFix={() => goToKey("pitches")}
                 />
@@ -424,14 +424,14 @@ export function TournamentSetupView() {
                     (progress.pendingTeams.length
                       ? `, ${plural(progress.pendingTeams.length, ["czeka", "czekają", "czeka"])} na akceptację`
                       : "") +
-                    (progress.done.teams ? "" : " — potrzeba co najmniej 2")
+                    (progress.done.teams ? "" : " - potrzeba co najmniej 2")
                   }
                   onFix={() => goToKey("teams")}
                 />
               </ul>
               {progress.done.schedule ? (
                 <div className="space-y-3">
-                  <p className="text-sm">Terminarz jest gotowy — turniej może ruszać.</p>
+                  <p className="text-sm">Terminarz jest gotowy - turniej może ruszać.</p>
                   <Button asChild>
                     <Link href={`${base}/schedule`}>
                       <CalendarCheck />
@@ -529,7 +529,7 @@ export function TournamentSetupView() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Ten krok nie jest skończony</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {currentBlocker.consequence} Możesz iść dalej i wrócić tu później — krok
+                        {currentBlocker.consequence} Możesz iść dalej i wrócić tu później - krok
                         zostanie oznaczony jako niegotowy.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
