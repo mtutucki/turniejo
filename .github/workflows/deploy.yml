@@ -1,0 +1,37 @@
+# Automatyczne wdrożenie na VPS po każdym pushu (merge'u PR) na master. Da się też odpalić ręcznie:
+# Actions → Deploy → Run workflow.
+#
+# Klucz z sekretu VPS_SSH_KEY jest na serwerze zapisany w authorized_keys z command="…/deploy.sh",restrict,
+# więc nawet po wycieku pozwala wyłącznie uruchomić wdrożenie (bez shella). Opis: deploy/README.md.
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Kolejne pushe czekają, aż poprzednie wdrożenie się skończy (nie przerywamy trwającego buildu).
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Wdrożenie przez SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # -T: bez terminala (klucz ma "restrict"). Komendę wybiera serwer (command= w authorized_keys).
+          ssh -T -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 "$VPS_USER@$VPS_HOST"
