@@ -54,6 +54,9 @@ const EXACT: Record<string, string> = {
   "A player with the same name and birth date is already in this team":
     "W składzie jest już zawodnik o tych samych danych",
   "Player is not part of the source squad": "Tego zawodnika nie ma w wybranym składzie",
+  "Player is not on the roster of this team": "Tego zawodnika nie ma w składzie tej drużyny",
+  "An own goal has no assist": "Samobój nie ma asysty",
+  "Scorer cannot assist their own goal": "Strzelec nie może asystować przy swoim golu",
   "Shirt numbers must be unique.": "Numery na koszulkach nie mogą się powtarzać",
   "Select at least one player.": "Zaznacz co najmniej jednego zawodnika",
   "Player is too old for this category": "Zawodnik jest za stary na tę kategorię",

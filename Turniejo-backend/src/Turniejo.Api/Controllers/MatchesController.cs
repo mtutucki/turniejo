@@ -29,6 +29,7 @@ using Turniejo.Matches.Application.Matches.ResumeMatch;
 using Turniejo.Matches.Application.Matches.RevertMatchEvent;
 using Turniejo.Matches.Application.Matches.SelectMatchMvp;
 using Turniejo.Matches.Application.Matches.SetMatchScore;
+using Turniejo.Matches.Application.Matches.SetGoalPlayers;
 using Turniejo.Matches.Application.Matches.StartMatch;
 using Turniejo.Matches.Application.Matches.UpdateMatchEvent;
 using Turniejo.Matches.Application.Matches.UpdatePlannedMatchSchedule;
@@ -336,6 +337,14 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        [HttpPatch("matches/{matchId}/events/{eventId}/players")]
+        public async Task<IActionResult> SetGoalPlayers([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromRoute] Guid eventId, [FromBody] SetGoalPlayersRequest request, CancellationToken cancellationToken)
+        {
+            var command = new SetGoalPlayersCommand(tournamentId, matchId, eventId, request.PlayerId, request.AssistPlayerId);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpPatch("matches/{matchId}/score")]
         public async Task<IActionResult> SetMatchScore([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] SetMatchScoreRequest request, CancellationToken cancellationToken)
         {
@@ -396,6 +405,7 @@ namespace Turniejo.Api.Controllers
         public sealed record SelectMatchMvpRequest(Guid TournamentTeamId, Guid PlayerId);
         public sealed record UpdateMatchEventRequest(MatchEventType Type, int Minute, int? Second, Guid? PlayerId, Guid? RelatedPlayerId);
         public sealed record SetMatchScoreRequest(int HomeScore, int AwayScore);
+        public sealed record SetGoalPlayersRequest(Guid? PlayerId, Guid? AssistPlayerId);
         public sealed record CorrectFinishedMatchScoreRequest(int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId);
         public sealed record RecordMatchResultRequest(
             int HomeScore, int AwayScore, MatchResultType ResultType, Guid? WinnerTournamentTeamId,

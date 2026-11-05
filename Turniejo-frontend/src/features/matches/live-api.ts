@@ -297,6 +297,31 @@ export function useSelectMvp(tournamentId: string, matchId: string) {
 }
 
 /**
+ * Strzelec i asysta już zapisanego gola. Wynik się nie zmienia, więc bez optymistycznej zmiany tablicy.
+ * Odświeżamy też rankingi turnieju (strzelcy, asysty).
+ */
+export function useSetGoalPlayers(tournamentId: string, matchId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      eventId: string
+      playerId: string | null
+      assistPlayerId: string | null
+    }) =>
+      request(`${matchPath(tournamentId, matchId)}/events/${input.eventId}/players`, {
+        method: "PATCH",
+        body: { playerId: input.playerId, assistPlayerId: input.assistPlayerId },
+      }),
+    onSettled: () =>
+      Promise.all([
+        invalidateLive(queryClient, matchId),
+        queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "ranking"] }),
+      ]),
+  })
+}
+
+/**
  * Sędzia bierze wolny mecz ("claim") albo oddaje swój z powrotem do puli ("release"). Zmienia się też
  * rola na meczu, od której zależy dostęp do panelu — stąd odświeżenie ról.
  */

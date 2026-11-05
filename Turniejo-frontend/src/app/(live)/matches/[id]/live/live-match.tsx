@@ -372,7 +372,13 @@ function LivePanel({
         <h2 className="text-muted-foreground py-2 text-xs font-medium tracking-wide uppercase">
           Zdarzenia
         </h2>
-        <EventTimeline panel={panel} canEdit={canEdit} onRevert={(event) => revert.mutate(event)} />
+        <EventTimeline
+          tournamentId={tournamentId}
+          panel={panel}
+          canEdit={canEdit}
+          canEditScorers={canEdit || (status === "Finished" && isOrganizer)}
+          onRevert={(event) => revert.mutate(event)}
+        />
       </section>
     </div>
   )

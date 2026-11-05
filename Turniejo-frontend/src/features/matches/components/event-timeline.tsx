@@ -1,6 +1,6 @@
 "use client"
 
-import { Loader2, Undo2 } from "lucide-react"
+import { Loader2, UserPen, Undo2 } from "lucide-react"
 
 import {
   AlertDialog,
@@ -16,6 +16,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { EVENT_LABELS, type MatchEvent, type MatchLivePanel, isGoal } from "@/types/matches"
+
+import { GoalPlayersDialog } from "./match-event-dialogs"
 
 // Oś czasu pokazuje to, co widzi kibic: gole i kartki (start/pauza są w statusie meczu).
 const VISIBLE = new Set(["Goal", "OwnGoal", "PenaltyGoal", "YellowCard", "RedCard"])
@@ -38,12 +40,18 @@ export function playerLabel(panel: MatchLivePanel, playerId: string | null) {
 }
 
 export function EventTimeline({
+  tournamentId,
   panel,
   canEdit,
+  canEditScorers = false,
   onRevert,
 }: {
+  /** Potrzebne tylko z canEditScorers (panel meczu). */
+  tournamentId?: string
   panel: MatchLivePanel
   canEdit: boolean
+  /** Strzelca można dopisać także po czasie na poprawki (organizator), cofać zdarzeń już nie. */
+  canEditScorers?: boolean
   onRevert: (event: MatchEvent) => void
 }) {
   // Najnowsze na górze według minuty meczu (i sekundy), nie według kolejności wpisania — gol z 12.
@@ -83,7 +91,14 @@ export function EventTimeline({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
                 {EVENT_LABELS[event.type]}
-                {player && <span className="font-normal"> · {player}</span>}
+                {player ? (
+                  <span className="font-normal"> · {player}</span>
+                ) : (
+                  isGoal(event.type) &&
+                  canEditScorers && (
+                    <span className="text-muted-foreground font-normal"> · bez strzelca</span>
+                  )
+                )}
               </p>
               <p className="text-muted-foreground truncate text-xs">
                 {team.name}
@@ -96,34 +111,55 @@ export function EventTimeline({
                 aria-label="Zapisywanie"
               />
             ) : (
-              canEdit && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-10"
-                      aria-label={`Cofnij: ${EVENT_LABELS[event.type]} ${event.minute}'`}
-                    >
-                      <Undo2 />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Cofnąć zdarzenie?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {EVENT_LABELS[event.type]} ({event.minute}&apos;
-                        {player ? `, ${player}` : ""}) zniknie z meczu
-                        {isGoal(event.type) ? ", a wynik zostanie przeliczony" : ""}.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Anuluj</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => onRevert(event)}>Cofnij</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )
+              <>
+                {canEditScorers && tournamentId && isGoal(event.type) && (
+                  <GoalPlayersDialog
+                    tournamentId={tournamentId}
+                    panel={panel}
+                    goal={event}
+                    trigger={
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-10"
+                        aria-label={`Strzelec: ${EVENT_LABELS[event.type]} ${event.minute}'`}
+                      >
+                        <UserPen />
+                      </Button>
+                    }
+                  />
+                )}
+                {canEdit && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-10"
+                        aria-label={`Cofnij: ${EVENT_LABELS[event.type]} ${event.minute}'`}
+                      >
+                        <Undo2 />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cofnąć zdarzenie?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {EVENT_LABELS[event.type]} ({event.minute}&apos;
+                          {player ? `, ${player}` : ""}) zniknie z meczu
+                          {isGoal(event.type) ? ", a wynik zostanie przeliczony" : ""}.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onRevert(event)}>
+                          Cofnij
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
             )}
           </li>
         )

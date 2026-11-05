@@ -28,14 +28,24 @@ import {
   GOAL_TYPE_LABELS,
   GOAL_TYPES,
   type GoalType,
+  EVENT_LABELS,
+  type MatchEvent,
   type MatchLivePanel,
   type MatchPlayer,
   type MatchTeam,
 } from "@/types/matches"
 
-import { cardState, effectiveCardType, useAddCard, useAddGoal, useSelectMvp } from "../live-api"
+import {
+  cardState,
+  effectiveCardType,
+  useAddCard,
+  useAddGoal,
+  useSelectMvp,
+  useSetGoalPlayers,
+} from "../live-api"
 
 const NONE = "none"
+const NO_CARDS: ReturnType<typeof cardState> = { yellow: new Set(), red: new Set() }
 
 const playerName = (p: MatchPlayer) =>
   `${p.shirtNumber != null ? `${p.shirtNumber}. ` : ""}${p.firstName} ${p.lastName}`
@@ -284,6 +294,99 @@ export function AddGoalDialog({
   )
 }
 
+/**
+ * Dopisanie albo poprawa strzelca i asysty gola, który już jest w meczu (np. wynik wpisany bez zegara).
+ * Wynik się nie zmienia. Lista zawodników to skład drużyny zapisanej przy golu (przy samobóju to drużyna
+ * sprawcy, tak jak w AddGoalDialog).
+ */
+export function GoalPlayersDialog({
+  tournamentId,
+  panel,
+  goal,
+  trigger,
+}: {
+  tournamentId: string
+  panel: MatchLivePanel
+  goal: MatchEvent
+  trigger: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [playerId, setPlayerId] = useState(NONE)
+  const [assistId, setAssistId] = useState(NONE)
+  const setPlayers = useSetGoalPlayers(tournamentId, panel.matchId)
+  const team = teamById(panel, goal.tournamentTeamId ?? panel.homeTeam.tournamentTeamId)
+  const ownGoal = goal.type === "OwnGoal"
+
+  function save() {
+    setPlayers.mutate(
+      {
+        eventId: goal.id,
+        playerId: playerId === NONE ? null : playerId,
+        assistPlayerId: ownGoal || assistId === NONE ? null : assistId,
+      },
+      { onSuccess: () => setOpen(false) },
+    )
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (next) {
+          setPlayerId(goal.playerId ?? NONE)
+          setAssistId(goal.relatedPlayerId ?? NONE)
+        }
+      }}
+    >
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{ownGoal ? "Kto strzelił samobója?" : "Kto strzelił?"}</DialogTitle>
+          <DialogDescription>
+            {EVENT_LABELS[goal.type]} {goal.minute > 0 ? `w ${goal.minute}. minucie ` : ""}
+            dla drużyny {ownGoal ? opponentOf(panel, team.tournamentTeamId).name : team.name}. Wynik
+            się nie zmieni.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5">
+          <PlayerSelect
+            id="edit-goal-player"
+            label={ownGoal ? `Strzelec samobója (${team.name})` : "Strzelec"}
+            players={team.players}
+            value={playerId}
+            onChange={(value) => {
+              setPlayerId(value)
+              if (value === assistId) setAssistId(NONE)
+            }}
+            allowNone="Nie wiadomo / bez zawodnika"
+            cards={NO_CARDS}
+          />
+          {!ownGoal && (
+            <PlayerSelect
+              id="edit-goal-assist"
+              label="Asysta (opcjonalnie)"
+              players={team.players.filter((p) => p.playerId !== playerId)}
+              value={assistId}
+              onChange={setAssistId}
+              allowNone="Bez asysty"
+              cards={NO_CARDS}
+            />
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" className="h-12" onClick={() => setOpen(false)}>
+            Anuluj
+          </Button>
+          <Button className="h-12" onClick={save} disabled={setPlayers.isPending}>
+            {setPlayers.isPending ? "Zapisywanie…" : "Zapisz"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // --- Kartka --------------------------------------------------------------------------------
 
 export function AddCardDialog({
@@ -414,8 +517,6 @@ export function AddCardDialog({
 }
 
 // --- MVP -----------------------------------------------------------------------------------
-
-const NO_CARDS: ReturnType<typeof cardState> = { yellow: new Set(), red: new Set() }
 
 export function SelectMvpDialog({
   tournamentId,
