@@ -211,7 +211,7 @@ export function FinishMatchDialog({
                     min={0}
                     max={99}
                     className="h-14 text-center font-mono text-2xl tabular-nums"
-                    placeholder="0"
+                    placeholder="-"
                     value={value}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => set(e.target.value)}
