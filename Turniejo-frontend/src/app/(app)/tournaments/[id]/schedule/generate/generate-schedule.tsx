@@ -956,9 +956,10 @@ function GenerateForm({
             <AlertDialogTitle>Wygenerować terminarz?</AlertDialogTitle>
             <AlertDialogDescription>
               {isKnockout(tournament)
-                ? `${plural(totalMatches, ["mecz", "mecze", "meczów"])} 1. rundy dostanie godziny i boiska.`
+                ? `${plural(totalMatches, ["mecz 1. rundy dostanie", "mecze 1. rundy dostaną", "meczów 1. rundy dostanie"])} godziny i boiska.`
                 : `Powstanie ${plural(totalMatches, ["mecz", "mecze", "meczów"])} dla ${plural(acceptedTeams, ["zaakceptowanej drużyny", "zaakceptowanych drużyn", "zaakceptowanych drużyn"])}.`}{" "}
-              Terminarz generuje się raz, a turniej przejdzie do etapu „Harmonogram gotowy”.
+              Turniej przejdzie do etapu „Harmonogram gotowy”. Żeby ułożyć terminarz jeszcze raz,
+              trzeba go najpierw wyczyścić.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {waitingTeams.length > 0 && (
@@ -1476,8 +1477,8 @@ export function GenerateScheduleView() {
         <CardHeader>
           <CardTitle className="text-base">Generuj terminarz</CardTitle>
           <CardDescription>
-            Po wygenerowaniu turniej przejdzie do etapu „Harmonogram gotowy” - generowanie jest
-            jednorazowe.
+            Po wygenerowaniu turniej przejdzie do etapu „Harmonogram gotowy”. Żeby ułożyć terminarz
+            jeszcze raz, trzeba go najpierw wyczyścić.
           </CardDescription>
         </CardHeader>
         <CardContent>
