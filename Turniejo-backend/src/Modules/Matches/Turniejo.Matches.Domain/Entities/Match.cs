@@ -269,6 +269,44 @@ namespace Turniejo.Matches.Domain.Entities
         }
 
         /// <summary>
+        /// Wynik wpisany od razu, bez prowadzenia meczu na żywo (bez zegara). Mecz przechodzi ze
+        /// Scheduled prosto do Finished. Gole zapisuje wywołujący jako zdarzenia bez strzelca, więc
+        /// poprawki w oknie edycji działają tak samo jak po zwykłym meczu.
+        /// </summary>
+        public Result RecordResult(
+            MatchResultType resultType, Guid? winnerTournamentTeamId, int homeScore, int awayScore,
+            int refereeEditWindowMinutes, Guid changedByUserId,
+            int? walkoverWinnerScore = null, int? walkoverLoserScore = null,
+            int? homePenaltyScore = null, int? awayPenaltyScore = null)
+        {
+            if (Status != MatchStatus.Scheduled)
+                return Result.Failure(Error.Conflict("Status", "A result can only be entered for a match that has not started"));
+
+            if (homeScore < 0 || awayScore < 0)
+                return Result.Failure(Error.Validation("Score", "Score cannot be negative"));
+
+            var decided = DecideResult(
+                resultType, winnerTournamentTeamId, homeScore, awayScore,
+                walkoverWinnerScore, walkoverLoserScore, homePenaltyScore, awayPenaltyScore);
+            if (decided.IsFailure)
+                return Result.Failure(decided.Error);
+
+            ApplyResult(resultType, decided.Value);
+            Status = MatchStatus.Finished;
+            StartedAt = DateTimeOffset.UtcNow;
+            FinishedAt = StartedAt;
+            EditLockedAt = FinishedAt.Value.AddMinutes(refereeEditWindowMinutes);
+            Version++;
+            SetUpdatedAt();
+
+            // Bez MatchStarted: nikt nie powinien dostać powiadomienia "mecz się zaczął" o meczu,
+            // który już się skończył.
+            _domainEvents.Add(new MatchFinished(Id, TournamentId, GroupId, resultType.ToString(), WinnerTournamentTeamId, FinishedAt.Value, changedByUserId, HomeScore, AwayScore));
+
+            return Result.Success();
+        }
+
+        /// <summary>
         /// Zmiana rozstrzygnięcia zakończonego meczu, np. na walkower albo karne. Te same reguły co
         /// w <see cref="Finish"/>. Wynik z goli podaje wywołujący (liczony ze zdarzeń), bo po walkowerze
         /// HomeScore/AwayScore trzymają wynik z regulaminu, a nie z boiska.

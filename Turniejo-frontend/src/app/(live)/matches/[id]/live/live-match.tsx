@@ -245,14 +245,27 @@ function LivePanel({
 
       {/* Sterowanie meczem */}
       {status === "Scheduled" && (
-        <Button
-          className="h-16 w-full text-lg"
-          onClick={() => run("start")}
-          disabled={lifecycle.isPending}
-        >
-          <Play className="size-6" />
-          START
-        </Button>
+        <div className="space-y-3">
+          <Button
+            className="h-16 w-full text-lg"
+            onClick={() => run("start")}
+            disabled={lifecycle.isPending}
+          >
+            <Play className="size-6" />
+            START
+          </Button>
+          {/* Mecz rozegrany bez prowadzenia w aplikacji: sam wynik, bez zegara. */}
+          <FinishMatchDialog
+            mode="record"
+            tournamentId={tournamentId}
+            panel={panel}
+            trigger={
+              <Button variant="outline" className="h-12 w-full">
+                Wpisz sam wynik (bez zegara)
+              </Button>
+            }
+          />
+        </div>
       )}
 
       {(status === "Live" || status === "Paused") && (

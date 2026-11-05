@@ -17,7 +17,13 @@ import { Input } from "@/components/ui/input"
 import { isApiError } from "@/lib/api/errors"
 import { type MatchLivePanel, isGoal } from "@/types/matches"
 
-import { type FinishResultKind, scoringTeamId, useChangeMatchResult, useFinishMatch } from "../live-api"
+import {
+  type FinishResultKind,
+  scoringTeamId,
+  useChangeMatchResult,
+  useFinishMatch,
+  useRecordMatchResult,
+} from "../live-api"
 
 const LABELS: Record<FinishResultKind, string> = {
   Regular: "Normalny",
@@ -29,13 +35,18 @@ const LABELS: Record<FinishResultKind, string> = {
 /** Gole z zapisanych zdarzeń. Po walkowerze homeScore/awayScore trzymają wynik z regulaminu. */
 function goalScore(panel: MatchLivePanel) {
   const goals = panel.events.filter((e) => isGoal(e.type))
-  const home = goals.filter((e) => scoringTeamId(panel, e) === panel.homeTeam.tournamentTeamId).length
+  const home = goals.filter(
+    (e) => scoringTeamId(panel, e) === panel.homeTeam.tournamentTeamId,
+  ).length
   return { homeScore: home, awayScore: goals.length - home }
 }
 
+const parseGoals = (value: string) => (/^\d{1,2}$/.test(value) ? Number(value) : null)
+
 /**
- * Kończenie meczu, a w trybie "change" zmiana rozstrzygnięcia meczu już zakończonego (np. na walkower
- * albo karne). Te same reguły w obu przypadkach (backend: Match.Finish / ChangeFinishedResult).
+ * Kończenie meczu. Tryb "change": zmiana rozstrzygnięcia meczu już zakończonego (np. na walkower albo
+ * karne). Tryb "record": wpisanie wyniku meczu, którego nie prowadzono na żywo (bez zegara).
+ * Te same reguły we wszystkich trybach (backend: Match.Finish / ChangeFinishedResult / RecordResult).
  */
 export function FinishMatchDialog({
   tournamentId,
@@ -48,13 +59,18 @@ export function FinishMatchDialog({
   panel: MatchLivePanel
   editWindowMinutes?: number
   trigger: ReactNode
-  mode?: "finish" | "change"
+  mode?: "finish" | "change" | "record"
 }) {
   const changing = mode === "change"
+  const recording = mode === "record"
   const { homeTeam, awayTeam } = panel
-  const { homeScore, awayScore } = changing
-    ? goalScore(panel)
-    : { homeScore: panel.homeScore, awayScore: panel.awayScore }
+  const [homeGoals, setHomeGoals] = useState("0")
+  const [awayGoals, setAwayGoals] = useState("0")
+  const { homeScore, awayScore } = recording
+    ? { homeScore: parseGoals(homeGoals) ?? 0, awayScore: parseGoals(awayGoals) ?? 0 }
+    : changing
+      ? goalScore(panel)
+      : { homeScore: panel.homeScore, awayScore: panel.awayScore }
   // Mecz pucharowy musi wyłonić zwycięzcę — remis rozstrzygają karne (backend: Match.Finish).
   const knockout = panel.stageType !== "Group"
   const draw = homeScore === awayScore
@@ -68,14 +84,17 @@ export function FinishMatchDialog({
     changing && current ? current : knockout && draw ? "Penalties" : "Regular"
 
   const [open, setOpen] = useState(false)
-  const [kind, setKind] = useState<FinishResultKind>(defaultKind)
+  const [chosenKind, setKind] = useState<FinishResultKind>(defaultKind)
+  // Przy wpisywaniu wyniku lista sposobów zmienia się razem z wynikiem (np. remis w pucharze → karne).
+  const kind = kinds.includes(chosenKind) ? chosenKind : kinds[0]!
   const [walkoverWinner, setWalkoverWinner] = useState<string | null>(null)
   const [homePens, setHomePens] = useState("")
   const [awayPens, setAwayPens] = useState("")
   const [error, setError] = useState<string | null>(null)
   const finishMatch = useFinishMatch(tournamentId, panel.matchId)
   const changeResult = useChangeMatchResult(tournamentId, panel.matchId)
-  const finish = changing ? changeResult : finishMatch
+  const recordResult = useRecordMatchResult(tournamentId, panel.matchId)
+  const finish = changing ? changeResult : recording ? recordResult : finishMatch
 
   const scoreWinner =
     homeScore > awayScore
@@ -86,6 +105,11 @@ export function FinishMatchDialog({
 
   function confirm() {
     setError(null)
+    const goalsMissing = parseGoals(homeGoals) == null || parseGoals(awayGoals) == null
+    if (recording && kind !== "Walkover" && goalsMissing) {
+      setError("Wpisz liczbę goli obu drużyn (0-99)")
+      return
+    }
     if (kind === "Walkover" && !walkoverWinner) {
       setError("Wybierz drużynę, która wygrywa walkowerem")
       return
@@ -115,6 +139,7 @@ export function FinishMatchDialog({
               : scoreWinner,
         homePenaltyScore: kind === "Penalties" ? home : null,
         awayPenaltyScore: kind === "Penalties" ? away : null,
+        ...(recording ? { homeScore, awayScore } : {}),
       },
       {
         // Bez toastu — status "Zakończony" widać na tablicy (toast zasłaniałby nagłówek na telefonie).
@@ -132,6 +157,8 @@ export function FinishMatchDialog({
       onOpenChange={(next) => {
         setOpen(next)
         if (next) {
+          setHomeGoals("0")
+          setAwayGoals("0")
           setKind(defaultKind)
           setWalkoverWinner(
             changing && panel.resultType === "Walkover" ? panel.winnerTournamentTeamId : null,
@@ -145,15 +172,47 @@ export function FinishMatchDialog({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{changing ? "Zmień rozstrzygnięcie" : "Zakończyć mecz?"}</DialogTitle>
+          <DialogTitle>
+            {changing ? "Zmień rozstrzygnięcie" : recording ? "Wpisz wynik" : "Zakończyć mecz?"}
+          </DialogTitle>
           <DialogDescription>
             {changing
               ? "Tabela i drabinka przeliczą się same."
-              : editWindowMinutes != null
-                ? `Po zakończeniu przez ${editWindowMinutes} min możesz jeszcze poprawiać zdarzenia, potem wynik jest zablokowany.`
-                : "Po zakończeniu wynik zostanie zablokowany po czasie na poprawki."}
+              : recording
+                ? "Mecz od razu będzie zakończony, bez zegara. Strzelców możesz dopisać w czasie na poprawki."
+                : editWindowMinutes != null
+                  ? `Po zakończeniu przez ${editWindowMinutes} min możesz jeszcze poprawiać zdarzenia, potem wynik jest zablokowany.`
+                  : "Po zakończeniu wynik zostanie zablokowany po czasie na poprawki."}
           </DialogDescription>
         </DialogHeader>
+
+        {recording && (
+          <FieldSet>
+            <FieldLegend variant="label">Wynik</FieldLegend>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+              {[
+                { team: homeTeam, value: homeGoals, set: setHomeGoals },
+                { team: awayTeam, value: awayGoals, set: setAwayGoals },
+              ].map(({ team, value, set }, i) => (
+                <div key={team.tournamentTeamId} className={i === 1 ? "order-3" : undefined}>
+                  <Input
+                    aria-label={`Gole: ${team.name}`}
+                    inputMode="numeric"
+                    type="number"
+                    min={0}
+                    max={99}
+                    className="h-14 text-center font-mono text-2xl tabular-nums"
+                    value={value}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => set(e.target.value)}
+                  />
+                  <p className="mt-1 truncate text-sm">{team.name}</p>
+                </div>
+              ))}
+              <span className="text-muted-foreground order-2 pb-6 text-2xl">:</span>
+            </div>
+          </FieldSet>
+        )}
 
         <FieldSet>
           <FieldLegend variant="label">Rozstrzygnięcie</FieldLegend>
@@ -200,17 +259,22 @@ export function FinishMatchDialog({
               Wynik walkowera ustawia się z ustawień turnieju.
             </p>
           </FieldSet>
-        ) : (
+        ) : recording && kind !== "Penalties" ? null : (
           <div className="bg-muted/40 rounded-lg border p-3">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-              <span className="truncate text-sm">{homeTeam.name}</span>
-              <span className="font-mono text-3xl font-semibold tabular-nums">
-                {homeScore} : {awayScore}
-              </span>
-              <span className="truncate text-sm">{awayTeam.name}</span>
-            </div>
+            {/* Przy wpisywaniu wyniku gole są już w polach wyżej. */}
+            {!recording && (
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+                <span className="truncate text-sm">{homeTeam.name}</span>
+                <span className="font-mono text-3xl font-semibold tabular-nums">
+                  {homeScore} : {awayScore}
+                </span>
+                <span className="truncate text-sm">{awayTeam.name}</span>
+              </div>
+            )}
             {kind === "Penalties" && (
-              <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div
+                className={`grid grid-cols-[1fr_auto_1fr] items-center gap-2 ${recording ? "" : "mt-3"}`}
+              >
                 <Input
                   aria-label={`Karne: ${homeTeam.name}`}
                   inputMode="numeric"
@@ -239,13 +303,15 @@ export function FinishMatchDialog({
 
         <DialogFooter>
           <Button variant="ghost" className="h-12" onClick={() => setOpen(false)}>
-            {changing ? "Anuluj" : "Wróć do meczu"}
+            {changing || recording ? "Anuluj" : "Wróć do meczu"}
           </Button>
           <Button className="h-12" onClick={confirm} disabled={finish.isPending}>
-            {changing
+            {changing || recording
               ? finish.isPending
                 ? "Zapisywanie…"
-                : "Zapisz"
+                : recording
+                  ? "Zapisz wynik"
+                  : "Zapisz"
               : finish.isPending
                 ? "Kończenie…"
                 : "Zakończ mecz"}

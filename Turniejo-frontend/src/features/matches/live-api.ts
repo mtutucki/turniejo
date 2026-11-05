@@ -360,6 +360,9 @@ export type MatchResultInput = {
   winnerTournamentTeamId: string | null
   homePenaltyScore?: number | null
   awayPenaltyScore?: number | null
+  /** Tylko przy wpisywaniu wyniku bez meczu na żywo (record-result). */
+  homeScore?: number
+  awayScore?: number
 }
 
 export function useFinishMatch(tournamentId: string, matchId: string) {
@@ -371,18 +374,35 @@ export function useChangeMatchResult(tournamentId: string, matchId: string) {
   return useMatchResultMutation(tournamentId, matchId, "change")
 }
 
-function useMatchResultMutation(tournamentId: string, matchId: string, mode: "finish" | "change") {
+/** Wynik wpisany od razu, bez prowadzenia meczu na żywo. Mecz kończy się bez zegara. */
+export function useRecordMatchResult(tournamentId: string, matchId: string) {
+  return useMatchResultMutation(tournamentId, matchId, "record")
+}
+
+const RESULT_ENDPOINTS = {
+  finish: { path: "finish", method: "POST" },
+  change: { path: "result", method: "PATCH" },
+  record: { path: "record-result", method: "POST" },
+} as const
+
+function useMatchResultMutation(
+  tournamentId: string,
+  matchId: string,
+  mode: keyof typeof RESULT_ENDPOINTS,
+) {
   const { request } = useApi()
   const queryClient = useQueryClient()
+  const endpoint = RESULT_ENDPOINTS[mode]
   return useMutation({
     mutationFn: (input: MatchResultInput) =>
-      request(`${matchPath(tournamentId, matchId)}/${mode === "finish" ? "finish" : "result"}`, {
-        method: mode === "finish" ? "POST" : "PATCH",
+      request(`${matchPath(tournamentId, matchId)}/${endpoint.path}`, {
+        method: endpoint.method,
         body: {
           resultType: MatchResultType[input.resultType],
           winnerTournamentTeamId: input.winnerTournamentTeamId,
           homePenaltyScore: input.homePenaltyScore ?? null,
           awayPenaltyScore: input.awayPenaltyScore ?? null,
+          ...(mode === "record" ? { homeScore: input.homeScore, awayScore: input.awayScore } : {}),
         },
       }),
     meta: { handlesValidation: true },

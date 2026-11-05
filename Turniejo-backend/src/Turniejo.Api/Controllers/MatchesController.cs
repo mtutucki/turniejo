@@ -9,6 +9,7 @@ using Turniejo.Matches.Application.Matches.AssignPlannedMatchReferee;
 using Turniejo.Matches.Application.Matches.AssignRefereeToMatch;
 using Turniejo.Matches.Application.Matches.ClaimMatch;
 using Turniejo.Matches.Application.Matches.ChangeFinishedMatchResult;
+using Turniejo.Matches.Application.Matches.RecordMatchResult;
 using Turniejo.Matches.Application.Matches.CorrectFinishedMatchScore;
 using Turniejo.Matches.Application.Matches.FinishMatch;
 using Turniejo.Matches.Application.Matches.GetAssignedMatches;
@@ -351,6 +352,17 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        // Wynik wpisany od razu, bez prowadzenia meczu na żywo (mecz musi być jeszcze niezaczęty).
+        [HttpPost("matches/{matchId}/record-result")]
+        public async Task<IActionResult> RecordMatchResult([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] RecordMatchResultRequest request, CancellationToken cancellationToken)
+        {
+            var command = new RecordMatchResultCommand(
+                tournamentId, matchId, request.HomeScore, request.AwayScore, request.ResultType, request.WinnerTournamentTeamId,
+                request.HomePenaltyScore, request.AwayPenaltyScore);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
         // Zmiana rozstrzygnięcia zakończonego meczu (walkower, karne). Sędzia w oknie poprawek, organizator zawsze.
         [HttpPatch("matches/{matchId}/result")]
         public async Task<IActionResult> ChangeFinishedMatchResult([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] FinishMatchRequest request, CancellationToken cancellationToken)
@@ -385,5 +397,8 @@ namespace Turniejo.Api.Controllers
         public sealed record UpdateMatchEventRequest(MatchEventType Type, int Minute, int? Second, Guid? PlayerId, Guid? RelatedPlayerId);
         public sealed record SetMatchScoreRequest(int HomeScore, int AwayScore);
         public sealed record CorrectFinishedMatchScoreRequest(int HomeScore, int AwayScore, Guid? WinnerTournamentTeamId);
+        public sealed record RecordMatchResultRequest(
+            int HomeScore, int AwayScore, MatchResultType ResultType, Guid? WinnerTournamentTeamId,
+            int? HomePenaltyScore = null, int? AwayPenaltyScore = null);
     }
 }
