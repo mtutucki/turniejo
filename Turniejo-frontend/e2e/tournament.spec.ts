@@ -9,10 +9,10 @@ test.describe("Tworzenie turnieju → Zmiana statusu", () => {
     await page.goto("/tournaments/new")
     await page.getByLabel("Nazwa").fill(name)
     await page.getByLabel("Rozpoczęcie", { exact: true }).fill("2026-11-14")
-    await page.getByLabel("Rozpoczęcie — godzina").fill("09:00")
+    await page.getByLabel("Rozpoczęcie - godzina").fill("09:00")
     // Data zakończenia podąża za rozpoczęciem.
     await expect(page.getByLabel("Zakończenie", { exact: true })).toHaveValue("2026-11-14")
-    await page.getByLabel("Zakończenie — godzina").fill("17:00")
+    await page.getByLabel("Zakończenie - godzina").fill("17:00")
     await page.getByRole("button", { name: "Utwórz turniej" }).click()
 
     // Po utworzeniu turnieju startuje kreator konfiguracji — każdy krok można pominąć.
@@ -45,8 +45,8 @@ test.describe("Tworzenie turnieju → Zmiana statusu", () => {
     await page.goto("/tournaments/new")
     await page.getByLabel("Nazwa").fill("Zły termin")
     await page.getByLabel("Rozpoczęcie", { exact: true }).fill("2026-11-14")
-    await page.getByLabel("Rozpoczęcie — godzina").fill("17:00")
-    await page.getByLabel("Zakończenie — godzina").fill("09:00")
+    await page.getByLabel("Rozpoczęcie - godzina").fill("17:00")
+    await page.getByLabel("Zakończenie - godzina").fill("09:00")
     await page.getByRole("button", { name: "Utwórz turniej" }).click()
     await expect(page.locator("[data-slot=field-error]").first()).toBeVisible()
     await expect(page).toHaveURL(/\/tournaments\/new$/)

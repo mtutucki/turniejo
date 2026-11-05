@@ -66,7 +66,7 @@ export function TournamentList() {
           <div className="space-y-1">
             <p className="font-medium">Konfigurujemy Twoje konto</p>
             <p className="text-muted-foreground text-sm">
-              Zakładamy Twoją organizację — to potrwa kilka sekund.
+              Zakładamy Twoją organizację - to potrwa kilka sekund.
             </p>
           </div>
         </div>
@@ -99,7 +99,7 @@ export function TournamentList() {
         <EmptyState
           icon={Trophy}
           title="Brak turniejów"
-          description="Utwórz pierwszy turniej — potem dodasz kategorie, grupy i drużyny."
+          description="Utwórz pierwszy turniej - potem dodasz kategorie, grupy i drużyny."
           action={<NewTournamentButton />}
         />
       )}

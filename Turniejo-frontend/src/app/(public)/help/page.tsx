@@ -8,7 +8,7 @@ import { PASSWORD_HINT } from "@/lib/auth/password"
 export const metadata: Metadata = {
   title: "Pomoc",
   description:
-    "Czym jest Turniejo, dla kogo jest i jak zacząć — organizator, trener, sędzia, rodzic.",
+    "Czym jest Turniejo, dla kogo jest i jak zacząć - organizator, trener, sędzia, rodzic.",
 }
 
 type Faq = { question: string; answer: ReactNode }
@@ -24,8 +24,8 @@ const SECTIONS: FaqSection[] = [
           <p>
             Aplikacją do prowadzenia turniejów piłkarskich od zapisów do finału: drużyny i
             kategorie, boiska, automatyczny terminarz, wyniki na żywo, tabele, drabinka pucharowa i
-            statystyki zawodników. Wszyscy uczestnicy — organizator, trenerzy, sędziowie, rodzice i
-            kibice — widzą te same, aktualne dane.
+            statystyki zawodników. Wszyscy uczestnicy - organizator, trenerzy, sędziowie, rodzice i
+            kibice - widzą te same, aktualne dane.
           </p>
         ),
       },
@@ -34,21 +34,21 @@ const SECTIONS: FaqSection[] = [
         answer: (
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <strong>Organizator</strong> — tworzy turniej, przyjmuje drużyny, generuje terminarz,
+              <strong>Organizator</strong> - tworzy turniej, przyjmuje drużyny, generuje terminarz,
               przydziela sędziów i boiska.
             </li>
             <li>
-              <strong>Trener</strong> — zarządza składem swojej drużyny, widzi jej mecze i
+              <strong>Trener</strong> - zarządza składem swojej drużyny, widzi jej mecze i
               statystyki.
             </li>
             <li>
-              <strong>Sędzia</strong> — prowadzi przydzielone mecze na żywo: gole, asysty, kartki.
+              <strong>Sędzia</strong> - prowadzi przydzielone mecze na żywo: gole, asysty, kartki.
             </li>
             <li>
-              <strong>Rodzic</strong> — śledzi terminarz, wyniki i statystyki swojego dziecka.
+              <strong>Rodzic</strong> - śledzi terminarz, wyniki i statystyki swojego dziecka.
             </li>
             <li>
-              <strong>Kibic</strong> — ogląda publiczny portal turnieju, także bez konta.
+              <strong>Kibic</strong> - ogląda publiczny portal turnieju, także bez konta.
             </li>
           </ul>
         ),
@@ -69,33 +69,33 @@ const SECTIONS: FaqSection[] = [
     title: "Jak zacząć",
     items: [
       {
-        question: "Organizuję turniej — od czego zacząć?",
+        question: "Organizuję turniej - od czego zacząć?",
         answer: (
           <ol className="list-decimal space-y-1 pl-5">
             <li>Załóż konto i wybierz „Organizuję turnieje”.</li>
             <li>Utwórz turniej: nazwa, termin, miejsce.</li>
             <li>Dodaj kategorie (np. roczniki), boiska i drużyny.</li>
-            <li>Wybierz format — grupowy, pucharowy albo grupy + puchar — i zamknij zapisy.</li>
+            <li>Wybierz format - grupowy, pucharowy albo grupy + puchar - i zamknij zapisy.</li>
             <li>Wygeneruj terminarz i przydziel sędziów do meczów.</li>
             <li>
-              Roześlij kody zaproszeń trenerom, sędziom i rodzicom, a kibicom — link do portalu
+              Roześlij kody zaproszeń trenerom, sędziom i rodzicom, a kibicom - link do portalu
               turnieju.
             </li>
           </ol>
         ),
       },
       {
-        question: "Dostałem kod od organizatora — co dalej?",
+        question: "Dostałem kod od organizatora - co dalej?",
         answer: (
           <>
             <p>
               Załóż konto jako „Dołączam do turnieju” (albo zaloguj się), wejdź w „Dołącz kodem” i
-              wpisz 6-znakowy kod. Jeśli dostałeś link z kodem, wystarczy go otworzyć — po
+              wpisz 6-znakowy kod. Jeśli dostałeś link z kodem, wystarczy go otworzyć - po
               zalogowaniu dołączysz automatycznie. Turniej pojawi się w menu „Dołączone turnieje”.
             </p>
             <p>
               Sędzia od razu widzi swoje mecze. Trenera organizator przypisuje jeszcze do drużyny, a
-              rodzica do dziecka — wtedy w menu pojawi się Twój panel.
+              rodzica do dziecka - wtedy w menu pojawi się Twój panel.
             </p>
           </>
         ),
@@ -105,7 +105,7 @@ const SECTIONS: FaqSection[] = [
         answer: (
           <p>
             Tak, jeśli organizator udostępnił publiczny portal turnieju. Pod linkiem od organizatora
-            znajdziesz terminarz, wyniki na żywo, tabele, drabinkę i statystyki — bez logowania.
+            znajdziesz terminarz, wyniki na żywo, tabele, drabinkę i statystyki - bez logowania.
           </p>
         ),
       },
@@ -114,7 +114,7 @@ const SECTIONS: FaqSection[] = [
         answer: (
           <p>
             Nie musisz zakładać nowego konta. Na stronie startowej wybierz „Zostań organizatorem” i
-            podaj nazwę organizacji — od razu możesz tworzyć turnieje.
+            podaj nazwę organizacji - od razu możesz tworzyć turnieje.
           </p>
         ),
       },
@@ -138,7 +138,7 @@ const SECTIONS: FaqSection[] = [
         answer: (
           <p>
             Ogłoszenia organizatora i zmiany w meczach (np. nowa godzina czy boisko) trafiają do
-            zakładki „Powiadomienia”. Wyniki na żywo odświeżają się same — nie trzeba przeładowywać
+            zakładki „Powiadomienia”. Wyniki na żywo odświeżają się same - nie trzeba przeładowywać
             strony.
           </p>
         ),
@@ -152,8 +152,8 @@ const SECTIONS: FaqSection[] = [
         question: "Czego potrzebuję, żeby korzystać z Turniejo?",
         answer: (
           <ul className="list-disc space-y-1 pl-5">
-            <li>Aktualnej przeglądarki — Chrome, Safari, Firefox lub Edge.</li>
-            <li>Telefonu, tabletu albo komputera — aplikacja działa na każdym ekranie.</li>
+            <li>Aktualnej przeglądarki - Chrome, Safari, Firefox lub Edge.</li>
+            <li>Telefonu, tabletu albo komputera - aplikacja działa na każdym ekranie.</li>
             <li>Połączenia z internetem (szczególnie sędzia podczas meczu).</li>
             <li>Adresu email do założenia konta. Nic nie trzeba instalować.</li>
           </ul>
@@ -180,7 +180,7 @@ const SECTIONS: FaqSection[] = [
         question: "Czy portal pokazuje pełne nazwiska dzieci?",
         answer: (
           <p>
-            Domyślnie nie — kibice widzą zawodników jako „Jan K.”. Organizator może to zmienić w
+            Domyślnie nie - kibice widzą zawodników jako „Jan K.”. Organizator może to zmienić w
             ustawieniach portalu, jeśli ma na to zgodę rodziców.
           </p>
         ),
@@ -193,7 +193,7 @@ const SECTIONS: FaqSection[] = [
             <Link href="/password-reset" className="text-primary font-medium hover:underline">
               reset hasła
             </Link>{" "}
-            — wyślemy Ci email z linkiem do ustawienia nowego.
+            - wyślemy Ci email z linkiem do ustawienia nowego.
           </p>
         ),
       },
@@ -221,7 +221,7 @@ export default function HelpPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Pomoc i najczęstsze pytania</h1>
         <p className="text-muted-foreground">
-          Czym jest Turniejo, dla kogo jest i jak zacząć — niezależnie od tego, czy organizujesz
+          Czym jest Turniejo, dla kogo jest i jak zacząć - niezależnie od tego, czy organizujesz
           turniej, prowadzisz drużynę, sędziujesz czy kibicujesz.
         </p>
       </div>

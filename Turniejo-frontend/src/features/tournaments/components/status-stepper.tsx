@@ -188,7 +188,7 @@ export function TournamentStatusStepper({ tournament, canManage = false }: Stepp
         label: "Wyczyść terminarz",
         description:
           tournament.format === "Knockout"
-            ? "Turniej wróci do etapu „Zapisy zamknięte”. Mecze drabinki zostają — terminy i boiska nadasz im ponownie, generując terminarz."
+            ? "Turniej wróci do etapu „Zapisy zamknięte”. Mecze drabinki zostają - terminy i boiska nadasz im ponownie, generując terminarz."
             : "Wszystkie mecze zostaną usunięte razem z przypisaniami sędziów, a turniej wróci do etapu „Zapisy zamknięte”. Potem wygenerujesz terminarz od nowa.",
       },
     }
@@ -204,7 +204,7 @@ export function TournamentStatusStepper({ tournament, canManage = false }: Stepp
       {canManage && isFinal && (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
           <Lock className="size-4" />
-          Status jest ostateczny — nie można go już zmienić.
+          Status jest ostateczny - nie można go już zmienić.
         </p>
       )}
 

@@ -25,7 +25,7 @@ const LOGIN_ERRORS: Record<LoginErrorCode, string> = {
   invalid_credentials:
     "Nieprawidłowy email lub hasło. Po kilku nieudanych próbach logowanie jest blokowane na kilka minut.",
   account_not_ready:
-    "Konto wymaga dokończenia konfiguracji — sprawdź skrzynkę email (np. link do ustawienia hasła).",
+    "Konto wymaga dokończenia konfiguracji - sprawdź skrzynkę email (np. link do ustawienia hasła).",
 }
 
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {

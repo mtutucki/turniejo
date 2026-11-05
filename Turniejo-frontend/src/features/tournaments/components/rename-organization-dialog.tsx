@@ -68,7 +68,7 @@ export function RenameOrganizationDialog({
         <DialogHeader>
           <DialogTitle>Nazwa organizacji</DialogTitle>
           <DialogDescription>
-            Klub, szkoła albo Ty sam — pod tą nazwą prowadzisz turnieje i bazę drużyn.
+            Klub, szkoła albo Ty sam - pod tą nazwą prowadzisz turnieje i bazę drużyn.
           </DialogDescription>
         </DialogHeader>
         <form id="rename-organization-form" onSubmit={form.handleSubmit(submit)} noValidate>

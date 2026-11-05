@@ -17,7 +17,7 @@ internal static class PasswordResetEmail
 
             {link}
 
-            Link jest ważny {minutes} minut i działa tylko raz. Jeśli to nie Ty, zignoruj tę wiadomość — hasło się nie zmieni.
+            Link jest ważny {minutes} minut i działa tylko raz. Jeśli to nie Ty, zignoruj tę wiadomość - hasło się nie zmieni.
 
             Turniejo
             """;
@@ -27,7 +27,7 @@ internal static class PasswordResetEmail
               <p>Cześć {WebUtility.HtmlEncode(user.FirstName)},</p>
               <p>ktoś poprosił o ustawienie nowego hasła do Twojego konta w Turniejo.</p>
               <p><a href="{WebUtility.HtmlEncode(link)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#16a34a;color:#ffffff;text-decoration:none;font-weight:bold">Ustaw nowe hasło</a></p>
-              <p style="font-size:14px;color:#52525b">Link jest ważny {minutes} minut i działa tylko raz. Jeśli to nie Ty, zignoruj tę wiadomość — hasło się nie zmieni.</p>
+              <p style="font-size:14px;color:#52525b">Link jest ważny {minutes} minut i działa tylko raz. Jeśli to nie Ty, zignoruj tę wiadomość - hasło się nie zmieni.</p>
               <p style="font-size:14px;color:#52525b">Turniejo</p>
             </div>
             """;

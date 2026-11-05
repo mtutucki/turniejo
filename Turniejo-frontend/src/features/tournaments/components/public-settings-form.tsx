@@ -45,7 +45,7 @@ const SECTIONS: { name: ToggleName; label: string; description: string }[] = [
   {
     name: "showTeams",
     label: "Drużyny",
-    description: "Nazwy drużyn — bez tego portal pokazuje „Gospodarze/Goście”.",
+    description: "Nazwy drużyn - bez tego portal pokazuje „Gospodarze/Goście”.",
   },
   {
     name: "showPlayers",

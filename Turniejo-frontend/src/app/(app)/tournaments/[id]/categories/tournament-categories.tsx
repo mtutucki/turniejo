@@ -51,12 +51,12 @@ export function TournamentCategoriesView({
             </h2>
             <p className="text-muted-foreground max-w-2xl text-sm">
               <span className="text-foreground font-medium">Kategoria</span> to osobne rozgrywki
-              (np. U10, U12) — drużyny z różnych kategorii nie grają ze sobą.
+              (np. U10, U12) - drużyny z różnych kategorii nie grają ze sobą.
               {!knockout && (
                 <>
                   {" "}
                   <span className="text-foreground font-medium">Grupa</span> to pula w kategorii, w
-                  której gra się każdy z każdym. Przy jednej grupie nic nie musisz ustawiać — „Grupa
+                  której gra się każdy z każdym. Przy jednej grupie nic nie musisz ustawiać - „Grupa
                   A” powstaje sama, a drużyny trafiają do niej automatycznie.
                 </>
               )}
@@ -107,7 +107,7 @@ export function TournamentCategoriesView({
               Kolejność w tabeli przy równej liczbie punktów
             </CardTitle>
             <CardDescription>
-              Reguły stosowane po kolei — przeciągnij, żeby zmienić priorytet.
+              Reguły stosowane po kolei - przeciągnij, żeby zmienić priorytet.
             </CardDescription>
           </CardHeader>
           <CardContent>
