@@ -12,6 +12,12 @@
 	}
 }
 
+# Ludzie wpisują adres z "www" — przekierowanie na domenę główną (rekord A dla www → VPS).
+www.{$DOMAIN} {
+	import security_headers
+	redir https://{$DOMAIN}{uri} permanent
+}
+
 {$DOMAIN} {
 	import security_headers
 	header X-Frame-Options "DENY"
