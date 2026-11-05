@@ -73,6 +73,21 @@ export function useSaveTeam(organizationId: string) {
   })
 }
 
+/** Wgrywa plik z herbem. Zwraca adres do zapisania jako logoUrl drużyny. */
+export function useUploadTeamLogo(organizationId: string) {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: (file: Blob) => {
+      const form = new FormData()
+      form.append("file", file, "logo")
+      return request<{ logoUrl: string }>(`/api/organizations/${organizationId}/teams/logos`, {
+        method: "POST",
+        body: form,
+      })
+    },
+  })
+}
+
 // --- Drużyny w turnieju --------------------------------------------------------------------
 
 export function useTournamentTeams(tournamentId: string) {

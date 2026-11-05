@@ -12,6 +12,7 @@ public static class RateLimitingExtensions
     public const string AuthAnonymous = "auth-anonymous";
     public const string JoinTournament = "join-tournament";
     public const string ChangePassword = "change-password";
+    public const string Uploads = "uploads";
 
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
     {
@@ -62,6 +63,19 @@ public static class RateLimitingExtensions
                         Window = TimeSpan.FromMinutes(15),
                         SegmentsPerWindow = 5,
                         PermitLimit = 5,
+                        QueueLimit = 0,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    }));
+
+            // Wgrywanie plików zajmuje dysk serwera. Na zmianę herbów kilkunastu drużyn wystarczy z zapasem.
+            options.AddPolicy(Uploads, httpContext =>
+                RateLimitPartition.GetSlidingWindowLimiter(
+                    GetUserIdOrClientIp(httpContext),
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(10),
+                        SegmentsPerWindow = 5,
+                        PermitLimit = 30,
                         QueueLimit = 0,
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst
                     }));

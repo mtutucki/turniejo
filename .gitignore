@@ -75,3 +75,6 @@ turniejo_frontend_plan.md
 dev.bat
 # Blokada równoległych wdrożeń (deploy/deploy.sh)
 deploy/.deploy.lock
+
+# Herby drużyn wgrane lokalnie (dotnet run)
+Turniejo-backend/src/Turniejo.Api/uploads/

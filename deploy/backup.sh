@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Dump obu baz (aplikacja + Keycloak) do ~/backups. Pliki starsze niż KEEP_DAYS są usuwane.
+# Dump obu baz (aplikacja + Keycloak) i archiwum wgranych plików do ~/backups. Pliki starsze niż
+# KEEP_DAYS są usuwane.
 # Uruchamiany przez deploy.sh przed każdym wdrożeniem i codziennie z crona (patrz README).
 # Odtworzenie: pg_restore -U postgres -d <baza> --clean <plik>.dump (opis w README).
 set -euo pipefail
@@ -26,4 +27,12 @@ for db in turniejo keycloak; do
   echo "backup: $file ($(du -h "$file" | cut -f1))"
 done
 
-find "$BACKUP_DIR" -name '*.dump' -mtime +"$KEEP_DAYS" -delete
+# Wgrane herby drużyn (wolumen uploads w kontenerze API).
+if [ -n "$("${COMPOSE[@]}" ps --status running -q api 2>/dev/null)" ]; then
+  file="$BACKUP_DIR/uploads-$stamp.tar.gz"
+  "${COMPOSE[@]}" exec -T api tar -czf - -C /data/uploads . > "$file.tmp"
+  mv "$file.tmp" "$file"
+  echo "backup: $file ($(du -h "$file" | cut -f1))"
+fi
+
+find "$BACKUP_DIR" \( -name '*.dump' -o -name 'uploads-*.tar.gz' \) -mtime +"$KEEP_DAYS" -delete

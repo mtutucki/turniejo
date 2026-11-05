@@ -8,6 +8,7 @@ using Turniejo.Teams.Application.Abstractions;
 using Turniejo.Teams.Application.Services;
 using Turniejo.Teams.Application.Teams.CreateTeam;
 using Turniejo.Teams.Infrastructure.Persistence;
+using Turniejo.Teams.Infrastructure.Storage;
 
 namespace Turniejo.Teams.Infrastructure.Extensions;
 
@@ -33,6 +34,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         services.AddScoped<TeamMatchResolver>();
+
+        services.AddSingleton<ITeamLogoStorage>(new TeamLogoFileStorage(TeamLogoFileStorage.ResolveUploadsRoot(configuration)));
 
         services.AddValidatorsFromAssemblyContaining<CreateTeamCommandValidator>();
 

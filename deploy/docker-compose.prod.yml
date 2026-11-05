@@ -92,6 +92,10 @@ services:
       # Host z Caddy (hub SignalR) i z rewrite'u Next (api:8080).
       AllowedHosts: ${DOMAIN};api
       ForwardedHeaders__KnownNetworks__0: 172.30.89.0/24
+      # Wgrane herby drużyn. Wolumen przeżywa przebudowę kontenera, backup.sh go archiwizuje.
+      Uploads__Path: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,5 +168,6 @@ networks:
 
 volumes:
   postgres_data:
+  uploads:
   caddy_data:
   caddy_config:
