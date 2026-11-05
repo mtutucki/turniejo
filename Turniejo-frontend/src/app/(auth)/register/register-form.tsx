@@ -20,6 +20,7 @@ import { applyFieldErrors } from "@/lib/api/form-errors"
 import { PASSWORD_HINT, passwordSchema } from "@/lib/auth/password"
 import { DEFAULT_APP_PATH } from "@/lib/auth/public-paths"
 import { cn } from "@/lib/utils"
+import { IS_DEMO } from "@/lib/demo"
 
 // Limity 1:1 z RegisterUserCommandValidator (hasło: passwordSchema).
 const schema = z
@@ -243,6 +244,11 @@ export function RegisterForm({ callbackUrl, defaultAccountType }: RegisterFormPr
           error={errors.confirmPassword}
           {...form.register("confirmPassword")}
         />
+        {IS_DEMO && (
+          <p className="rounded-md bg-amber-400/15 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+            To wersja demo. Wpisuj wymyślone dane, bo konto i turnieje mogą zniknąć bez uprzedzenia.
+          </p>
+        )}
         <Controller
           control={form.control}
           name="acceptTerms"

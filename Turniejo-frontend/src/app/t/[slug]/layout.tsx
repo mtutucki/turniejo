@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 
+import { DemoBanner } from "@/components/demo-banner"
 import { LegalLinks } from "@/components/layout/legal-links"
 import { ChampionBanner } from "@/features/public/components/champion-banner"
 import { PublicHeader } from "@/features/public/components/public-header"
@@ -27,6 +28,7 @@ export default async function PublicTournamentLayout({
   return (
     <PublicTournamentProvider initialTournament={tournament}>
       <div className="flex min-h-dvh flex-1 flex-col">
+        <DemoBanner />
         <PublicHeader />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
           <ChampionBanner />

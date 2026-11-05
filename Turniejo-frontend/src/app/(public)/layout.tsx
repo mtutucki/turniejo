@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { auth } from "@/auth"
+import { DemoBanner } from "@/components/demo-banner"
 import { LegalLinks } from "@/components/layout/legal-links"
 import { Logo } from "@/components/layout/logo"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,7 @@ export default async function PublicPagesLayout({ children }: LayoutProps<"/">) 
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
+      <DemoBanner />
       <header className="bg-card/95 sticky top-0 z-10 border-b backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-3 px-4">
           <Logo />
