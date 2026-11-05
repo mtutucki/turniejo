@@ -9,6 +9,7 @@ import type { ReactNode } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
+import { useAuthStore } from "@/stores/auth-store"
 import { selectUnreadCount, useNotificationStore } from "@/stores/notification-store"
 
 import { isNavItemActive, type NavItem, tournamentNavItems } from "./nav-items"
@@ -46,20 +47,23 @@ function BottomNavItem({
 
 /**
  * Dolna nawigacja kciukowa (< 1024px): trzy sekcje turnieju + arkusz "Więcej". Rodzic/kibic nie
- * pracuje w turnieju — dostaje zamiast nich trzy pierwsze pozycje swojego menu (np. "Moje dzieci").
+ * pracuje w turnieju, a reszta może jeszcze nie mieć wybranego turnieju — wtedy zamiast sekcji są
+ * trzy pierwsze pozycje menu (np. "Moje turnieje", "Moje dzieci").
  */
 export function BottomNav() {
   const pathname = usePathname()
   const tournament = useActiveTournamentStore((state) => state.tournament)
   const globalItems = useGlobalNavItems()
-  const showTournament = useShowsTournamentSection()
+  const rolesLoading = useAuthStore((state) => state.roleAssignments === null)
+  // Bez wybranego turnieju Mecze/Tabela/Drużyny nie mają dokąd prowadzić, więc pasek pokazuje
+  // zwykłe menu. Póki role się wczytują, zostają sekcje turnieju, żeby układ nie mignął.
+  const showTournament = useShowsTournamentSection() && (!!tournament || rolesLoading)
   const hasUnread = useNotificationStore(selectUnreadCount) > 0
   const [moreOpen, setMoreOpen] = useState(false)
   const moreActive = globalItems.some((item) => isNavItemActive(pathname, item))
   const primaryItems = showTournament
     ? tournamentNavItems(tournament).map((item): NavItem & { active: boolean } => ({
         ...item,
-        // Bez turnieju wszystkie sekcje prowadzą do listy — nie podświetlamy ich wtedy.
         active: !!tournament && isNavItemActive(pathname, { href: item.href }),
       }))
     : globalItems.slice(0, 3).map((item) => ({ ...item, active: isNavItemActive(pathname, item) }))
