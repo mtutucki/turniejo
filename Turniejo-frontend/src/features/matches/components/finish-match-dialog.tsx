@@ -188,7 +188,7 @@ export function FinishMatchDialog({
             {changing
               ? "Tabela i drabinka przeliczą się same."
               : recording
-                ? "Mecz od razu będzie zakończony, bez zegara. Strzelców możesz dopisać w czasie na poprawki."
+                ? "Mecz od razu będzie zakończony, bez zegara. Strzelców dopiszesz potem na liście zdarzeń."
                 : editWindowMinutes != null
                   ? `Po zakończeniu przez ${editWindowMinutes} min możesz jeszcze poprawiać zdarzenia, potem wynik jest zablokowany.`
                   : "Po zakończeniu wynik zostanie zablokowany po czasie na poprawki."}
@@ -221,6 +221,11 @@ export function FinishMatchDialog({
               ))}
               <span className="text-muted-foreground order-2 pb-6 text-2xl">:</span>
             </div>
+            {!scoresFilled && (
+              <p className="text-muted-foreground text-center text-xs">
+                Były karne? Wpisz remis z boiska, a pojawią się pola na rzuty karne.
+              </p>
+            )}
             <Button
               variant="link"
               className="text-muted-foreground h-auto p-0 text-sm"
