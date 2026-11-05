@@ -321,7 +321,7 @@ export function AddCardDialog({
       {
         onSuccess: (response) => {
           if (response.cardType === "RedCard" && cardType === "YellowCard")
-            toast.warning("Druga żółta kartka — zawodnik dostał czerwoną")
+            toast.warning("Druga żółta kartka - zawodnik dostał czerwoną")
         },
       },
     )
@@ -389,7 +389,7 @@ export function AddCardDialog({
           />
           {secondYellow && (
             <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm">
-              Druga żółta kartka tego zawodnika — zostanie zapisana jako czerwona.
+              Druga żółta kartka tego zawodnika - zostanie zapisana jako czerwona.
             </p>
           )}
           <MinuteField value={eventMinute} onChange={setEventMinute} />
@@ -459,7 +459,7 @@ export function SelectMvpDialog({
         <DialogHeader>
           <DialogTitle>MVP meczu</DialogTitle>
           <DialogDescription>
-            Najlepszy zawodnik meczu — trafi do rankingu MVP turnieju.
+            Najlepszy zawodnik meczu - trafi do rankingu MVP turnieju.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">

@@ -173,7 +173,7 @@ export function PitchFormDialog({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Usunąć boisko „{pitch.name}”?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Boiska z zaplanowanymi meczami nie da się usunąć — możesz je wtedy oznaczyć jako
+                    Boiska z zaplanowanymi meczami nie da się usunąć - możesz je wtedy oznaczyć jako
                     nieaktywne.
                   </AlertDialogDescription>
                 </AlertDialogHeader>

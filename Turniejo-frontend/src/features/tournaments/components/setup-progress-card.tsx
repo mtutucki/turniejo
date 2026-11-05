@@ -43,7 +43,7 @@ export function SetupProgressCard({ tournament }: { tournament: Tournament }) {
       detail:
         `${progress.acceptedTeams.length} zaakceptowanych` +
         (progress.pendingTeams.length ? ` · ${progress.pendingTeams.length} czeka` : "") +
-        (progress.done.teams ? "" : " — potrzeba co najmniej 2"),
+        (progress.done.teams ? "" : " - potrzeba co najmniej 2"),
     },
     schedule: { title: "Terminarz", detail: "godziny i boiska meczów" },
   }

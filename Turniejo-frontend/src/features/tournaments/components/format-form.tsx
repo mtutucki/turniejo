@@ -22,7 +22,7 @@ const FORMATS: { value: TournamentFormat; description: string; icon: LucideIcon 
   },
   {
     value: "Knockout",
-    description: "Drabinka od pierwszego meczu — przegrany odpada.",
+    description: "Drabinka od pierwszego meczu - przegrany odpada.",
     icon: GitBranch,
   },
   {

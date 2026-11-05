@@ -38,7 +38,7 @@ export function TournamentPitchesView() {
           <h2 className="text-lg font-semibold">Boiska</h2>
           <p className="text-muted-foreground text-sm">
             {pitches.data?.length
-              ? `${plural(activeCount, ["aktywne boisko", "aktywne boiska", "aktywnych boisk"])} — na nich generator ustawia mecze.`
+              ? `${plural(activeCount, ["aktywne boisko", "aktywne boiska", "aktywnych boisk"])} - na nich generator ustawia mecze.`
               : "Miejsca, na których rozgrywane są mecze."}
           </p>
         </div>
@@ -96,7 +96,7 @@ export function TournamentPitchesView() {
           title="Brak boisk"
           description={
             isOrganizer
-              ? "Dodaj co najmniej jedno boisko — bez niego nie wygenerujesz terminarza."
+              ? "Dodaj co najmniej jedno boisko - bez niego nie wygenerujesz terminarza."
               : "Organizator nie dodał jeszcze boisk."
           }
           action={addButton || undefined}

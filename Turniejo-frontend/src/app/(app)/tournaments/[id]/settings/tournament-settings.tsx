@@ -232,7 +232,7 @@ export function TournamentSettingsView() {
       <div>
         <Section
           title="Etap turnieju"
-          description="Turniej przechodzi przez kolejne etapy — od szkicu do zakończenia."
+          description="Turniej przechodzi przez kolejne etapy - od szkicu do zakończenia."
           hidden={current !== "status"}
         >
           <TournamentStatusStepper tournament={data} canManage={isOrganizer} />

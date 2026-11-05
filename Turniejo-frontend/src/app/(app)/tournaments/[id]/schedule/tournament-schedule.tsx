@@ -268,8 +268,8 @@ function MatchRow({
               </TooltipTrigger>
               <TooltipContent>
                 {inProgress
-                  ? "Mecz trwa — terminu i boiska nie można już zmienić."
-                  : "Mecz się zakończył albo został odwołany — terminu, boiska i sędziego nie można już zmienić."}
+                  ? "Mecz trwa - terminu i boiska nie można już zmienić."
+                  : "Mecz się zakończył albo został odwołany - terminu, boiska i sędziego nie można już zmienić."}
               </TooltipContent>
             </Tooltip>
           )}
@@ -423,7 +423,7 @@ function ClearScheduleButton({
                 onSuccess: ({ matchesRemoved }) =>
                   toast.success(
                     knockout
-                      ? "Terminy wyczyszczone — pary czekają na nowy terminarz"
+                      ? "Terminy wyczyszczone - pary czekają na nowy terminarz"
                       : `Usunięto ${plural(matchesRemoved, ["mecz", "mecze", "meczów"])}`,
                   ),
               })
@@ -632,7 +632,7 @@ export function TournamentScheduleView() {
           </h2>
           <p className="text-muted-foreground text-sm">
             {awaitingSchedule
-              ? `${plural(rows.length, ["mecz czeka", "mecze czekają", "meczów czeka"])} na godziny i boiska — nadasz je, generując terminarz.`
+              ? `${plural(rows.length, ["mecz czeka", "mecze czekają", "meczów czeka"])} na godziny i boiska - nadasz je, generując terminarz.`
               : plural(filtered.length, ["mecz", "mecze", "meczów"])}
             {!awaitingSchedule &&
               filtered.length !== schedule.data.length &&

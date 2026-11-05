@@ -140,7 +140,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
             <p className="text-muted-foreground" role={editing ? "status" : undefined}>
               {editing &&
                 (selectedSlot
-                  ? "Teraz kliknij drugi slot — zamienią się miejscami."
+                  ? "Teraz kliknij drugi slot - zamienią się miejscami."
                   : "Kliknij dwa sloty pierwszej rundy, żeby zamienić je miejscami. Terminy meczów zostają.")}
             </p>
             <div className="flex flex-wrap gap-2">
@@ -244,7 +244,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
                   : `Drabinka nie obejmuje wszystkich zaakceptowanych drużyn (brakuje: ${missingFromBracket
                       .map((teamId) => teamById.get(teamId) ?? "Drużyna")
                       .join(", ")}).`}{" "}
-              Drabinka zostanie wygenerowana jeszcze raz — pary ułożysz od nowa.
+              Drabinka zostanie wygenerowana jeszcze raz - pary ułożysz od nowa.
             </p>
             <Button
               size="sm"
@@ -252,7 +252,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
               onClick={() =>
                 resetBracket.mutate(
                   { categoryId },
-                  { onSuccess: () => toast.success("Drabinka usunięta — ułóż pary od nowa") },
+                  { onSuccess: () => toast.success("Drabinka usunięta - ułóż pary od nowa") },
                 )
               }
             >
@@ -265,7 +265,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
             role="status"
             className="bg-primary/10 border-primary/40 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm"
           >
-            <p>Pary gotowe. Teraz wygeneruj terminarz — mecze 1. rundy dostaną godziny i boiska.</p>
+            <p>Pary gotowe. Teraz wygeneruj terminarz - mecze 1. rundy dostaną godziny i boiska.</p>
             <Button asChild size="sm">
               <Link href={`/tournaments/${id}/schedule/generate`}>Generuj terminarz</Link>
             </Button>

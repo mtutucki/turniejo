@@ -45,7 +45,7 @@ export function BecomeOrganizerDialog({ trigger }: { trigger: ReactNode }) {
   function submit({ name }: Values) {
     create.mutate(name, {
       onSuccess: () => {
-        toast.success("Jesteś organizatorem — utwórz pierwszy turniej")
+        toast.success("Jesteś organizatorem - utwórz pierwszy turniej")
         setOpen(false)
         router.push("/tournaments")
       },
@@ -66,7 +66,7 @@ export function BecomeOrganizerDialog({ trigger }: { trigger: ReactNode }) {
         <DialogHeader>
           <DialogTitle>Zostań organizatorem</DialogTitle>
           <DialogDescription>
-            Turnieje i baza drużyn należą do organizacji — może to być klub, szkoła albo Ty sam.
+            Turnieje i baza drużyn należą do organizacji - może to być klub, szkoła albo Ty sam.
           </DialogDescription>
         </DialogHeader>
         <form id="organization-form" onSubmit={form.handleSubmit(submit)} noValidate>

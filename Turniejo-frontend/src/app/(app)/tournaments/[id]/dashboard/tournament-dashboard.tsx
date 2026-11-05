@@ -124,7 +124,7 @@ function PublicPortalCard({
           <>
             <p className="flex items-start gap-2">
               <Globe className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />
-              Turniej jest publiczny — kibice widzą go bez logowania.
+              Turniej jest publiczny - kibice widzą go bez logowania.
             </p>
             <Link
               href={path}
@@ -140,7 +140,7 @@ function PublicPortalCard({
           <>
             <p className="text-muted-foreground flex items-start gap-2">
               <EyeOff className="mt-0.5 size-4 shrink-0" aria-hidden />
-              Turniej nie jest publiczny — portal kibica jest wyłączony.
+              Turniej nie jest publiczny - portal kibica jest wyłączony.
             </p>
             {canManage && (
               <Link

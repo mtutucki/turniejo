@@ -36,7 +36,7 @@ function PendingMemberships({ tournamentIds }: { tournamentIds: { id: string; ro
           Czekasz na organizatora
         </CardTitle>
         <CardDescription>
-          Rodzica organizator przypisuje do dziecka, a trenera do drużyny — wtedy w menu pojawi się
+          Rodzica organizator przypisuje do dziecka, a trenera do drużyny - wtedy w menu pojawi się
           Twój panel. Do tego czasu możesz śledzić turniej jak kibic.
         </CardDescription>
       </CardHeader>
@@ -54,7 +54,7 @@ function PendingMemberships({ tournamentIds }: { tournamentIds: { id: string; ro
                   </span>
                   <span className="text-muted-foreground text-xs">
                     {role === "Coach"
-                      ? "Trener — czeka na przypisanie do drużyny"
+                      ? "Trener - czeka na przypisanie do drużyny"
                       : "Kibic / rodzic"}
                   </span>
                 </span>
@@ -127,7 +127,7 @@ export function StartView() {
               Mam kod od organizatora
             </CardTitle>
             <CardDescription>
-              Rodzic, trener albo sędzia — kod (albo link) dostaniesz od organizatora turnieju.
+              Rodzic, trener albo sędzia - kod (albo link) dostaniesz od organizatora turnieju.
             </CardDescription>
           </CardHeader>
           <CardContent>

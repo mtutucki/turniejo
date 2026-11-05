@@ -89,7 +89,7 @@ export function TournamentTeamsView() {
                   "odrzucone lub wycofane drużyny ukryte",
                   "odrzuconych lub wycofanych drużyn ukrytych",
                 ])}{" "}
-                — możesz zgłosić je ponownie.
+                - możesz zgłosić je ponownie.
               </span>
             )}
           </p>
@@ -126,7 +126,7 @@ export function TournamentTeamsView() {
         <EmptyState
           icon={Shield}
           title="Brak zgłoszonych drużyn"
-          description="Zgłoś drużyny z bazy organizacji — każda trafi jako oczekująca na akceptację."
+          description="Zgłoś drużyny z bazy organizacji - każda trafi jako oczekująca na akceptację."
           action={addButton || undefined}
         />
       ) : (

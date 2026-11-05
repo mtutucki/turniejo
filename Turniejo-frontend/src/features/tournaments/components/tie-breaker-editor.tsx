@@ -159,7 +159,7 @@ export function TieBreakerEditor({ tournamentId, savedRules, canManage }: TieBre
     <div className="space-y-4">
       {rules.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Brak reguł — przy równej liczbie punktów kolejność w tabeli nie będzie rozstrzygana.
+          Brak reguł - przy równej liczbie punktów kolejność w tabeli nie będzie rozstrzygana.
         </p>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

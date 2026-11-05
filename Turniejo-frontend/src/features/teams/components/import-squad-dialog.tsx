@@ -255,7 +255,7 @@ export function ImportSquadDialog({
           <DialogTitle>Skład z poprzedniego turnieju</DialogTitle>
           <DialogDescription>
             Wybrani zawodnicy trafią do składu z tymi samymi profilami. Numery możesz zmienić od
-            razu, resztę — później w edycji zawodnika.
+            razu, resztę - później w edycji zawodnika.
           </DialogDescription>
         </DialogHeader>
 

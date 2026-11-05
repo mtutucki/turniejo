@@ -148,7 +148,7 @@ export function EditChildDialog({ child }: { child: MyChild }) {
             />
             <TextField
               id="child-photo"
-              label="Zdjęcie — adres (opcjonalnie)"
+              label="Zdjęcie - adres (opcjonalnie)"
               placeholder="https://…"
               error={errors.photoUrl}
               {...form.register("photoUrl")}
