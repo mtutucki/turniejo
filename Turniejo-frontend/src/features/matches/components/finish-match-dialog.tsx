@@ -79,7 +79,9 @@ export function FinishMatchDialog({
     ? draw
       ? ["Penalties", "Walkover"]
       : ["Regular", "ExtraTime", "Walkover"]
-    : ["Regular", "Walkover"]
+    : draw
+      ? ["Regular", "Penalties", "Walkover"]
+      : ["Regular", "Walkover"]
   const current = kinds.find((k) => k === panel.resultType)
   const defaultKind: FinishResultKind =
     changing && current ? current : knockout && draw ? "Penalties" : "Regular"
@@ -244,7 +246,7 @@ export function FinishMatchDialog({
                   className="h-12 px-2"
                   onClick={() => setKind(k)}
                 >
-                  {LABELS[k]}
+                  {k === "Regular" && draw && !knockout ? "Remis" : LABELS[k]}
                 </Button>
               ))}
             </div>
@@ -297,8 +299,13 @@ export function FinishMatchDialog({
                 <span className="truncate text-sm">{awayTeam.name}</span>
               </div>
             )}
-            {recording && (
+            {recording && knockout && (
               <p className="mb-2 text-sm">Remis w meczu pucharowym. Wpisz wynik rzutów karnych.</p>
+            )}
+            {!knockout && kind === "Penalties" && (
+              <p className="text-muted-foreground mb-2 text-xs">
+                W tabeli grupy mecz i tak liczy się jako remis. Karne zostaną zapisane przy meczu.
+              </p>
             )}
             {showPenalties && (
               <div
