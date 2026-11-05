@@ -57,8 +57,17 @@ export default function TermsPage() {
             <strong>
               <Fill value={LEGAL.controllerName} />
             </strong>
-            , <Fill value={LEGAL.controllerAddress} />, <Fill value={LEGAL.controllerRegistry} />,
-            e-mail: <Fill value={LEGAL.contactEmail} /> (dalej „Usługodawca”).
+            {LEGAL.controllerAddress && (
+              <>
+                , <Fill value={LEGAL.controllerAddress} />
+              </>
+            )}
+            {LEGAL.controllerRegistry && (
+              <>
+                , <Fill value={LEGAL.controllerRegistry} />
+              </>
+            )}
+            , e-mail: <Fill value={LEGAL.contactEmail} /> (dalej „Usługodawca”).
           </li>
           <li>
             Pojęcia: <strong>Użytkownik</strong> — osoba z kontem w Serwisie;{" "}

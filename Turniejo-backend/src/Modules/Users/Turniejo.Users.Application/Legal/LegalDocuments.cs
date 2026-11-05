@@ -6,5 +6,5 @@ public static class LegalDocuments
     /// Wersja Regulaminu i Polityki prywatności akceptowana przy rejestracji. Zmieniasz treść
     /// dokumentów → podbij datę (frontend: src/lib/legal.ts), żeby było wiadomo, co kto zaakceptował.
     /// </summary>
-    public const string CurrentVersion = "2026-09-30";
+    public const string CurrentVersion = "2026-11-05";
 }
