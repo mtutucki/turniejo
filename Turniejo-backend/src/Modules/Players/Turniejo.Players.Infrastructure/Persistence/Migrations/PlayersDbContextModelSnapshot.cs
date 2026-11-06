@@ -98,6 +98,42 @@ namespace Turniejo.Players.Infrastructure.Persistence.Migrations
                     b.ToTable("player_guardians", "players");
                 });
 
+            modelBuilder.Entity("Turniejo.Players.Domain.Entities.TeamPlayer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LeftAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ShirtNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("TeamId", "PlayerId")
+                        .IsUnique();
+
+                    b.ToTable("team_players", "players");
+                });
+
             modelBuilder.Entity("Turniejo.Players.Domain.Entities.TournamentPlayer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -181,6 +217,15 @@ namespace Turniejo.Players.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Turniejo.Players.Domain.Entities.PlayerGuardian", b =>
+                {
+                    b.HasOne("Turniejo.Players.Domain.Entities.Player", null)
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Turniejo.Players.Domain.Entities.TeamPlayer", b =>
                 {
                     b.HasOne("Turniejo.Players.Domain.Entities.Player", null)
                         .WithMany()

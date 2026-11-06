@@ -29,7 +29,7 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             var authorizationService = Substitute.For<IAuthorizationService>();
             var currentUserContext = Substitute.For<ICurrentUserContext>();
             var squadEditGuard = new SquadEditGuard(authorizationService, Substitute.For<ITournamentModule>());
-            _handler = new RemovePlayerFromTournamentTeamCommandHandler(_dbContext, _teamModule, _matchModule, squadEditGuard, currentUserContext);
+            _handler = new RemovePlayerFromTournamentTeamCommandHandler(_dbContext, _teamModule, new SquadRemoval(_dbContext, _matchModule), squadEditGuard, currentUserContext);
 
             // organizator: blokada składu go nie dotyczy
             authorizationService.HasAnyRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())

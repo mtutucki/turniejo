@@ -14,6 +14,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
         ITeamModule teamModule,
         ITournamentModule tournamentModule,
         SquadEditGuard squadEditGuard,
+        TeamRosterSync teamRosterSync,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignPlayerToTournamentTeamCommand, AssignPlayerToTournamentTeamResponse>
     {
         public async Task<Result<AssignPlayerToTournamentTeamResponse>> Handle(AssignPlayerToTournamentTeamCommand request, CancellationToken cancellationToken)
@@ -63,6 +64,11 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
             var tournamentPlayer = result.Value;
 
             await dbContext.AddTournamentPlayerAsync(tournamentPlayer, cancellationToken);
+
+            var rosterResult = await teamRosterSync.EnsureInRosterAsync(
+                tournamentTeam.TeamId, [(request.PlayerId, request.ShirtNumber)], cancellationToken);
+            if (rosterResult.IsFailure)
+                return Result.Failure<AssignPlayerToTournamentTeamResponse>(rosterResult.Error);
 
             foreach (var domainEvent in tournamentPlayer.DomainEvents)
             {

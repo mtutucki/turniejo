@@ -23,6 +23,20 @@ namespace Turniejo.Players.Application.Abstractions
         Task RemoveTournamentPlayerAsync(TournamentPlayer tournamentPlayer, CancellationToken cancellationToken = default);
         Task RemovePlayerAsync(Player player, CancellationToken cancellationToken = default);
 
+        // TeamPlayer (kadra drużyny)
+        Task AddTeamPlayerAsync(TeamPlayer teamPlayer, CancellationToken cancellationToken = default);
+        /// <summary>Śledzony — zmiany trafiają do bazy przy SaveChanges.</summary>
+        Task<TeamPlayer?> GetTeamPlayerAsync(Guid teamId, Guid playerId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TeamPlayer>> GetTeamPlayersByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TeamPlayer>> GetTeamPlayersByPlayerIdAsync(Guid playerId, CancellationToken cancellationToken = default);
+        Task RemoveTeamPlayerAsync(TeamPlayer teamPlayer, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Usuwa kadry wskazanych drużyn i zawodników, którzy nie są już w żadnej kadrze ani składzie.
+        /// Zwraca Id usuniętych zawodników.
+        /// </summary>
+        Task<IReadOnlyList<Guid>> RemoveRostersOfTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
+
         // PlayerGuardian
         Task AddPlayerGuardianAsync(PlayerGuardian playerGuardian, CancellationToken cancellationToken = default);
         Task<bool> PlayerGuardianExistsAsync(Guid playerId, Guid userId, CancellationToken cancellationToken = default);

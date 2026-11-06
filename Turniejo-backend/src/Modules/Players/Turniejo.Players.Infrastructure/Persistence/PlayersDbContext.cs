@@ -11,6 +11,7 @@ public sealed class PlayersDbContext(DbContextOptions<PlayersDbContext> options)
     public DbSet<Player> Players => Set<Player>();
     public DbSet<TournamentPlayer> TournamentPlayers => Set<TournamentPlayer>();
     public DbSet<PlayerGuardian> PlayerGuardians => Set<PlayerGuardian>();
+    public DbSet<TeamPlayer> TeamPlayers => Set<TeamPlayer>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default)
@@ -76,6 +77,63 @@ public sealed class PlayersDbContext(DbContextOptions<PlayersDbContext> options)
         return Task.CompletedTask;
     }
 
+    public async Task AddTeamPlayerAsync(TeamPlayer teamPlayer, CancellationToken cancellationToken = default) =>
+        await TeamPlayers.AddAsync(teamPlayer, cancellationToken);
+
+    public async Task<TeamPlayer?> GetTeamPlayerAsync(Guid teamId, Guid playerId, CancellationToken cancellationToken = default) =>
+        await TeamPlayers.FirstOrDefaultAsync(tp => tp.TeamId == teamId && tp.PlayerId == playerId, cancellationToken);
+
+    public async Task<IReadOnlyList<TeamPlayer>> GetTeamPlayersByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
+        await TeamPlayers
+            .AsNoTracking()
+            .Where(tp => tp.TeamId == teamId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<TeamPlayer>> GetTeamPlayersByPlayerIdAsync(Guid playerId, CancellationToken cancellationToken = default) =>
+        await TeamPlayers
+            .AsNoTracking()
+            .Where(tp => tp.PlayerId == playerId)
+            .ToListAsync(cancellationToken);
+
+    public Task RemoveTeamPlayerAsync(TeamPlayer teamPlayer, CancellationToken cancellationToken = default)
+    {
+        TeamPlayers.Remove(teamPlayer);
+        return Task.CompletedTask;
+    }
+
+    // ExecuteDelete — od razu w bazie, bez SaveChanges (usunięcie organizacji woła to z innego modułu).
+    public async Task<IReadOnlyList<Guid>> RemoveRostersOfTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default)
+    {
+        if (teamIds.Count == 0)
+            return [];
+
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        var rosterPlayerIds = await TeamPlayers
+            .Where(tp => teamIds.Contains(tp.TeamId))
+            .Select(tp => tp.PlayerId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        await TeamPlayers
+            .Where(tp => teamIds.Contains(tp.TeamId))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        // Zawodnik z kadrą lub składem w innej organizacji zostaje.
+        var orphanedPlayerIds = await Players
+            .Where(p => rosterPlayerIds.Contains(p.Id)
+                && !TournamentPlayers.Any(tp => tp.PlayerId == p.Id)
+                && !TeamPlayers.Any(tp => tp.PlayerId == p.Id))
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        await Players
+            .Where(p => orphanedPlayerIds.Contains(p.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return orphanedPlayerIds;
+    }
+
     public async Task AddPlayerGuardianAsync(PlayerGuardian playerGuardian, CancellationToken cancellationToken = default) =>
         await PlayerGuardians.AddAsync(playerGuardian, cancellationToken);
 
@@ -130,8 +188,11 @@ public sealed class PlayersDbContext(DbContextOptions<PlayersDbContext> options)
             .ExecuteDeleteAsync(cancellationToken);
 
         // Zawodnik grający także w drużynie innej organizacji zostaje — traci tylko te składy.
+        // Zostaje też ktoś, kto jest w kadrze drużyny: składy turniejowe to tylko wybór z kadry.
         var orphanedPlayerIds = await Players
-            .Where(p => rosterPlayerIds.Contains(p.Id) && !TournamentPlayers.Any(tp => tp.PlayerId == p.Id))
+            .Where(p => rosterPlayerIds.Contains(p.Id)
+                && !TournamentPlayers.Any(tp => tp.PlayerId == p.Id)
+                && !TeamPlayers.Any(tp => tp.PlayerId == p.Id))
             .Select(p => p.Id)
             .ToListAsync(cancellationToken);
 

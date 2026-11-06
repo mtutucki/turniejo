@@ -447,6 +447,6 @@ namespace Turniejo.Api.Controllers
         public sealed record CreatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, PlayerPosition DefaultPosition, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position, bool AllowDuplicate = false);
         public sealed record UpdateTournamentPlayerRequest(int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status);
         public sealed record UpdatePlayerInTournamentTeamRequest(string FirstName, string LastName, DateTime BirthDate, string? PhotoUrl, int? ShirtNumber, PlayerPosition? Position, TournamentPlayerStatus Status, bool AllowDuplicate = false);
-        public sealed record ImportSquadRequest(Guid SourceTournamentTeamId, IReadOnlyList<ImportSquadPlayer>? Players);
+        public sealed record ImportSquadRequest(Guid? SourceTournamentTeamId, IReadOnlyList<ImportSquadPlayer>? Players);
     }
 }

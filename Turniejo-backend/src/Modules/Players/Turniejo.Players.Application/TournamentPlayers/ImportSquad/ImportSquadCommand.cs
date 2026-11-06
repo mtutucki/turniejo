@@ -5,12 +5,13 @@ using Turniejo.SharedKernel.Enums;
 
 namespace Turniejo.Players.Application.TournamentPlayers.ImportSquad
 {
-    // Kopia składu z innego zgłoszenia tej samej drużyny: nowe wpisy TournamentPlayer wskazują na te same
-    // profile Player. Wszystko w jednym SaveChanges — albo wchodzi cała wybrana lista, albo nic.
+    // Wybór zawodników do składu z kadry drużyny (SourceTournamentTeamId = null) albo kopia składu z innego
+    // zgłoszenia tej samej drużyny. Nowe wpisy TournamentPlayer wskazują na te same profile Player.
+    // Wszystko w jednym SaveChanges — albo wchodzi cała wybrana lista, albo nic.
     public sealed record ImportSquadCommand(
         Guid TournamentId,
         Guid TournamentTeamId,
-        Guid SourceTournamentTeamId,
+        Guid? SourceTournamentTeamId,
         IReadOnlyList<ImportSquadPlayer> Players) : ICommand<ImportSquadResponse>, IAuthorizedRequest, IAlternateAuthorizedScope
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);

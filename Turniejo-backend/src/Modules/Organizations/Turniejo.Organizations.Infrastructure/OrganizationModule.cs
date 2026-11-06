@@ -17,7 +17,10 @@ internal sealed class OrganizationModule(
     {
         // Składy przed drużynami: po usunięciu zgłoszeń nie byłoby już po czym znaleźć zawodników.
         var tournamentTeamIds = await teamModule.GetTournamentTeamIdsByOrganizationIdAsync(organizationId, cancellationToken);
-        var playerIds = await playerModule.RemovePlayersOfTournamentTeamsAsync(tournamentTeamIds, cancellationToken);
+        var playerIds = (await playerModule.RemovePlayersOfTournamentTeamsAsync(tournamentTeamIds, cancellationToken)).ToList();
+        // Potem kadry: zawodnicy z kadr byli chronieni przed usunięciem w kroku wyżej.
+        var teamIds = await teamModule.GetTeamIdsByOrganizationIdAsync(organizationId, cancellationToken);
+        playerIds.AddRange(await playerModule.RemoveRostersOfTeamsAsync(teamIds, cancellationToken));
         await teamModule.RemoveTeamsByOrganizationIdAsync(organizationId, cancellationToken);
 
         var tournamentIds = await tournamentModule.DeleteTournamentsByOrganizationIdAsync(organizationId, cancellationToken);

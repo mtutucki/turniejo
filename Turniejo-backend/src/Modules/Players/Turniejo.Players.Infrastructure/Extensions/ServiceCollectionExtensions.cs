@@ -36,6 +36,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MyChildMatchResolver>();
         services.AddScoped<SquadEditGuard>();
         services.AddScoped<PlayerAccessGuard>();
+        services.AddScoped<TeamRosterAccessGuard>();
+        services.AddScoped<TeamRosterSync>();
+        services.AddScoped<TeamSquadsReader>();
+        services.AddScoped<SquadRemoval>();
 
         services.AddValidatorsFromAssemblyContaining<CreatePlayerCommandValidator>();
 

@@ -10,9 +10,11 @@ namespace Turniejo.Players.Application.TournamentPlayers.ImportSquad
                 .NotEmpty().WithMessage("TournamentId is required.");
             RuleFor(x => x.TournamentTeamId)
                 .NotEmpty().WithMessage("TournamentTeamId is required.");
+            // null = kadra drużyny.
             RuleFor(x => x.SourceTournamentTeamId)
-                .NotEmpty().WithMessage("SourceTournamentTeamId is required.")
-                .NotEqual(x => x.TournamentTeamId).WithMessage("Source squad must be a different team registration.");
+                .NotEqual(Guid.Empty).WithMessage("SourceTournamentTeamId is required.")
+                .NotEqual(x => x.TournamentTeamId).WithMessage("Source squad must be a different team registration.")
+                .When(x => x.SourceTournamentTeamId.HasValue);
             RuleFor(x => x.Players)
                 .NotEmpty().WithMessage("Select at least one player.")
                 .Must(players => players.Count <= 100).WithMessage("Too many players selected.")

@@ -21,6 +21,8 @@ public interface IPlayerModule
     // Usunięcie organizacji: usuwa składy wskazanych drużyn oraz zawodników, którzy nie grają już
     // w żadnej innej drużynie (razem z powiązaniami opiekunów). Zwraca Id usuniętych zawodników.
     Task<IReadOnlyList<Guid>> RemovePlayersOfTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
+    // Usunięcie organizacji, krok po składach: kadry jej drużyn i zawodnicy, którzy nie należą już nigdzie.
+    Task<IReadOnlyList<Guid>> RemoveRostersOfTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
 }
 
 public record PlayerDto(Guid Id, string FirstName, string LastName);

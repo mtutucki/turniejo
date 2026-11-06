@@ -66,9 +66,45 @@ namespace Turniejo.Players.Application.TournamentPlayers.GetRosterSources
                     sourceCategory?.Name, players));
             }
 
-            // Najnowszy turniej pierwszy — to jego skład jest domyślnie proponowany do skopiowania.
-            return Result.Success<IReadOnlyList<RosterSourceDto>>(
-                sources.OrderByDescending(s => s.TournamentStartAt ?? DateTimeOffset.MinValue).ToList());
+            // Kadra pierwsza (domyślna), potem najnowszy turniej.
+            var ordered = sources.OrderByDescending(s => s.TournamentStartAt ?? DateTimeOffset.MinValue).ToList();
+            var teamRoster = await BuildRosterSourceAsync(tournamentTeam.TeamId, category, currentPlayerIds, cancellationToken);
+            if (teamRoster != null)
+                ordered.Insert(0, teamRoster);
+
+            return Result.Success<IReadOnlyList<RosterSourceDto>>(ordered);
+        }
+
+        private async Task<RosterSourceDto?> BuildRosterSourceAsync(
+            Guid teamId, TournamentCategoryDto? category, HashSet<Guid> currentPlayerIds, CancellationToken cancellationToken)
+        {
+            var members = (await dbContext.GetTeamPlayersByTeamIdAsync(teamId, cancellationToken))
+                .Where(tp => tp.Status == TeamPlayerStatus.Active)
+                .ToList();
+            if (members.Count == 0)
+                return null;
+
+            var profilesById = (await dbContext.GetPlayersByIdsAsync(members.Select(m => m.PlayerId).ToList(), cancellationToken))
+                .ToDictionary(p => p.Id);
+
+            var players = members
+                .Where(m => profilesById.ContainsKey(m.PlayerId))
+                .Select(m =>
+                {
+                    var profile = profilesById[m.PlayerId];
+                    return new RosterSourcePlayerDto(
+                        profile.Id, profile.FirstName, profile.LastName, profile.BirthDate,
+                        m.ShirtNumber, profile.DefaultPosition.ToString(),
+                        currentPlayerIds.Contains(profile.Id),
+                        CategoryAgeRule.Check(category, profile.BirthDate));
+                })
+                .OrderBy(p => p.ShirtNumber ?? int.MaxValue)
+                .ThenBy(p => p.LastName)
+                .ToList();
+            if (players.Count == 0)
+                return null;
+
+            return new RosterSourceDto(null, null, string.Empty, null, null, players, RosterSourceDto.RosterKind);
         }
     }
 }
