@@ -72,7 +72,10 @@ Turniejo_V2_Dokumentacja_Backendu.pdf
 Turniejo_V2_swagger.json
 docs_gen/
 turniejo_frontend_plan.md
+turniejo_testy_manualne.xlsx
+Turniejo_VPS_checklista.docx
 dev.bat
+/qa
 # Blokada równoległych wdrożeń (deploy/deploy.sh)
 deploy/.deploy.lock
 
