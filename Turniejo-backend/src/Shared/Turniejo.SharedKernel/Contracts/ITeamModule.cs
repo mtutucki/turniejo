@@ -4,6 +4,8 @@ public interface ITeamModule
 {
     Task<TeamDto?> GetTeamAsync(Guid teamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TeamDto>> GetTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
+    // Kadra drużyny (moduł Players): organizator organizacji, do której należy drużyna, może nią zarządzać.
+    Task<Guid?> GetTeamOrganizationIdAsync(Guid teamId, CancellationToken cancellationToken = default);
     Task<TournamentTeamDto?> GetTournamentTeamAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     // Wszystkie zgłoszenia tej samej drużyny (we wszystkich turniejach) — moduł Players bierze z nich
@@ -26,6 +28,7 @@ public interface ITeamModule
     // Usunięcie organizacji: zgłoszenia jej drużyn (potrzebne modułowi Players do usunięcia składów),
     // a potem cała baza drużyn ze zgłoszeniami i sztabem.
     Task<IReadOnlyList<Guid>> GetTournamentTeamIdsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Guid>> GetTeamIdsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 }
 

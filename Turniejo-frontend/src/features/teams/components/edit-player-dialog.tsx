@@ -95,7 +95,7 @@ export function EditPlayerDialog({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Usunąć {name} ze składu?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Jeśli zawodnik ma gole lub kartki w meczach, zostaną one w historii.
+                      Zawodnik zostanie w kadrze drużyny. Gole i kartki z meczów zostaną w historii.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

@@ -9,8 +9,6 @@ type TeamLogoProps = {
   className?: string
 }
 
-const isOptimizable = (url: string) => url.startsWith("https://") && !/\.svg(\?|#|$)/i.test(url)
-
 /** Herb drużyny albo inicjały, gdy logo nie ustawiono. */
 export function TeamLogo({ name, logoUrl, size = 36, className }: TeamLogoProps) {
   const initials = name
@@ -29,14 +27,14 @@ export function TeamLogo({ name, logoUrl, size = 36, className }: TeamLogoProps)
       style={{ width: size, height: size }}
     >
       {logoUrl ? (
-        // https → optymalizator Next.js (next.config: remotePatterns). SVG i http idą bez niego:
-        // SVG optymalizator odrzuca (dangerouslyAllowSVG=false), a http nie jest na liście wzorców.
+        // Bez optymalizatora Next.js: wgrane herby mają już 256 px, a obrazki z linków przeglądarka
+        // ładuje sama, zamiast żeby nasz serwer pobierał dowolne adresy (next.config.ts).
         <Image
           src={logoUrl}
           alt={`Herb: ${name}`}
           fill
           sizes={`${size}px`}
-          unoptimized={!isOptimizable(logoUrl)}
+          unoptimized
           className="object-contain"
         />
       ) : (

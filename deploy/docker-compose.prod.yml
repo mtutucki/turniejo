@@ -55,6 +55,8 @@ services:
         NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-}
     <<: [*restart, *logging]
     environment:
+      # Komponenty serwerowe Next pobierają dane prosto z API (lib/api/client.ts).
+      API_URL: http://api:8080
       # Logowanie grant_type=password idzie z serwera Next do Keycloaka siecią wewnętrzną.
       # Issuer w tokenach i tak jest publiczny (KC_HOSTNAME), więc API waliduje je poprawnie.
       KEYCLOAK_URL: http://keycloak:8080
@@ -90,6 +92,10 @@ services:
       # Host z Caddy (hub SignalR) i z rewrite'u Next (api:8080).
       AllowedHosts: ${DOMAIN};api
       ForwardedHeaders__KnownNetworks__0: 172.30.89.0/24
+      # Wgrane herby drużyn. Wolumen przeżywa przebudowę kontenera, backup.sh go archiwizuje.
+      Uploads__Path: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -162,5 +168,6 @@ networks:
 
 volumes:
   postgres_data:
+  uploads:
   caddy_data:
   caddy_config:

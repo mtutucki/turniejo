@@ -2,6 +2,7 @@ using System.Text.Json;
 using Turniejo.Players.Application.Abstractions;
 using Turniejo.Players.Application.Services;
 using Turniejo.Players.Domain.Entities;
+using Turniejo.Players.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -14,6 +15,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.ImportSquad
         ITeamModule teamModule,
         ITournamentModule tournamentModule,
         SquadEditGuard squadEditGuard,
+        TeamRosterSync teamRosterSync,
         ICurrentUserContext currentUserContext) : ICommandHandler<ImportSquadCommand, ImportSquadResponse>
     {
         public async Task<Result<ImportSquadResponse>> Handle(ImportSquadCommand request, CancellationToken cancellationToken)
@@ -24,15 +26,27 @@ namespace Turniejo.Players.Application.TournamentPlayers.ImportSquad
 
             await squadEditGuard.EnsureCanEditSquadAsync(request.TournamentId, currentUserContext.UserId, cancellationToken);
 
-            // Źródłem może być tylko inne zgłoszenie TEJ SAMEJ drużyny — inaczej trener jednej drużyny
-            // mógłby wyciągać (i przepisywać do siebie) zawodników dowolnej innej, znając samo Id.
-            var source = await teamModule.GetTournamentTeamAsync(request.SourceTournamentTeamId, cancellationToken);
-            if (source == null || source.TeamId != tournamentTeam.TeamId || source.Id == tournamentTeam.Id)
-                return Result.Failure<ImportSquadResponse>(Error.NotFound("TournamentTeam", request.SourceTournamentTeamId));
+            HashSet<Guid> sourcePlayerIds;
+            if (request.SourceTournamentTeamId is not { } sourceTournamentTeamId)
+            {
+                // Kadra tej drużyny: tylko zawodnicy, którzy wciąż w niej są.
+                sourcePlayerIds = (await dbContext.GetTeamPlayersByTeamIdAsync(tournamentTeam.TeamId, cancellationToken))
+                    .Where(tp => tp.Status == TeamPlayerStatus.Active)
+                    .Select(tp => tp.PlayerId)
+                    .ToHashSet();
+            }
+            else
+            {
+                // Źródłem może być tylko inne zgłoszenie TEJ SAMEJ drużyny — inaczej trener jednej drużyny
+                // mógłby wyciągać (i przepisywać do siebie) zawodników dowolnej innej, znając samo Id.
+                var source = await teamModule.GetTournamentTeamAsync(sourceTournamentTeamId, cancellationToken);
+                if (source == null || source.TeamId != tournamentTeam.TeamId || source.Id == tournamentTeam.Id)
+                    return Result.Failure<ImportSquadResponse>(Error.NotFound("TournamentTeam", sourceTournamentTeamId));
 
-            var sourcePlayerIds = (await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(source.Id, cancellationToken))
-                .Select(tp => tp.PlayerId)
-                .ToHashSet();
+                sourcePlayerIds = (await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(source.Id, cancellationToken))
+                    .Select(tp => tp.PlayerId)
+                    .ToHashSet();
+            }
             if (request.Players.Any(p => !sourcePlayerIds.Contains(p.PlayerId)))
                 return Result.Failure<ImportSquadResponse>(Error.Validation("Players", "Player is not part of the source squad"));
 
@@ -92,6 +106,11 @@ namespace Turniejo.Players.Application.TournamentPlayers.ImportSquad
                     await dbContext.AddOutboxMessageAsync(outboxMessage, cancellationToken);
                 }
             }
+
+            var rosterResult = await teamRosterSync.EnsureInRosterAsync(
+                tournamentTeam.TeamId, request.Players.Select(p => (p.PlayerId, p.ShirtNumber)), cancellationToken);
+            if (rosterResult.IsFailure)
+                return Result.Failure<ImportSquadResponse>(rosterResult.Error);
 
             await dbContext.SaveChangesAsync(cancellationToken);
 

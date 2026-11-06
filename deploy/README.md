@@ -82,7 +82,8 @@ późniejsza zmiana wymaga `ALTER ROLE ... PASSWORD` w Postgresie.
 
 ## Backup
 
-`backup.sh` zrzuca obie bazy do `~/backups` i usuwa zrzuty starsze niż 14 dni. Uruchamia go
+`backup.sh` zrzuca obie bazy i wgrane herby drużyn (`uploads-*.tar.gz`) do `~/backups` i usuwa
+pliki starsze niż 14 dni. Uruchamia go
 `deploy.sh` przed każdym wdrożeniem, a codziennie cron (`crontab -e`):
 
 ```
@@ -94,6 +95,12 @@ Odtworzenie bazy z pliku (przykład dla aplikacji):
 
 ```sh
 docker compose -f docker-compose.prod.yml exec -T postgres   pg_restore -U postgres -d turniejo --clean --if-exists < ~/backups/turniejo-RRRR-MM-DD_GGMM.dump
+```
+
+Herby drużyn wracają z archiwum do wolumenu w kontenerze API:
+
+```sh
+docker compose -f docker-compose.prod.yml exec -T api tar -xzf - -C /data/uploads < ~/backups/uploads-RRRR-MM-DD_GGMM.tar.gz
 ```
 
 Raz przetestuj odtworzenie na czystej bazie.

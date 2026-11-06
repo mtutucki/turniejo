@@ -54,6 +54,9 @@ const EXACT: Record<string, string> = {
   "A player with the same name and birth date is already in this team":
     "W składzie jest już zawodnik o tych samych danych",
   "Player is not part of the source squad": "Tego zawodnika nie ma w wybranym składzie",
+  "Player is not on the roster of this team": "Tego zawodnika nie ma w składzie tej drużyny",
+  "An own goal has no assist": "Samobój nie ma asysty",
+  "Scorer cannot assist their own goal": "Strzelec nie może asystować przy swoim golu",
   "Shirt numbers must be unique.": "Numery na koszulkach nie mogą się powtarzać",
   "Select at least one player.": "Zaznacz co najmniej jednego zawodnika",
   "Player is too old for this category": "Zawodnik jest za stary na tę kategorię",
@@ -122,6 +125,13 @@ const EXACT: Record<string, string> = {
     "Drabinka wymaga formatu z fazą pucharową",
   "Match events can only be recorded while the match is live, paused, or within the post-match edit window":
     "Czas na poprawki minął - wynik meczu jest zablokowany",
+  "The post-match edit window has closed":
+    "Czas na poprawki minął. Rozstrzygnięcie może teraz zmienić tylko organizator",
+  "Match must be finished to change its result": "Ten mecz nie jest jeszcze zakończony",
+  "Walkover requires a winner": "Wybierz drużynę, która wygrywa walkowerem",
+  "Logo must be a PNG, JPEG or WebP image": "Herb musi być obrazkiem PNG, JPG albo WebP",
+  "Logo file is too large.": "Plik z herbem jest za duży",
+  "Logo file is empty.": "Wybierz plik z herbem",
   "Pitch is inactive": "To boisko jest nieaktywne",
   "Pitch does not belong to this tournament": "To boisko nie należy do tego turnieju",
   "Match must take place within the tournament dates": "Mecz musi się odbyć w trakcie turnieju",

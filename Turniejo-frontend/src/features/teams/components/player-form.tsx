@@ -130,6 +130,11 @@ type PlayerFormProps = {
   onSubmit: (input: SquadPlayerInput) => Promise<unknown>
   /** Przycisk obok "Zapisz" (np. Anuluj w dialogu). */
   secondaryAction?: React.ReactNode
+  /**
+   * "roster": kadra drużyny, bez statusu i zdjęcia (to cechy wpisu w składzie turnieju).
+   * `squad` to wtedy zawodnicy kadry.
+   */
+  mode?: "squad" | "roster"
 }
 
 export function PlayerForm({
@@ -139,6 +144,7 @@ export function PlayerForm({
   submitLabel,
   onSubmit,
   secondaryAction,
+  mode = "squad",
 }: PlayerFormProps) {
   const form = useForm<PlayerValues>({
     resolver: zodResolver(buildSchema(category, squad, player)),
@@ -248,7 +254,7 @@ export function PlayerForm({
             {...form.register("shirtNumber")}
           />
         </div>
-        {player && (
+        {player && mode === "squad" && (
           <Controller
             control={form.control}
             name="status"
@@ -271,13 +277,15 @@ export function PlayerForm({
             )}
           />
         )}
-        <TextField
-          id="player-photo"
-          label="Adres zdjęcia (opcjonalnie)"
-          placeholder="https://…"
-          error={errors.photoUrl}
-          {...form.register("photoUrl")}
-        />
+        {mode === "squad" && (
+          <TextField
+            id="player-photo"
+            label="Adres zdjęcia (opcjonalnie)"
+            placeholder="https://…"
+            error={errors.photoUrl}
+            {...form.register("photoUrl")}
+          />
+        )}
         <FieldError errors={[errors.root]} />
         {namesake ? (
           <div
@@ -287,7 +295,8 @@ export function PlayerForm({
             <p className="flex items-start gap-2">
               <CircleAlert className="text-live mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
-                W składzie jest już {namesake.firstName} {namesake.lastName}
+                {mode === "roster" ? "W kadrze" : "W składzie"} jest już {namesake.firstName}{" "}
+                {namesake.lastName}
                 {namesake.birthDate && `, ur. ${formatBirthDate(namesake.birthDate)}`}. Na pewno to
                 inna osoba?
               </span>

@@ -14,6 +14,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamen
         ITeamModule teamModule,
         ITournamentModule tournamentModule,
         SquadEditGuard squadEditGuard,
+        TeamRosterSync teamRosterSync,
         ICurrentUserContext currentUserContext) : ICommandHandler<CreatePlayerInTournamentTeamCommand, CreatePlayerInTournamentTeamResponse>
     {
         public async Task<Result<CreatePlayerInTournamentTeamResponse>> Handle(CreatePlayerInTournamentTeamCommand request, CancellationToken cancellationToken)
@@ -86,6 +87,12 @@ namespace Turniejo.Players.Application.TournamentPlayers.CreatePlayerInTournamen
 
             await dbContext.AddPlayerAsync(player, cancellationToken);
             await dbContext.AddTournamentPlayerAsync(tournamentPlayer, cancellationToken);
+
+            // Nowy zawodnik w składzie to też nowy zawodnik w kadrze drużyny.
+            var rosterResult = await teamRosterSync.EnsureInRosterAsync(
+                tournamentTeam.TeamId, [(player.Id, request.ShirtNumber)], cancellationToken);
+            if (rosterResult.IsFailure)
+                return Result.Failure<CreatePlayerInTournamentTeamResponse>(rosterResult.Error);
 
             foreach (var domainEvent in player.DomainEvents.Concat(tournamentPlayer.DomainEvents))
             {

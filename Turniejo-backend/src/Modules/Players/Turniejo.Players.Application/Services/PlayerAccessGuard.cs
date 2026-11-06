@@ -60,6 +60,14 @@ namespace Turniejo.Players.Application.Services
                     return true;
             }
 
+            // Zawodnik z kadry, który jeszcze nie grał w żadnym turnieju, też ma "swój" sztab.
+            var rosterGuard = new TeamRosterAccessGuard(teamModule, authorizationService);
+            foreach (var membership in await dbContext.GetTeamPlayersByPlayerIdAsync(playerId, cancellationToken))
+            {
+                if (await rosterGuard.GetAccessAsync(membership.TeamId, userId, cancellationToken) == TeamRosterAccess.Edit)
+                    return true;
+            }
+
             return false;
         }
     }

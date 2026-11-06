@@ -27,7 +27,11 @@ RUN npm run build
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
-ENV NODE_ENV=production \
+# API_URL potrzebny też w działającym serwerze: komponenty serwerowe (np. /t/[slug]) pobierają dane
+# prosto z API (lib/api/client.ts). Bez niego fetch idzie na "undefined/..." i strona kończy się 500.
+ARG API_URL
+ENV API_URL=$API_URL \
+    NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0

@@ -1,13 +1,19 @@
 namespace Turniejo.Players.Application.DTOs
 {
-    // Poprzednie zgłoszenie tej samej drużyny razem ze składem, który można skopiować do bieżącego.
+    // Skąd można wziąć zawodników do bieżącego składu: kadra drużyny (Kind = "Roster", bez turnieju)
+    // albo poprzednie zgłoszenie tej samej drużyny (Kind = "Tournament").
     public sealed record RosterSourceDto(
-        Guid TournamentTeamId,
-        Guid TournamentId,
+        Guid? TournamentTeamId,
+        Guid? TournamentId,
         string TournamentName,
         DateTimeOffset? TournamentStartAt,
         string? CategoryName,
-        IReadOnlyList<RosterSourcePlayerDto> Players);
+        IReadOnlyList<RosterSourcePlayerDto> Players,
+        string Kind = RosterSourceDto.TournamentKind)
+    {
+        public const string RosterKind = "Roster";
+        public const string TournamentKind = "Tournament";
+    }
 
     public sealed record RosterSourcePlayerDto(
         Guid PlayerId,

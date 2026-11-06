@@ -30,7 +30,7 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             _authorizationService = Substitute.For<IAuthorizationService>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             var squadEditGuard = new SquadEditGuard(_authorizationService, _tournamentModule);
-            _handler = new CreatePlayerInTournamentTeamCommandHandler(_dbContext, _teamModule, _tournamentModule, squadEditGuard, _currentUserContext);
+            _handler = new CreatePlayerInTournamentTeamCommandHandler(_dbContext, _teamModule, _tournamentModule, squadEditGuard, new TeamRosterSync(_dbContext), _currentUserContext);
 
             // domyślnie: organizer -> blokada składu nie dotyczy
             _authorizationService.HasAnyRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())

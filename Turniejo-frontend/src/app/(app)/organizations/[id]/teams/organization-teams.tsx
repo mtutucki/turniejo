@@ -1,6 +1,7 @@
 "use client"
 
-import { Pencil, Plus, Shield } from "lucide-react"
+import { Pencil, Plus, Shield, Users } from "lucide-react"
+import Link from "next/link"
 import { useParams } from "next/navigation"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -72,12 +73,21 @@ export function OrganizationTeams() {
               <Card className="py-4">
                 <CardContent className="flex items-center gap-3 px-4">
                   <TeamLogo name={team.name} logoUrl={team.logoUrl} size={44} />
-                  <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/organizations/${id}/teams/${team.id}`}
+                    className="min-w-0 flex-1 hover:underline"
+                  >
                     <p className="truncate font-medium">{team.name}</p>
                     {team.shortName && (
                       <p className="text-muted-foreground font-mono text-xs">{team.shortName}</p>
                     )}
-                  </div>
+                  </Link>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/organizations/${id}/teams/${team.id}`}>
+                      <Users />
+                      Kadra
+                    </Link>
+                  </Button>
                   <TeamFormDialog
                     organizationId={id}
                     team={team}

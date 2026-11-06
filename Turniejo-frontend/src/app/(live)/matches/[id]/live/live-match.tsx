@@ -245,14 +245,27 @@ function LivePanel({
 
       {/* Sterowanie meczem */}
       {status === "Scheduled" && (
-        <Button
-          className="h-16 w-full text-lg"
-          onClick={() => run("start")}
-          disabled={lifecycle.isPending}
-        >
-          <Play className="size-6" />
-          START
-        </Button>
+        <div className="space-y-3">
+          <Button
+            className="h-16 w-full text-lg"
+            onClick={() => run("start")}
+            disabled={lifecycle.isPending}
+          >
+            <Play className="size-6" />
+            START
+          </Button>
+          {/* Mecz rozegrany bez prowadzenia w aplikacji: sam wynik, bez zegara. */}
+          <FinishMatchDialog
+            mode="record"
+            tournamentId={tournamentId}
+            panel={panel}
+            trigger={
+              <Button variant="outline" className="h-12 w-full">
+                Wpisz sam wynik (bez zegara)
+              </Button>
+            }
+          />
+        </div>
       )}
 
       {(status === "Live" || status === "Paused") && (
@@ -322,12 +335,29 @@ function LivePanel({
       )}
 
       {status === "Finished" && (
-        <p className="bg-muted/40 flex items-start gap-2 rounded-lg border p-3 text-sm">
-          <Flag className="text-primary mt-0.5 size-4 shrink-0" />
-          {canEdit && panel.editLockedAt
-            ? `Mecz zakończony. Poprawki możliwe do ${formatTime(panel.editLockedAt)}.`
-            : "Mecz zakończony - wynik jest zablokowany."}
-        </p>
+        <div className="bg-muted/40 space-y-3 rounded-lg border p-3 text-sm">
+          <p className="flex items-start gap-2">
+            <Flag className="text-primary mt-0.5 size-4 shrink-0" />
+            {canEdit && panel.editLockedAt
+              ? `Mecz zakończony. Poprawki możliwe do ${formatTime(panel.editLockedAt)}.`
+              : isOrganizer
+                ? "Mecz zakończony. Jako organizator nadal możesz zmienić rozstrzygnięcie."
+                : "Mecz zakończony - wynik jest zablokowany."}
+          </p>
+          {/* Sędzia w czasie na poprawki, organizator zawsze (backend: ChangeFinishedMatchResult). */}
+          {(canEdit || isOrganizer) && (
+            <FinishMatchDialog
+              mode="change"
+              tournamentId={tournamentId}
+              panel={panel}
+              trigger={
+                <Button variant="outline" className="h-12 w-full">
+                  Zmień rozstrzygnięcie (karne, walkower)
+                </Button>
+              }
+            />
+          )}
+        </div>
       )}
 
       {status !== "Scheduled" && status !== "Cancelled" && (
@@ -342,7 +372,13 @@ function LivePanel({
         <h2 className="text-muted-foreground py-2 text-xs font-medium tracking-wide uppercase">
           Zdarzenia
         </h2>
-        <EventTimeline panel={panel} canEdit={canEdit} onRevert={(event) => revert.mutate(event)} />
+        <EventTimeline
+          tournamentId={tournamentId}
+          panel={panel}
+          canEdit={canEdit}
+          canEditScorers={canEdit || (status === "Finished" && isOrganizer)}
+          onRevert={(event) => revert.mutate(event)}
+        />
       </section>
     </div>
   )

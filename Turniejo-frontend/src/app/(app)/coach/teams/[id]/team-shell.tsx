@@ -17,6 +17,7 @@ import { TEAM_STAFF_ROLE_LABELS } from "@/types/teams"
 
 const TABS = [
   { segment: "players", label: "Skład" },
+  { segment: "roster", label: "Kadra" },
   { segment: "schedule", label: "Terminarz" },
   { segment: "stats", label: "Statystyki" },
 ]

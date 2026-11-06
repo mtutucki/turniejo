@@ -3,7 +3,7 @@ import { ApiError } from "./errors"
 type ApiRequestOptions = Omit<RequestInit, "body"> & {
   /** Access token z sesji Auth.js — dołączany jako Bearer. */
   token?: string
-  /** Obiekt serializowany do JSON. */
+  /** Obiekt serializowany do JSON albo FormData (wysyłka pliku, multipart). */
   body?: unknown
 }
 
@@ -20,12 +20,14 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   const requestHeaders = new Headers(headers)
   requestHeaders.set("Accept", "application/json")
   if (token) requestHeaders.set("Authorization", `Bearer ${token}`)
-  if (body !== undefined) requestHeaders.set("Content-Type", "application/json")
+  const isForm = body instanceof FormData
+  // Przy FormData Content-Type (z granicą multipart) ustawia sama przeglądarka.
+  if (body !== undefined && !isForm) requestHeaders.set("Content-Type", "application/json")
 
   const response = await fetch(resolveUrl(path), {
     ...init,
     headers: requestHeaders,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   })
 
   if (!response.ok) throw await ApiError.fromResponse(response)

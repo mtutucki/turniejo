@@ -297,6 +297,31 @@ export function useSelectMvp(tournamentId: string, matchId: string) {
 }
 
 /**
+ * Strzelec i asysta już zapisanego gola. Wynik się nie zmienia, więc bez optymistycznej zmiany tablicy.
+ * Odświeżamy też rankingi turnieju (strzelcy, asysty).
+ */
+export function useSetGoalPlayers(tournamentId: string, matchId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      eventId: string
+      playerId: string | null
+      assistPlayerId: string | null
+    }) =>
+      request(`${matchPath(tournamentId, matchId)}/events/${input.eventId}/players`, {
+        method: "PATCH",
+        body: { playerId: input.playerId, assistPlayerId: input.assistPlayerId },
+      }),
+    onSettled: () =>
+      Promise.all([
+        invalidateLive(queryClient, matchId),
+        queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "ranking"] }),
+      ]),
+  })
+}
+
+/**
  * Sędzia bierze wolny mecz ("claim") albo oddaje swój z powrotem do puli ("release"). Zmienia się też
  * rola na meczu, od której zależy dostęp do panelu — stąd odświeżenie ról.
  */
@@ -355,23 +380,54 @@ export function useMatchLifecycle(tournamentId: string, matchId: string) {
 
 export type FinishResultKind = "Regular" | "ExtraTime" | "Penalties" | "Walkover"
 
+export type MatchResultInput = {
+  resultType: FinishResultKind
+  winnerTournamentTeamId: string | null
+  homePenaltyScore?: number | null
+  awayPenaltyScore?: number | null
+  /** Tylko przy wpisywaniu wyniku bez meczu na żywo (record-result). */
+  homeScore?: number
+  awayScore?: number
+}
+
 export function useFinishMatch(tournamentId: string, matchId: string) {
+  return useMatchResultMutation(tournamentId, matchId, "finish")
+}
+
+/** Zmiana rozstrzygnięcia zakończonego meczu: sędzia w czasie na poprawki, organizator zawsze. */
+export function useChangeMatchResult(tournamentId: string, matchId: string) {
+  return useMatchResultMutation(tournamentId, matchId, "change")
+}
+
+/** Wynik wpisany od razu, bez prowadzenia meczu na żywo. Mecz kończy się bez zegara. */
+export function useRecordMatchResult(tournamentId: string, matchId: string) {
+  return useMatchResultMutation(tournamentId, matchId, "record")
+}
+
+const RESULT_ENDPOINTS = {
+  finish: { path: "finish", method: "POST" },
+  change: { path: "result", method: "PATCH" },
+  record: { path: "record-result", method: "POST" },
+} as const
+
+function useMatchResultMutation(
+  tournamentId: string,
+  matchId: string,
+  mode: keyof typeof RESULT_ENDPOINTS,
+) {
   const { request } = useApi()
   const queryClient = useQueryClient()
+  const endpoint = RESULT_ENDPOINTS[mode]
   return useMutation({
-    mutationFn: (input: {
-      resultType: FinishResultKind
-      winnerTournamentTeamId: string | null
-      homePenaltyScore?: number | null
-      awayPenaltyScore?: number | null
-    }) =>
-      request(`${matchPath(tournamentId, matchId)}/finish`, {
-        method: "POST",
+    mutationFn: (input: MatchResultInput) =>
+      request(`${matchPath(tournamentId, matchId)}/${endpoint.path}`, {
+        method: endpoint.method,
         body: {
           resultType: MatchResultType[input.resultType],
           winnerTournamentTeamId: input.winnerTournamentTeamId,
           homePenaltyScore: input.homePenaltyScore ?? null,
           awayPenaltyScore: input.awayPenaltyScore ?? null,
+          ...(mode !== "finish" ? { homeScore: input.homeScore, awayScore: input.awayScore } : {}),
         },
       }),
     meta: { handlesValidation: true },

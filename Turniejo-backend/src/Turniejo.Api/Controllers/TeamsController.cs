@@ -1,11 +1,13 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
 using Turniejo.Teams.Application.Teams.CreateTeam;
 using Turniejo.Teams.Application.Teams.GetTeamById;
 using Turniejo.Teams.Application.Teams.GetTeams;
 using Turniejo.Teams.Application.Teams.UpdateTeam;
 using Turniejo.Teams.Application.Teams.UpdateTeamLogo;
+using Turniejo.Teams.Application.Teams.UploadTeamLogo;
 
 namespace Turniejo.Api.Controllers
 {
@@ -38,6 +40,30 @@ namespace Turniejo.Api.Controllers
         {
             var command = new UpdateTeamLogoCommand(organizationId, teamId, request.LogoUrl);
             var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        // Plik z herbem (multipart, pole "file"). Zwraca adres do zapisania jako LogoUrl drużyny.
+        [HttpPost("logos")]
+        [EnableRateLimiting(RateLimitingExtensions.Uploads)]
+        [RequestSizeLimit(UploadTeamLogoCommand.MaxBytes + 64 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = UploadTeamLogoCommand.MaxBytes + 64 * 1024)]
+        public async Task<IActionResult> UploadTeamLogo([FromRoute] Guid organizationId, IFormFile? file, CancellationToken cancellationToken)
+        {
+            byte[] content = [];
+            if (file is { Length: > 0 and <= UploadTeamLogoCommand.MaxBytes })
+            {
+                using var buffer = new MemoryStream();
+                await file.CopyToAsync(buffer, cancellationToken);
+                content = buffer.ToArray();
+            }
+            else if (file is { Length: > UploadTeamLogoCommand.MaxBytes })
+            {
+                // Validator zgłosi "za duży" bez kopiowania całego pliku do pamięci.
+                content = new byte[UploadTeamLogoCommand.MaxBytes + 1];
+            }
+
+            var result = await sender.Send(new UploadTeamLogoCommand(organizationId, content), cancellationToken);
             return result.ToActionResult();
         }
 

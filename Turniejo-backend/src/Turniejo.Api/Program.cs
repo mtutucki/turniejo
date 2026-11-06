@@ -10,7 +10,9 @@ using Turniejo.Organizations.Infrastructure.Extensions;
 using Turniejo.Players.Infrastructure.Extensions;
 using Turniejo.SharedKernel.Behaviors;
 using Turniejo.Standings.Infrastructure.Extensions;
+using Microsoft.Extensions.FileProviders;
 using Turniejo.Teams.Infrastructure.Extensions;
+using Turniejo.Teams.Infrastructure.Storage;
 using Turniejo.Tournaments.Infrastructure.Extensions;
 using Turniejo.Users.Infrastructure.Extensions;
 
@@ -78,6 +80,29 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerDocumentation();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Wgrane pliki (herby drużyn). Nazwy są losowe i się nie zmieniają, więc przeglądarka może je trzymać
+// w pamięci podręcznej na stałe. Tylko PNG/JPG/WebP: nawet gdyby w katalogu znalazł się plik .html
+// czy .svg, nie zostanie podany przeglądarce.
+var uploadsRoot = TeamLogoFileStorage.ResolveUploadsRoot(app.Configuration);
+Directory.CreateDirectory(uploadsRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsRoot),
+    RequestPath = "/uploads",
+    ContentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider(
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".png"] = "image/png",
+            [".jpg"] = "image/jpeg",
+            [".webp"] = "image/webp",
+        }),
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        context.Context.Response.Headers.XContentTypeOptions = "nosniff";
+    },
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
