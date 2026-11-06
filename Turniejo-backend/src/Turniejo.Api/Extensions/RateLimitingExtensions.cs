@@ -14,8 +14,12 @@ public static class RateLimitingExtensions
     public const string ChangePassword = "change-password";
     public const string Uploads = "uploads";
 
-    public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
+    public static IServiceCollection AddApiRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
+        // Lokalnie (testy, zakładanie wielu kont z jednego IP) limity tylko przeszkadzają, więc da się je wyłączyć
+        // przez RateLimiting:Enabled = false. Domyślnie są włączone, więc produkcja nie musi nic ustawiać.
+        var enabled = configuration.GetValue("RateLimiting:Enabled", true);
+
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -28,7 +32,8 @@ public static class RateLimitingExtensions
 
             // Rejestracja i reset hasła: przed zalogowaniem, więc jedyny dostępny identyfikator to IP.
             options.AddPolicy(AuthAnonymous, httpContext =>
-                RateLimitPartition.GetSlidingWindowLimiter(
+                SlidingWindowOrNone(
+                    enabled,
                     GetClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -42,7 +47,8 @@ public static class RateLimitingExtensions
             // Dołączanie kodem wymaga zalogowania (JoinTournamentCommand nie jest IPublicRequest),
             // więc limitujemy per user — nie da się obejść zmianą adresu IP.
             options.AddPolicy(JoinTournament, httpContext =>
-                RateLimitPartition.GetSlidingWindowLimiter(
+                SlidingWindowOrNone(
+                    enabled,
                     GetUserIdOrClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -56,7 +62,8 @@ public static class RateLimitingExtensions
             // Zmiana hasła sprawdza obecne hasło logowaniem do Keycloaka — kilka prób na kwadrans wystarczy
             // na literówki, a nie pozwala zgadywać.
             options.AddPolicy(ChangePassword, httpContext =>
-                RateLimitPartition.GetSlidingWindowLimiter(
+                SlidingWindowOrNone(
+                    enabled,
                     GetUserIdOrClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -69,7 +76,8 @@ public static class RateLimitingExtensions
 
             // Wgrywanie plików zajmuje dysk serwera. Na zmianę herbów kilkunastu drużyn wystarczy z zapasem.
             options.AddPolicy(Uploads, httpContext =>
-                RateLimitPartition.GetSlidingWindowLimiter(
+                SlidingWindowOrNone(
+                    enabled,
                     GetUserIdOrClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -83,6 +91,14 @@ public static class RateLimitingExtensions
 
         return services;
     }
+
+    private static RateLimitPartition<string> SlidingWindowOrNone(
+        bool enabled,
+        string partitionKey,
+        Func<string, SlidingWindowRateLimiterOptions> factory) =>
+        enabled
+            ? RateLimitPartition.GetSlidingWindowLimiter(partitionKey, factory)
+            : RateLimitPartition.GetNoLimiter(partitionKey);
 
     private static string GetClientIp(HttpContext httpContext) =>
         httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
