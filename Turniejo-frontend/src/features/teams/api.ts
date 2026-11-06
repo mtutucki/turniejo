@@ -14,10 +14,13 @@ import {
   PaymentStatus,
   PlayerPosition,
   RegistrationStatus,
+  type RemoveRosterPlayerResult,
+  type RosterPlayerInput,
   type RosterSource,
   type SquadPlayerInput,
   type Team,
   type TeamInput,
+  type TeamRoster,
   type TeamStaffMember,
   TeamStaffRole,
   type TournamentMember,
@@ -34,6 +37,8 @@ export const teamKeys = {
     ["tournament-teams", tournamentTeamId, "roster-sources"] as const,
   staff: (tournamentTeamId: string) => ["tournament-teams", tournamentTeamId, "staff"] as const,
   members: (tournamentId: string) => ["tournaments", tournamentId, "members"] as const,
+  roster: (teamId: string) => ["team-roster", teamId] as const,
+  allRosters: ["team-roster"] as const,
 }
 
 const tournamentTeamPath = (tournamentId: string, tournamentTeamId: string) =>
@@ -245,6 +250,8 @@ function useInvalidateSquad(tournamentTeamId: string) {
     void queryClient.invalidateQueries({ queryKey: teamKeys.rosterSources(tournamentTeamId) })
     // Skład w panelu trenera (panelKeys.team) — literał, bo features/panels importuje ten moduł.
     void queryClient.invalidateQueries({ queryKey: ["coach", "teams", tournamentTeamId] })
+    // Dodanie do składu dopisuje też do kadry drużyny.
+    void queryClient.invalidateQueries({ queryKey: teamKeys.allRosters })
   }
 }
 
@@ -331,6 +338,89 @@ export function useImportSquad(tournamentId: string, tournamentTeamId: string) {
       ),
     meta: { handlesValidation: true },
     onSuccess: useInvalidateSquad(tournamentTeamId),
+  })
+}
+
+// --- Kadra drużyny --------------------------------------------------------------------------
+
+const rosterPath = (teamId: string) => `/api/teams/${teamId}/players`
+
+/** Kadra drużyny z bazy: organizator organizacji i sztab jej zgłoszeń (asystent i kierownik tylko podgląd). */
+export function useTeamRoster(teamId: string | undefined) {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: teamKeys.roster(teamId ?? ""),
+    queryFn: () => request<TeamRoster>(rosterPath(teamId!)),
+    enabled: isAuthenticated && !!teamId,
+  })
+}
+
+function useInvalidateRoster(teamId: string) {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: teamKeys.roster(teamId) })
+    // Kadra jest pierwszym źródłem "Dodaj z kadry", a usunięcie z kadry może zmienić składy turniejów.
+    void queryClient.invalidateQueries({ queryKey: ["tournament-teams"] })
+    void queryClient.invalidateQueries({ queryKey: ["coach", "teams"] })
+  }
+}
+
+const rosterBody = (input: RosterPlayerInput) => ({
+  firstName: input.firstName,
+  lastName: input.lastName,
+  birthDate: input.birthDate,
+  defaultPosition: PlayerPosition[input.position],
+  shirtNumber: input.shirtNumber,
+  allowDuplicate: input.allowDuplicate ?? false,
+})
+
+/** Nowy zawodnik w kadrze (bez playerId) albo edycja profilu i numeru w kadrze. */
+export function useSaveRosterPlayer(teamId: string) {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: ({ playerId, ...input }: RosterPlayerInput & { playerId?: string }) =>
+      playerId
+        ? request(`${rosterPath(teamId)}/${playerId}`, { method: "PUT", body: rosterBody(input) })
+        : request<{ playerId: string }>(rosterPath(teamId), {
+            method: "POST",
+            body: rosterBody(input),
+          }),
+    meta: { handlesValidation: true },
+    onSuccess: useInvalidateRoster(teamId),
+  })
+}
+
+/**
+ * Usunięcie z kadry. Profil i historia zostają (były zawodnik), chyba że zawodnik nigdzie nie grał.
+ * removeFromCurrentSquads: czy zdjąć go też ze składów turniejów, które trwają albo się nie zaczęły.
+ */
+export function useRemoveRosterPlayer(teamId: string) {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: ({
+      playerId,
+      removeFromCurrentSquads,
+    }: {
+      playerId: string
+      removeFromCurrentSquads: boolean
+    }) =>
+      request<RemoveRosterPlayerResult>(
+        `${rosterPath(teamId)}/${playerId}?removeFromCurrentSquads=${removeFromCurrentSquads}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: useInvalidateRoster(teamId),
+  })
+}
+
+export function useRestoreRosterPlayer(teamId: string) {
+  const { request } = useApi()
+  return useMutation({
+    mutationFn: (playerId: string) =>
+      request<{ playerId: string; shirtNumber: number | null }>(
+        `${rosterPath(teamId)}/${playerId}/restore`,
+        { method: "POST" },
+      ),
+    onSuccess: useInvalidateRoster(teamId),
   })
 }
 

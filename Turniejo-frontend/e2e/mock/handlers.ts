@@ -9,6 +9,7 @@ import {
   IDS,
   type Match,
   newId,
+  type RosterEntry,
   reset,
   slugify,
   TEAM_NAMES,
@@ -57,6 +58,64 @@ function authed<P extends Record<string, string>>(
 
 const hasRole = (user: User, role: string, scopeType: string, scopeId: string) =>
   user.roles.some((r) => r.role === role && r.scopeType === scopeType && r.scopeId === scopeId)
+
+// Kadra drużyny: dostęp ma organizator organizacji (w mocku wszystkie drużyny należą do jednej).
+const POSITIONS: Record<number, string> = {
+  1: "Goalkeeper",
+  2: "Defender",
+  3: "Midfielder",
+  4: "Forward",
+  5: "Universal",
+  6: "Unknown",
+}
+type RosterBody = {
+  firstName: string
+  lastName: string
+  birthDate: string
+  defaultPosition: number
+  shirtNumber: number | null
+}
+
+function rosterOf(user: User, teamId: string) {
+  if (!hasRole(user, "Organizer", "Organization", IDS.organization)) return undefined
+  return db.rosters[teamId]
+}
+
+const numberTaken = (roster: RosterEntry[], shirtNumber: number | null, exceptId: string | null) =>
+  shirtNumber !== null &&
+  roster.some(
+    (p) => p.status === "Active" && p.playerId !== exceptId && p.shirtNumber === shirtNumber,
+  )
+
+const numberTakenProblem = () =>
+  HttpResponse.json(
+    {
+      status: 422,
+      title: "Validation",
+      errors: [{ field: "ShirtNumber", message: "Shirt number is already taken in this team" }],
+    },
+    { status: 422 },
+  )
+
+function rosterDto({ inCurrentSquad, ...entry }: RosterEntry) {
+  const tournament = db.tournaments.find((t) => t.id === IDS.tournament)!
+  return {
+    ...entry,
+    photoUrl: null,
+    currentSquads: inCurrentSquad
+      ? [
+          {
+            tournamentTeamId: IDS.homeTeam,
+            tournamentId: tournament.id,
+            tournamentName: tournament.name,
+            tournamentStatus: tournament.status,
+            tournamentStartAt: tournament.startAt,
+            canEditSquad: true,
+          },
+        ]
+      : [],
+  }
+}
 
 const tournamentDto = (t: Tournament, user?: User) => {
   const organizer = user && hasRole(user, "Organizer", "Tournament", t.id)
@@ -772,6 +831,105 @@ const api = [
         })
       : problem(404, "Not found")
   }),
+
+  // --- Baza drużyn i kadra -----------------------------------------------------------------------
+  http.get(
+    "*/api/organizations/:id/teams",
+    authed(({ user, params }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      return HttpResponse.json(
+        Object.values(TEAM_NAMES).map((t) => ({ ...t, organizationId: params.id, logoUrl: null })),
+      )
+    }),
+  ),
+  http.get(
+    "*/api/teams/:teamId/players",
+    authed(({ user, params }) => {
+      const roster = rosterOf(user, params.teamId)
+      if (!roster) return problem(403, "Forbidden")
+      const team = Object.values(TEAM_NAMES).find((t) => t.id === params.teamId)!
+      return HttpResponse.json({
+        teamId: team.id,
+        teamName: team.name,
+        canEdit: true,
+        players: roster.map(rosterDto),
+      })
+    }),
+  ),
+  http.post(
+    "*/api/teams/:teamId/players",
+    authed(async ({ user, params, request }) => {
+      const roster = rosterOf(user, params.teamId)
+      if (!roster) return problem(403, "Forbidden")
+      const body = (await request.json()) as RosterBody
+      if (numberTaken(roster, body.shirtNumber, null)) return numberTakenProblem()
+      const entry: RosterEntry = {
+        playerId: newId(),
+        firstName: body.firstName,
+        lastName: body.lastName,
+        birthDate: body.birthDate,
+        defaultPosition: POSITIONS[body.defaultPosition] ?? "Unknown",
+        shirtNumber: body.shirtNumber,
+        status: "Active",
+        leftAt: null,
+        inCurrentSquad: false,
+        pastTournamentsCount: 0,
+      }
+      roster.push(entry)
+      return HttpResponse.json({ playerId: entry.playerId }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/teams/:teamId/players/:playerId",
+    authed(async ({ user, params, request }) => {
+      const roster = rosterOf(user, params.teamId)
+      const entry = roster?.find((p) => p.playerId === params.playerId)
+      if (!roster || !entry) return problem(404, "Player not found")
+      const body = (await request.json()) as RosterBody
+      if (numberTaken(roster, body.shirtNumber, entry.playerId)) return numberTakenProblem()
+      Object.assign(entry, {
+        firstName: body.firstName,
+        lastName: body.lastName,
+        birthDate: body.birthDate,
+        defaultPosition: POSITIONS[body.defaultPosition] ?? "Unknown",
+        shirtNumber: body.shirtNumber,
+      })
+      return HttpResponse.json({ playerId: entry.playerId })
+    }),
+  ),
+  http.delete(
+    "*/api/teams/:teamId/players/:playerId",
+    authed(({ user, params, request }) => {
+      const roster = rosterOf(user, params.teamId)
+      const entry = roster?.find((p) => p.playerId === params.playerId)
+      if (!roster || !entry) return problem(404, "Player not found")
+      const fromSquads = new URL(request.url).searchParams.get("removeFromCurrentSquads") === "true"
+      const removedFromSquads = fromSquads && entry.inCurrentSquad ? 1 : 0
+      const hadHistory = entry.inCurrentSquad || entry.pastTournamentsCount > 0
+      if (fromSquads) entry.inCurrentSquad = false
+      // Jak backend: kto nigdzie nie grał, znika całkiem; reszta zostaje jako były zawodnik.
+      const deleted = !hadHistory
+      if (deleted) roster.splice(roster.indexOf(entry), 1)
+      else Object.assign(entry, { status: "Left", leftAt: new Date().toISOString() })
+      return HttpResponse.json({
+        playerId: entry.playerId,
+        deleted,
+        removedFromSquads,
+        keptInSquads: [],
+      })
+    }),
+  ),
+  http.post(
+    "*/api/teams/:teamId/players/:playerId/restore",
+    authed(({ user, params }) => {
+      const roster = rosterOf(user, params.teamId)
+      const entry = roster?.find((p) => p.playerId === params.playerId)
+      if (!roster || !entry) return problem(404, "Player not found")
+      if (numberTaken(roster, entry.shirtNumber, entry.playerId)) entry.shirtNumber = null
+      Object.assign(entry, { status: "Active", leftAt: null })
+      return HttpResponse.json({ playerId: entry.playerId, shirtNumber: entry.shirtNumber })
+    }),
+  ),
 
   // --- SignalR negotiate (WebSocket obsługuje signalr.ts) ---
   http.post("*/hubs/:hub/negotiate", () => HttpResponse.json(negotiateResponse())),

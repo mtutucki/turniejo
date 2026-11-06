@@ -13,6 +13,20 @@ export type User = {
   roles: Role[]
 }
 export type Team = { id: string; name: string; shortName: string | null }
+/** Zawodnik w kadrze drużyny (TeamRosterPlayerDto bez wyliczanych składów). */
+export type RosterEntry = {
+  playerId: string
+  firstName: string
+  lastName: string
+  birthDate: string
+  defaultPosition: string
+  shirtNumber: number | null
+  status: "Active" | "Left"
+  leftAt: string | null
+  /** W składzie seedowanego turnieju (trwa), więc usuwający dostaje pytanie o skład. */
+  inCurrentSquad: boolean
+  pastTournamentsCount: number
+}
 export type Tournament = {
   id: string
   organizationId: string
@@ -159,7 +173,48 @@ function seed() {
   const organizations: Organization[] = [
     { id: IDS.organization, name: "Klub E2E", slug: "klub-e2e", ownerUserId: IDS.organizer },
   ]
-  return { users, tournaments, matches, organizations, usedResetTokens: [] as string[] }
+  const rosters: Record<string, RosterEntry[]> = {
+    "team-orly": [
+      {
+        playerId: "0f000000-0000-4000-8000-0000000000b1",
+        firstName: "Adam",
+        lastName: "Bramka",
+        birthDate: "2014-03-01T00:00:00Z",
+        defaultPosition: "Goalkeeper",
+        shirtNumber: 1,
+        status: "Active",
+        leftAt: null,
+        inCurrentSquad: true,
+        pastTournamentsCount: 1,
+      },
+      {
+        playerId: "0f000000-0000-4000-8000-0000000000b2",
+        firstName: "Bartek",
+        lastName: "Lewy",
+        birthDate: "2014-07-12T00:00:00Z",
+        defaultPosition: "Defender",
+        shirtNumber: 4,
+        status: "Active",
+        leftAt: null,
+        inCurrentSquad: false,
+        pastTournamentsCount: 0,
+      },
+      {
+        playerId: "0f000000-0000-4000-8000-0000000000b3",
+        firstName: "Cezary",
+        lastName: "Dawny",
+        birthDate: "2013-11-20T00:00:00Z",
+        defaultPosition: "Forward",
+        shirtNumber: 9,
+        status: "Left",
+        leftAt: new Date(now - 30 * 86_400_000).toISOString(),
+        inCurrentSquad: false,
+        pastTournamentsCount: 2,
+      },
+    ],
+    "team-lwy": [],
+  }
+  return { users, tournaments, matches, organizations, rosters, usedResetTokens: [] as string[] }
 }
 
 export const db = seed()

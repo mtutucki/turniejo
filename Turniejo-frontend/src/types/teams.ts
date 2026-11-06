@@ -178,10 +178,14 @@ export type RosterSourcePlayer = {
   ineligibility: "TooOld" | "TooYoung" | null
 }
 
-/** RosterSourceDto — skład tej samej drużyny z innego turnieju. */
+/**
+ * RosterSourceDto — skąd wziąć zawodników do składu: kadra drużyny (kind "Roster", bez turnieju)
+ * albo skład tej samej drużyny z innego turnieju (kind "Tournament").
+ */
 export type RosterSource = {
-  tournamentTeamId: string
-  tournamentId: string
+  kind: "Roster" | "Tournament"
+  tournamentTeamId: string | null
+  tournamentId: string | null
   tournamentName: string
   tournamentStartAt: string | null
   categoryName: string | null
@@ -189,6 +193,62 @@ export type RosterSource = {
 }
 
 export type ImportSquadInput = {
-  sourceTournamentTeamId: string
+  /** null = kadra drużyny. */
+  sourceTournamentTeamId: string | null
   players: { playerId: string; shirtNumber: number | null; position: PlayerPosition | null }[]
+}
+
+// --- Kadra drużyny -------------------------------------------------------------------------
+
+/** TeamRosterSquadDto — skład w turnieju, który trwa albo się nie zaczął. */
+export type TeamRosterSquad = {
+  tournamentTeamId: string
+  tournamentId: string
+  tournamentName: string
+  tournamentStatus: string
+  tournamentStartAt: string | null
+  /** Czy bieżący użytkownik może zmienić ten skład (np. blokada po starcie turnieju). */
+  canEditSquad: boolean
+}
+
+/** TeamRosterPlayerDto */
+export type TeamRosterPlayer = {
+  playerId: string
+  firstName: string
+  lastName: string
+  birthDate: string
+  defaultPosition: PlayerPosition
+  photoUrl: string | null
+  shirtNumber: number | null
+  status: "Active" | "Left"
+  leftAt: string | null
+  currentSquads: TeamRosterSquad[]
+  pastTournamentsCount: number
+}
+
+/** TeamRosterDto — GET /api/teams/{teamId}/players */
+export type TeamRoster = {
+  teamId: string
+  teamName: string
+  canEdit: boolean
+  players: TeamRosterPlayer[]
+}
+
+export type RosterPlayerInput = {
+  firstName: string
+  lastName: string
+  /** ISO z północą UTC. */
+  birthDate: string
+  position: PlayerPosition
+  shirtNumber: number | null
+  allowDuplicate?: boolean
+}
+
+/** RemoveTeamPlayerResponse */
+export type RemoveRosterPlayerResult = {
+  playerId: string
+  /** true: profil usunięty całkiem (nigdzie nie grał); false: został jako były zawodnik. */
+  deleted: boolean
+  removedFromSquads: number
+  keptInSquads: string[]
 }

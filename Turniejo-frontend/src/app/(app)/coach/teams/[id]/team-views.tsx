@@ -16,11 +16,18 @@ import { SimpleMatchList } from "@/features/panels/components/simple-match-list"
 import { AddPlayerDialog } from "@/features/teams/components/add-player-dialog"
 import { EditPlayerDialog } from "@/features/teams/components/edit-player-dialog"
 import { ImportSquadDialog } from "@/features/teams/components/import-squad-dialog"
+import { TeamRoster } from "@/features/teams/components/team-roster"
 import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { PLAYER_POSITION_LABELS, PLAYER_STATUS_LABELS, type TournamentPlayer } from "@/types/teams"
 
 import { useCoachTeam } from "./team-shell"
+
+/** Kadra drużyny z bazy (wszystkie turnieje). Trener edytuje, asystent i kierownik oglądają. */
+export function CoachRosterView() {
+  const team = useCoachTeam()
+  return <TeamRoster teamId={team.teamId} />
+}
 
 export function CoachPlayersView() {
   const team = useCoachTeam()

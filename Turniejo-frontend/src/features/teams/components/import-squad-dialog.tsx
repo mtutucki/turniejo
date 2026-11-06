@@ -1,6 +1,6 @@
 "use client"
 
-import { History } from "lucide-react"
+import { History, Users } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -45,7 +45,11 @@ function blockReason(player: RosterSourcePlayer) {
   return null
 }
 
+/** Kadra nie ma zgłoszenia, więc dostaje stały klucz. */
+const sourceKey = (source: RosterSource) => source.tournamentTeamId ?? "roster"
+
 function sourceLabel(source: RosterSource) {
+  if (source.kind === "Roster") return "Kadra drużyny"
   return [
     source.tournamentName,
     source.categoryName,
@@ -210,8 +214,8 @@ function SourcePlayers({
 }
 
 /**
- * Kopia składu z innego turnieju tej samej drużyny. Przycisk pojawia się dopiero, gdy drużyna ma
- * skąd kopiować — przy pierwszym turnieju nie ma czego proponować.
+ * Wybór zawodników do składu z kadry drużyny albo kopia składu z innego turnieju tej samej drużyny.
+ * Przycisk pojawia się dopiero, gdy jest skąd brać zawodników.
  */
 export function ImportSquadDialog({
   tournamentId,
@@ -230,8 +234,10 @@ export function ImportSquadDialog({
 
   if (!sources.data?.length) return null
 
-  // Źródła są posortowane od najnowszego turnieju — to on jest domyślny.
-  const source = sources.data.find((s) => s.tournamentTeamId === sourceId) ?? sources.data[0]!
+  // Kadra pierwsza, potem turnieje od najnowszego. Pierwsze źródło jest domyślne.
+  const source = sources.data.find((s) => sourceKey(s) === sourceId) ?? sources.data[0]!
+  const fromRoster = source.kind === "Roster"
+  const hasRoster = sources.data[0]!.kind === "Roster"
 
   return (
     <Dialog
@@ -246,33 +252,35 @@ export function ImportSquadDialog({
     >
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          <History />
-          Wczytaj skład
+          {hasRoster ? <Users /> : <History />}
+          {hasRoster ? "Dodaj z kadry" : "Wczytaj skład"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Skład z poprzedniego turnieju</DialogTitle>
+          <DialogTitle>
+            {fromRoster ? "Zawodnicy z kadry" : "Skład z poprzedniego turnieju"}
+          </DialogTitle>
           <DialogDescription>
-            Wybrani zawodnicy trafią do składu z tymi samymi profilami. Numery możesz zmienić od
-            razu, resztę - później w edycji zawodnika.
+            Zaznacz, kto gra w tym turnieju. Numery możesz zmienić od razu, resztę później w edycji
+            zawodnika.
           </DialogDescription>
         </DialogHeader>
 
         {sources.data.length > 1 ? (
           <Select
-            value={source.tournamentTeamId}
+            value={sourceKey(source)}
             onValueChange={(value) => {
               setSourceId(value)
               setError(undefined)
             }}
           >
-            <SelectTrigger aria-label="Turniej, z którego kopiujesz skład" className="w-full">
+            <SelectTrigger aria-label="Skąd wziąć zawodników" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {sources.data.map((s) => (
-                <SelectItem key={s.tournamentTeamId} value={s.tournamentTeamId}>
+                <SelectItem key={sourceKey(s)} value={sourceKey(s)}>
                   {sourceLabel(s)}
                 </SelectItem>
               ))}
@@ -285,7 +293,7 @@ export function ImportSquadDialog({
         {/* Montowane przy otwarciu i per źródło — zaznaczenia zawsze startują od domyślnych. */}
         {open && (
           <SourcePlayers
-            key={source.tournamentTeamId}
+            key={sourceKey(source)}
             source={source}
             squad={squad}
             isPending={importSquad.isPending}
