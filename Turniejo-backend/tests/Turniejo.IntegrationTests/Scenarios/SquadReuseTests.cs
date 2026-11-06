@@ -40,9 +40,12 @@ public sealed class SquadReuseTests(IntegrationTestWebApplicationFactory factory
         var summerTeamId = await TournamentFlow.AddTeamToTournamentAsync(organizer, summerId, teamId, summerCategoryId);
         var summerTeam = $"/api/tournaments/{summerId}/tournament-teams/{summerTeamId}";
 
-        // Lista do skopiowania: jeden poprzedni skład, Adam oznaczony jako za stary.
+        // Lista do skopiowania: kadra drużyny i jeden poprzedni skład, Adam oznaczony jako za stary.
         var sources = await (await organizer.GetAsync($"{summerTeam}/roster-sources")).ReadJsonAsync();
-        var source = sources.EnumerateArray().Should().ContainSingle().Subject;
+        sources.EnumerateArray().Should().ContainSingle(s => s.GetString("kind") == "Roster")
+            .Which.GetProperty("players").EnumerateArray().Should().HaveCount(2);
+        var source = sources.EnumerateArray().Where(s => s.GetString("kind") == "Tournament")
+            .Should().ContainSingle().Subject;
         source.GetGuid("tournamentTeamId").Should().Be(springTeamId);
         source.GetString("tournamentName").Should().Be("Wiosna");
         var sourcePlayers = source.GetProperty("players").EnumerateArray().ToList();
@@ -68,7 +71,7 @@ public sealed class SquadReuseTests(IntegrationTestWebApplicationFactory factory
 
         // Po kopii zawodnik jest już oznaczony jako obecny w składzie.
         sources = await (await organizer.GetAsync($"{summerTeam}/roster-sources")).ReadJsonAsync();
-        sources.EnumerateArray().Single().GetProperty("players").EnumerateArray()
+        sources.EnumerateArray().Single(s => s.GetString("kind") == "Tournament").GetProperty("players").EnumerateArray()
             .Single(p => p.GetGuid("playerId") == jan).GetProperty("alreadyInSquad").GetBoolean().Should().BeTrue();
 
         // Edycja w drugim turnieju: nazwisko idzie do wspólnego profilu, numer zostaje lokalny.
