@@ -22,7 +22,8 @@ namespace Turniejo.Notifications.Application.Notifications.CreateMatchReminderNo
             var createdCount = 0;
             foreach (var match in matches)
             {
-                var alreadyReminded = await dbContext.MatchReminderExistsAsync(match.Id, cancellationToken);
+                var alreadyReminded = await dbContext.MatchReminderExistsAsync(
+                    match.Id, match.ScheduledAt.AddMinutes(-request.MinutesBeforeMatch), cancellationToken);
                 if (alreadyReminded)
                     continue;
 

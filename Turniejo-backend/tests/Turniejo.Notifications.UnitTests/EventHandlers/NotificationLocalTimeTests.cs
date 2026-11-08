@@ -96,6 +96,22 @@ public sealed class NotificationLocalTimeTests
         _published.Should().ContainSingle().Which.Message.Should().Contain("o 09:00");
     }
 
+    // QA v3: PAN-010 - po przesunięciu meczu nie przychodziło nowe przypomnienie, bo liczyło się każde
+    // wcześniejsze. Teraz liczy się tylko przypomnienie wysłane w oknie przed aktualnym terminem.
+    [Fact]
+    public async Task PAN_010_Reminder_OnlyCountsRemindersSentForTheCurrentTerm()
+    {
+        _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([_match]);
+        _teamModule.GetTournamentTeamAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((TournamentTeamDto?)null);
+        var handler = new Turniejo.Notifications.Application.Notifications.CreateMatchReminderNotifications.CreateMatchReminderNotificationsCommandHandler(
+            _dbContext, Publisher, Resolver, _matchModule, _teamModule);
+
+        await handler.Handle(new Turniejo.Notifications.Application.Notifications.CreateMatchReminderNotifications.CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
+
+        await _dbContext.Received(1).MatchReminderExistsAsync(_match.Id, WinterUtc.AddMinutes(-30), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task PUC_032_SummerTime_UsesTwoHourOffset()
     {

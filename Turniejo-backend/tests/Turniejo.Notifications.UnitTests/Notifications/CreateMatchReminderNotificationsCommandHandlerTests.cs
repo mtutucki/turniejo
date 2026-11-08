@@ -41,7 +41,7 @@ public sealed class CreateMatchReminderNotificationsCommandHandlerTests
         var match = CreateMatch(refereeId: Guid.NewGuid());
         _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns([match]);
-        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(false);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
 
         // Act
         var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
@@ -59,7 +59,7 @@ public sealed class CreateMatchReminderNotificationsCommandHandlerTests
         var match = CreateMatch(refereeId: Guid.NewGuid());
         _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns([match]);
-        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(true);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
 
         // Act
         var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
@@ -77,7 +77,7 @@ public sealed class CreateMatchReminderNotificationsCommandHandlerTests
         var match = CreateMatch(refereeId: null);
         _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns([match]);
-        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(false);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
         _teamModule.GetTeamStaffUserIdsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new List<Guid>());
 
         // Act
@@ -98,7 +98,7 @@ public sealed class CreateMatchReminderNotificationsCommandHandlerTests
         var matchB = CreateMatch(refereeId: Guid.NewGuid());
         _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns([matchA, matchB]);
-        _dbContext.MatchReminderExistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        _dbContext.MatchReminderExistsAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
 
         // Act
         var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
@@ -118,7 +118,7 @@ public sealed class CreateMatchReminderNotificationsCommandHandlerTests
         var match = CreateMatch(refereeId: Guid.NewGuid());
         _matchModule.GetMatchesScheduledBetweenAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns([match]);
-        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<CancellationToken>()).Returns(false);
+        _dbContext.MatchReminderExistsAsync(match.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(false);
 
         // Act
         var result = await _handler.Handle(new CreateMatchReminderNotificationsCommand(30), CancellationToken.None);
