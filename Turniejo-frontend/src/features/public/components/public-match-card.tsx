@@ -62,7 +62,8 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
   const isLive = match.status === "Live" || match.status === "Paused"
   const live = usePublicLiveMatch(slug, match.id, isLive && tournament.settings.showLiveMatches)
   const minute = useLiveMinute(live.data)
-  const showScore = isLive || match.status === "Finished"
+  // Bez „Meczów na żywo” trwający mecz nie pokazuje wyniku ani szczegółów (QA v3: PUB-003f).
+  const showScore = (isLive && tournament.settings.showLiveMatches) || match.status === "Finished"
   const home = lookups.teamName(match.homeTournamentTeamId, "Gospodarze")
   const away = lookups.teamName(match.awayTournamentTeamId, "Goście")
   const pitch = lookups.pitchName(match.pitchId)

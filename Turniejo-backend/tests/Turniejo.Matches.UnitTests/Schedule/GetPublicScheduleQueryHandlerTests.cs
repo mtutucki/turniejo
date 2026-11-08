@@ -97,5 +97,40 @@ namespace Turniejo.Matches.UnitTests.Schedule
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().ContainSingle().Which.RefereeId.Should().BeNull();
         }
+            // QA v3: PUB-003c / PUB-003f - przełączniki „Terminarz” i „Mecze na żywo” działają niezależnie.
+        private (Match Live, Match Upcoming) ArrangeLiveAndUpcoming(Guid tournamentId, bool showSchedule, bool showLive)
+        {
+            _tournamentModule.GetPublicTournamentBySlugAsync("cup-slug", Arg.Any<CancellationToken>())
+                .Returns(new PublicTournamentDto(tournamentId, "Cup", "cup-slug", "InProgress", "Group",
+                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1), null,
+                    new TournamentPublicSettingsDto(tournamentId, true, true, true, showSchedule, true, true, showLive, true)));
+            var live = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow, StageType.Group).Value;
+            live.Start(Guid.NewGuid());
+            live.UpdateScore(1, 0);
+            var upcoming = Match.Create(Guid.NewGuid(), tournamentId, null, null, Guid.NewGuid(), Guid.NewGuid(), null, DateTimeOffset.UtcNow.AddHours(2), StageType.Group).Value;
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns([live, upcoming]);
+            return (live, upcoming);
+        }
+
+        [Fact]
+        public async Task PUB_003c_ScheduleOff_LiveOn_ReturnsOnlyLiveMatches()
+        {
+            var (live, _) = ArrangeLiveAndUpcoming(Guid.NewGuid(), showSchedule: false, showLive: true);
+
+            var result = await _handler.Handle(new GetPublicScheduleQuery("cup-slug"), CancellationToken.None);
+
+            result.Value.Select(m => m.Id).Should().Equal(live.Id);
+        }
+
+        [Fact]
+        public async Task PUB_003f_LiveOff_HidesTheScoreOfMatchesInProgress()
+        {
+            var (live, _) = ArrangeLiveAndUpcoming(Guid.NewGuid(), showSchedule: true, showLive: false);
+
+            var result = await _handler.Handle(new GetPublicScheduleQuery("cup-slug"), CancellationToken.None);
+
+            var dto = result.Value.Single(m => m.Id == live.Id);
+            (dto.HomeScore, dto.AwayScore).Should().Be((0, 0));
+        }
     }
 }

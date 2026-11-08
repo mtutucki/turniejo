@@ -122,7 +122,11 @@ function TeamSelect({
 
 function useFilteredSchedule(initialTeamId: string | undefined) {
   const { slug, tournament } = usePublicContext()
-  const schedule = usePublicSchedule(slug, tournament.settings.showSchedule)
+  // Bez terminarza kibic dalej widzi mecze na żywo (QA v3: PUB-003c) - backend zwraca wtedy tylko je.
+  const schedule = usePublicSchedule(
+    slug,
+    tournament.settings.showSchedule || tournament.settings.showLiveMatches,
+  )
   const [filter, setFilter] = useState<MatchFilter>(ALL_MATCHES)
   const team = useTeamFilter(initialTeamId)
   const matches = (schedule.data ?? []).filter(
@@ -146,12 +150,23 @@ export function MatchesOverview({ initialTeamId }: { initialTeamId?: string }) {
   const { slug, tournament } = usePublicContext()
   const { schedule, matches, filters, filtered } = useFilteredSchedule(initialTeamId)
 
-  if (!tournament.settings.showSchedule) {
+  const { showSchedule, showLiveMatches } = tournament.settings
+  if (!showSchedule && !showLiveMatches) {
     return <EmptyState icon={CalendarClock} title="Organizator nie udostępnił terminarza" />
   }
   if (schedule.isPending) return <Skeleton className="h-64 w-full rounded-xl" />
 
-  const live = matches.filter(isLive)
+  // Wyłączone „Mecze na żywo”: trwające mecze nie mają osobnej sekcji (QA v3: PUB-003f).
+  const live = showLiveMatches ? matches.filter(isLive) : []
+  if (!showSchedule) {
+    return live.length > 0 ? (
+      <Section title="Na żywo">
+        <Grid matches={live} />
+      </Section>
+    ) : (
+      <EmptyState icon={CalendarClock} title="Teraz nic się nie toczy" />
+    )
+  }
   const upcoming = matches.filter((m) => UPCOMING.has(m.status)).slice(0, 6)
   const results = matches
     .filter((m) => m.status === "Finished")
