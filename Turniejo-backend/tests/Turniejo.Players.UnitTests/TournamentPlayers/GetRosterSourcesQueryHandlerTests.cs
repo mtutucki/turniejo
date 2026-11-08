@@ -125,5 +125,25 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             result.IsSuccess.Should().BeTrue();
             result.Value.Should().BeEmpty();
         }
+            // QA v3: DRU-027a - zawodnik usunięty z kadry z opcją „Zostaw w składzie” dalej był proponowany
+        // (i zaznaczony) w źródle „skład z poprzedniego turnieju”. Były zawodnik kadry nie jest proponowany.
+        [Fact]
+        public async Task DRU_027a_FormerRosterMember_IsNotOfferedFromPreviousSquads()
+        {
+            var former = Profile("Bruno", "Były", new DateTime(2012, 5, 1));
+            var current = Profile("Antek", "Obecny", new DateTime(2012, 6, 1));
+            var registration = Guid.NewGuid();
+            PreviousRegistration("Wiosna", DateTimeOffset.UtcNow.AddMonths(-2),
+                SquadEntry(registration, former.Id, 8), SquadEntry(registration, current.Id, 7));
+            var leftMember = TeamPlayer.Create(Guid.NewGuid(), _teamId, former.Id, 8).Value;
+            leftMember.Leave();
+            _dbContext.GetTeamPlayersByTeamIdAsync(_teamId, Arg.Any<CancellationToken>())
+                .Returns([leftMember, TeamPlayer.Create(Guid.NewGuid(), _teamId, current.Id, 7).Value]);
+
+            var result = await _handler.Handle(new GetRosterSourcesQuery(_tournamentId, _tournamentTeamId), CancellationToken.None);
+
+            var previous = result.Value.Single(s => s.Kind == "Tournament");
+            previous.Players.Select(p => p.PlayerId).Should().Equal(current.Id);
+        }
     }
 }

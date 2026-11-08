@@ -27,12 +27,19 @@ namespace Turniejo.Players.Application.TournamentPlayers.GetRosterSources
             var currentSquad = await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(tournamentTeam.Id, cancellationToken);
             var currentPlayerIds = currentSquad.Select(tp => tp.PlayerId).ToHashSet();
 
+            // Kto odszedł z kadry drużyny, nie jest proponowany także ze składów poprzednich turniejów
+            // (QA v3: DRU-027a). Zawodnicy spoza kadry (dane sprzed kadry) dalej są proponowani.
+            var formerMembers = (await dbContext.GetTeamPlayersByTeamIdAsync(tournamentTeam.TeamId, cancellationToken))
+                .Where(tp => tp.Status == TeamPlayerStatus.Left)
+                .Select(tp => tp.PlayerId)
+                .ToHashSet();
+
             var sources = new List<RosterSourceDto>();
 
             foreach (var registration in registrations.Where(r => r.Id != tournamentTeam.Id))
             {
                 var roster = (await dbContext.GetTournamentPlayersByTournamentTeamIdAsync(registration.Id, cancellationToken))
-                    .Where(tp => tp.Status != TournamentPlayerStatus.Removed)
+                    .Where(tp => tp.Status != TournamentPlayerStatus.Removed && !formerMembers.Contains(tp.PlayerId))
                     .ToList();
                 if (roster.Count == 0)
                     continue;
