@@ -13,6 +13,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
         private readonly ITeamsDbContext _dbContext;
         private readonly ITournamentModule _tournamentModule;
         private readonly ICurrentUserContext _currentUserContext;
+        private readonly IMatchModule _matchModule = Substitute.For<IMatchModule>();
         private readonly ChangeTournamentTeamRegistrationStatusCommandHandler _handler;
 
         public ChangeTournamentTeamRegistrationStatusCommandHandlerTests()
@@ -22,7 +23,7 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             _tournamentModule = Substitute.For<ITournamentModule>();
             _tournamentModule.GetTournamentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
                 .Returns(call => new TournamentDto(call.Arg<Guid>(), "Turniej", "RegistrationOpen", null, Guid.NewGuid(), TeamLimit: 4));
-            _handler = new ChangeTournamentTeamRegistrationStatusCommandHandler(_dbContext, _tournamentModule, _currentUserContext);
+            _handler = new ChangeTournamentTeamRegistrationStatusCommandHandler(_dbContext, _tournamentModule, _matchModule, _currentUserContext);
         }
 
         [Fact]
@@ -137,6 +138,27 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Validation.RegistrationStatus");
             await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+            // QA v3: PUC-054 - decyzja: nie można wycofać drużyny w trakcie jej meczu.
+        [Theory]
+        [InlineData("Live")]
+        [InlineData("Paused")]
+        public async Task PUC_054_Withdrawing_DuringTeamsMatch_IsRejected(string matchStatus)
+        {
+            var tournamentId = Guid.NewGuid();
+            var tournamentTeam = CreateFakeTournamentTeam(tournamentId);
+            tournamentTeam.ChangeRegistrationStatus(RegistrationStatus.Accepted, Guid.NewGuid());
+            tournamentTeam.ClearDomainEvents();
+            _dbContext.GetTournamentTeamByIdAsync(tournamentTeam.Id, Arg.Any<CancellationToken>()).Returns(tournamentTeam);
+            _matchModule.GetMatchesByTournamentTeamIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns([new TournamentMatchDto(Guid.NewGuid(), tournamentId, matchStatus, DateTimeOffset.UtcNow, tournamentTeam.Id, Guid.NewGuid(), 0, 0)]);
+
+            var result = await _handler.Handle(
+                new ChangeTournamentTeamRegistrationStatusCommand(tournamentId, tournamentTeam.Id, RegistrationStatus.Withdrawn), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Be("The team is playing a match right now");
+            tournamentTeam.RegistrationStatus.Should().Be(RegistrationStatus.Accepted);
         }
     }
 }
