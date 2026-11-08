@@ -31,6 +31,7 @@ import {
 } from "@/features/matches/api"
 import { BracketBoard } from "@/features/matches/components/bracket-board"
 import { GenerateBracketForm } from "@/features/matches/components/generate-bracket-form"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { autoBracketPairs } from "@/features/matches/suggest-bracket"
 import { bracketChampion } from "@/features/public/components/champion-banner"
 import { useTournamentTeams } from "@/features/teams/api"
@@ -429,6 +430,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
 export function TournamentBracketView() {
   const { id, tournament } = useTournamentContext()
   const categories = useCategories(id)
+  useTournamentMatchesRealtime([id])
   // ?category=… otwiera drabinkę konkretnej kategorii (np. link z usuwania kategorii).
   const searchParams = useSearchParams()
   const [selected, setSelected] = useState<string | undefined>(
