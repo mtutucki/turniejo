@@ -6,7 +6,7 @@ import Link from "next/link"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { EventTimeline } from "@/features/matches/components/event-timeline"
+import { EventTimeline, playerLabel } from "@/features/matches/components/event-timeline"
 import { resultNote } from "@/features/matches/result-note"
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge"
 
@@ -41,6 +41,8 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
   }
 
   const m = match.data
+  const mvpEvent = m.events.filter((e) => e.type === "MvpSelected").at(-1)
+  const mvp = mvpEvent ? playerLabel(m, mvpEvent.playerId) : null
   const live = m.status === "Live" || m.status === "Paused"
   // Nazwy z listy drużyn portalu (respektują ShowTeams); backend i tak zwraca neutralne przy ukryciu.
   const home = lookups.teamName(m.homeTeam.tournamentTeamId, m.homeTeam.name)
@@ -76,6 +78,8 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
         {resultNote(m) && (
           <p className="text-muted-foreground mt-2 text-center text-sm">{resultNote(m)}</p>
         )}
+        {/* QA v3: PUB-007 - wybrany MVP był zapisany, ale strona meczu go nie pokazywała. */}
+        {mvp && <p className="mt-2 text-center text-sm font-medium">MVP: {mvp}</p>}
       </section>
       <section aria-label="Zdarzenia" className="bg-card rounded-2xl border px-4 py-2">
         <h2 className="text-muted-foreground py-2 text-xs font-medium tracking-wide uppercase">
