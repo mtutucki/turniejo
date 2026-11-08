@@ -69,8 +69,10 @@ export function OrganizationTeams() {
       ) : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {teams.data.map((team) => (
-            <li key={team.id}>
-              <Card className="py-4">
+            // min-w-0: element siatki nie kurczy się poniżej treści, więc długa nazwa wypychała
+            // przyciski poza ekran telefonu zamiast się skracać (QA v3: DRU-023).
+            <li key={team.id} className="min-w-0">
+              <Card className="min-w-0 py-4">
                 <CardContent className="flex items-center gap-3 px-4">
                   <TeamLogo name={team.name} logoUrl={team.logoUrl} size={44} />
                   <Link
