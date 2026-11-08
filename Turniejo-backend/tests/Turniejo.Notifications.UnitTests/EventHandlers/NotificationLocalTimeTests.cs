@@ -55,6 +55,33 @@ public sealed class NotificationLocalTimeTests
         _published.Should().ContainSingle().Which.Message.Should().Contain("09:00").And.NotContain("08:00");
     }
 
+    // QA v3: PAN-008 - powiadomienie o zmianie boiska nie mówiło, na które boisko przeniesiono mecz.
+    [Fact]
+    public async Task PAN_008_MatchPitchChanged_NamesNewPitch()
+    {
+        var pitchId = Guid.NewGuid();
+        _matchModule.GetPitchesByTournamentIdAsync(_match.TournamentId, Arg.Any<CancellationToken>())
+            .Returns([new PitchInfoDto(pitchId, "Boisko boczne", true)]);
+        var handler = new MatchPitchChangedHandler(Publisher, Resolver, _matchModule, _dbContext);
+
+        await handler.Handle(new MatchPitchChanged(_match.Id, _match.TournamentId, pitchId, Guid.NewGuid()), CancellationToken.None);
+
+        _published.Should().ContainSingle().Which.Message.Should().Contain("Boisko boczne");
+    }
+
+    [Fact]
+    public async Task PAN_008_MatchScheduleChanged_NamesNewPitch()
+    {
+        var pitchId = Guid.NewGuid();
+        _matchModule.GetPitchesByTournamentIdAsync(_match.TournamentId, Arg.Any<CancellationToken>())
+            .Returns([new PitchInfoDto(pitchId, "Boisko 2", true)]);
+        var handler = new MatchScheduleChangedHandler(Publisher, Resolver, _matchModule, _dbContext);
+
+        await handler.Handle(new MatchScheduleChanged(_match.Id, _match.TournamentId, pitchId, WinterUtc, Guid.NewGuid()), CancellationToken.None);
+
+        _published.Should().ContainSingle().Which.Message.Should().Contain("Boisko 2");
+    }
+
     [Fact]
     public async Task PAN_010_Reminder_ShowsPolishLocalTime()
     {

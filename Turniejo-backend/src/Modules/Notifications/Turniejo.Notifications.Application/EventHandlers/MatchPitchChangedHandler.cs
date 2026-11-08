@@ -24,9 +24,12 @@ namespace Turniejo.Notifications.Application.EventHandlers
             if (recipients.Count == 0)
                 return;
 
+            var pitchName = await NotificationPitch.NameAsync(matchModule, notification.TournamentId, notification.PitchId, cancellationToken);
+            var message = pitchName is null ? "Boisko meczu zostało zmienione." : $"Mecz przeniesiony na: {pitchName}.";
+
             var publishResult = await publisher.PublishAsync(
                 notification.TournamentId, NotificationType.PitchChanged, "Zmiana boiska",
-                "Boisko meczu zostało zmienione.", createdByUserId: null, recipients, matchId: notification.MatchId, cancellationToken);
+                message, createdByUserId: null, recipients, matchId: notification.MatchId, cancellationToken);
 
             // Bez tego błąd publikacji był cichy — OutboxProcessor uznawał wiadomość za przetworzoną
             // mimo że nic się nie zapisało. Throw uruchamia już istniejący mechanizm retry/dead-letter.

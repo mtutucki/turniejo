@@ -17,4 +17,18 @@ namespace Turniejo.Notifications.Application.Services
         /// <summary>Np. „09:00”.</summary>
         public static string Time(DateTimeOffset value) => Local(value).ToString("HH:mm", Polish);
     }
+
+    public static class NotificationPitch
+    {
+        // Zdarzenie niesie tylko Id boiska - bez nazwy powiadomienie nie mówiło, gdzie mecz się odbędzie.
+        public static async Task<string?> NameAsync(
+            Turniejo.SharedKernel.Contracts.IMatchModule matchModule, Guid tournamentId, Guid? pitchId, CancellationToken cancellationToken)
+        {
+            if (pitchId is not { } id)
+                return null;
+
+            var pitches = await matchModule.GetPitchesByTournamentIdAsync(tournamentId, cancellationToken);
+            return pitches.FirstOrDefault(p => p.Id == id)?.Name;
+        }
+    }
 }
