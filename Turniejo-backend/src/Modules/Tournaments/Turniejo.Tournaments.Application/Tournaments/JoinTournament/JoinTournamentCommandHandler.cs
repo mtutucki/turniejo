@@ -1,4 +1,5 @@
-﻿using Turniejo.SharedKernel.Contracts;
+using Turniejo.Tournaments.Domain.Enums;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Enums;
 using Turniejo.SharedKernel.Results;
@@ -14,6 +15,10 @@ namespace Turniejo.Tournaments.Application.Tournaments.JoinTournament
 
             if (result == null)
                 return Result.Failure<JoinTournamentResponse>(Error.Validation("Code", "Invalid tournament code."));
+
+            // Decyzja QA v3 (KON-018): anulowany turniej nie przyjmuje nowych osób; zakończony - tak, do wglądu.
+            if (result.Status == TournamentStatus.Cancelled)
+                return Result.Failure<JoinTournamentResponse>(Error.Validation("Code", "This tournament has been cancelled"));
 
             var role = result.RefereeCode == request.Code ? nameof(UserRole.Referee) :
                result.CoachCode == request.Code ? nameof(UserRole.Coach) :
