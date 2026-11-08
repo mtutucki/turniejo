@@ -23,6 +23,12 @@ namespace Turniejo.Matches.Application.Matches.ChangeFinishedMatchResult
             if (match == null || match.TournamentId != request.TournamentId)
                 return Result.Failure<ChangeFinishedMatchResultResponse>(Error.NotFound("Match", request.MatchId));
 
+            // Po zakończeniu (albo anulowaniu) turnieju wyniki są ostateczne - także dla organizatora.
+            var tournament = await tournamentModule.GetTournamentAsync(request.TournamentId, cancellationToken);
+            if (tournament?.Status is "Finished" or "Cancelled")
+                return Result.Failure<ChangeFinishedMatchResultResponse>(
+                    Error.Conflict("Status", "The tournament has finished or been cancelled"));
+
             var settings = await tournamentModule.GetTournamentSettingsAsync(request.TournamentId, cancellationToken);
             if (settings == null)
                 return Result.Failure<ChangeFinishedMatchResultResponse>(Error.NotFound("TournamentSettings", request.TournamentId));
