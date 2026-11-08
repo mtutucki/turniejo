@@ -151,11 +151,12 @@ namespace Turniejo.Matches.Domain.Entities
             if (IsOver)
                 return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has finished or been cancelled"));
 
+            var previousRefereeId = RefereeId;
             RefereeId = refereeId;
             Version++;
             SetUpdatedAt();
 
-            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, changedByUserId));
+            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, changedByUserId, previousRefereeId));
 
             return Result.Success();
         }
@@ -191,7 +192,7 @@ namespace Turniejo.Matches.Domain.Entities
             Version++;
             SetUpdatedAt();
 
-            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, null, refereeId));
+            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, null, refereeId, refereeId));
 
             return Result.Success();
         }
