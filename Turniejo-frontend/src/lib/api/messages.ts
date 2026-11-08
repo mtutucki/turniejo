@@ -157,6 +157,70 @@ const EXACT: Record<string, string> = {
     "Mecze usunięte, ale nie udało się cofnąć etapu turnieju - spróbuj ponownie",
   "Schedule status is set automatically by generating the schedule":
     "Ten etap ustawia się automatycznie po wygenerowaniu terminarza",
+  // QA v3: komunikaty, na które da się trafić z UI, a które przechodziły po angielsku (m.in. DRU-020, PUC-017).
+  "User is already a guardian of this player": "Ta osoba jest już opiekunem tego zawodnika",
+  "A pairing cannot have Bye on both sides — there would be no team to advance.":
+    "Para nie może mieć wolnego losu po obu stronach - nikt by z niej nie awansował",
+  "A result can only be entered for a match that has not started":
+    "Wynik bez zegara można wpisać tylko dla meczu, który się nie zaczął",
+  "A team cannot play against itself": "Drużyna nie może grać sama ze sobą",
+  "A team cannot play against itself.": "Drużyna nie może grać sama ze sobą",
+  "A walkover can only be awarded before the match has started":
+    "Walkower można przyznać tylko przed rozpoczęciem meczu",
+  "Cannot cancel a match that is live, paused, or already finished":
+    "Nie można odwołać meczu, który trwa albo się zakończył",
+  "Cannot change the teams once the match has started, finished or been cancelled":
+    "Nie można zmienić drużyn po rozpoczęciu meczu",
+  "Cannot update a reverted event": "Tego zdarzenia już nie ma - zostało cofnięte",
+  "Event is already reverted": "To zdarzenie zostało już cofnięte",
+  "Days must not overlap.": "Dni gry nie mogą się nakładać",
+  "Each day must end after it starts.": "Dzień gry musi się kończyć po rozpoczęciu",
+  "The number of matches for a day must be greater than zero.": "Podaj co najmniej 1 mecz na dzień",
+  "Each player can be selected only once.": "Każdego zawodnika można wybrać tylko raz",
+  "Too many players selected.": "Wybrano za dużo zawodników",
+  "Source squad must be a different team registration.": "Wybierz skład z innego turnieju",
+  "Email is not valid.": "Nieprawidłowy adres email",
+  "Group does not belong to this tournament": "Ta grupa nie należy do tego turnieju",
+  "Match can only be finished from Live or Paused status": "Zakończyć można tylko trwający mecz",
+  "Match can only be paused while Live": "Wstrzymać można tylko trwający mecz",
+  "Match can only be resumed from Paused status": "Wznowić można tylko wstrzymany mecz",
+  "Match can only be started from Scheduled status": "Ten mecz już się rozpoczął",
+  "Match is already cancelled": "Ten mecz jest już odwołany",
+  "Match must be finished to correct its score": "Wynik można poprawić dopiero po zakończeniu meczu",
+  "Match must be live or paused to set a manual score": "Wynik ręcznie ustawisz tylko w trakcie meczu",
+  "Use CorrectFinishedMatchScoreCommand to change the score of a finished match":
+    "Wynik zakończonego meczu zmienisz przez „Zmień rozstrzygnięcie”",
+  "Only read notifications can be deleted": "Usunąć można tylko przeczytane powiadomienia",
+  "Password must contain a lowercase letter, an uppercase letter and a digit.":
+    "Hasło musi zawierać małą i wielką literę oraz cyfrę",
+  "Reset link is invalid or has expired.": "Ten link wygasł albo został już użyty",
+  "Score cannot be negative": "Wynik nie może być ujemny",
+  "HomeScore cannot be negative.": "Wynik nie może być ujemny",
+  "AwayScore cannot be negative.": "Wynik nie może być ujemny",
+  "Score must be between 0 and 99.": "Wpisz liczbę goli od 0 do 99",
+  "ShirtNumber must be greater than 0": "Numer musi być większy od 0",
+  "ShirtNumber must be greater than 0.": "Numer musi być większy od 0",
+  "Team is not playing in this match": "Ta drużyna nie gra w tym meczu",
+  "TieBreakerRule order values must be unique.": "Każde kryterium musi mieć inną pozycję",
+  "Walkover requires the tournament's walkover scores": "Ustaw wynik walkowera w zasadach gry turnieju",
+  "WalkoverHomeScore cannot equal WalkoverAwayScore.": "Wynik walkowera nie może być remisem",
+  "walkoverHomeScore cannot equal to walkoverAwayScore": "Wynik walkowera nie może być remisem",
+  "Winner must be one of the two teams playing": "Zwycięzca musi być jedną z drużyn meczu",
+  "You must accept the terms and privacy policy.": "Zaakceptuj Regulamin, aby założyć konto",
+  "PointsForWin cannot be less than PointsForDraw.": "Punkty za wygraną nie mogą być mniejsze niż za remis",
+  "PointsForWin cannot be less than pointsForDraw": "Punkty za wygraną nie mogą być mniejsze niż za remis",
+  "PointsForDraw cannot be less than PointsForLoss.": "Punkty za remis nie mogą być mniejsze niż za porażkę",
+  "pointsForDraw cannot be less than pointsForLoss": "Punkty za remis nie mogą być mniejsze niż za porażkę",
+  "PointsForLoss cannot be negative.": "Punkty za porażkę nie mogą być ujemne",
+  "pointsForLoss cannot be negative": "Punkty za porażkę nie mogą być ujemne",
+  "MatchDurationMinutes must be higher than 0.": "Długość meczu musi być większa od 0",
+  "matchDurationMinutes must be higher than 0": "Długość meczu musi być większa od 0",
+  "MinBirthDate must be less than or equal to MaxBirthDate.":
+    "Najstarszy rocznik musi być wcześniej niż najmłodszy",
+  "TournamentCategory minBirthDate cannot be greater than maxBirthDate":
+    "Najstarszy rocznik musi być wcześniej niż najmłodszy",
+  "BirthDate cannot be in the future.": "Data urodzenia nie może być w przyszłości",
+  "Player birthDate cannot be in the future": "Data urodzenia nie może być w przyszłości",
 }
 
 const PATTERNS: [RegExp, string][] = [
