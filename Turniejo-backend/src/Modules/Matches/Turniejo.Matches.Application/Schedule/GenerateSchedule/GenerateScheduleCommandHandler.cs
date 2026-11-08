@@ -286,6 +286,16 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                     .DefaultIfEmpty(windows[0].StartAt)
                     .Max();
 
+                // Finał po meczu o 3. miejsce z tej samej drabinki (te same półfinały). Na dwóch boiskach
+                // oba dostawały ten sam slot i grały równolegle.
+                if (!node.IsThirdPlace)
+                {
+                    var thirdPlace = nodes.FirstOrDefault(n => n.IsThirdPlace &&
+                        n.HomeSourceNodeId == node.HomeSourceNodeId && n.AwaySourceNodeId == node.AwaySourceNodeId);
+                    if (thirdPlace != null && readyAt.TryGetValue(thirdPlace.Id, out var thirdPlaceEnd) && thirdPlaceEnd > notBefore)
+                        notBefore = thirdPlaceEnd;
+                }
+
                 BracketPlannedSlotDto? found = null;
                 foreach (var (slotStart, windowIndex) in slotStarts)
                 {

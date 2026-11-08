@@ -224,6 +224,36 @@ namespace Turniejo.Matches.UnitTests.Schedule
                 Arg.Any<CancellationToken>());
         }
 
+        // QA v3: PUC-023 - na dwóch boiskach mecz o 3. miejsce i finał dostawały ten sam slot (równolegle).
+        // Mecz o 3. miejsce ma się odbyć przed finałem.
+        [Fact]
+        public async Task PUC_023_ThirdPlaceMatch_IsPlannedBeforeTheFinal_EvenWithTwoPitches()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitchId = Guid.NewGuid();
+            var secondPitch = Pitch.Create(Guid.NewGuid(), tournamentId, "Boisko 2", null, Guid.NewGuid()).Value;
+            var matches = SetupKnockout(tournamentId, pitchId, 2);
+            var allPitches = (await _dbContext.GetPitchesByIdsAsync(new[] { pitchId }, CancellationToken.None)).Append(secondPitch).ToList();
+            _dbContext.GetPitchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns(allPitches);
+            var semi1 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[0].Id, null, null, false);
+            var semi2 = new BracketNodeInfoDto(Guid.NewGuid(), 1, false, matches[1].Id, null, null, false);
+            var third = new BracketNodeInfoDto(Guid.NewGuid(), 2, true, null, semi1.Id, semi2.Id, false);
+            var final = new BracketNodeInfoDto(Guid.NewGuid(), 2, false, null, semi1.Id, semi2.Id, false);
+            _bracketModule.GetNodesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new List<BracketNodeInfoDto> { final, third, semi1, semi2 });
+            IReadOnlyCollection<BracketPlannedSlotDto>? planned = null;
+            await _bracketModule.SetPlannedSlotsAsync(Arg.Do<IReadOnlyCollection<BracketPlannedSlotDto>>(s => planned = s), Arg.Any<CancellationToken>());
+            var startAt = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+
+            var result = await _handler.Handle(
+                new GenerateScheduleCommand(tournamentId, startAt, startAt.AddHours(4), new[] { pitchId, secondPitch.Id }), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            var thirdAt = planned!.Single(p => p.NodeId == third.Id).ScheduledAt;
+            var finalAt = planned!.Single(p => p.NodeId == final.Id).ScheduledAt;
+            finalAt.Should().BeAfter(thirdAt);
+        }
+
         [Fact]
         public async Task Handle_ShouldPlanTheFinalOnTheNextDay_WhenTheFirstDayIsLimitedToTheSemiFinals()
         {
