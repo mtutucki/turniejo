@@ -1,3 +1,4 @@
+using Turniejo.Matches.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
@@ -20,7 +21,7 @@ namespace Turniejo.Matches.UnitTests.Matches
         public ChangeFinishedMatchResultCommandHandlerTests()
         {
             _currentUserContext.UserId.Returns(Guid.NewGuid());
-            _handler = new ChangeFinishedMatchResultCommandHandler(_dbContext, _tournamentModule, _currentUserContext, _authorizationService);
+            _handler = new ChangeFinishedMatchResultCommandHandler(_dbContext, new GoalAdjuster(_dbContext), _tournamentModule, _currentUserContext, _authorizationService);
         }
 
         private Match ArrangeFinishedMatch(int editWindowMinutes, bool isOrganizer, params (bool Home, MatchEventType Type)[] goals)

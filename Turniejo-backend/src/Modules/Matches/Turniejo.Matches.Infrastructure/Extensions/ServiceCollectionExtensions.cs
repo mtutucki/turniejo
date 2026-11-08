@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MatchEventRosterGuard>();
         services.AddScoped<MatchAccessGuard>();
         services.AddScoped<ScheduleConflictChecker>();
+        services.AddScoped<GoalAdjuster>();
         services.AddScoped<PlannedSlotShifter>();
         services.AddScoped<PlannedMatchContext>();
         services.AddScoped<SendOffRules>();
