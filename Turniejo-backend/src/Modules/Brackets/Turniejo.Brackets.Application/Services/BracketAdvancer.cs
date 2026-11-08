@@ -130,6 +130,54 @@ namespace Turniejo.Brackets.Application.Services
             }
         }
 
+        /// <summary>
+        /// Korekta wyniku grupowego po zakończeniu fazy grupowej zmienia tabelę, a obsadzony już slot
+        /// z miejsca w grupie zostawał ze starą drużyną. Przelicza obsadzone sloty z danej grupy:
+        /// nierozpoczęty mecz dostaje nową drużynę, rozpoczęty zostaje i trafia do <paramref name="blockedMatchIds"/>.
+        /// </summary>
+        public async Task<bool> RefreshResolvedGroupSlotsAsync(
+            BracketNode node, Guid groupId, Guid tournamentId, Guid categoryId,
+            ICollection<Guid> blockedMatchIds, CancellationToken cancellationToken)
+        {
+            var changed = false;
+            foreach (var slot in new[] { BracketSlot.Home, BracketSlot.Away })
+            {
+                var home = slot == BracketSlot.Home;
+                var sourceType = home ? node.HomeSourceType : node.AwaySourceType;
+                var sourceGroup = home ? node.HomeSourceGroupId : node.AwaySourceGroupId;
+                var position = home ? node.HomeSourcePosition : node.AwaySourcePosition;
+                var current = home ? node.HomeTournamentTeamId : node.AwayTournamentTeamId;
+
+                if (sourceType != BracketSourceType.GroupPosition || sourceGroup != groupId || current is null || position is null)
+                    continue;
+
+                var expected = await ResolveGroupPositionAsync(groupId, position.Value, cancellationToken);
+                if (expected is not { } expectedId || expectedId == current)
+                    continue;
+
+                if (node.MatchId is { } matchId)
+                {
+                    var newHome = home ? expectedId : node.HomeTournamentTeamId!.Value;
+                    var newAway = home ? node.AwayTournamentTeamId!.Value : expectedId;
+                    if (!await matchModule.ChangeUnstartedMatchTeamsAsync(matchId, newHome, newAway, cancellationToken))
+                    {
+                        blockedMatchIds.Add(matchId);
+                        continue;
+                    }
+                }
+
+                node.ResolveSlot(slot, expectedId);
+                changed = true;
+
+                // Para z wolnym losem nie ma meczu - drużyna z grupy przeszła już dalej, więc poprawiamy ją tam.
+                var otherIsBye = (home ? node.AwaySourceType : node.HomeSourceType) == BracketSourceType.Bye;
+                if (otherIsBye && node.WinnerGoesToNodeId is { } nextNodeId && node.WinnerGoesToSlot is { } nextSlot)
+                    await AdvanceIntoAsync(nextNodeId, nextSlot, expectedId, tournamentId, categoryId, cancellationToken);
+            }
+
+            return changed;
+        }
+
         public async Task<Result> TryCreateMatchAsync(
             BracketNode node, Guid tournamentId, Guid categoryId, string stageType, CancellationToken cancellationToken)
         {

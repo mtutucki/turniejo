@@ -32,6 +32,12 @@ namespace Turniejo.Brackets.Application.Brackets.ResolveGroupPositionSlots
 
             var resolvedAny = false;
 
+            // Najpierw sloty już obsadzone - korekta wyniku mogła zmienić kolejność w tabeli.
+            var blockedMatchIds = new List<Guid>();
+            foreach (var node in nodes)
+                resolvedAny |= await bracketAdvancer.RefreshResolvedGroupSlotsAsync(
+                    node, request.GroupId, request.TournamentId, request.CategoryId, blockedMatchIds, cancellationToken);
+
             foreach (var node in nodes)
             {
                 var referencesThisGroup =
