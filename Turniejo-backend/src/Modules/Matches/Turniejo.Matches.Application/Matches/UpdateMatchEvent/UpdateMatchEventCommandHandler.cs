@@ -44,6 +44,13 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchEvent
             if (result.IsFailure)
                 return Result.Failure<UpdateMatchEventResponse>(result.Error);
 
+            // Zmiana typu (np. gol na samobój) też zmienia wynik - zdarzenia z bazy są bez śledzenia,
+            // więc podmieniamy w nich edytowane zdarzenie na jego nową wersję.
+            var drawCheck = await MatchGoalScore.EnsureKnockoutStaysDecidedAsync(
+                dbContext, match, events => events.Select(e => e.Id == matchEvent.Id ? matchEvent : e), cancellationToken);
+            if (drawCheck.IsFailure)
+                return Result.Failure<UpdateMatchEventResponse>(drawCheck.Error);
+
             var newValue = JsonSerializer.Serialize(new
             {
                 matchEvent.Type,

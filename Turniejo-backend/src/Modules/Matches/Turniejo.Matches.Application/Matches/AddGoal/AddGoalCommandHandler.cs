@@ -54,6 +54,11 @@ namespace Turniejo.Matches.Application.Matches.AddGoal
             if (eventResult.IsFailure)
                 return Result.Failure<AddGoalResponse>(eventResult.Error);
 
+            var drawCheck = await MatchGoalScore.EnsureKnockoutStaysDecidedAsync(
+                dbContext, match, events => events.Append(eventResult.Value), cancellationToken);
+            if (drawCheck.IsFailure)
+                return Result.Failure<AddGoalResponse>(drawCheck.Error);
+
             await dbContext.AddMatchEventAsync(eventResult.Value, cancellationToken);
 
             var addedEvent = new MatchEventAdded(eventResult.Value.Id, match.Id, match.TournamentId, request.GoalType.ToString());

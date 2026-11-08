@@ -29,6 +29,11 @@ namespace Turniejo.Matches.Application.Matches.RevertMatchEvent
             if (editableCheck.IsFailure)
                 return Result.Failure<RevertMatchEventResponse>(editableCheck.Error);
 
+            var drawCheck = await MatchGoalScore.EnsureKnockoutStaysDecidedAsync(
+                dbContext, match, events => events.Where(e => e.Id != matchEvent.Id), cancellationToken);
+            if (drawCheck.IsFailure)
+                return Result.Failure<RevertMatchEventResponse>(drawCheck.Error);
+
             var result = matchEvent.MarkDeleted(currentUserContext.UserId, request.TournamentId);
             if (result.IsFailure)
                 return Result.Failure<RevertMatchEventResponse>(result.Error);

@@ -1,4 +1,6 @@
+using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Domain.Entities;
+using Turniejo.SharedKernel.Results;
 using Turniejo.Matches.Domain.Enums;
 
 namespace Turniejo.Matches.Application.Matches
@@ -27,6 +29,19 @@ namespace Turniejo.Matches.Application.Matches
             }
 
             return (home, away);
+        }
+
+        /// <summary>Sprawdza wynik po planowanej zmianie goli, zanim cokolwiek zostanie zapisane.</summary>
+        public static async Task<Result> EnsureKnockoutStaysDecidedAsync(
+            IMatchesDbContext dbContext, Match match,
+            Func<IReadOnlyList<MatchEvent>, IEnumerable<MatchEvent>> applyChange, CancellationToken cancellationToken)
+        {
+            if (match.Status != MatchStatus.Finished)
+                return Result.Success();
+
+            var events = await dbContext.GetMatchEventsByMatchIdAsync(match.Id, cancellationToken);
+            var (home, away) = FromEvents(match, applyChange(events));
+            return match.EnsureKnockoutStaysDecided(home, away);
         }
 
         private static Guid? OpposingTeam(Match match, Guid? teamId)
