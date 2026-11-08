@@ -24,7 +24,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             _userModule = Substitute.For<IUserModule>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             _authorizationService = Substitute.For<IAuthorizationService>();
-            _handler = new AssignRefereeToMatchCommandHandler(_dbContext, _userModule, _authorizationService, new ScheduleConflictChecker(_dbContext, Substitute.For<ITournamentModule>()), _currentUserContext);
+            _handler = new AssignRefereeToMatchCommandHandler(_dbContext, _userModule, _authorizationService, new ScheduleConflictChecker(_dbContext, Substitute.For<ITournamentModule>(), Substitute.For<ITeamModule>()), _currentUserContext);
 
             // domyślnie: wskazany user jest sędzią turnieju
             _authorizationService.HasAnyRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())

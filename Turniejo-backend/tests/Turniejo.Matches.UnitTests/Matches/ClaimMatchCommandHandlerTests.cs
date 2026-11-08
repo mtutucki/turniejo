@@ -25,7 +25,7 @@ namespace Turniejo.Matches.UnitTests.Matches
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             _currentUserContext.UserId.Returns(_refereeId);
             _handler = new ClaimMatchCommandHandler(
-                _dbContext, _userModule, new ScheduleConflictChecker(_dbContext, Substitute.For<ITournamentModule>()), _currentUserContext);
+                _dbContext, _userModule, new ScheduleConflictChecker(_dbContext, Substitute.For<ITournamentModule>(), Substitute.For<ITeamModule>()), _currentUserContext);
         }
 
         private static Match CreateFakeMatch(Guid tournamentId)
