@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EventTimeline } from "@/features/matches/components/event-timeline"
+import { resultNote } from "@/features/matches/result-note"
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge"
 
 import { usePublicLiveMatch } from "../api"
@@ -72,13 +73,8 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
           </p>
           <p className="min-w-0 truncate font-semibold">{away}</p>
         </div>
-        {m.homePenaltyScore != null && m.awayPenaltyScore != null && (
-          <p className="text-muted-foreground mt-2 text-center text-sm">
-            karne{" "}
-            <span className="font-mono tabular-nums">
-              {m.homePenaltyScore}:{m.awayPenaltyScore}
-            </span>
-          </p>
+        {resultNote(m) && (
+          <p className="text-muted-foreground mt-2 text-center text-sm">{resultNote(m)}</p>
         )}
       </section>
       <section aria-label="Zdarzenia" className="bg-card rounded-2xl border px-4 py-2">

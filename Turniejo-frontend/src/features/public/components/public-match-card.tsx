@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge"
 import { formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { resultNote } from "@/features/matches/result-note"
 import type { PublicMatch } from "@/types/public"
 
 import { type PublicLiveMatch, usePublicLiveMatch } from "../api"
@@ -139,13 +140,8 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
           winner={showScore && awayWins}
         />
       </div>
-      {penalties && (
-        <p className="text-muted-foreground mt-1 text-right text-xs">
-          karne{" "}
-          <span className="font-mono tabular-nums">
-            {match.homePenaltyScore}:{match.awayPenaltyScore}
-          </span>
-        </p>
+      {resultNote(match) && (
+        <p className="text-muted-foreground mt-1 text-right text-xs">{resultNote(match)}</p>
       )}
     </article>
   )

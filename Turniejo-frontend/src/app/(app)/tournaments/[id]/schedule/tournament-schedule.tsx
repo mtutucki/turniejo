@@ -61,6 +61,7 @@ import { type Match, type Pitch, SCHEDULABLE_STATUSES } from "@/types/matches"
 import type { TournamentMember } from "@/types/teams"
 import { UserRole } from "@/types/roles"
 
+import { resultNote } from "@/features/matches/result-note"
 import { hasScheduleDraft } from "./generate/generate-schedule"
 
 const ALL = "all"
@@ -195,6 +196,11 @@ function MatchRow({
             {showScore ? (
               <span className="font-mono tabular-nums">
                 {match.homeScore}:{match.awayScore}
+                {resultNote(match) && (
+                  <span className="text-muted-foreground ml-1 font-sans text-xs">
+                    ({resultNote(match)})
+                  </span>
+                )}
               </span>
             ) : (
               <span className="text-muted-foreground text-sm">vs</span>
