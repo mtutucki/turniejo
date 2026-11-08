@@ -322,6 +322,38 @@ export function useSetGoalPlayers(tournamentId: string, matchId: string) {
 }
 
 /**
+ * Pełna edycja zapisanego zdarzenia (minuta, zawodnicy). Zmiana minuty gola nie zmienia wyniku, ale
+ * przesuwa zdarzenie na osi czasu (QA v3: MNZ-017).
+ */
+export function useUpdateEvent(tournamentId: string, matchId: string) {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      event: MatchEvent
+      minute: number
+      playerId: string | null
+      relatedPlayerId: string | null
+    }) =>
+      request(`${matchPath(tournamentId, matchId)}/events/${input.event.id}`, {
+        method: "PUT",
+        body: {
+          type: input.event.type,
+          minute: input.minute,
+          second: input.minute === input.event.minute ? input.event.second : null,
+          playerId: input.playerId,
+          relatedPlayerId: input.relatedPlayerId,
+        },
+      }),
+    onSettled: () =>
+      Promise.all([
+        invalidateLive(queryClient, matchId),
+        queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "ranking"] }),
+      ]),
+  })
+}
+
+/**
  * Sędzia bierze wolny mecz ("claim") albo oddaje swój z powrotem do puli ("release"). Zmienia się też
  * rola na meczu, od której zależy dostęp do panelu — stąd odświeżenie ról.
  */

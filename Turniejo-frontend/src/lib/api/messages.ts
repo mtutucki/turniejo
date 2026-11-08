@@ -40,6 +40,7 @@ const EXACT: Record<string, string> = {
   "Team is already registered for this tournament and category":
     "Ta drużyna jest już zgłoszona do tej kategorii",
   "Tournament has reached its team limit": "Osiągnięto limit drużyn w turnieju",
+  "Minute must be between 0 and 300.": "Minuta musi być od 0 do 300",
   "The team is playing a match right now": "Drużyna gra teraz mecz. Wycofasz ją po jego zakończeniu.",
   "Some matches fall outside the new tournament dates":
     "Część meczów wypada poza nowymi datami turnieju. Najpierw przesuń je w terminarzu.",
