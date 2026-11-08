@@ -15,7 +15,7 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
@@ -222,8 +222,21 @@ function LivePanel({
 
   // Bez toastów potwierdzeń: zmiana i tak jest widoczna na tablicy, a toast na górze ekranu telefonu
   // zasłaniał nagłówek (powrót do listy). Toasty zostają dla błędów i ostrzeżeń (druga żółta).
+  // Blokada do zmiany statusu meczu: isPending dochodzi do przycisku z opóźnieniem, a po sukcesie,
+  // zanim panel pobierze nowy status, START był znowu aktywny - drugie kliknięcie dawało 409 (QA v3: MNZ-005).
+  const lockedFor = useRef<string | null>(null)
+  const [lockedStatus, setLockedStatus] = useState<string | null>(null)
+  const locked = lifecycle.isPending || lockedStatus === status
   function run(action: "start" | "pause" | "resume") {
-    lifecycle.mutate(action)
+    if (lockedFor.current === status) return
+    lockedFor.current = status
+    setLockedStatus(status)
+    lifecycle.mutate(action, {
+      onError: () => {
+        lockedFor.current = null
+        setLockedStatus(null)
+      },
+    })
   }
 
   return (
@@ -249,7 +262,7 @@ function LivePanel({
           <Button
             className="h-16 w-full text-lg"
             onClick={() => run("start")}
-            disabled={lifecycle.isPending}
+            disabled={locked}
           >
             <Play className="size-6" />
             START
@@ -275,7 +288,7 @@ function LivePanel({
               variant="outline"
               className="h-16 text-base"
               onClick={() => run("pause")}
-              disabled={lifecycle.isPending}
+              disabled={locked}
             >
               <Pause className="size-5" />
               PAUZA
@@ -284,7 +297,7 @@ function LivePanel({
             <Button
               className="h-16 text-base"
               onClick={() => run("resume")}
-              disabled={lifecycle.isPending}
+              disabled={locked}
             >
               <Play className="size-5" />
               WZNÓW
