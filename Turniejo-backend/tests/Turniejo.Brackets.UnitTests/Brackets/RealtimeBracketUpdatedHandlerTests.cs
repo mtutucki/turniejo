@@ -22,5 +22,17 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             // Assert
             await realtimeService.Received(1).PublishBracketUpdatedAsync(tournamentId, Arg.Any<CancellationToken>());
         }
+            // QA v3: GPK-006 - uzupełnienie slotów z miejsc w grupach nie odświeżało drabinki na żywo.
+        [Fact]
+        public async Task GPK_006_TeamsAdvancedToBracket_PublishesBracketUpdated()
+        {
+            var realtimeService = Substitute.For<IRealtimeService>();
+            var handler = new RealtimeBracketUpdatedHandler(realtimeService);
+            var tournamentId = Guid.NewGuid();
+
+            await handler.Handle(new TeamsAdvancedToBracket(Guid.NewGuid(), tournamentId), CancellationToken.None);
+
+            await realtimeService.Received(1).PublishBracketUpdatedAsync(tournamentId, Arg.Any<CancellationToken>());
+        }
     }
 }
