@@ -151,6 +151,7 @@ export function MatchesOverview({ initialTeamId }: { initialTeamId?: string }) {
   const { schedule, matches, filters, filtered } = useFilteredSchedule(initialTeamId)
 
   const { showSchedule, showLiveMatches } = tournament.settings
+  const cancelledTournament = tournament.status === "Cancelled"
   if (!showSchedule && !showLiveMatches) {
     return <EmptyState icon={CalendarClock} title="Organizator nie udostępnił terminarza" />
   }
@@ -178,10 +179,23 @@ export function MatchesOverview({ initialTeamId }: { initialTeamId?: string }) {
     <div className="space-y-6">
       {filters}
       {matches.length === 0 ? (
+        // Anulowany turniej nie dostanie terminarza - bez tego strona obiecywała go „wkrótce” (QA v3: PUB-012).
         <EmptyState
           icon={CalendarClock}
-          title={filtered ? "Brak meczów dla wybranych filtrów" : "Brak meczów"}
-          description={filtered ? undefined : "Terminarz pojawi się wkrótce."}
+          title={
+            filtered
+              ? "Brak meczów dla wybranych filtrów"
+              : cancelledTournament
+                ? "Turniej został odwołany"
+                : "Brak meczów"
+          }
+          description={
+            filtered
+              ? undefined
+              : cancelledTournament
+                ? "Organizator odwołał ten turniej. Mecze się nie odbędą."
+                : "Terminarz pojawi się wkrótce."
+          }
         />
       ) : (
         <>
