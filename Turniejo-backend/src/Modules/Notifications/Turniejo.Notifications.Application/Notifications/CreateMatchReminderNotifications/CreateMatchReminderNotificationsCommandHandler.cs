@@ -35,7 +35,7 @@ namespace Turniejo.Notifications.Application.Notifications.CreateMatchReminderNo
                 var awayTeamName = await GetTeamNameAsync(match.AwayTournamentTeamId, cancellationToken);
 
                 var title = "Przypomnienie o meczu";
-                var message = $"Mecz {homeTeamName} vs {awayTeamName} rozpocznie się o {match.ScheduledAt:HH:mm}.";
+                var message = $"Mecz {homeTeamName} vs {awayTeamName} rozpocznie się o {NotificationTime.Time(match.ScheduledAt)}.";
 
                 var publishResult = await publisher.PublishAsync(
                     match.TournamentId, NotificationType.MatchReminder, title, message,
