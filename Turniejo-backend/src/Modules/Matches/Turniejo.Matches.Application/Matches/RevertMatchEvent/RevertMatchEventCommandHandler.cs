@@ -1,3 +1,4 @@
+using Turniejo.Matches.Domain.Enums;
 using System.Text.Json;
 using MediatR;
 using Turniejo.Matches.Application.Abstractions;
@@ -37,6 +38,21 @@ namespace Turniejo.Matches.Application.Matches.RevertMatchEvent
             var result = matchEvent.MarkDeleted(currentUserContext.UserId, request.TournamentId);
             if (result.IsFailure)
                 return Result.Failure<RevertMatchEventResponse>(result.Error);
+
+            // Cofnięta żółta: czerwona z drugiej żółtej tego zawodnika wraca do zwykłej żółtej (decyzja MNZ-015).
+            if (matchEvent.Type == MatchEventType.YellowCard && matchEvent.PlayerId is { } playerId)
+            {
+                var redCards = await dbContext.GetActiveMatchEventsByTypeAsync(match.Id, MatchEventType.RedCard, cancellationToken);
+                foreach (var red in redCards.Where(r => r.PlayerId == playerId && r.IsSecondYellow))
+                {
+                    red.RevertToYellow(currentUserContext.UserId, request.TournamentId);
+                    foreach (var domainEvent in red.DomainEvents)
+                        await dbContext.AddOutboxMessageAsync(
+                            OutboxMessage.Create(domainEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(domainEvent, domainEvent.GetType())),
+                            cancellationToken);
+                    red.ClearDomainEvents();
+                }
+            }
 
             var auditLogResult = AuditLog.Create(
                 Guid.NewGuid(), currentUserContext.UserId, "MatchEvent", matchEvent.Id, "Revert",
