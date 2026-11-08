@@ -4,7 +4,6 @@ import { Download, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { signOut } from "next-auth/react"
 import { useState } from "react"
-import { toast } from "sonner"
 
 import { LegalLinks } from "@/components/layout/legal-links"
 import { PageHeader } from "@/components/layout/page-header"
@@ -46,8 +45,8 @@ function DeleteAccount() {
 
   function onDeleted() {
     setTournament(null)
-    toast.success("Konto zostało usunięte")
-    void signOut({ redirectTo: "/login" })
+    // Komunikat pokazuje strona logowania - toast znikał razem z przeładowaniem po signOut.
+    void signOut({ redirectTo: "/login?accountDeleted=1" })
   }
 
   return (
