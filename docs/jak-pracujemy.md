@@ -14,17 +14,20 @@ Etykiety: `funkcja`, `błąd`, `dług` (porządki techniczne), `pomysł` (na pó
 
 ## 2. Branch i plan
 
-- Branch od aktualnego `master`: `feat/krotka-nazwa`, `fix/krotka-nazwa`, `chore/…`.
+- Branch od aktualnego `master`: `feat/…`, `fix/…`, `chore/…`. Nazwa po angielsku, krótka, z myślnikami, np. `feat/whats-new`, `fix/bracket-third-place`, `chore/update-packages`.
 - Krótki plan: które moduły backendu, które ekrany, jakie testy na każde kryterium.
 
 ## 3. Kod i testy razem
 
 - Każde kryterium akceptacji = co najmniej jeden test na właściwej warstwie ([testy.md](testy.md)): reguła serwera → test integracyjny, zachowanie ekranu → E2E na mocku, kluczowa ścieżka przez cały system → pełny stos.
 - Poprawka błędu: najpierw test, który pokazuje błąd (czerwony), potem poprawka (zielony).
+- W trakcie pracy uruchamiaj tylko testy tego, co zmieniasz: jeden plik E2E, `dotnet test --filter …`, `npx vitest run plik` (przykłady w [testy.md](testy.md#uruchamianie)). To sekundy, a nie minuty.
 - Jeden commit na jedną spójną zmianę, opis mówi „dlaczego”.
 - Zmiana widoczna dla użytkownika: jedna linijka w sekcji „Nieopublikowane” w [../CHANGELOG.md](../CHANGELOG.md).
 
 ## 4. Kontrola przed oddaniem
+
+Pełna kontrola raz, gdy funkcja jest gotowa, a nie po każdej zmianie (trwa kilka minut). CI po pushu i tak puszcza wszystko jeszcze raz, łącznie z pełnym stosem.
 
 ```bash
 bash scripts/check.sh --e2e

@@ -21,9 +21,10 @@ Zasada: test jak najniżej, jak się da. Reguła „nie można zmienić formatu 
 bash scripts/check.sh            # backend (wszystkie testy) + frontend: lint, typy, Vitest
 bash scripts/check.sh --e2e      # + E2E na mocku (oba widoki: telefon i desktop)
 
-# pojedynczo
+# pojedynczo, w trakcie pracy (sekundy)
 dotnet test Turniejo-backend/Turniejo.slnx --filter "FullyQualifiedName~GroupStageRules"
 cd Turniejo-frontend && npx playwright test e2e/bracket.spec.ts --project=mobile
+cd Turniejo-frontend && npx vitest run src/lib/version.test.ts
 
 # pełny stos (Docker, ok. 6 min budowy obrazów za pierwszym razem)
 cd Turniejo-frontend
