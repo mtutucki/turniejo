@@ -31,13 +31,14 @@ Pracujesz według [docs/jak-pracujemy.md](../../../docs/jak-pracujemy.md) i zasa
 ## 4. Kontrola
 
 ```bash
-bash scripts/check.sh --e2e
+bash scripts/check.sh                                   # backend + lint, typy, Vitest
+cd Turniejo-frontend && npx playwright test e2e/<nowe-i-zmienione>.spec.ts
 ```
 
-Wszystko zielone. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), uruchom też pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`).
+Wszystko zielone. Całe E2E (`bash scripts/check.sh --e2e`) dopiero przed PR, gdy użytkownik o niego prosi. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), przed PR także pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`).
 
 Nowe decyzje dopisz do `docs/decyzje.md`, zmiany w architekturze do `docs/architektura.md`. Zmiana widoczna dla użytkownika: jedna linijka w sekcji „Nieopublikowane” w `CHANGELOG.md` (kategoria Nowe / Zmienione / Poprawione / Usunięte, po polsku, z perspektywy użytkownika).
 
 ## 5. Oddanie
 
-Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Nie pushuj i nie zakładaj PR bez prośby. Na prośbę: opis PR po angielsku według `.github/pull_request_template.md`, z `Closes #N`.
+Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Nie pushuj i nie zakładaj PR bez prośby. Na prośbę najpierw `bash scripts/check.sh --e2e`, potem opis PR po angielsku według `.github/pull_request_template.md`, z `Closes #N`.

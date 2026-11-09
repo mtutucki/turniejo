@@ -27,10 +27,11 @@ Etykiety: `funkcja`, `błąd`, `dług` (porządki techniczne), `pomysł` (na pó
 ## 4. Kontrola przed oddaniem
 
 ```bash
-bash scripts/check.sh --e2e
+bash scripts/check.sh                                   # backend + lint, typy, Vitest
+npx playwright test e2e/<zmieniony-ekran>.spec.ts       # tylko E2E dotkniętych ekranów (w Turniejo-frontend)
 ```
 
-Wszystko zielone. Nowe komunikaty backendu mają polskie tłumaczenie. Nowe teksty w UI są krótkie i bez „—”.
+Wszystko zielone. Całe E2E (`bash scripts/check.sh --e2e`, kilka minut) dopiero przed PR. Nowe komunikaty backendu mają polskie tłumaczenie. Nowe teksty w UI są krótkie i bez „—”.
 
 ## 5. Pull request
 
