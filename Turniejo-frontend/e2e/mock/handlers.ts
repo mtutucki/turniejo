@@ -224,6 +224,38 @@ const livePanel = (m: Match) => ({
   awayPenaltyScore: null,
 })
 
+const rosterPlayer = (playerId: string) =>
+  Object.values(db.rosters)
+    .flat()
+    .find((p) => p.playerId === playerId)
+
+/** Skład zgłoszenia w seedowanym turnieju: zawodnicy kadry z flagą inCurrentSquad. */
+const squadOf = (tournamentTeamId: string) =>
+  (db.rosters[TEAM_NAMES[tournamentTeamId]?.id ?? ""] ?? [])
+    .filter((p) => p.inCurrentSquad)
+    .map((p) => ({
+      id: `tp-${p.playerId}`,
+      tournamentTeamId,
+      playerId: p.playerId,
+      shirtNumber: p.shirtNumber,
+      position: p.defaultPosition,
+      status: "Active",
+      firstName: p.firstName,
+      lastName: p.lastName,
+      birthDate: p.birthDate,
+      photoUrl: null,
+    }))
+
+const teamMatch = (m: Match) => ({
+  matchId: m.id,
+  scheduledAt: m.scheduledAt,
+  status: m.status,
+  homeTeamName: TEAM_NAMES[m.home]!.name,
+  awayTeamName: TEAM_NAMES[m.away]!.name,
+  homeScore: m.homeScore,
+  awayScore: m.awayScore,
+})
+
 const tournamentTeams = (tournamentId: string) =>
   tournamentId !== IDS.tournament
     ? []
@@ -846,6 +878,145 @@ const api = [
         homeScore: m.homeScore,
         awayScore: m.awayScore,
       })
+    }),
+  ),
+
+  // --- Panel trenera i rodzica (z seeda: Orły, skład = zawodnicy kadry w bieżącym składzie) ---
+  http.get(
+    "*/api/coach/teams",
+    authed(({ user }) => {
+      const t = findTournament(IDS.tournament)!
+      return HttpResponse.json(
+        user.roles
+          .filter((r) => r.scopeType === "TournamentTeam" && r.role === "Coach")
+          .map((r) => ({
+            tournamentTeamId: r.scopeId,
+            tournamentId: t.id,
+            tournamentName: t.name,
+            teamId: TEAM_NAMES[r.scopeId!]!.id,
+            teamName: TEAM_NAMES[r.scopeId!]!.name,
+            categoryId: IDS.category,
+            groupId: IDS.group,
+            role: "Coach",
+            tournamentStatus: t.status,
+            canEditSquad: t.status !== "InProgress" && t.status !== "Finished",
+          })),
+      )
+    }),
+  ),
+  http.get(
+    "*/api/coach/teams/:id/:part",
+    authed<{ id: string; part: string }>(({ params, user }) => {
+      if (!hasRole(user, "Coach", "TournamentTeam", params.id)) return problem(403, "Forbidden")
+      const squad = squadOf(params.id)
+      if (params.part === "players") return HttpResponse.json(squad)
+      const matches = db.matches
+        .filter((m) => m.home === params.id || m.away === params.id)
+        .map(teamMatch)
+      if (params.part === "schedule") return HttpResponse.json(matches)
+      if (params.part === "results")
+        return HttpResponse.json(matches.filter((m) => m.status === "Finished"))
+      return HttpResponse.json(
+        squad.map((p) => ({
+          tournamentPlayerId: p.id,
+          playerId: p.playerId,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          goals: db.matches
+            .flatMap((m) => m.events)
+            .filter((e) => e.playerId === p.playerId && e.type === "Goal").length,
+          assists: 0,
+          yellowCards: 0,
+          redCards: 0,
+        })),
+      )
+    }),
+  ),
+  http.get(
+    "*/api/parent/players",
+    authed(({ user }) =>
+      HttpResponse.json(
+        db.guardians
+          .filter((g) => g.userId === user.id)
+          .map((g) => {
+            const p = rosterPlayer(g.playerId)!
+            return {
+              playerId: p.playerId,
+              firstName: p.firstName,
+              lastName: p.lastName,
+              birthDate: p.birthDate,
+              defaultPosition: p.defaultPosition,
+              photoUrl: null,
+              relationshipType: "Parent",
+              canEdit: g.canEdit,
+            }
+          }),
+      ),
+    ),
+  ),
+  http.get(
+    "*/api/parent/players/:id/:part",
+    authed<{ id: string; part: string }>(({ params, user }) => {
+      if (!db.guardians.some((g) => g.userId === user.id && g.playerId === params.id))
+        return problem(403, "Forbidden")
+      const t = findTournament(IDS.tournament)!
+      const p = rosterPlayer(params.id)!
+      const team = IDS.homeTeam
+      const childMatch = (m: Match) => ({
+        ...teamMatch(m),
+        tournamentId: t.id,
+        tournamentName: t.name,
+      })
+      const matches = db.matches.filter((m) => m.home === team || m.away === team)
+      if (params.part === "team")
+        return HttpResponse.json([
+          {
+            tournamentPlayerId: `tp-${p.playerId}`,
+            tournamentTeamId: team,
+            tournamentId: t.id,
+            tournamentName: t.name,
+            teamId: TEAM_NAMES[team]!.id,
+            teamName: TEAM_NAMES[team]!.name,
+            groupId: IDS.group,
+            shirtNumber: p.shirtNumber,
+            position: p.defaultPosition,
+          },
+        ])
+      if (params.part === "schedule") return HttpResponse.json(matches.map(childMatch))
+      if (params.part === "results")
+        return HttpResponse.json(matches.filter((m) => m.status === "Finished").map(childMatch))
+      return HttpResponse.json([
+        {
+          tournamentTeamId: team,
+          groupId: IDS.group,
+          groupName: "Grupa A",
+          tournamentName: t.name,
+          teamNames: Object.fromEntries(Object.entries(TEAM_NAMES).map(([id, x]) => [id, x.name])),
+          standings: Object.keys(TEAM_NAMES).map((id, i) => ({
+            tournamentTeamId: id,
+            position: i + 1,
+            points: 0,
+            matchesPlayed: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+          })),
+        },
+      ])
+    }),
+  ),
+  http.patch(
+    "*/api/parent/players/:id",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      const guardian = db.guardians.find((g) => g.userId === user.id && g.playerId === params.id)
+      if (!guardian?.canEdit) return problem(403, "Forbidden")
+      const body = (await request.json()) as { firstName: string; lastName: string }
+      const p = rosterPlayer(params.id)!
+      p.firstName = body.firstName
+      p.lastName = body.lastName
+      return HttpResponse.json({ playerId: p.playerId })
     }),
   ),
 
