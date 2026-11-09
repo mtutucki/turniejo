@@ -24,6 +24,16 @@ export const mock = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ side }),
     }),
+  /**
+   * Następne wywołania API (metoda + ścieżka, np. "/api/tournaments/:id/settings") dostają
+   * podaną odpowiedź. Bez "times" działa do końca testu.
+   */
+  override: (o: { method: string; path: string; status?: number; body?: unknown; times?: number }) =>
+    fetch(`${MOCK_URL}/__control/override`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(o),
+    }),
   release: (matchId: string) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/release`, { method: "POST" }),
 }
@@ -39,6 +49,18 @@ export async function login(page: Page, email: string, password = PASSWORD) {
 export async function loginAs(page: Page, email: string) {
   await login(page, email)
   await page.waitForURL((url) => !url.pathname.startsWith("/login"))
+}
+
+/** Nowy turniej w szkicu (organizator musi być zalogowany); zwraca jego id. */
+export async function createTournament(page: Page, name = `Turniej ${Date.now() % 100_000}`) {
+  await page.goto("/tournaments/new")
+  await page.getByLabel("Nazwa").fill(name)
+  await page.getByLabel("Rozpoczęcie", { exact: true }).fill("2026-11-14")
+  await page.getByLabel("Rozpoczęcie - godzina").fill("09:00")
+  await page.getByLabel("Zakończenie - godzina").fill("17:00")
+  await page.getByRole("button", { name: "Utwórz turniej" }).click()
+  await page.waitForURL(/\/tournaments\/[0-9a-f-]+\/setup/)
+  return page.url().match(/tournaments\/([0-9a-f-]+)\//)![1]!
 }
 
 /** Każdy test startuje od czystego mocka (seed: organizator, sędzia, turniej z meczem LIVE 0:0). */

@@ -40,7 +40,7 @@ test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => 
     await expect(page.getByLabel("Lwy E2E: 1", { exact: true })).toHaveText("1")
   })
 
-  test("mecz oddany z innego urządzenia od razu wraca do wolnych", async ({ page }) => {
+  test("[MNZ-028] mecz oddany z innego urządzenia od razu wraca do wolnych", async ({ page }) => {
     await loginAs(page, REFEREE)
     await page.goto("/referee/matches")
     await expect(page.getByRole("link", { name: /Orły E2E/ })).toBeVisible()

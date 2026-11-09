@@ -10,7 +10,7 @@ test.describe("Kadra drużyny", () => {
     await expect(page.getByRole("heading", { name: "Orły E2E" })).toBeVisible()
   })
 
-  test("organizator dodaje zawodnika, a zajęty numer blokuje zapis", async ({ page }) => {
+  test("[DRU-024 DRU-026] organizator dodaje zawodnika, a zajęty numer blokuje zapis", async ({ page }) => {
     await expect(page.getByText("2 zawodników w kadrze")).toBeVisible()
 
     await page.getByRole("button", { name: "Dodaj zawodnika" }).click()

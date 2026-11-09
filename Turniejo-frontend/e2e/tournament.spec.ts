@@ -1,7 +1,7 @@
 import { expect, loginAs, mock, ORGANIZER, test } from "./fixtures"
 
 test.describe("Tworzenie turnieju → Zmiana statusu", () => {
-  test("organizator tworzy turniej i otwiera zapisy", async ({ page }) => {
+  test("[PUC-001 UST-010] organizator tworzy turniej i otwiera zapisy", async ({ page }) => {
     const name = `Turniej Jesienny ${Date.now() % 100_000}`
     await loginAs(page, ORGANIZER)
     await expect(page).toHaveURL(/\/tournaments$/)
@@ -39,7 +39,7 @@ test.describe("Tworzenie turnieju → Zmiana statusu", () => {
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible()
   })
 
-  test("data końca przed startem nie przechodzi walidacji", async ({ page }) => {
+  test("[UST-001b UST-018] data końca przed startem nie przechodzi walidacji", async ({ page }) => {
     await loginAs(page, ORGANIZER)
     await expect(page).toHaveURL(/\/tournaments$/)
     await page.goto("/tournaments/new")

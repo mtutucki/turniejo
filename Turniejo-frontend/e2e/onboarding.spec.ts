@@ -1,7 +1,7 @@
 import { expect, mock, PASSWORD, PUBLIC_SLUG, test, VIEWER_CODE } from "./fixtures"
 
 test.describe("Zaproszenie → rejestracja rodzica", () => {
-  test("link z kodem prowadzi przez rejestrację i od razu dołącza, bez roli organizatora", async ({
+  test("[KON-014] link z kodem prowadzi przez rejestrację i od razu dołącza, bez roli organizatora", async ({
     page,
   }) => {
     const email = `rodzic.${Date.now()}@e2e.pl`

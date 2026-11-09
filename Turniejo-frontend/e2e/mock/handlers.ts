@@ -20,6 +20,29 @@ import {
 } from "./db"
 import { closeAll, connectionCount, negotiateResponse, publish } from "./signalr"
 
+/**
+ * Odpowiedzi ustawione przez test (POST /__control/override): test UI sam mówi, co zwraca API,
+ * zamiast odtwarzać w mocku logikę backendu. Ścieżka jak w Express: /api/tournaments/:id/settings.
+ * Override bez "times" działa do resetu mocka, z "times" - tyle razy.
+ */
+type Override = { method: string; pattern: RegExp; status: number; body: unknown; times: number | null }
+let overrides: Override[] = []
+
+function toPattern(path: string) {
+  const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/:[A-Za-z]+/g, "[^/]+")
+  return new RegExp(`${escaped}$`)
+}
+
+const overrideHandler = http.all("*", ({ request }) => {
+  const url = new URL(request.url)
+  const hit = overrides.find((o) => o.method === request.method && o.pattern.test(url.pathname))
+  if (!hit) return undefined
+  if (hit.times !== null && --hit.times <= 0) overrides = overrides.filter((o) => o !== hit)
+  return hit.body === null
+    ? new HttpResponse(null, { status: hit.status })
+    : HttpResponse.json(hit.body as never, { status: hit.status })
+})
+
 const STATUSES = [
   "Draft",
   "RegistrationOpen",
@@ -938,7 +961,19 @@ const api = [
 // --- Sterowanie mockiem z testów ---------------------------------------------------------------
 
 const control = [
+  http.post("*/__control/override", async ({ request }) => {
+    const o = (await request.json()) as { method: string; path: string; status?: number; body?: unknown; times?: number }
+    overrides.push({
+      method: o.method.toUpperCase(),
+      pattern: toPattern(o.path),
+      status: o.status ?? 200,
+      body: o.body ?? null,
+      times: o.times ?? null,
+    })
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/__control/reset", () => {
+    overrides = []
     reset()
     closeAll()
     return new HttpResponse(null, { status: 204 })
@@ -980,4 +1015,4 @@ const control = [
   ),
 ]
 
-export const handlers = [...keycloak, ...api, ...control]
+export const handlers = [...control, overrideHandler, ...keycloak, ...api]

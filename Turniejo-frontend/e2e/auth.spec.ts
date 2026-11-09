@@ -12,7 +12,7 @@ async function fillRegistration(page: Page, email: string, firstName = "Kamil") 
 }
 
 test.describe("Rejestracja → Logowanie", () => {
-  test("organizator: konto z organizacją, wylogowanie i powrót hasłem", async ({ page }) => {
+  test("[KON-001] organizator: konto z organizacją, wylogowanie i powrót hasłem", async ({ page }) => {
     const email = `organizator.${Date.now()}@e2e.pl`
 
     await page.goto("/register")
@@ -60,7 +60,7 @@ test.describe("Rejestracja → Logowanie", () => {
     await expect(page.getByRole("link", { name: "Moje turnieje" })).toHaveCount(0)
   })
 
-  test("walidacja formularza i błędne hasło", async ({ page }) => {
+  test("[KON-038a KON-038c] walidacja formularza i błędne hasło", async ({ page }) => {
     await page.goto("/register")
     await page.getByLabel("Email").fill("zly-email")
     await page.getByLabel("Hasło", { exact: true }).fill("krotkie")
@@ -73,12 +73,18 @@ test.describe("Rejestracja → Logowanie", () => {
     await expect(page.getByText("Wybierz, jak chcesz korzystać z Turniejo")).toBeVisible()
     await expect(page.getByText("Zaakceptuj Regulamin, aby założyć konto")).toBeVisible()
 
+    // Długie hasło bez cyfry też nie przechodzi.
+    await page.getByLabel("Hasło", { exact: true }).fill("Abcdefghij")
+    await page.getByLabel("Powtórz hasło").fill("Abcdefghij")
+    await page.getByRole("button", { name: "Załóż konto" }).click()
+    await expect(page.getByText("Hasło musi zawierać małą i wielką literę oraz cyfrę")).toBeVisible()
+
     await login(page, "organizator@e2e.pl", "zle-haslo")
     await expect(page.getByText(/Nieprawidłowy email lub hasło/)).toBeVisible()
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test("zajęty email pokazuje błąd przy polu", async ({ page }) => {
+  test("[KON-002] zajęty email pokazuje błąd przy polu", async ({ page }) => {
     await page.goto("/register")
     await fillRegistration(page, "organizator@e2e.pl", "Olga")
     await page.getByText("Organizuję turnieje").click()
@@ -126,7 +132,7 @@ test.describe("Reset hasła", () => {
     await expect(page.getByRole("link", { name: "Wyślij nowy link" })).toBeVisible()
   })
 
-  test("link bez tokenu nie pokazuje formularza", async ({ page }) => {
+  test("[KON-039] link bez tokenu nie pokazuje formularza", async ({ page }) => {
     await page.goto("/password-reset/confirm")
     await expect(page.getByText("Ten link jest niepełny")).toBeVisible()
     await expect(page.getByRole("button", { name: "Ustaw hasło" })).toHaveCount(0)
@@ -134,7 +140,7 @@ test.describe("Reset hasła", () => {
 })
 
 test.describe("Organizacja", () => {
-  test("organizator nazywa organizację przy rejestracji i zmienia nazwę w koncie", async ({
+  test("[KON-042] organizator nazywa organizację przy rejestracji i zmienia nazwę w koncie", async ({
     page,
   }) => {
     const email = `klub.${Date.now()}@e2e.pl`
@@ -156,7 +162,7 @@ test.describe("Organizacja", () => {
 })
 
 test.describe("RODO: konto", () => {
-  test("uczestnik pobiera dane i usuwa konto — potem nie może się zalogować", async ({ page }) => {
+  test("[KON-008] uczestnik pobiera dane i usuwa konto — potem nie może się zalogować", async ({ page }) => {
     const email = `usun.${Date.now()}@e2e.pl`
 
     await page.goto("/register")
@@ -179,7 +185,7 @@ test.describe("RODO: konto", () => {
     await expect(page.getByText(/Nieprawidłowy email lub hasło/)).toBeVisible()
   })
 
-  test("jedyny organizator usuwa konto z organizacją dopiero po drugim potwierdzeniu", async ({
+  test("[KON-009] jedyny organizator usuwa konto z organizacją dopiero po drugim potwierdzeniu", async ({
     page,
   }) => {
     await login(page, "organizator@e2e.pl")

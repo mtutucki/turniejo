@@ -1,7 +1,7 @@
 import { expect, MATCH_ID, mock, PUBLIC_SLUG, test } from "./fixtures"
 
 test.describe("Portal publiczny → Wynik live", () => {
-  test("kibic bez logowania widzi mecz LIVE i gol bez przeładowania", async ({ page }) => {
+  test("[PUB-003f] kibic bez logowania widzi mecz LIVE i gol bez przeładowania", async ({ page }) => {
     await page.goto(`/t/${PUBLIC_SLUG}`)
     await expect(page.getByRole("heading", { level: 1, name: "Puchar E2E" })).toBeVisible()
 
@@ -33,7 +33,7 @@ test.describe("Portal publiczny → Wynik live", () => {
     await expect(score).toHaveText("0:2")
   })
 
-  test("nieistniejący turniej to 404", async ({ page }) => {
+  test("[PUB-015] nieistniejący turniej to 404", async ({ page }) => {
     const response = await page.goto("/t/nie-ma-takiego")
     expect(response?.status()).toBe(404)
     await expect(page.getByText("Nie ma takiej strony")).toBeVisible()
