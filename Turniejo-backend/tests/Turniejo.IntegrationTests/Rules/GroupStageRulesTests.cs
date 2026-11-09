@@ -239,4 +239,25 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
         row.GetInt("points").Should().Be(3);
         (row.GetInt("goalsFor"), row.GetInt("goalsAgainst")).Should().Be((2, 1));
     }
+
+    [Fact]
+    public async Task GRP_026_PenaltiesAfterAGroupDraw_StillCountAsADraw()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var match = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        (await s.Organizer.PostAsync($"{M(s, match)}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+        await TournamentFlow.AddGoalAsync(s.Organizer, s.TournamentId, match, s.Team("T1"), 10);
+        await TournamentFlow.AddGoalAsync(s.Organizer, s.TournamentId, match, s.Team("T2"), 20);
+        var home = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("homeTournamentTeamId");
+
+        (await s.Organizer.PostAsJsonAsync($"{M(s, match)}/finish",
+                new { resultType = 4, winnerTournamentTeamId = home, homePenaltyScore = 4, awayPenaltyScore = 3 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        await FlushOutboxAsync();
+
+        (await RowAsync(s, "T1")).GetInt("draws").Should().Be(1);
+        (await RowAsync(s, "T2")).GetInt("draws").Should().Be(1);
+        (await RowAsync(s, "T1")).GetInt("points").Should().Be(1);
+        (await s.MatchBetweenAsync("T1", "T2")).GetInt("homePenaltyScore").Should().Be(4);
+    }
 }
