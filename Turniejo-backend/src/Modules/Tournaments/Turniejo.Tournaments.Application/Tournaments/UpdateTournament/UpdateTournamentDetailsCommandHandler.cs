@@ -16,6 +16,13 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
             if (result == null)
                 return Result.Failure<UpdateTournamentDetailsResponse>(Error.NotFound("Tournament", request.TournamentId));
 
+            // Optymistyczna kontrola zapisu (QA v3: UST-015): drugi organizator bez odświeżenia nadpisywał
+            // zmiany pierwszego. Tolerancja 1 ms na zaokrąglenie czasu w bazie (mikrosekundy).
+            if (request.ExpectedUpdatedAt is { } expected &&
+                (result.UpdatedAt - expected).Duration() > TimeSpan.FromMilliseconds(1))
+                return Result.Failure<UpdateTournamentDetailsResponse>(Error.Conflict(
+                    "UpdatedAt", "The tournament was changed by someone else. Refresh to see the latest data."));
+
             // Limit nie może spaść poniżej liczby już zaakceptowanych drużyn, inaczej turniej ma ich więcej,
             // niż pozwala. Sprawdzamy tylko przy obniżaniu, żeby zwykła edycja nie pytała modułu Teams.
             if (request.TeamLimit < result.TeamLimit)

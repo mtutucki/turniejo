@@ -139,6 +139,7 @@ export function TournamentDetailsForm({
         startAt: zonedToIso(values.startDate, values.startTime),
         endAt: zonedToIso(values.endDate, values.endTime),
         teamLimit: values.teamLimit,
+        expectedUpdatedAt: tournament?.updatedAt ?? null,
       })
       form.reset(values)
     } catch (error) {

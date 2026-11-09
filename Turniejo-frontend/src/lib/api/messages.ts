@@ -43,6 +43,8 @@ const EXACT: Record<string, string> = {
   "Tournament has reached its team limit": "Osiągnięto limit drużyn w turnieju",
   "Minute must be between 0 and 300.": "Minuta musi być od 0 do 300",
   "The team is playing a match right now": "Drużyna gra teraz mecz. Wycofasz ją po jego zakończeniu.",
+  "The tournament was changed by someone else. Refresh to see the latest data.":
+    "Ktoś inny zmienił w międzyczasie dane turnieju. Odśwież stronę, żeby zobaczyć aktualne dane.",
   "Some matches fall outside the new tournament dates":
     "Część meczów wypada poza nowymi datami turnieju. Najpierw przesuń je w terminarzu.",
   "Team limit cannot be lower than the number of accepted teams":

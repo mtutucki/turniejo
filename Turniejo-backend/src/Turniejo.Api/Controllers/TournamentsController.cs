@@ -128,7 +128,7 @@ namespace Turniejo.Api.Controllers
         [HttpPut("{tournamentId}")]
         public async Task<IActionResult> UpdateTournamentDetails([FromRoute] Guid tournamentId, [FromBody] UpdateTournamentDetailsRequest request, CancellationToken cancellationToken)
         {
-            var command = new UpdateTournamentDetailsCommand(tournamentId, request.Name, request.StartAt, request.EndAt, request.TeamLimit, request.Description);
+            var command = new UpdateTournamentDetailsCommand(tournamentId, request.Name, request.StartAt, request.EndAt, request.TeamLimit, request.Description, request.ExpectedUpdatedAt);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -429,7 +429,7 @@ namespace Turniejo.Api.Controllers
 
         public sealed record ChangeTournamentStatusRequest(TournamentStatus TournamentStatus);
         public sealed record UpdateTournamentFormatRequest(TournamentFormat TournamentFormat);
-        public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description);
+        public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description, DateTimeOffset? ExpectedUpdatedAt = null);
         public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
         public sealed record UpdateTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);

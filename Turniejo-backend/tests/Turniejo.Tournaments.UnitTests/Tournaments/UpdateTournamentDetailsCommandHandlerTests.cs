@@ -216,4 +216,35 @@ public sealed class UpdateTournamentDetailsCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
     }
+
+    // QA v3: UST-015 - decyzja: zapis drugiego organizatora bez odświeżenia nie może po cichu
+    // nadpisać zmian pierwszego. Formularz wysyła UpdatedAt z chwili wczytania.
+    [Fact]
+    public async Task UST_015_SavingOverSomeoneElsesChange_IsRejected()
+    {
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        var loadedAt = tournament.UpdatedAt.AddMinutes(-5);
+        var command = new UpdateTournamentDetailsCommand(
+            tournament.Id, "Inna nazwa", tournament.StartAt, tournament.EndAt, 8, null, ExpectedUpdatedAt: loadedAt);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Conflict.UpdatedAt");
+        await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UST_015_SavingWithTheCurrentVersion_IsAccepted()
+    {
+        var tournament = CreateFakeTournament();
+        _dbContext.GetTournamentByIdAsync(tournament.Id, Arg.Any<CancellationToken>()).Returns(tournament);
+        var command = new UpdateTournamentDetailsCommand(
+            tournament.Id, "Inna nazwa", tournament.StartAt, tournament.EndAt, 8, null, ExpectedUpdatedAt: tournament.UpdatedAt);
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
 }

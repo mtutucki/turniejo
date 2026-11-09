@@ -119,6 +119,8 @@ export type Tournament = {
   description: string | null
   // Portal kibica (/t/{slug}) włączony — inaczej link prowadzi na 404.
   isPublic: boolean
+  /** Do wykrycia, że ktoś inny zapisał turniej w międzyczasie (QA v3: UST-015). */
+  updatedAt?: string | null
 }
 
 /** TournamentDashboardDto */
@@ -183,6 +185,8 @@ export type TournamentDetailsInput = {
   startAt: string
   endAt: string
   teamLimit: number
+  /** updatedAt turnieju z chwili otwarcia formularza; backend odrzuca zapis, gdy się zmienił. */
+  expectedUpdatedAt?: string | null
 }
 
 export type CategoryInput = {
