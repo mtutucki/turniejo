@@ -19,6 +19,7 @@ public sealed class TournamentScenario
     private readonly IntegrationTestWebApplicationFactory _factory;
     private readonly Dictionary<string, Guid> _teams = new();
     private readonly Dictionary<string, Guid> _groups = new();
+    private readonly Dictionary<string, Guid> _clubTeams = new();
 
     private TournamentScenario(IntegrationTestWebApplicationFactory factory, HttpClient organizer, Guid organizationId)
     {
@@ -36,6 +37,8 @@ public sealed class TournamentScenario
 
     public Guid Team(string name) => _teams[name];
     public Guid Group(string name) => _groups[name];
+    /// <summary>Drużyna klubu (teamId), z której powstało zgłoszenie <paramref name="name"/>.</summary>
+    public Guid ClubTeam(string name) => _clubTeams[name];
     public IReadOnlyDictionary<string, Guid> Teams => _teams;
 
     /// <summary>Turniej grupowy: <paramref name="teamsPerGroup"/> drużyn w każdej z grup "A", "B"…</summary>
@@ -127,8 +130,12 @@ public sealed class TournamentScenario
         var ttId = await TournamentFlow.AddTeamToTournamentAsync(Organizer, TournamentId, teamId, CategoryId);
         await TournamentFlow.AcceptRegistrationAsync(Organizer, TournamentId, ttId);
         _teams[name] = ttId;
+        _clubTeams[name] = teamId;
         return ttId;
     }
+
+    public Task StartAsync() =>
+        TournamentFlow.ChangeStatusAsync(Organizer, TournamentId, TournamentStatus.InProgress);
 
     public Task CloseRegistrationAsync() =>
         TournamentFlow.ChangeStatusAsync(Organizer, TournamentId, TournamentStatus.RegistrationClosed);
@@ -140,10 +147,10 @@ public sealed class TournamentScenario
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
     }
 
-    public async Task UpdateSettingsAsync(bool thirdPlace = false, int editWindowMinutes = 60, int matchMinutes = 30)
+    public async Task UpdateSettingsAsync(bool thirdPlace = false, int editWindowMinutes = 60, int matchMinutes = 30, bool coachEditsSquadAfterStart = false)
     {
         var response = await Organizer.PutAsJsonAsync($"/api/tournaments/{TournamentId}/settings",
-            new TournamentsController.UpdateTournamentSettingsRequest(3, 1, 0, matchMinutes, 5, thirdPlace, editWindowMinutes, 3, 0, false));
+            new TournamentsController.UpdateTournamentSettingsRequest(3, 1, 0, matchMinutes, 5, thirdPlace, editWindowMinutes, 3, 0, coachEditsSquadAfterStart));
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
     }
 
