@@ -6,6 +6,7 @@ import { LegalLinks } from "@/components/layout/legal-links"
 import { Logo } from "@/components/layout/logo"
 import { Button } from "@/components/ui/button"
 import { DEFAULT_APP_PATH } from "@/lib/auth/public-paths"
+import { formatVersion } from "@/lib/version"
 
 // Strony informacyjne dostępne bez logowania: pomoc, regulamin, polityka prywatności.
 export default async function PublicPagesLayout({ children }: LayoutProps<"/">) {
@@ -37,6 +38,9 @@ export default async function PublicPagesLayout({ children }: LayoutProps<"/">) 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">{children}</main>
       <footer className="border-t py-6">
         <LegalLinks className="justify-center" />
+        {formatVersion() && (
+          <p className="text-muted-foreground mt-2 text-center text-xs">Wersja {formatVersion()}</p>
+        )}
       </footer>
     </div>
   )
