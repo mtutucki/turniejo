@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { Match } from "@/types/matches"
 import type { Bracket, BracketNode } from "@/types/public"
 
-import { bracketChampion, matchWinner, showsChampion } from "./champion-banner"
+import { bracketChampion, bracketThirdPlace, matchWinner, showsChampion } from "./champion-banner"
 
 const match = (overrides: Partial<Match>): Match => ({
   id: "m",
@@ -116,5 +116,57 @@ describe("bracketChampion", () => {
 
   it("returns null until the final is played", () => {
     expect(bracketChampion(bracket, [match({ id: "final", status: "Scheduled" })])).toBeNull()
+  })
+})
+
+// QA v3: PUC-019 - przy 3 drużynach nie ma meczu o 3. miejsce, a przegrany półfinału nie był nigdzie oznaczony.
+describe("bracketThirdPlace", () => {
+  const withBye = (homeSource: "Bye" | "Fixed"): Bracket => ({
+    id: "b",
+    tournamentId: "t",
+    rounds: [
+      {
+        id: "sf",
+        roundNumber: 1,
+        roundType: "Standard",
+        name: "Półfinały",
+        nodes: [
+          { ...node("bye", "", "f"), matchId: null, homeSourceType: homeSource },
+          node("played", "semi", "f"),
+        ],
+      },
+      {
+        id: "f",
+        roundNumber: 2,
+        roundType: "Standard",
+        name: "Finał",
+        nodes: [node("f", "final", null)],
+      },
+    ],
+  })
+
+  it("bez meczu o 3. miejsce: przegrany jedynego rozegranego półfinału", () => {
+    expect(bracketThirdPlace(withBye("Bye"), [match({ id: "semi", homeScore: 2 })])).toBe("away")
+  })
+
+  it("dwa rozegrane półfinały bez meczu o 3. miejsce: brak 3. miejsca", () => {
+    expect(bracketThirdPlace(withBye("Fixed"), [match({ id: "semi", homeScore: 2 })])).toBeNull()
+  })
+
+  it("z meczem o 3. miejsce: jego zwycięzca", () => {
+    const bracket: Bracket = {
+      ...withBye("Fixed"),
+      rounds: [
+        ...withBye("Fixed").rounds,
+        {
+          id: "3",
+          roundNumber: 3,
+          roundType: "ThirdPlace",
+          name: "O 3. miejsce",
+          nodes: [node("n3", "third", null)],
+        },
+      ],
+    }
+    expect(bracketThirdPlace(bracket, [match({ id: "third", awayScore: 1 })])).toBe("away")
   })
 })
