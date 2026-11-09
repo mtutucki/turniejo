@@ -13,7 +13,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [1.0.0] - 2026-11-09
 
-Pierwsza wersja z numerem. Ten wpis streszcza, co aplikacja umie w tym momencie.
+Pierwsze oficjalne wydanie Turniejo: cały turniej, od zapisów drużyn po wyniki na żywo, w jednym miejscu.
 
 ### Nowe
 
