@@ -836,7 +836,11 @@ const api = [
             resultType?: string | number
             winnerTournamentTeamId?: string | null
           }
-          m.resultType = typeof body.resultType === "string" ? body.resultType : "Regular"
+          const RESULT_TYPES = ["NotPlayed", "Regular", "ExtraTime", "Penalties", "Walkover", "ManualDecision"]
+          m.resultType =
+            typeof body.resultType === "string"
+              ? body.resultType
+              : (RESULT_TYPES[(body.resultType ?? 2) - 1] ?? "Regular")
           m.winnerTournamentTeamId = body.winnerTournamentTeamId ?? null
           m.pausedAt = null
         }
