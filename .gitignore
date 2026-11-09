@@ -63,19 +63,10 @@ docker-compose.override.yml
 *.snupkg
 packages/
 
-turniejo_final_v3.xlsx
-plan_dump.txt
-plan_header.txt
-plan_status.txt
-plan_wdrozenia_frontend.txt
-Turniejo_V2_Dokumentacja_Backendu.pdf
-Turniejo_V2_swagger.json
-docs_gen/
-turniejo_frontend_plan.md
-turniejo_testy_manualne.xlsx
-Turniejo_VPS_checklista.docx
-dev.bat
-/qa
+# Lokalne narzędzia (zrzuty z sesji Playwright MCP, ustawienia Claude na tym komputerze)
+.playwright-mcp/
+.claude/settings.local.json
+
 # Blokada równoległych wdrożeń (deploy/deploy.sh)
 deploy/.deploy.lock
 
