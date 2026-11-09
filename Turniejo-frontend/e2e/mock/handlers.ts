@@ -198,7 +198,17 @@ const matchTeam = (tournamentTeamId: string) => ({
   teamId: TEAM_NAMES[tournamentTeamId]!.id,
   name: TEAM_NAMES[tournamentTeamId]!.name,
   shortName: TEAM_NAMES[tournamentTeamId]!.shortName,
-  players: [],
+  players: squadEntries(tournamentTeamId)
+    .filter((p) => p.status !== "Removed")
+    .map((p) => ({
+      tournamentPlayerId: p.id,
+      playerId: p.playerId,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      shirtNumber: p.shirtNumber,
+      position: p.position,
+      status: p.status,
+    })),
 })
 
 const livePanel = (m: Match) => ({
@@ -836,6 +846,76 @@ const api = [
         return HttpResponse.json({ matchId: m.id, status: to })
       }),
     ),
+  ),
+  // Kartka: druga żółta tego samego zawodnika dokłada czerwoną (jak backend, IsSecondYellow).
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/cards",
+    authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      if (m.status !== "Live" && m.status !== "Paused") return problem(400, "Match is not in progress.")
+      const body = (await request.json()) as { tournamentTeamId: string; playerId: string; cardType: number | string; minute: number }
+      const type = typeof body.cardType === "number" ? (body.cardType === 9 ? "RedCard" : "YellowCard") : body.cardType
+      const sentOff = m.events.some((e) => e.playerId === body.playerId && e.type === "RedCard")
+      if (sentOff) return validation("PlayerId", "Player has been sent off")
+      const event = (eventType: string) => {
+        const e = {
+          id: newId(),
+          matchId: m.id,
+          type: eventType,
+          tournamentTeamId: body.tournamentTeamId,
+          playerId: body.playerId,
+          relatedPlayerId: null,
+          minute: body.minute,
+          second: null,
+          createdByUserId: user.id,
+          occurredAt: new Date().toISOString(),
+        }
+        m.events.push(e)
+        return e
+      }
+      const card = event(type)
+      if (type === "YellowCard" && m.events.filter((e) => e.playerId === body.playerId && e.type === "YellowCard").length === 2)
+        event("RedCard")
+      publish("matches", m.id, "MatchEventAdded", { matchId: m.id, matchEventId: card.id })
+      return HttpResponse.json({ matchEventId: card.id })
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:tid/matches/:mid/events/:eid",
+    authed<{ tid: string; mid: string; eid: string }>(async ({ params, request }) => {
+      const m = findMatch(params.mid)
+      const e = m?.events.find((x) => x.id === params.eid)
+      if (!m || !e) return problem(404, "Event not found")
+      const body = (await request.json()) as { minute: number; second: number | null; playerId: string | null }
+      if (body.minute < 0 || body.minute > 300) return validation("Minute", "Minute must be between 0 and 300.")
+      Object.assign(e, { minute: body.minute, second: body.second ?? null, playerId: body.playerId ?? e.playerId })
+      publish("matches", m.id, "MatchEventAdded", { matchId: m.id, matchEventId: e.id })
+      return HttpResponse.json({ matchEventId: e.id })
+    }),
+  ),
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/mvp",
+    authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      const body = (await request.json()) as { tournamentTeamId: string; playerId: string }
+      m.events = m.events.filter((e) => e.type !== "MvpSelected")
+      const e = {
+        id: newId(),
+        matchId: m.id,
+        type: "MvpSelected",
+        tournamentTeamId: body.tournamentTeamId,
+        playerId: body.playerId,
+        relatedPlayerId: null,
+        minute: 0,
+        second: null,
+        createdByUserId: user.id,
+        occurredAt: new Date().toISOString(),
+      }
+      m.events.push(e)
+      return HttpResponse.json({ matchEventId: e.id })
+    }),
   ),
   http.post(
     "*/api/tournaments/:tid/matches/:mid/goals",

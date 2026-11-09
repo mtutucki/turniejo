@@ -74,3 +74,55 @@ test.describe("Koniec meczu: walidacja rozstrzygnięcia", () => {
     expect(await mock.calls("POST", "/finish")).toBe(1)
   })
 })
+
+test.describe("Zdarzenia meczu", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, REFEREE)
+    await page.goto(`/matches/${MATCH_ID}/live`)
+  })
+
+  const events = (page: import("@playwright/test").Page) => page.getByRole("list", { name: "Zdarzenia meczu" })
+
+  async function choosePlayer(page: import("@playwright/test").Page, dialogName: string, player: RegExp) {
+    const dialog = page.getByRole("dialog", { name: dialogName })
+    await dialog.getByRole("combobox", { name: "Zawodnik" }).click()
+    await page.getByRole("option", { name: player }).click()
+    return dialog
+  }
+
+  test("[MNZ-012] druga żółta kartka daje czerwoną", async ({ page }) => {
+    for (const minute of ["10", "20"]) {
+      await page.getByRole("button", { name: "KARTKA", exact: true }).click()
+      const dialog = await choosePlayer(page, "Kartka", /Adam Bramka/)
+      await dialog.getByLabel("Minuta").fill(minute)
+      await dialog.getByRole("button", { name: "Zapisz kartkę" }).click()
+      await expect(dialog).toBeHidden()
+    }
+
+    await expect(events(page).getByRole("listitem").filter({ hasText: /Żółta/ })).toHaveCount(2)
+    await expect(events(page).getByRole("listitem").filter({ hasText: /Czerwona/ })).toHaveCount(1)
+  })
+
+  test("[MNZ-017a] edycja gola: strzelec i minuta", async ({ page }) => {
+    await page.getByRole("button", { name: "Szybki gol: ORŁ" }).click()
+    await page.getByRole("button", { name: "Strzelec: Gol 10'" }).click()
+    const dialog = page.getByRole("dialog")
+    await dialog.getByRole("combobox").first().click()
+    await page.getByRole("option", { name: /Adam Bramka/ }).click()
+    await dialog.getByLabel("Minuta").fill("12")
+    await dialog.getByRole("button", { name: /Zapisz/ }).click()
+
+    await expect(dialog).toBeHidden()
+    await expect(events(page).getByRole("listitem").first()).toContainText("12'")
+    await expect(events(page).getByRole("listitem").first()).toContainText("Adam")
+  })
+
+  test("[MNZ-019] wybór MVP meczu", async ({ page }) => {
+    await page.getByRole("region", { name: "MVP meczu" }).getByRole("button", { name: "Wybierz" }).click()
+    const dialog = await choosePlayer(page, "MVP meczu", /Adam Bramka/)
+    await dialog.getByRole("button", { name: "Zapisz MVP" }).click()
+
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole("region", { name: "MVP meczu" })).toContainText("Adam")
+  })
+})
