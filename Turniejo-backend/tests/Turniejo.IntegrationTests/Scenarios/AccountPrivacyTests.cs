@@ -19,6 +19,7 @@ namespace Turniejo.IntegrationTests.Scenarios;
 public sealed class AccountPrivacyTests(IntegrationTestWebApplicationFactory factory) : IntegrationTestBase(factory)
 {
     [Fact]
+    // QA v3: KON-007 - eksport danych konta.
     public async Task Export_ReturnsOwnProfile()
     {
         var client = await TournamentFlow.RegisterAndAuthenticateAsync(Factory, "export@integration.test");
@@ -64,6 +65,7 @@ public sealed class AccountPrivacyTests(IntegrationTestWebApplicationFactory fac
     }
 
     [Fact]
+    // QA v3: KON-009 - usunięcie konta jedynego organizatora razem z organizacją.
     public async Task Delete_WithConfirmation_RemovesSoleOrganizersOrganizationWithItsData()
     {
         var userId = await TournamentFlow.SeedUserAsync(Factory, "owner@integration.test");

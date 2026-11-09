@@ -88,6 +88,17 @@ public sealed class TeamsAndSquadsRulesTests(IntegrationTestWebApplicationFactor
     }
 
     [Fact]
+    public async Task DRU_007_RejectedTeam_CannotBeAcceptedDirectly()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var (_, tt) = await RegisterTeamAsync(s, "Odrzuceni");
+        (await SetStatusAsync(s, tt, Rejected)).IsSuccessStatusCode.Should().BeTrue();
+
+        (await SetStatusAsync(s, tt, Accepted)).IsSuccessStatusCode.Should().BeFalse();
+        (await EntryAsync(s, tt)).GetString("registrationStatus").Should().Be("Rejected");
+    }
+
+    [Fact]
     public async Task DRU_009_PaymentStatusChanges_AndUnpaidTeamCanBeAccepted()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);

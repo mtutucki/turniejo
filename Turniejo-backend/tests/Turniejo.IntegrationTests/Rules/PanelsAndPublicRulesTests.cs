@@ -89,6 +89,32 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
     }
 
     [Fact]
+    public async Task PAN_013_TournamentStats_ShowScorersAssistsAndMvp()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (_, adam) = await s.CreatePlayerAsync("T1", "Adam", "Strzelec");
+        var (_, bartek) = await s.CreatePlayerAsync("T1", "Bartek", "Podający");
+        var match = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        var m = $"{T(s)}/matches/{match}";
+        (await s.Organizer.PostAsync($"{m}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{m}/goals",
+                new { tournamentTeamId = s.Team("T1"), playerId = adam, assistPlayerId = bartek, goalType = Goal, minute = 10, second = (int?)null }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{m}/finish", new { resultType = 2, winnerTournamentTeamId = s.Team("T1") })).IsSuccessStatusCode.Should().BeTrue();
+        var mvp = await s.Organizer.PostAsJsonAsync($"{m}/mvp", new { tournamentTeamId = s.Team("T1"), playerId = adam });
+        mvp.IsSuccessStatusCode.Should().BeTrue(await mvp.Content.ReadAsStringAsync());
+        await FlushOutboxAsync();
+
+        async Task<int> CountAsync(string kind, Guid player) =>
+            (await (await s.Organizer.GetAsync($"{T(s)}/stats/{kind}")).ReadJsonAsync()).EnumerateArray()
+                .Where(r => r.GetGuid("playerId") == player).Select(r => r.GetInt("count")).FirstOrDefault();
+
+        (await CountAsync("top-scorers", adam)).Should().Be(1);
+        (await CountAsync("top-assists", bartek)).Should().Be(1);
+        (await CountAsync("mvp", adam)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task PUB_001_PUB_002_PublicPage_IsAvailableOnlyWhenPublished()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
