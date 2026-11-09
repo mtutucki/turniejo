@@ -242,7 +242,9 @@ function seed() {
     "team-lwy": [],
   }
   const guardians = [{ playerId: IDS.child, userId: IDS.parent, canEdit: true }]
-  return { users, tournaments, matches, organizations, rosters, guardians, usedResetTokens: [] as string[] }
+  /** Drużyny dodane w teście (seedowane Orły i Lwy są w TEAM_NAMES). */
+  const orgTeams: (Team & { logoUrl: string | null })[] = []
+  return { users, tournaments, matches, organizations, rosters, guardians, orgTeams, usedResetTokens: [] as string[] }
 }
 
 export const db = seed()

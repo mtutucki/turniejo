@@ -1084,8 +1084,42 @@ const api = [
     authed(({ user, params }) => {
       if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
       return HttpResponse.json(
-        Object.values(TEAM_NAMES).map((t) => ({ ...t, organizationId: params.id, logoUrl: null })),
+        [...Object.values(TEAM_NAMES).map((t) => ({ ...t, logoUrl: null })), ...db.orgTeams].map((t) => ({
+          ...t,
+          organizationId: params.id,
+        })),
       )
+    }),
+  ),
+  http.post(
+    "*/api/organizations/:id/teams",
+    authed<{ id: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as { name: string; shortName: string | null; logoUrl: string | null }
+      const team = { id: newId(), name: body.name, shortName: body.shortName, logoUrl: body.logoUrl }
+      db.orgTeams.push(team)
+      return HttpResponse.json({ teamId: team.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/teams/:teamId/logo",
+    authed<{ id: string; teamId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const team = db.orgTeams.find((t) => t.id === params.teamId)
+      if (!team) return problem(404, "Team not found")
+      team.logoUrl = ((await request.json()) as { logoUrl: string | null }).logoUrl
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/teams/:teamId",
+    authed<{ id: string; teamId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const team = db.orgTeams.find((t) => t.id === params.teamId)
+      if (!team) return problem(404, "Team not found")
+      const body = (await request.json()) as { name: string; shortName: string | null }
+      Object.assign(team, { name: body.name, shortName: body.shortName })
+      return HttpResponse.json({ teamId: team.id })
     }),
   ),
   http.get(
