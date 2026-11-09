@@ -37,3 +37,40 @@ test.describe("Mecz na żywo: sterowanie", () => {
     await expect(page.getByRole("button", { name: "PAUZA" })).toBeHidden()
   })
 })
+
+test.describe("Koniec meczu: walidacja rozstrzygnięcia", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, REFEREE)
+    await page.goto(`/matches/${MATCH_ID}/live`)
+    await page.getByRole("button", { name: "KONIEC" }).click()
+  })
+
+  const dialog = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Zakończyć mecz?" })
+
+  test("[PUC-040b] puste pola karnych", async ({ page }) => {
+    await dialog(page).getByRole("button", { name: "Karne" }).click()
+    await dialog(page).getByRole("button", { name: "Zakończ mecz" }).click()
+    await expect(dialog(page).getByText("Wpisz wynik rzutów karnych")).toBeVisible()
+    expect(await mock.calls("POST", "/finish")).toBe(0)
+  })
+
+  test("[PUC-040a] karne zakończone remisem", async ({ page }) => {
+    await dialog(page).getByRole("button", { name: "Karne" }).click()
+    await dialog(page).getByLabel("Karne: Orły E2E").fill("4")
+    await dialog(page).getByLabel("Karne: Lwy E2E").fill("4")
+    await dialog(page).getByRole("button", { name: "Zakończ mecz" }).click()
+    await expect(dialog(page).getByText("Karne muszą wyłonić zwycięzcę")).toBeVisible()
+    expect(await mock.calls("POST", "/finish")).toBe(0)
+  })
+
+  test("[PUC-043] walkower bez wskazania zwycięzcy", async ({ page }) => {
+    await dialog(page).getByRole("button", { name: "Walkower" }).click()
+    await dialog(page).getByRole("button", { name: "Zakończ mecz" }).click()
+    await expect(dialog(page).getByText("Wybierz drużynę, która wygrywa walkowerem")).toBeVisible()
+
+    await dialog(page).getByRole("button", { name: "LWY" }).click()
+    await dialog(page).getByRole("button", { name: "Zakończ mecz" }).click()
+    await expect(dialog(page)).toBeHidden()
+    expect(await mock.calls("POST", "/finish")).toBe(1)
+  })
+})
