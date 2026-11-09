@@ -13,6 +13,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 ### Poprawione
 
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
+- Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
 
 ## [1.0.0] - 2026-11-09
 
