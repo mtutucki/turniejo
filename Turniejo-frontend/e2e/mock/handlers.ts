@@ -434,6 +434,7 @@ const api = [
         firstName: user.firstName,
         lastName: user.lastName,
         phoneNumber: user.phoneNumber ?? null,
+        seenReleaseVersion: user.seenReleaseVersion ?? null,
       }),
     ),
   ),
@@ -448,6 +449,21 @@ const api = [
       user.firstName = body.firstName.trim()
       user.lastName = body.lastName.trim()
       user.phoneNumber = body.phoneNumber?.trim() || null
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  // Jak MarkReleaseSeenCommand: tylko X.Y.Z i tylko w przód.
+  http.put(
+    "*/api/me/seen-release",
+    authed(async ({ user, request }) => {
+      const { version } = (await request.json()) as { version: string }
+      if (!/^\d+\.\d+\.\d+$/.test(version)) return problem(422, "Release version must look like 1.2.0.")
+      const newer = (a: string, b: string) => {
+        const [x, y] = [a, b].map((v) => v.split(".").map(Number))
+        const i = x!.findIndex((n, k) => n !== y![k])
+        return i >= 0 && x![i]! > y![i]!
+      }
+      if (!user.seenReleaseVersion || newer(version, user.seenReleaseVersion)) user.seenReleaseVersion = version
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -1869,6 +1885,13 @@ const control = [
     Object.assign(t, (await request.json()) as Partial<Tournament>)
     return new HttpResponse(null, { status: 204 })
   }),
+  // Ostatnia wersja z okna „Co nowego” ustawiona przez test (np. konto sprzed kilku wydań).
+  http.post("*/__control/users/:email/seen-release", async ({ params, request }) => {
+    const user = db.users.find((u) => u.email === String(params.email))
+    if (!user) return problem(404, "User not found")
+    user.seenReleaseVersion = ((await request.json()) as { version: string | null }).version
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/__control/reset", () => {
     overrides = []
     requests = []
@@ -1906,6 +1929,7 @@ const control = [
       users: db.users.map((u) => ({
         email: u.email,
         roles: u.roles.map((r) => `${r.role}@${r.scopeType}`),
+        seenReleaseVersion: u.seenReleaseVersion ?? null,
       })),
       organizations: db.organizations.map((o) => o.name),
       requests,

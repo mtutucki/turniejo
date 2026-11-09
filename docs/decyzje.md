@@ -22,6 +22,7 @@ Nowa decyzja: dopisz wiersz z datą. Zmiana decyzji: popraw wiersz i dopisz dat�
 | Maile | wysyła API przez SMTP (od 2026-10-12), reset hasła własnym linkiem jednorazowym | pełna kontrola treści, bez maili z Keycloaka |
 | Powiadomienia | tylko w aplikacji; push na później | prostota V1 |
 | Współbieżny zapis | dane turnieju: wersja (`UpdatedAt`); zasady gry i portal: wczytane wartości; konflikt = 409 i prośba o odświeżenie (2026-11-09) | dwóch organizatorów nie nadpisuje się po cichu |
+| Okno „Co nowego” | tylko po wydaniu (X.Y.Z), jedno okno ze wszystkimi pominiętymi wersjami, tylko „Nowe” i „Zmienione”, ostatnia obejrzana wersja na koncie; nowe konto bez okna, istniejące konta startują od 1.0.0 (2026-11-09) | nie zasypujemy wracających wieloma oknami, okno nie wraca na innym urządzeniu |
 
 ## Produkt
 

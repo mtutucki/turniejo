@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/password-reset",
   "/password-reset/confirm",
   "/help",
+  "/changelog",
   "/terms",
   "/privacy",
 ]

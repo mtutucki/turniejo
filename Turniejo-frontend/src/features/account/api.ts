@@ -41,6 +41,8 @@ export type MyProfile = {
   firstName: string
   lastName: string
   phoneNumber: string | null
+  /** Ostatnia wersja z okna „Co nowego” (null = nowe konto, okna jeszcze nie było). */
+  seenReleaseVersion: string | null
 }
 
 export const accountKeys = {
@@ -54,6 +56,18 @@ export function useMyProfile() {
     queryKey: accountKeys.profile,
     queryFn: () => request<MyProfile>("/api/me/profile"),
     enabled: isAuthenticated,
+  })
+}
+
+/** PUT /api/me/seen-release — zamknięte okno „Co nowego” (X.Y.Z). Backend zapisuje tylko w przód. */
+export function useMarkReleaseSeen() {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (version: string) => request("/api/me/seen-release", { method: "PUT", body: { version } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: accountKeys.profile }),
+    // Wersja pochodzi z buildu, więc 422 to błąd po naszej stronie: bez toastu, okno i tak znika.
+    meta: { handlesValidation: true },
   })
 }
 
