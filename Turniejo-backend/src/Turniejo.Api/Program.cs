@@ -26,7 +26,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new UtcDateTimeOffsetConverter());
 });
 builder.Services.AddTrustedProxyForwarding(builder.Configuration);
-builder.Services.AddApiRateLimiting(builder.Configuration);
+builder.Services.AddApiRateLimiting();
 builder.Services.AddSwaggerDocumentation();
 builder.Services.AddSmtpEmail(builder.Configuration);
 

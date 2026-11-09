@@ -14,12 +14,8 @@ public static class RateLimitingExtensions
     public const string ChangePassword = "change-password";
     public const string Uploads = "uploads";
 
-    public static IServiceCollection AddApiRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
     {
-        // Lokalnie (testy, zakładanie wielu kont z jednego IP) limity tylko przeszkadzają, więc da się je wyłączyć
-        // przez RateLimiting:Enabled = false. Domyślnie są włączone, więc produkcja nie musi nic ustawiać.
-        var enabled = configuration.GetValue("RateLimiting:Enabled", true);
-
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -33,7 +29,7 @@ public static class RateLimitingExtensions
             // Rejestracja i reset hasła: przed zalogowaniem, więc jedyny dostępny identyfikator to IP.
             options.AddPolicy(AuthAnonymous, httpContext =>
                 SlidingWindowOrNone(
-                    enabled,
+                    httpContext,
                     GetClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -48,7 +44,7 @@ public static class RateLimitingExtensions
             // więc limitujemy per user — nie da się obejść zmianą adresu IP.
             options.AddPolicy(JoinTournament, httpContext =>
                 SlidingWindowOrNone(
-                    enabled,
+                    httpContext,
                     GetUserIdOrClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -63,7 +59,7 @@ public static class RateLimitingExtensions
             // na literówki, a nie pozwala zgadywać.
             options.AddPolicy(ChangePassword, httpContext =>
                 SlidingWindowOrNone(
-                    enabled,
+                    httpContext,
                     GetUserIdOrClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -77,7 +73,7 @@ public static class RateLimitingExtensions
             // Wgrywanie plików zajmuje dysk serwera. Na zmianę herbów kilkunastu drużyn wystarczy z zapasem.
             options.AddPolicy(Uploads, httpContext =>
                 SlidingWindowOrNone(
-                    enabled,
+                    httpContext,
                     GetUserIdOrClientIp(httpContext),
                     _ => new SlidingWindowRateLimiterOptions
                     {
@@ -92,11 +88,15 @@ public static class RateLimitingExtensions
         return services;
     }
 
+    // Lokalnie (testy, zakładanie wielu kont z jednego IP) limity tylko przeszkadzają, więc da się je wyłączyć
+    // przez RateLimiting:Enabled = false. Domyślnie są włączone, więc produkcja nie musi nic ustawiać.
+    // Czytane przy żądaniu, nie przy rejestracji usług: konfiguracja z WebApplicationFactory (testy integracyjne)
+    // jest gotowa dopiero po zbudowaniu hosta - wcześniej przełącznik działał tylko z appsettings.Development.json.
     private static RateLimitPartition<string> SlidingWindowOrNone(
-        bool enabled,
+        HttpContext httpContext,
         string partitionKey,
         Func<string, SlidingWindowRateLimiterOptions> factory) =>
-        enabled
+        httpContext.RequestServices.GetRequiredService<IConfiguration>().GetValue("RateLimiting:Enabled", true)
             ? RateLimitPartition.GetSlidingWindowLimiter(partitionKey, factory)
             : RateLimitPartition.GetNoLimiter(partitionKey);
 

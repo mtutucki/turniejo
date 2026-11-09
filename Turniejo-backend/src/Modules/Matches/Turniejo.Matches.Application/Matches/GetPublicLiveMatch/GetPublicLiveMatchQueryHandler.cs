@@ -26,7 +26,7 @@ namespace Turniejo.Matches.Application.Matches.GetPublicLiveMatch
             var visible = match.Status == MatchStatus.Finished
                 ? settings is { IsPublic: true } && (settings.ShowSchedule || settings.ShowLiveMatches)
                 : settings is { IsPublic: true, ShowLiveMatches: true };
-            if (!visible)
+            if (!visible || settings is null)
                 return Result.Failure<MatchLivePanelDto>(Error.NotFound("Match", request.MatchId));
 
             // ShowLiveMatches włącza sam podgląd meczu — ShowTeams/ShowPlayers rządzą OSOBNO tym, czy
