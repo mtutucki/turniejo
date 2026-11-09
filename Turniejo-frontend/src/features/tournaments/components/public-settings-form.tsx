@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Copy, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { Controller, useForm, useWatch } from "react-hook-form"
@@ -61,6 +62,7 @@ export function PublicSettingsForm({
   settings,
   disabled,
   onSaved,
+  onDirtyChange,
 }: {
   tournamentId: string
   slug: string
@@ -68,11 +70,14 @@ export function PublicSettingsForm({
   disabled: boolean
   /** Tryb kreatora: przycisk prowadzi do kolejnego kroku, także gdy nic się nie zmieniło. */
   onSaved?: () => void
+  /** Kreator pyta przed wyjściem z kroku z niezapisanymi zmianami (QA v3: UST-017). */
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const update = useUpdatePublicSettings(tournamentId)
   const form = useForm<PublicSettings>({ values: settings })
   const isPublic = useWatch({ control: form.control, name: "isPublic" })
   const { isDirty } = form.formState
+  useEffect(() => onDirtyChange?.(isDirty), [isDirty, onDirtyChange])
   const path = `/t/${slug}`
 
   function submit(values: PublicSettings) {
