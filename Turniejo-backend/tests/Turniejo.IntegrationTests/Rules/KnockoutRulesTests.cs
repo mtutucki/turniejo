@@ -40,8 +40,8 @@ public sealed class KnockoutRulesTests(IntegrationTestWebApplicationFactory fact
             categoryId = s.CategoryId,
             roundOnePairings = pairs.Select(p => new
             {
-                homeSourceType = p.HomeType, homeSourceGroupId = (Guid?)null, homeSourcePosition = (int?)null, homeTournamentTeamId = p.Home,
-                awaySourceType = p.AwayType, awaySourceGroupId = (Guid?)null, awaySourcePosition = (int?)null, awayTournamentTeamId = p.Away,
+                homeSourceType = p.HomeType, homeGroupId = (Guid?)null, homePosition = (int?)null, homeTournamentTeamId = p.Home,
+                awaySourceType = p.AwayType, awayGroupId = (Guid?)null, awayPosition = (int?)null, awayTournamentTeamId = p.Away,
             }),
         });
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
@@ -472,8 +472,8 @@ public sealed class KnockoutRulesTests(IntegrationTestWebApplicationFactory fact
             categoryId = u10,
             roundOnePairings = new[] { ("M1", "M2"), ("M3", "M4") }.Select(p => new
             {
-                homeSourceType = Fixed, homeSourceGroupId = (Guid?)null, homeSourcePosition = (int?)null, homeTournamentTeamId = (Guid?)s.Team(p.Item1),
-                awaySourceType = Fixed, awaySourceGroupId = (Guid?)null, awaySourcePosition = (int?)null, awayTournamentTeamId = (Guid?)s.Team(p.Item2),
+                homeSourceType = Fixed, homeGroupId = (Guid?)null, homePosition = (int?)null, homeTournamentTeamId = (Guid?)s.Team(p.Item1),
+                awaySourceType = Fixed, awayGroupId = (Guid?)null, awayPosition = (int?)null, awayTournamentTeamId = (Guid?)s.Team(p.Item2),
             }),
         })).IsSuccessStatusCode.Should().BeTrue();
 
