@@ -8,7 +8,9 @@ namespace Turniejo.Standings.Application.Standings.GetPublicStandings
 {
     internal sealed class GetPublicStandingsQueryHandler(
         IStandingsDbContext dbContext,
-        ITournamentModule tournamentModule) : IQueryHandler<GetPublicStandingsQuery, IReadOnlyList<StandingDto>>
+        ITournamentModule tournamentModule,
+        ITeamModule teamModule,
+        IMatchModule matchModule) : IQueryHandler<GetPublicStandingsQuery, IReadOnlyList<StandingDto>>
     {
         public async Task<Result<IReadOnlyList<StandingDto>>> Handle(GetPublicStandingsQuery request, CancellationToken cancellationToken)
         {
@@ -24,14 +26,8 @@ namespace Turniejo.Standings.Application.Standings.GetPublicStandings
             // GetStandingsByGroupIdAsync filtruje tylko po GroupId — bez tego ktoś podający slug
             // dowolnego publicznego turnieju razem z GroupId z INNEGO turnieju (nawet prywatnego)
             // dostałby jego tabelę. GroupId nie jest sekretem (widoczny w publicznym JSON-ie grup).
-            var dtos = standings
-                .Where(s => s.TournamentId == tournament.Id)
-                .OrderBy(s => s.Position)
-                .Select(s => new StandingDto(
-                    s.Id, s.TournamentId, s.CategoryId, s.GroupId, s.TournamentTeamId,
-                    s.MatchesPlayed, s.Wins, s.Draws, s.Losses, s.GoalsFor, s.GoalsAgainst,
-                    s.GoalDifference, s.Points, s.Position))
-                .ToList();
+            var dtos = await GroupTable.ReadAsync(
+                tournament.Id, request.GroupId, standings, tournamentModule, teamModule, matchModule, cancellationToken);
 
             return Result.Success<IReadOnlyList<StandingDto>>(dtos);
         }

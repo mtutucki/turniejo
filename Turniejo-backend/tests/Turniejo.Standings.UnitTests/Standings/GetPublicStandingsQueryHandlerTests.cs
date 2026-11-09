@@ -17,7 +17,17 @@ namespace Turniejo.Standings.UnitTests.Standings
         {
             _dbContext = Substitute.For<IStandingsDbContext>();
             _tournamentModule = Substitute.For<ITournamentModule>();
-            _handler = new GetPublicStandingsQueryHandler(_dbContext, _tournamentModule);
+            _handler = new GetPublicStandingsQueryHandler(
+                _dbContext, _tournamentModule, NoGroupTeams(), Substitute.For<IMatchModule>());
+        }
+
+        // Drużyny grupy z modułu Teams: pusto = zapisane wiersze tabeli wystarczą (GroupTable.ReadAsync).
+        private static ITeamModule NoGroupTeams()
+        {
+            var teamModule = Substitute.For<ITeamModule>();
+            teamModule.GetTournamentTeamsByTournamentIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamDto>());
+            return teamModule;
         }
 
         private static PublicTournamentDto CreatePublicTournamentDto(Guid tournamentId, bool showStandings) =>

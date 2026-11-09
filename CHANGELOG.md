@@ -10,6 +10,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 
+### Poprawione
+
+- Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
+
 ## [1.0.0] - 2026-11-09
 
 Pierwsza wersja z numerem. Ten wpis streszcza, co aplikacja umie w tym momencie.

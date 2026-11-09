@@ -17,31 +17,12 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
     {
         public async Task<Result<RecalculateStandingsResponse>> Handle(RecalculateStandingsCommand request, CancellationToken cancellationToken)
         {
-            var group = await tournamentModule.GetTournamentGroupAsync(request.GroupId, cancellationToken);
-            if (group == null)
-                return Result.Failure<RecalculateStandingsResponse>(Error.NotFound("TournamentGroup", request.GroupId));
+            var computed = await GroupTable.ComputeAsync(request.GroupId, tournamentModule, teamModule, matchModule, cancellationToken);
+            if (computed.IsFailure)
+                return Result.Failure<RecalculateStandingsResponse>(computed.Error);
+            var group = computed.Value.Group;
 
-            var settings = await tournamentModule.GetTournamentSettingsAsync(group.TournamentId, cancellationToken);
-            if (settings == null)
-                return Result.Failure<RecalculateStandingsResponse>(Error.NotFound("TournamentSettings", group.TournamentId));
-
-            var tieBreakerRules = await tournamentModule.GetTieBreakerRulesAsync(group.TournamentId, cancellationToken);
-
-            var allTeams = await teamModule.GetTournamentTeamsByTournamentIdAsync(group.TournamentId, cancellationToken);
-            var groupTeams = allTeams
-                .Where(t => t.GroupId == request.GroupId && t.RegistrationStatus == "Accepted")
-                .ToList();
-
-            var matches = await matchModule.GetFinishedMatchesByGroupIdAsync(request.GroupId, cancellationToken);
-
-            var stats = groupTeams
-                .Select(t => StandingCalculator.ComputeStats(t.Id, matches, settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss))
-                .ToList();
-
-            var sortedTeamIds = StandingCalculator.SortTeams(
-                stats, matches, tieBreakerRules, settings.PointsForWin, settings.PointsForDraw, settings.PointsForLoss).ToList();
-
-            foreach (var stat in stats)
+            foreach (var (stat, position) in computed.Value.Rows)
             {
                 var standing = await dbContext.GetStandingAsync(request.GroupId, stat.TournamentTeamId, cancellationToken);
                 if (standing == null)
@@ -58,7 +39,6 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
                 if (updateResult.IsFailure)
                     return Result.Failure<RecalculateStandingsResponse>(updateResult.Error);
 
-                var position = sortedTeamIds.IndexOf(stat.TournamentTeamId) + 1;
                 standing.SetPosition(position);
             }
 
@@ -70,7 +50,7 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
 
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            return Result.Success(new RecalculateStandingsResponse(stats.Count));
+            return Result.Success(new RecalculateStandingsResponse(computed.Value.Rows.Count));
         }
     }
 }
