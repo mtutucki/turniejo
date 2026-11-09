@@ -47,7 +47,8 @@ test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => 
     await expect.poll(async () => (await mock.state()).connections.tournaments).toBeGreaterThan(0)
 
     await mock.release(MATCH_ID)
-    await expect(page.getByText("Trwają bez sędziego")).toBeVisible()
+    // Przy pełnym przebiegu (oba projekty) odświeżenie listy po zdarzeniu bywało wolniejsze niż 8 s.
+    await expect(page.getByText("Trwają bez sędziego")).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole("button", { name: /Sędziuję ten mecz: Orły E2E/ })).toBeVisible()
   })
 
