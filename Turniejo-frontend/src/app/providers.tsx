@@ -109,7 +109,10 @@ function PersistedStoresHydration() {
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    // Sprawdzanie sesji co 30 s: bez tego na bezczynnej stronie wygasła sesja wychodziła na jaw dopiero
+    // przy pierwszym kliknięciu (SessionExpiryWatcher reaguje na odświeżoną sesję), a token odświeżał się
+    // dopiero przy zapytaniu do API.
+    <SessionProvider refetchInterval={30}>
       <QueryProvider>
         {/* Animacje respektują systemowe "ogranicz ruch". */}
         <MotionConfig reducedMotion="user">

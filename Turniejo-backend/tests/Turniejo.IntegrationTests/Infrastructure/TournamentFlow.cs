@@ -121,6 +121,11 @@ public static class TournamentFlow
         response.IsSuccessStatusCode.Should().BeTrue();
     }
 
+    /// <summary>Gol bez sprawdzania odpowiedzi - dla testów, w których ma zostać odrzucony.</summary>
+    public static Task<HttpResponseMessage> AddGoalAsyncRaw(HttpClient client, Guid tournamentId, Guid matchId, Guid scoringTeamId, int minute = 20) =>
+        client.PostAsJsonAsync($"/api/tournaments/{tournamentId}/matches/{matchId}/goals",
+            new MatchesController.AddGoalRequest(scoringTeamId, null, null, MatchEventType.Goal, minute, null));
+
     public static async Task<Guid> AddCategoryAsync(HttpClient client, Guid tournamentId, string name)
     {
         var response = await client.PostAsJsonAsync($"/api/tournaments/{tournamentId}/categories",

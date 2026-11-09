@@ -23,6 +23,9 @@ test.describe("Portal publiczny → Wynik live", () => {
     await page.goto(`/t/${PUBLIC_SLUG}/matches/${MATCH_ID}`)
     const score = page.getByTestId("detail-score")
     await expect(score).toHaveText("0:0")
+    // Wskaźnik „Na żywo” zapala się dopiero, gdy TA strona dołączy do grupy turnieju. Sam licznik połączeń
+    // w mocku bywał już > 0, zanim strona była gotowa, i gole przepadały (test niestabilny w pełnym przebiegu).
+    await expect(page.getByRole("status").filter({ hasText: "Na żywo" })).toBeVisible()
     await expect.poll(async () => (await mock.state()).connections.tournaments).toBeGreaterThan(0)
 
     await mock.goal(MATCH_ID, "away")
