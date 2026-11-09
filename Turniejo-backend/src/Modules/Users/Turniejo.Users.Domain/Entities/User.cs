@@ -16,6 +16,9 @@ public sealed class User : BaseEntity
     public DateTimeOffset? TermsAcceptedAt { get; private set; }
     public string? TermsVersion { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
+    // Ostatnia wersja z okna "Co nowego", którą user zamknął (X.Y.Z). Null = nowe konto, okna jeszcze
+    // nie było: frontend zapisuje wtedy bieżącą wersję bez pokazywania (docs/decyzje.md).
+    public string? SeenReleaseVersion { get; private set; }
 
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -84,6 +87,32 @@ public sealed class User : BaseEntity
         PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
         SetUpdatedAt();
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Zapamiętuje wersję z okna "Co nowego". Tylko w przód: karta otwarta przed wdrożeniem nie cofnie
+    /// zapisu i nie pokaże drugi raz tych samych zmian.
+    /// </summary>
+    public Result MarkReleaseSeen(string version)
+    {
+        if (!TryParseRelease(version, out var parsed))
+            return Result.Failure(Error.Validation("Version", "Release version must look like 1.2.0."));
+
+        if (SeenReleaseVersion is not null && TryParseRelease(SeenReleaseVersion, out var current) && parsed <= current)
+            return Result.Success();
+
+        SeenReleaseVersion = version;
+        SetUpdatedAt();
+        return Result.Success();
+    }
+
+    private static bool TryParseRelease(string? value, out Version version)
+    {
+        version = new Version();
+        var parts = value?.Split('.');
+        return parts is { Length: 3 }
+            && parts.All(p => p.Length is > 0 and <= 5 && p.All(char.IsAsciiDigit))
+            && Version.TryParse(value, out version!);
     }
 
     /// <summary>

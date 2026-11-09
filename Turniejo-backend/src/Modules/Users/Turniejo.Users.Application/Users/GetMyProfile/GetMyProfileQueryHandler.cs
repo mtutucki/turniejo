@@ -15,6 +15,6 @@ internal sealed class GetMyProfileQueryHandler(
         if (user is null)
             return Result.Failure<MyProfileDto>(Error.NotFound("User", currentUserContext.UserId));
 
-        return Result.Success(new MyProfileDto(user.Email, user.FirstName, user.LastName, user.PhoneNumber));
+        return Result.Success(new MyProfileDto(user.Email, user.FirstName, user.LastName, user.PhoneNumber, user.SeenReleaseVersion));
     }
 }

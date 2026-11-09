@@ -10,6 +10,8 @@ export type User = {
   firstName: string
   lastName: string
   phoneNumber?: string | null
+  /** Ostatnia wersja z okna „Co nowego” (null/brak = nowe konto, okno się nie pokaże). */
+  seenReleaseVersion?: string | null
   roles: Role[]
 }
 export type Team = { id: string; name: string; shortName: string | null }

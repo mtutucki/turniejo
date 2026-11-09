@@ -39,7 +39,9 @@ case "$command" in
       index($0, head) == 1 { print; print ""; print release; next }
       { print }
     ' "$CHANGELOG" > "$CHANGELOG.tmp" && mv "$CHANGELOG.tmp" "$CHANGELOG"
-    git add "$CHANGELOG"
+    # Kopia wydań dla okna „Co nowego” (frontend buduje się bez CHANGELOG.md).
+    node "$ROOT/Turniejo-frontend/scripts/sync-changelog.mjs" > /dev/null
+    git add "$CHANGELOG" "$ROOT/Turniejo-frontend/src/features/whats-new/releases.json"
     git commit --quiet -m "Release $version"
     echo "Gotowe: branch release/$version z wpisem [$version] - $today."
     echo "Dalej: git push -u origin release/$version, PR do master, merge, potem:"

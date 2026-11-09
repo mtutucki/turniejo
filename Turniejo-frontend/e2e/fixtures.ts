@@ -12,7 +12,7 @@ export const TOURNAMENT_ID = "0f000000-0000-4000-8000-000000000010"
 type MockState = {
   tournaments: { id: string; name: string; status: string }[]
   matches: { id: string; homeScore: number; awayScore: number }[]
-  users: { email: string; roles: string[] }[]
+  users: { email: string; roles: string[]; seenReleaseVersion: string | null }[]
   organizations: string[]
   requests: string[]
   connections: { tournaments: number; matches: number }
@@ -51,6 +51,13 @@ export const mock = {
   /** Ile razy aplikacja wywołała dane API od początku testu, np. "POST", "/start". */
   calls: async (method: string, pathEnd: string) =>
     (await mock.state()).requests.filter((r) => r.startsWith(`${method} `) && r.endsWith(pathEnd)).length,
+  /** Ostatnia wersja z okna „Co nowego” na koncie (null = nowe konto). */
+  seenRelease: (email: string, version: string | null) =>
+    fetch(`${MOCK_URL}/__control/users/${encodeURIComponent(email)}/seen-release`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version }),
+    }),
   release: (matchId: string) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/release`, { method: "POST" }),
 }

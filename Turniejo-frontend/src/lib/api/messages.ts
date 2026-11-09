@@ -8,6 +8,8 @@ const EXACT: Record<string, string> = {
   "You already have an organization.": "Masz już organizację",
   "Current password is incorrect.": "Obecne hasło jest nieprawidłowe",
   "New password must be different from the current one.": "Nowe hasło musi się różnić od obecnego",
+  "Release version is required.": "Brak numeru wersji",
+  "Release version must look like 1.2.0.": "Nieprawidłowy numer wersji",
   // Dołączanie kodem
   "Invalid tournament code.": "Nieprawidłowy kod turnieju",
   "This tournament has been cancelled": "Ten turniej został anulowany. Nie można już do niego dołączyć.",

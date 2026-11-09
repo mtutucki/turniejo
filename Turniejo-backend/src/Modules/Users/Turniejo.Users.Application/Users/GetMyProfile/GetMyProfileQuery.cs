@@ -6,4 +6,5 @@ namespace Turniejo.Users.Application.Users.GetMyProfile;
 // bo token ma tylko imię, nazwisko i e-mail (bez telefonu) i nie odświeża się po zmianie.
 public sealed record GetMyProfileQuery : IQuery<MyProfileDto>, IAuthenticatedOnlyRequest;
 
-public sealed record MyProfileDto(string Email, string FirstName, string LastName, string? PhoneNumber);
+// SeenReleaseVersion: ostatnia wersja z okna "Co nowego" (null = nowe konto, okna jeszcze nie było).
+public sealed record MyProfileDto(string Email, string FirstName, string LastName, string? PhoneNumber, string? SeenReleaseVersion);

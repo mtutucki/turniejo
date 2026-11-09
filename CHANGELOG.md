@@ -6,6 +6,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+### Nowe
+
+- Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
+
 ## [1.0.0] - 2026-11-09
 
 Pierwsza wersja z numerem. Ten wpis streszcza, co aplikacja umie w tym momencie.

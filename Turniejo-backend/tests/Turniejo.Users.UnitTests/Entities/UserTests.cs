@@ -192,4 +192,29 @@ public sealed class UserTests
         // Dowód akceptacji regulaminu zostaje (rozliczalność).
         user.TermsVersion.Should().Be("2026-09-30");
     }
+
+    [Fact]
+    public void MarkReleaseSeen_MovesOnlyForward()
+    {
+        var user = User.Create(ValidId, ValidEmail, ValidFirstName, ValidLastName).Value;
+
+        user.MarkReleaseSeen("1.2.0").IsSuccess.Should().BeTrue();
+        user.MarkReleaseSeen("1.10.0").IsSuccess.Should().BeTrue();
+        user.MarkReleaseSeen("1.9.5").IsSuccess.Should().BeTrue();
+
+        user.SeenReleaseVersion.Should().Be("1.10.0");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("1.2")]
+    [InlineData("v1.2.0")]
+    [InlineData("1.2.0-3-gabc1234")]
+    public void MarkReleaseSeen_RejectsAnythingButXYZ(string version)
+    {
+        var user = User.Create(ValidId, ValidEmail, ValidFirstName, ValidLastName).Value;
+
+        user.MarkReleaseSeen(version).IsFailure.Should().BeTrue();
+        user.SeenReleaseVersion.Should().BeNull();
+    }
 }

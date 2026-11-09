@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 
 const LINKS = [
   { href: "/help", label: "Pomoc" },
+  { href: "/changelog", label: "Co nowego" },
   { href: "/terms", label: "Regulamin" },
   { href: "/privacy", label: "Polityka prywatności" },
 ]
