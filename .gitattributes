@@ -1,0 +1,2 @@
+# Skrypty powłoki zawsze z LF - z CRLF bash się wywraca (Windows checkout).
+*.sh text eol=lf
