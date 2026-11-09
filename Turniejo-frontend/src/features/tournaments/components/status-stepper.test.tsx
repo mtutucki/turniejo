@@ -54,7 +54,7 @@ describe("TournamentStatusStepper", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
 
-  it("następny etap wymaga potwierdzenia i wysyła PATCH ze statusem", async () => {
+  it("PUC-035: następny etap wymaga potwierdzenia i wysyła PATCH ze statusem", async () => {
     const user = userEvent.setup()
     renderWithQuery(<TournamentStatusStepper tournament={tournament("Draft")} canManage />)
 
@@ -83,7 +83,7 @@ describe("TournamentStatusStepper", () => {
     expect(statusChanges()).toHaveLength(0)
   })
 
-  it("zakończenie turnieju ostrzega o meczach, które zostaną anulowane", async () => {
+  it("PUC-058: zakończenie turnieju ostrzega o meczach, które zostaną anulowane", async () => {
     request.mockImplementation(async (path: string) =>
       path.includes("/dashboard")
         ? { matches: { finished: 4, scheduled: 3, total: 7 } }

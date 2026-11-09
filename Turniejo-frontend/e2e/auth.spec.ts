@@ -12,7 +12,7 @@ async function fillRegistration(page: Page, email: string, firstName = "Kamil") 
 }
 
 test.describe("Rejestracja → Logowanie", () => {
-  test("[KON-001] organizator: konto z organizacją, wylogowanie i powrót hasłem", async ({ page }) => {
+  test("[KON-001 KON-038b] organizator: konto z organizacją, wylogowanie i powrót hasłem", async ({ page }) => {
     const email = `organizator.${Date.now()}@e2e.pl`
 
     await page.goto("/register")

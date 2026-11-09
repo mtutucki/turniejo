@@ -1361,6 +1361,23 @@ const config = [
       return new HttpResponse(null, { status: 204 })
     }),
   ),
+  http.put(
+    "*/api/tournaments/:id",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      const t = findTournament(params.id)
+      if (!t) return problem(404, "Tournament not found")
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as Pick<Tournament, "name" | "startAt" | "endAt" | "teamLimit" | "description">
+      Object.assign(t, {
+        name: body.name,
+        startAt: body.startAt,
+        endAt: body.endAt,
+        teamLimit: body.teamLimit,
+        description: body.description,
+      })
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
   http.get(
     "*/api/tournaments/:id/public-settings",
     authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).publicSettings)),
