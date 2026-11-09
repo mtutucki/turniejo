@@ -13,3 +13,4 @@
 - [ ] New backend messages have a Polish translation in `lib/api/messages.ts`
 - [ ] UI texts are short, without "—", and work for users with several roles
 - [ ] Decisions made during the work are in `docs/decyzje.md`
+- [ ] User-visible change has a line under "Nieopublikowane" in `CHANGELOG.md`
