@@ -44,13 +44,19 @@ export function suggestPairs(
       return { home, away: slot(pairCount * 2 - 1 - i) ?? (home ? { kind: "bye" } : null) }
     })
   }
+  // Miejsce, którego w grupie nie ma (np. 4. w grupie 3-drużynowej), zostawiamy do wybrania
+  // (QA v3: GPK-007). Grupa bez drużyn jeszcze nie wie, ile ich będzie - wtedy nie ograniczamy.
+  const teamsInGroup = (groupId: string) => teams.filter((t) => t.groupId === groupId).length
+  const existing = (slot: BracketSlotInput): BracketSlotInput | null =>
+    slot.kind === "group" &&
+    teamsInGroup(slot.groupId) > 0 &&
+    slot.position > teamsInGroup(slot.groupId)
+      ? null
+      : slot
   if (groups.length === 1) {
     const group = groups[0]!
-    const slot = (position: number): BracketSlotInput => ({
-      kind: "group",
-      groupId: group.id,
-      position,
-    })
+    const slot = (position: number) =>
+      existing({ kind: "group", groupId: group.id, position })
     return Array.from({ length: pairCount }, (_, i) => ({
       home: slot(i + 1),
       away: slot(pairCount * 2 - i),
@@ -62,8 +68,10 @@ export function suggestPairs(
     const opponent = groups[(i + 1) % groups.length] ?? g
     const round = Math.floor(i / groups.length)
     pairs.push({
-      home: g ? { kind: "group", groupId: g.id, position: 1 + round * 2 } : null,
-      away: opponent ? { kind: "group", groupId: opponent.id, position: 2 + round * 2 } : null,
+      home: g ? existing({ kind: "group", groupId: g.id, position: 1 + round * 2 }) : null,
+      away: opponent
+        ? existing({ kind: "group", groupId: opponent.id, position: 2 + round * 2 })
+        : null,
     })
   }
   return pairs

@@ -62,10 +62,10 @@ function SlotSelect({
   groups: TournamentGroup[]
   teams: TournamentTeam[]
 }) {
-  const maxPosition = Math.max(
-    2,
-    ...groups.map((g) => teams.filter((t) => t.groupId === g.id).length),
-  )
+  // Tyle miejsc, ile drużyn ma dana grupa - nie da się wybrać miejsca, którego nie ma (QA v3: GPK-007).
+  // Grupa jeszcze bez drużyn dostaje dwa pierwsze miejsca.
+  const positionsIn = (groupId: string) =>
+    teams.filter((t) => t.groupId === groupId).length || 2
   return (
     <Select value={encode(value)} onValueChange={(v) => onChange(decode(v))}>
       <SelectTrigger className="h-10 w-full min-w-0" aria-label={label}>
@@ -73,7 +73,7 @@ function SlotSelect({
       </SelectTrigger>
       <SelectContent>
         {groups.flatMap((g) =>
-          Array.from({ length: maxPosition }, (_, i) => (
+          Array.from({ length: positionsIn(g.id) }, (_, i) => (
             <SelectItem key={`${g.id}-${i + 1}`} value={`g:${g.id}:${i + 1}`}>
               {i + 1}. miejsce · {g.name}
             </SelectItem>

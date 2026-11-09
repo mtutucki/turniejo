@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { TournamentTeam } from "@/types/teams"
 import type { TournamentGroup } from "@/types/tournaments"
 
-import { autoBracketPairs, defaultPairCount } from "./suggest-bracket"
+import { autoBracketPairs, defaultPairCount, suggestPairs } from "./suggest-bracket"
 
 const team = (id: string, groupId: string | null = null, seedNumber: number | null = null) =>
   ({
@@ -67,5 +67,18 @@ describe("autoBracketPairs", () => {
 
   it("needs at least two teams", () => {
     expect(autoBracketPairs([], [team("a")])).toBeNull()
+  })
+})
+
+// QA v3: GPK-007 - formularz proponował „4. miejsce” w grupie 3-drużynowej.
+describe("suggestPairs", () => {
+  it("GPK-007: zostawia do wybrania miejsce, którego w grupie nie ma", () => {
+    const teams = [team("a", "A"), team("b", "A"), team("c", "A")]
+    const pairs = suggestPairs([group("A", 1)], teams, 2)
+    expect(pairs[0]).toEqual({ home: { kind: "group", groupId: "A", position: 1 }, away: null })
+    expect(pairs[1]).toEqual({
+      home: { kind: "group", groupId: "A", position: 2 },
+      away: { kind: "group", groupId: "A", position: 3 },
+    })
   })
 })
