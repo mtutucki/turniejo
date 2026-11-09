@@ -260,4 +260,20 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
         (await RowAsync(s, "T1")).GetInt("points").Should().Be(1);
         (await s.MatchBetweenAsync("T1", "T2")).GetInt("homePenaltyScore").Should().Be(4);
     }
+
+    // QA v3: PUC-033b (przepisany na turniej grupowy - w pucharze przed startem drużyna ma jeden mecz).
+    [Fact]
+    public async Task PUC_033b_MovingAMatchToATimeWhenOneOfItsTeamsPlays_IsRejected()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3, start: false);
+        var busy = await s.MatchBetweenAsync("T1", "T2");
+        var moved = (await s.MatchBetweenAsync("T1", "T3")).GetGuid("id");
+        var otherPitch = await TournamentFlow.AddPitchAsync(s.Organizer, s.TournamentId, "Boisko 2");
+
+        var response = await s.Organizer.PutAsJsonAsync($"{M(s, moved)}/schedule",
+            new { pitchId = otherPitch, scheduledAt = DateTimeOffset.Parse(busy.GetString("scheduledAt")) });
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+        (await response.Content.ReadAsStringAsync()).Should().Contain("One of the teams already plays another match at this time");
+    }
 }

@@ -107,3 +107,18 @@ test("[PUC-071] przeliczenie drabinki przy rozpoczętym meczu kolejnej rundy", a
 
   await expect(page.getByText("Kolejny mecz już się zaczął, więc nie dało się w nim zmienić drużyny.")).toBeVisible()
 })
+
+test("[PUC-013] drabinka większa niż liczba drużyn: puste miejsca dostają wolny los", async ({ page }) => {
+  await loginAs(page, ORGANIZER)
+  await knockoutWith(8)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/bracket`)
+
+  await page.getByRole("button", { name: "1/8 finału (9–16 drużyn)" }).click()
+
+  for (let pair = 1; pair <= 8; pair++) {
+    await expect(page.getByRole("combobox", { name: `Para ${pair}: gospodarz` })).toHaveText(/Drużyna \d/)
+    await expect(page.getByRole("combobox", { name: `Para ${pair}: gość` })).toHaveText("Wolny los")
+  }
+  await expect(page.getByText("Drużyna z wolnym losem przechodzi do kolejnej rundy bez meczu.", { exact: false })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Utwórz drabinkę" })).toBeEnabled()
+})
