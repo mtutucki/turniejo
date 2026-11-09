@@ -38,7 +38,7 @@ describe("autoBracketPairs", () => {
     ])
   })
 
-  it("crosses two groups: A1-B2, B1-A2", () => {
+  it("GPK-001: crosses two groups: A1-B2, B1-A2", () => {
     const groups = [group("A", 1), group("B", 2)]
     const teams = [team("a1", "A"), team("a2", "A"), team("b1", "B"), team("b2", "B")]
     expect(autoBracketPairs(groups, teams)).toEqual([
@@ -49,6 +49,40 @@ describe("autoBracketPairs", () => {
       {
         home: { kind: "group", groupId: "B", position: 1 },
         away: { kind: "group", groupId: "A", position: 2 },
+      },
+    ])
+  })
+
+  it("PUC-008: 8 seeded teams give quarter-finals 1-8, 2-7, 3-6, 4-5 without byes", () => {
+    const teams = Array.from({ length: 8 }, (_, i) => team(`t${i + 1}`, null, i + 1))
+    expect(defaultPairCount([], teams)).toBe(4)
+    const pairs = autoBracketPairs([], teams)!
+    const ids = pairs.map((p) =>
+      [p.home, p.away].map((slot) => (slot?.kind === "team" ? slot.tournamentTeamId : "bye")).sort().join("-"),
+    )
+    expect(ids.sort()).toEqual(["t1-t8", "t2-t7", "t3-t6", "t4-t5"])
+    expect(pairs.flatMap((p) => [p.home, p.away]).filter((slot) => slot?.kind === "team")).toHaveLength(8)
+  })
+
+  it("PUC-015: 5 teams give quarter-finals with three byes for the top seeds", () => {
+    const teams = Array.from({ length: 5 }, (_, i) => team(`t${i + 1}`, null, i + 1))
+    const pairs = autoBracketPairs([], teams)!
+    expect(pairs).toHaveLength(4)
+    const byes = pairs.filter((p) => p.away?.kind === "bye" || p.home?.kind === "bye")
+    expect(byes).toHaveLength(3)
+    expect(byes.map((p) => (p.home?.kind === "team" ? p.home.tournamentTeamId : null)).sort()).toEqual(["t1", "t2", "t3"])
+  })
+
+  it("GPK-002: one group of four, semi-finals chosen: 1-4 and 2-3", () => {
+    const teams = [team("a1", "A"), team("a2", "A"), team("a3", "A"), team("a4", "A")]
+    expect(suggestPairs([group("A", 1)], teams, 2)).toEqual([
+      {
+        home: { kind: "group", groupId: "A", position: 1 },
+        away: { kind: "group", groupId: "A", position: 4 },
+      },
+      {
+        home: { kind: "group", groupId: "A", position: 2 },
+        away: { kind: "group", groupId: "A", position: 3 },
       },
     ])
   })
