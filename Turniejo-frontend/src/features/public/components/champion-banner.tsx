@@ -37,8 +37,53 @@ export function bracketChampion(bracket: Bracket, matches: Match[]) {
   return matchWinner(matches.find((m) => m.id === finalNode.matchId))
 }
 
-function ChampionRow({ label, teamId }: { label: string | null; teamId: string | null }) {
+/** Przegrany zakończonego meczu (przy remisie decydują karne), null gdy nierozstrzygnięty. */
+export function matchLoser(match: Match | undefined) {
+  const winner = matchWinner(match)
+  if (!winner || !match) return null
+  return winner === match.homeTournamentTeamId
+    ? match.awayTournamentTeamId
+    : match.homeTournamentTeamId
+}
+
+/**
+ * 3. miejsce: zwycięzca meczu o 3. miejsce, a bez takiego meczu - przegrany jedynego rozegranego
+ * półfinału, gdy drugi półfinał był wolnym losem (np. 3 drużyny). Przy dwóch półfinałach bez meczu
+ * o 3. miejsce trzeciego miejsca nie ma (QA v3: PUC-019).
+ */
+export function bracketThirdPlace(bracket: Bracket, matches: Match[]) {
+  const byId = (id: string | null) => matches.find((m) => m.id === id)
+  const thirdPlaceNode = bracket.rounds.find((r) => r.roundType === "ThirdPlace")?.nodes[0]
+  if (thirdPlaceNode) return matchWinner(byId(thirdPlaceNode.matchId))
+
+  const standard = bracket.rounds
+    .filter((r) => r.roundType === "Standard")
+    .sort((a, b) => b.roundNumber - a.roundNumber)
+  const semis = standard[1]?.nodes ?? []
+  if (semis.length !== 2) return null
+  const played = semis.filter((n) => n.homeSourceType !== "Bye" && n.awaySourceType !== "Bye")
+  if (played.length !== 1) return null
+  return matchLoser(byId(played[0]!.matchId))
+}
+
+function ChampionRow({
+  label,
+  teamId,
+  place = 1,
+}: {
+  label: string | null
+  teamId: string | null
+  place?: 1 | 3
+}) {
   const { lookups } = usePublicContext()
+  const title =
+    place === 3
+      ? label
+        ? `3. miejsce · ${label}`
+        : "3. miejsce"
+      : label
+        ? `Zwycięzca · ${label}`
+        : "Zwycięzca turnieju"
   // Bez ShowTeams backend nie zdradza nazw drużyn — wtedy nie ma czego ogłaszać.
   const name = lookups.teamName(teamId, "")
   if (!teamId || !name) return null
@@ -50,7 +95,7 @@ function ChampionRow({ label, teamId }: { label: string | null; teamId: string |
       </span>
       <span className="min-w-0">
         <span className="text-muted-foreground block text-xs font-medium tracking-wide uppercase">
-          {label ? `Zwycięzca · ${label}` : "Zwycięzca turnieju"}
+          {title}
         </span>
         <span className="block truncate text-lg font-bold">{name}</span>
       </span>
@@ -63,7 +108,19 @@ function KnockoutChampion({ categoryId, label }: { categoryId: string; label: st
   const bracket = usePublicBracket(slug, categoryId)
   const schedule = usePublicSchedule(slug, tournament.settings.showSchedule)
   if (!bracket.data || !schedule.data) return null
-  return <ChampionRow label={label} teamId={bracketChampion(bracket.data, schedule.data)} />
+  const champion = bracketChampion(bracket.data, schedule.data)
+  return (
+    <>
+      <ChampionRow label={label} teamId={champion} />
+      {champion && (
+        <ChampionRow
+          label={label}
+          teamId={bracketThirdPlace(bracket.data, schedule.data)}
+          place={3}
+        />
+      )}
+    </>
+  )
 }
 
 function GroupLeader({ groupId, label }: { groupId: string; label: string | null }) {

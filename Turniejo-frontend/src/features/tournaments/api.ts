@@ -270,8 +270,9 @@ export function useUpdateTournamentSettings(id: string) {
   const { request } = useApi()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (settings: TournamentSettings) =>
-      request(`${base(id)}/settings`, { method: "PUT", body: settings }),
+    // expected: wartości z chwili otwarcia formularza - serwer odrzuca zapis, gdy ktoś zmienił je w międzyczasie.
+    mutationFn: ({ expected, ...settings }: TournamentSettings & { expected?: TournamentSettings }) =>
+      request(`${base(id)}/settings`, { method: "PUT", body: { ...settings, expected } }),
     meta: { handlesValidation: true },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tournamentKeys.settings(id) }),
   })
@@ -291,8 +292,8 @@ export function useUpdatePublicSettings(id: string) {
   const { request } = useApi()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (settings: PublicSettings) =>
-      request(`${base(id)}/public-settings`, { method: "PUT", body: settings }),
+    mutationFn: ({ expected, ...settings }: PublicSettings & { expected?: PublicSettings }) =>
+      request(`${base(id)}/public-settings`, { method: "PUT", body: { ...settings, expected } }),
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: tournamentKeys.publicSettings(id) }),

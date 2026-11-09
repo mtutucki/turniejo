@@ -33,7 +33,11 @@ import { BracketBoard } from "@/features/matches/components/bracket-board"
 import { GenerateBracketForm } from "@/features/matches/components/generate-bracket-form"
 import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { autoBracketPairs } from "@/features/matches/suggest-bracket"
-import { bracketChampion, showsChampion } from "@/features/public/components/champion-banner"
+import {
+  bracketChampion,
+  bracketThirdPlace,
+  showsChampion,
+} from "@/features/public/components/champion-banner"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups, useTournamentSettings } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
@@ -74,10 +78,10 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     // Puchar: drabinka gotowa, ale mecze 1. rundy nie mają jeszcze godzin — następny krok to terminarz.
     const needsSchedule =
       isOrganizer && tournamentFormat === "Knockout" && tournamentStatus === "RegistrationClosed"
-    const champion =
-      showsChampion(tournamentStatus, tournamentFormat)
-        ? bracketChampion(bracket.data, schedule.data ?? [])
-        : null
+    const champion = showsChampion(tournamentStatus, tournamentFormat)
+      ? bracketChampion(bracket.data, schedule.data ?? [])
+      : null
+    const thirdPlace = champion ? bracketThirdPlace(bracket.data, schedule.data ?? []) : null
     // Drużyna, która już nie gra (wycofana, odrzucona albo usunięta z turnieju), zostaje w swojej parze
     // na stałe (węzły mają zamrożone drużyny), a slot w kolejnej rundzie nigdy by się nie wypełnił —
     // jedyne wyjście to ułożyć drabinkę od nowa, póki nic nie zagrano.
@@ -289,6 +293,11 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
               <span className="block truncate text-lg font-bold">
                 {teamById.get(champion) ?? "Drużyna"}
               </span>
+              {thirdPlace && (
+                <span className="text-muted-foreground block truncate text-sm">
+                  3. miejsce: {teamById.get(thirdPlace) ?? "Drużyna"}
+                </span>
+              )}
             </span>
           </div>
         )}

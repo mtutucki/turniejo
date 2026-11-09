@@ -4,7 +4,7 @@ import { expect, login, loginAs, mock, PASSWORD, REFEREE, test } from "./fixture
 test.skip(({ isMobile }) => isMobile, "menu boczne tylko na desktopie")
 
 test.describe("Moje konto", () => {
-  test("sędzia bez organizacji zostaje organizatorem z menu", async ({ page }) => {
+  test("[KON-010] sędzia bez organizacji zostaje organizatorem z menu", async ({ page }) => {
     await loginAs(page, REFEREE)
     const menuItem = page.getByRole("link", { name: "Zostań organizatorem" })
     await menuItem.click()
@@ -46,7 +46,7 @@ test.describe("Moje konto", () => {
     await expect(page.getByText("500 100 200")).toBeVisible()
   })
 
-  test("zmiana hasła wymaga obecnego hasła i działa przy kolejnym logowaniu", async ({
+  test("[KON-041a KON-041b] zmiana hasła wymaga obecnego hasła i działa przy kolejnym logowaniu", async ({
     page,
     browser,
   }) => {

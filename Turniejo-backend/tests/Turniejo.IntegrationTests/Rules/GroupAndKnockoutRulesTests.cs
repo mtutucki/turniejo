@@ -114,4 +114,29 @@ public sealed class GroupAndKnockoutRulesTests(IntegrationTestWebApplicationFact
         semis.Should().HaveCount(2);
         semis.Select(n => n.GetInt("homeSourcePosition")).Should().BeEquivalentTo([1, 1]);
     }
+
+    // QA v3: GPK-008 - korekta w grupie po rozpoczęciu meczu pucharowego: nierozpoczęty półfinał dostaje
+    // nową drużynę, rozpoczęty zostaje, a organizator dostaje powiadomienie, że drabinka różni się od tabeli.
+    [Fact]
+    public async Task GPK_008_CorrectionAfterAKnockoutMatchStarted_NotifiesTheOrganizer()
+    {
+        var s = await CrossBracketAsync(Factory);
+        await PlayGroupAsync(s, GroupA);
+        await PlayGroupAsync(s, GroupB);
+        await FlushOutboxAsync();
+        var startedSemi = (await s.MatchBetweenAsync("T1", "T5")).GetGuid("id");
+        (await s.Organizer.PostAsync($"{T(s)}/matches/{startedSemi}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+
+        // T2 jednak wygrywa z T1: w grupie A zmienia się kolejność (1. T2, 2. T1).
+        var groupMatch = await s.MatchBetweenAsync("T1", "T2");
+        var t2Home = groupMatch.GetGuid("homeTournamentTeamId") == s.Team("T2");
+        (await s.Organizer.PatchAsJsonAsync($"{T(s)}/matches/{groupMatch.GetGuid("id")}/correct-score",
+                new { homeScore = t2Home ? 1 : 0, awayScore = t2Home ? 0 : 1, winnerTournamentTeamId = s.Team("T2") }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        await FlushOutboxAsync();
+
+        (await s.MatchBetweenAsync("T1", "T5")).GetGuid("id").Should().Be(startedSemi);
+        await s.MatchBetweenAsync("T4", "T1");
+        (await s.NotificationsAsync(s.Organizer)).Should().Contain(n => n.GetString("type") == "BracketChangeBlocked");
+    }
 }

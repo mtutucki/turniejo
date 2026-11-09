@@ -3,6 +3,8 @@
 import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Match } from "@/types/matches"
+
+import { resultNote } from "../result-note"
 import type {
   Bracket,
   BracketNode,
@@ -206,6 +208,12 @@ function NodeCard({
         decided={played}
         swap={swapOf("Away")}
       />
+      {/* Karne są przy wynikach drużyn - tu dogrywka i walkower, żeby nie wyglądały jak zwykły wynik. */}
+      {played && match && (match.resultType === "ExtraTime" || match.resultType === "Walkover") && (
+        <p className="text-muted-foreground border-t px-3 py-1 text-xs" data-testid="bracket-node-note">
+          {resultNote({ ...match, homePenaltyScore: null, awayPenaltyScore: null })}
+        </p>
+      )}
       {showTime && (
         <p
           className="text-muted-foreground border-t px-3 py-1 text-xs"

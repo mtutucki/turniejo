@@ -67,6 +67,11 @@ export type Match = {
   homeScore: number
   awayScore: number
   events: MatchEvent[]
+  pausedAt?: string | null
+  totalPausedSeconds?: number
+  resultType?: string
+  winnerTournamentTeamId?: string | null
+  editLockedAt?: string | null
 }
 
 // Stałe id — testy odwołują się do nich w URL-ach.
@@ -83,6 +88,10 @@ export const IDS = {
   referee: "0f000000-0000-4000-8000-0000000000a2",
   expiring: "0f000000-0000-4000-8000-0000000000a3",
   expiringNow: "0f000000-0000-4000-8000-0000000000a4",
+  coach: "0f000000-0000-4000-8000-0000000000a5",
+  parent: "0f000000-0000-4000-8000-0000000000a6",
+  /** Adam Bramka (Orły) - dziecko rodzica z seeda. */
+  child: "0f000000-0000-4000-8000-0000000000b1",
 }
 export const PUBLIC_SLUG = "puchar-e2e"
 // Kody dostępu seedowanego turnieju (6 znaków hex, jak w Tournament.Create).
@@ -135,6 +144,25 @@ function seed() {
         { role: "Referee", scopeType: "Tournament", scopeId: IDS.tournament },
         { role: "Referee", scopeType: "Match", scopeId: IDS.match },
       ],
+    },
+    {
+      id: IDS.coach,
+      email: "trener@e2e.pl",
+      password: PASSWORD,
+      firstName: "Tomasz",
+      lastName: "Trener",
+      roles: [
+        { role: "Coach", scopeType: "Tournament", scopeId: IDS.tournament },
+        { role: "Coach", scopeType: "TournamentTeam", scopeId: IDS.homeTeam },
+      ],
+    },
+    {
+      id: IDS.parent,
+      email: "rodzic@e2e.pl",
+      password: PASSWORD,
+      firstName: "Renata",
+      lastName: "Rodzic",
+      roles: [{ role: "Parent", scopeType: "Player", scopeId: IDS.child }],
     },
   ]
   const tournaments: Tournament[] = [
@@ -214,7 +242,10 @@ function seed() {
     ],
     "team-lwy": [],
   }
-  return { users, tournaments, matches, organizations, rosters, usedResetTokens: [] as string[] }
+  const guardians = [{ playerId: IDS.child, userId: IDS.parent, canEdit: true }]
+  /** Drużyny dodane w teście (seedowane Orły i Lwy są w TEAM_NAMES). */
+  const orgTeams: (Team & { logoUrl: string | null })[] = []
+  return { users, tournaments, matches, organizations, rosters, guardians, orgTeams, usedResetTokens: [] as string[] }
 }
 
 export const db = seed()

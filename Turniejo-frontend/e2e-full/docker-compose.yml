@@ -1,0 +1,105 @@
+# Pełny stos do testów E2E (faza 5): backend, Keycloak, Postgres, Mailpit i frontend z obrazów jak na
+# produkcji. Jednorazowy: bez wolumenów, każdy start to czysta baza i świeży import realmu.
+# Porty nie kolidują z lokalnym dev (3000/5432/8080/8025).
+#
+#   docker compose -f e2e-full/docker-compose.yml -p turniejo-e2e up -d --build --wait
+#   npx playwright test -c playwright.full.config.ts
+#   docker compose -f e2e-full/docker-compose.yml -p turniejo-e2e down -v
+#
+# Hasła poniżej są tylko dla tego jednorazowego stosu.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: turniejo
+      POSTGRES_PASSWORD: turniejo
+      POSTGRES_DB: turniejo
+    tmpfs: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turniejo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Stały wystawca tokenów: frontend (w sieci dockera) i testy (z hosta przez port 18080)
+      # dostają tokeny z tym samym "iss", który sprawdza API.
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
+      KC_HEALTH_ENABLED: "true"
+      TURNIEJO_BACKEND_ADMIN_SECRET: e2e-backend-admin-secret
+    ports:
+      - "18080:8080"
+    volumes:
+      - ../../Turniejo-backend/infra/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "18025:8025"
+
+  api:
+    build:
+      context: ../../Turniejo-backend
+    environment:
+      # Development tylko po to, żeby API przyjęło metadane Keycloaka po HTTP. Sekrety dev nie trafiają
+      # do obrazu (.dockerignore), SMTP idzie do Mailpita.
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=turniejo;Username=turniejo;Password=turniejo
+      Database__MigrateOnStartup: "true"
+      Keycloak__Authority: http://keycloak:8080/realms/turniejo
+      Keycloak__BaseUrl: http://keycloak:8080
+      Keycloak__AdminClientSecret: e2e-backend-admin-secret
+      App__PublicUrl: http://localhost:13100
+      Smtp__Host: mailpit
+      Smtp__Port: "1025"
+      Smtp__Username: ""
+      Smtp__Password: ""
+      RateLimiting__Enabled: "false"
+      AllowedHosts: "*"
+    ports:
+      - "18081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+
+  frontend:
+    build:
+      context: ..
+      args:
+        API_URL: http://api:8080
+    environment:
+      API_URL: http://api:8080
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: turniejo
+      KEYCLOAK_CLIENT_ID: turniejo-frontend
+      NEXTAUTH_SECRET: e2e-only-secret-not-for-production-0123456789
+      NEXTAUTH_URL: http://localhost:13100
+      AUTH_TRUST_HOST: "true"
+    ports:
+      - "13100:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 3s
+      timeout: 5s
+      retries: 60

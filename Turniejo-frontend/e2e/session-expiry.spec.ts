@@ -1,7 +1,7 @@
 import { expect, login, loginAs, test } from "./fixtures"
 
 test.describe("Wygaśnięcie sesji", () => {
-  test("po wygaśnięciu sesji wraca do logowania raz, bez pętli przeładowań", async ({ page }) => {
+  test("[KON-006 MNZ-025] po wygaśnięciu sesji wraca do logowania raz, bez pętli przeładowań", async ({ page }) => {
     test.setTimeout(90_000)
     // Token żyje 35 s, a odświeżenie się nie udaje (jak po restarcie Keycloaka).
     await loginAs(page, "wygasa@e2e.pl")

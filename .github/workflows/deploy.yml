@@ -79,9 +79,41 @@ jobs:
           path: Turniejo-frontend/playwright-report
           retention-days: 7
 
+  e2e-full:
+    name: Testy pełnego stosu
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: Turniejo-frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Turniejo-frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chrome
+      # Jednorazowy stos z obrazów jak na produkcji (backend, Keycloak, Postgres, Mailpit, frontend).
+      - run: npm run e2e:full:up
+      - run: npm run test:e2e:full
+      - if: failure()
+        run: docker compose -f e2e-full/docker-compose.yml -p turniejo-e2e logs --no-color > full-stack.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-full
+          path: |
+            Turniejo-frontend/playwright-report-full
+            Turniejo-frontend/full-stack.log
+          retention-days: 7
+      - if: always()
+        run: npm run e2e:full:down
+
   deploy:
     name: Wdrożenie
-    needs: [backend, frontend, e2e]
+    needs: [backend, frontend, e2e, e2e-full]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 40

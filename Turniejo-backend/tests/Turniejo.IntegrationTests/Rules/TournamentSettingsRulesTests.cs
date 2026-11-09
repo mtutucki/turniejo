@@ -116,4 +116,68 @@ public sealed class TournamentSettingsRulesTests(IntegrationTestWebApplicationFa
         teams.GetInt("rejected").Should().Be(1);
         teams.GetInt("withdrawn").Should().Be(1);
     }
+
+    // QA v3: UST-015 - dwóch organizatorów zapisuje naraz: drugi zapis bez odświeżenia nadpisywał pierwszy.
+    // Zapis z nieaktualnymi wartościami (wczytanymi przed cudzą zmianą) dostaje konflikt.
+    [Fact]
+    public async Task UST_015_StaleRulesSave_IsRejected_FreshOneGoesThrough()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var loaded = await (await s.Organizer.GetAsync($"{T(s)}/settings")).ReadJsonAsync();
+        object Rules(int win, object? expected) => new
+        {
+            pointsForWin = win, pointsForDraw = 1, pointsForLoss = 0, matchDurationMinutes = 30, breakDurationMinutes = 5,
+            isThirdPlaceMatchEnabled = false, refereeEditWindowMinutes = 60, walkoverHomeScore = 3, walkoverAwayScore = 0,
+            canCoachEditSquadAfterStart = false, expected,
+        };
+        var expected = System.Text.Json.JsonSerializer.Deserialize<object>(loaded.GetRawText());
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/settings", Rules(4, expected))).IsSuccessStatusCode.Should().BeTrue();
+
+        var stale = await s.Organizer.PutAsJsonAsync($"{T(s)}/settings", Rules(5, expected));
+        stale.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        (await (await s.Organizer.GetAsync($"{T(s)}/settings")).ReadJsonAsync()).GetInt("pointsForWin").Should().Be(4);
+
+        var fresh = System.Text.Json.JsonSerializer.Deserialize<object>((await (await s.Organizer.GetAsync($"{T(s)}/settings")).ReadJsonAsync()).GetRawText());
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/settings", Rules(5, fresh))).IsSuccessStatusCode.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UST_015_StalePortalSave_IsRejected()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var loaded = System.Text.Json.JsonSerializer.Deserialize<object>(
+            (await (await s.Organizer.GetAsync($"{T(s)}/public-settings")).ReadJsonAsync()).GetRawText());
+        object Portal(bool isPublic, bool showStats) => new
+        {
+            isPublic, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true,
+            showLiveMatches = true, showStats, abbreviatePlayerNames = true, expected = loaded,
+        };
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", Portal(true, true))).IsSuccessStatusCode.Should().BeTrue();
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", Portal(false, false))).StatusCode
+            .Should().Be(System.Net.HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task UST_002_TwoTournamentsWithTheSameName_GetSeparatePublicPages()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var first = await s.TournamentAsync();
+        var created = await s.Organizer.PostAsJsonAsync("/api/tournaments", new
+        {
+            organizationId = s.OrganizationId, name = first.GetString("name"), startAt = s.StartsAt, endAt = s.StartsAt.AddDays(1), teamLimit = 8, description = (string?)null,
+        });
+        created.IsSuccessStatusCode.Should().BeTrue(await created.Content.ReadAsStringAsync());
+        var second = await created.ReadJsonAsync();
+        var publicSettings = new { isPublic = true, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true };
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", publicSettings)).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PutAsJsonAsync($"/api/tournaments/{second.GetGuid("tournamentId")}/public-settings", publicSettings)).IsSuccessStatusCode.Should().BeTrue();
+
+        second.GetString("slug").Should().NotBe(first.GetString("slug"));
+        var anonymous = CreateClient();
+        (await (await anonymous.GetAsync($"/public/tournaments/{first.GetString("slug")}")).ReadJsonAsync()).GetGuid("id").Should().Be(s.TournamentId);
+        (await (await anonymous.GetAsync($"/public/tournaments/{second.GetString("slug")}")).ReadJsonAsync()).GetGuid("id").Should().Be(second.GetGuid("tournamentId"));
+    }
 }

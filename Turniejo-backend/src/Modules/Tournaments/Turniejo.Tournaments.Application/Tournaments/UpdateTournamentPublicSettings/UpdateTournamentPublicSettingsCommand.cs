@@ -14,10 +14,23 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSet
         bool ShowBracket,
         bool ShowLiveMatches,
         bool ShowStats,
-        bool AbbreviatePlayerNames = true) : ICommand<UpdateTournamentPublicSettingsResponse>, IAuthorizedRequest
+        bool AbbreviatePlayerNames = true,
+        // Wartości, które formularz wczytał. Inne w bazie = ktoś zapisał portal w międzyczasie (QA v3: UST-015).
+        ExpectedPublicSettings? Expected = null) : ICommand<UpdateTournamentPublicSettingsResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;
         public IReadOnlyCollection<string> AllowedRoles => TournamentRoles.OrganizerOnly;
     }
+
+    public sealed record ExpectedPublicSettings(
+        bool IsPublic,
+        bool ShowTeams,
+        bool ShowPlayers,
+        bool ShowSchedule,
+        bool ShowStandings,
+        bool ShowBracket,
+        bool ShowLiveMatches,
+        bool ShowStats,
+        bool AbbreviatePlayerNames);
 }

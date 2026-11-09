@@ -178,4 +178,21 @@ public sealed class AccountAndRolesRulesTests(IntegrationTestWebApplicationFacto
 
         organization.GetString("name").Should().Be("Jan Testowy");
     }
+
+    // QA v3: KON-016 (przepisany) - kodu organizatora nie ma; żaden kod turnieju nie daje roli organizatora
+    // ani dostępu do zarządzania.
+    [Fact]
+    public async Task KON_016_NoTournamentCode_GivesTheOrganizerRole()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, schedule: false);
+        var (user, _) = await s.NewUserAsync();
+
+        foreach (var role in new[] { "Referee", "Coach", "Viewer" })
+            await s.JoinWithAsync(user, role);
+
+        var roles = (await RolesAsync(user)).Where(r => r.GetGuid("scopeId") == s.TournamentId).Select(r => r.GetString("role")).ToList();
+        roles.Should().BeEquivalentTo(["Referee", "Coach", "Viewer"]);
+        (await user.PatchAsJsonAsync($"/api/tournaments/{s.TournamentId}/status", new { tournamentStatus = (int)TournamentStatus.RegistrationOpen }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
 }

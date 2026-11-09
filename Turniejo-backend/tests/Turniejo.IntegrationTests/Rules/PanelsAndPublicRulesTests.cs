@@ -12,9 +12,9 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
 
     private static string T(TournamentScenario s) => $"/api/tournaments/{s.TournamentId}";
 
-    private static Task<HttpResponseMessage> PublishAsync(TournamentScenario s, bool isPublic) =>
+    private static Task<HttpResponseMessage> PublishAsync(TournamentScenario s, bool isPublic, bool showPlayers = true, bool abbreviatePlayerNames = true) =>
         s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
-            new { isPublic, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true });
+            new { isPublic, showTeams = true, showPlayers, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true, abbreviatePlayerNames });
 
     private static async Task GoalAsync(TournamentScenario s, Guid match, string team, Guid player, int type = Goal) =>
         (await s.Organizer.PostAsJsonAsync($"{T(s)}/matches/{match}/goals",
@@ -149,5 +149,93 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
 
         scorers.Single(r => r.GetGuid("playerId") == adam).GetInt("count").Should().Be(2);
         scorers.Should().NotContain(r => r.GetGuid("playerId") == cezary);
+    }
+
+    private async Task<(Guid Match, Guid Adam, string Slug)> PublicMatchWithGoalAsync(TournamentScenario s)
+    {
+        var (_, adam) = await s.CreatePlayerAsync("T1", "Adam", "Strzelec");
+        var match = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        (await s.Organizer.PostAsync($"{T(s)}/matches/{match}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+        await GoalAsync(s, match, "T1", adam);
+        await FlushOutboxAsync();
+        return (match, adam, (await s.TournamentAsync()).GetString("slug"));
+    }
+
+    private static string LiveTeamsJson(System.Text.Json.JsonElement live) =>
+        live.GetProperty("homeTeam").GetRawText() + live.GetProperty("awayTeam").GetRawText();
+
+    [Fact]
+    public async Task PUB_004_AbbreviatedNames_HideFullSurnamesOnThePortal()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (match, _, slug) = await PublicMatchWithGoalAsync(s);
+        var anonymous = CreateClient();
+
+        (await PublishAsync(s, true, abbreviatePlayerNames: true)).IsSuccessStatusCode.Should().BeTrue();
+        var live = await (await anonymous.GetAsync($"/public/matches/{match}/live")).ReadJsonAsync();
+        var scorers = await (await anonymous.GetAsync($"/public/tournaments/{slug}/stats/top-scorers")).Content.ReadAsStringAsync();
+        LiveTeamsJson(live).Should().NotContain("Strzelec");
+        scorers.Should().Contain("Adam").And.NotContain("Strzelec");
+
+        (await PublishAsync(s, true, abbreviatePlayerNames: false)).IsSuccessStatusCode.Should().BeTrue();
+        live = await (await anonymous.GetAsync($"/public/matches/{match}/live")).ReadJsonAsync();
+        LiveTeamsJson(live).Should().Contain("Strzelec");
+    }
+
+    [Fact]
+    public async Task PUB_003b_HiddenPlayers_AreNotInLiveSquadsOrProfiles()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (match, adam, _) = await PublicMatchWithGoalAsync(s);
+        var anonymous = CreateClient();
+
+        (await PublishAsync(s, true, showPlayers: false)).IsSuccessStatusCode.Should().BeTrue();
+
+        var live = await (await anonymous.GetAsync($"/public/matches/{match}/live")).ReadJsonAsync();
+        live.GetProperty("homeTeam").GetProperty("players").EnumerateArray().Should().BeEmpty();
+        live.GetProperty("awayTeam").GetProperty("players").EnumerateArray().Should().BeEmpty();
+        (await anonymous.GetAsync($"/public/players/{adam}")).IsSuccessStatusCode.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PUB_007_PublicMatch_ShowsMvp_AndHidesRevertedEvents()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (match, adam, _) = await PublicMatchWithGoalAsync(s);
+        var m = $"{T(s)}/matches/{match}";
+        var reverted = await s.Organizer.PostAsJsonAsync($"{m}/goals",
+            new { tournamentTeamId = s.Team("T1"), playerId = adam, assistPlayerId = (Guid?)null, goalType = Goal, minute = 20, second = (int?)null });
+        var revertedId = (await reverted.ReadJsonAsync()).GetGuid("matchEventId");
+        (await s.Organizer.DeleteAsync($"{m}/events/{revertedId}")).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{m}/finish", new { resultType = 2, winnerTournamentTeamId = s.Team("T1") })).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{m}/mvp", new { tournamentTeamId = s.Team("T1"), playerId = adam })).IsSuccessStatusCode.Should().BeTrue();
+        (await PublishAsync(s, true)).IsSuccessStatusCode.Should().BeTrue();
+
+        var live = await (await CreateClient().GetAsync($"/public/matches/{match}/live")).ReadJsonAsync();
+
+        var events = live.GetProperty("events").EnumerateArray().ToList();
+        events.Should().Contain(e => e.GetString("type") == "MvpSelected" && e.GetGuidOrNull("playerId") == adam);
+        events.Should().NotContain(e => e.GetGuid("id") == revertedId);
+        events.Count(e => e.GetString("type") == "Goal").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PAN_007_StartAndEndOfAMatch_NotifyCoachesAndParents()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (coach, coachId) = await s.JoinAsync("Coach");
+        await s.AssignCoachAsync("T1", coachId);
+        var (_, child) = await s.CreatePlayerAsync("T2", "Ola", "Dziecko");
+        var (parent, parentId) = await s.NewUserAsync("parent");
+        await s.AddGuardianAsync(child, "T2", parentId);
+        var match = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+
+        await s.PlayAsync(match, 1, 0);
+
+        foreach (var participant in new[] { coach, parent })
+        {
+            var types = (await s.NotificationsAsync(participant)).Select(n => n.GetString("type")).ToList();
+            types.Should().Contain("MatchStarted").And.Contain("MatchFinished");
+        }
     }
 }

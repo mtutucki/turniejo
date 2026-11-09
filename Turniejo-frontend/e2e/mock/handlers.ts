@@ -20,6 +20,33 @@ import {
 } from "./db"
 import { closeAll, connectionCount, negotiateResponse, publish } from "./signalr"
 
+/**
+ * Odpowiedzi ustawione przez test (POST /__control/override): test UI sam mówi, co zwraca API,
+ * zamiast odtwarzać w mocku logikę backendu. Ścieżka jak w Express: /api/tournaments/:id/settings.
+ * Override bez "times" działa do resetu mocka, z "times" - tyle razy.
+ */
+type Override = { method: string; pattern: RegExp; status: number; body: unknown; times: number | null }
+let overrides: Override[] = []
+/** Wywołania API od resetu ("POST /api/..."): test sprawdza np., że podwójny klik wysłał jedno żądanie. */
+let requests: string[] = []
+
+function toPattern(path: string) {
+  const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/:[A-Za-z]+/g, "[^/]+")
+  return new RegExp(`${escaped}$`)
+}
+
+const overrideHandler = http.all("*", ({ request }) => {
+  const url = new URL(request.url)
+  if (url.pathname.startsWith("/api/")) requests.push(`${request.method} ${url.pathname}`)
+  // Najnowszy override wygrywa - test może zmienić odpowiedź w trakcie.
+  const hit = overrides.findLast((o) => o.method === request.method && o.pattern.test(url.pathname))
+  if (!hit) return undefined
+  if (hit.times !== null && --hit.times <= 0) overrides = overrides.filter((o) => o !== hit)
+  return hit.body === null
+    ? new HttpResponse(null, { status: hit.status })
+    : HttpResponse.json(hit.body as never, { status: hit.status })
+})
+
 const STATUSES = [
   "Draft",
   "RegistrationOpen",
@@ -154,20 +181,34 @@ const matchDto = (m: Match) => ({
   stageType: "Group",
   homeScore: m.homeScore,
   awayScore: m.awayScore,
-  resultType: m.status === "Finished" ? "Regular" : "NotPlayed",
+  resultType: m.resultType ?? (m.status === "Finished" ? "Regular" : "NotPlayed"),
   homePenaltyScore: null,
   awayPenaltyScore: null,
 })
 
-const elapsed = (m: Match) =>
-  m.startedAt ? Math.max(0, Math.floor((Date.now() - new Date(m.startedAt).getTime()) / 1000)) : 0
+const elapsed = (m: Match) => {
+  if (!m.startedAt) return 0
+  const until = m.pausedAt ? new Date(m.pausedAt).getTime() : Date.now()
+  const seconds = (until - new Date(m.startedAt).getTime()) / 1000 - (m.totalPausedSeconds ?? 0)
+  return Math.max(0, Math.floor(seconds))
+}
 
 const matchTeam = (tournamentTeamId: string) => ({
   tournamentTeamId,
   teamId: TEAM_NAMES[tournamentTeamId]!.id,
   name: TEAM_NAMES[tournamentTeamId]!.name,
   shortName: TEAM_NAMES[tournamentTeamId]!.shortName,
-  players: [],
+  players: squadEntries(tournamentTeamId)
+    .filter((p) => p.status !== "Removed")
+    .map((p) => ({
+      tournamentPlayerId: p.id,
+      playerId: p.playerId,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      shirtNumber: p.shirtNumber,
+      position: p.position,
+      status: p.status,
+    })),
 })
 
 const livePanel = (m: Match) => ({
@@ -177,20 +218,38 @@ const livePanel = (m: Match) => ({
   stageType: "Group",
   scheduledAt: m.scheduledAt,
   startedAt: m.startedAt,
-  pausedAt: null,
+  pausedAt: m.pausedAt ?? null,
   finishedAt: null,
-  totalPausedSeconds: 0,
+  totalPausedSeconds: m.totalPausedSeconds ?? 0,
   homeScore: m.homeScore,
   awayScore: m.awayScore,
-  resultType: "NotPlayed",
-  winnerTournamentTeamId: null,
+  resultType: m.resultType ?? "NotPlayed",
+  winnerTournamentTeamId: m.winnerTournamentTeamId ?? null,
   homeTeam: matchTeam(m.home),
   awayTeam: matchTeam(m.away),
   events: m.events,
-  editLockedAt: null,
+  editLockedAt: m.editLockedAt ?? null,
   elapsedSeconds: elapsed(m),
   homePenaltyScore: null,
   awayPenaltyScore: null,
+})
+
+const rosterPlayer = (playerId: string) =>
+  Object.values(db.rosters)
+    .flat()
+    .find((p) => p.playerId === playerId)
+
+/** Skład zgłoszenia - ten sam, który edytuje organizator (sekcja „Skład drużyny w turnieju”). */
+const squadOf = (tournamentTeamId: string) => squadEntries(tournamentTeamId)
+
+const teamMatch = (m: Match) => ({
+  matchId: m.id,
+  scheduledAt: m.scheduledAt,
+  status: m.status,
+  homeTeamName: TEAM_NAMES[m.home]!.name,
+  awayTeamName: TEAM_NAMES[m.away]!.name,
+  homeScore: m.homeScore,
+  awayScore: m.awayScore,
 })
 
 const tournamentTeams = (tournamentId: string) =>
@@ -306,6 +365,8 @@ const keycloak = [
 
 const api = [
   // Jak ConfirmPasswordResetCommandHandler; rolę maila z linkiem gra stały token "token-<email>".
+  // Jak backend: ta sama odpowiedź dla istniejącego i nieznanego e-maila (nie zdradza, czy konto jest).
+  http.post("*/api/auth/password-reset/request", () => new HttpResponse(null, { status: 204 })),
   http.post("*/api/auth/password-reset/confirm", async ({ request }) => {
     const body = (await request.json()) as { token: string; newPassword: string }
     const user = db.users.find((u) => `token-${u.email}` === body.token)
@@ -744,6 +805,124 @@ const api = [
         : problem(404, "Match not found")
     }),
   ),
+  // Start, pauza, wznowienie i koniec: tylko sędzia meczu albo organizator, w dozwolonym stanie (inaczej 409).
+  ...(
+    [
+      ["start", ["Scheduled"], "Live"],
+      ["pause", ["Live"], "Paused"],
+      ["resume", ["Paused"], "Live"],
+      ["finish", ["Live", "Paused"], "Finished"],
+    ] as const
+  ).map(([action, from, to]) =>
+    http.post(
+      `*/api/tournaments/:tid/matches/:mid/${action}`,
+      authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
+        const m = findMatch(params.mid)
+        if (!m) return problem(404, "Match not found")
+        if (m.refereeId !== user.id && !hasRole(user, "Organizer", "Tournament", m.tournamentId)) {
+          return problem(403, "Forbidden")
+        }
+        if (!(from as readonly string[]).includes(m.status)) {
+          return problem(409, `Cannot ${action} a match that is ${m.status}.`)
+        }
+        const now = new Date().toISOString()
+        if (action === "start") m.startedAt = now
+        if (action === "pause") m.pausedAt = now
+        if (action === "resume" && m.pausedAt) {
+          m.totalPausedSeconds =
+            (m.totalPausedSeconds ?? 0) + (Date.now() - new Date(m.pausedAt).getTime()) / 1000
+          m.pausedAt = null
+        }
+        if (action === "finish") {
+          const body = (await request.json().catch(() => ({}))) as {
+            resultType?: string | number
+            winnerTournamentTeamId?: string | null
+          }
+          const RESULT_TYPES = ["NotPlayed", "Regular", "ExtraTime", "Penalties", "Walkover", "ManualDecision"]
+          m.resultType =
+            typeof body.resultType === "string"
+              ? body.resultType
+              : (RESULT_TYPES[(body.resultType ?? 2) - 1] ?? "Regular")
+          m.winnerTournamentTeamId = body.winnerTournamentTeamId ?? null
+          m.pausedAt = null
+        }
+        m.status = to
+        publish("matches", m.id, "MatchStatusChanged", { matchId: m.id, status: to })
+        publish("tournaments", m.tournamentId, "MatchChanged", { tournamentId: m.tournamentId, matchId: m.id })
+        return HttpResponse.json({ matchId: m.id, status: to })
+      }),
+    ),
+  ),
+  // Kartka: druga żółta tego samego zawodnika dokłada czerwoną (jak backend, IsSecondYellow).
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/cards",
+    authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      if (m.status !== "Live" && m.status !== "Paused") return problem(400, "Match is not in progress.")
+      const body = (await request.json()) as { tournamentTeamId: string; playerId: string; cardType: number | string; minute: number }
+      const type = typeof body.cardType === "number" ? (body.cardType === 9 ? "RedCard" : "YellowCard") : body.cardType
+      const sentOff = m.events.some((e) => e.playerId === body.playerId && e.type === "RedCard")
+      if (sentOff) return validation("PlayerId", "Player has been sent off")
+      const event = (eventType: string) => {
+        const e = {
+          id: newId(),
+          matchId: m.id,
+          type: eventType,
+          tournamentTeamId: body.tournamentTeamId,
+          playerId: body.playerId,
+          relatedPlayerId: null,
+          minute: body.minute,
+          second: null,
+          createdByUserId: user.id,
+          occurredAt: new Date().toISOString(),
+        }
+        m.events.push(e)
+        return e
+      }
+      const card = event(type)
+      if (type === "YellowCard" && m.events.filter((e) => e.playerId === body.playerId && e.type === "YellowCard").length === 2)
+        event("RedCard")
+      publish("matches", m.id, "MatchEventAdded", { matchId: m.id, matchEventId: card.id })
+      return HttpResponse.json({ matchEventId: card.id })
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:tid/matches/:mid/events/:eid",
+    authed<{ tid: string; mid: string; eid: string }>(async ({ params, request }) => {
+      const m = findMatch(params.mid)
+      const e = m?.events.find((x) => x.id === params.eid)
+      if (!m || !e) return problem(404, "Event not found")
+      const body = (await request.json()) as { minute: number; second: number | null; playerId: string | null }
+      if (body.minute < 0 || body.minute > 300) return validation("Minute", "Minute must be between 0 and 300.")
+      Object.assign(e, { minute: body.minute, second: body.second ?? null, playerId: body.playerId ?? e.playerId })
+      publish("matches", m.id, "MatchEventAdded", { matchId: m.id, matchEventId: e.id })
+      return HttpResponse.json({ matchEventId: e.id })
+    }),
+  ),
+  http.post(
+    "*/api/tournaments/:tid/matches/:mid/mvp",
+    authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
+      const m = findMatch(params.mid)
+      if (!m) return problem(404, "Match not found")
+      const body = (await request.json()) as { tournamentTeamId: string; playerId: string }
+      m.events = m.events.filter((e) => e.type !== "MvpSelected")
+      const e = {
+        id: newId(),
+        matchId: m.id,
+        type: "MvpSelected",
+        tournamentTeamId: body.tournamentTeamId,
+        playerId: body.playerId,
+        relatedPlayerId: null,
+        minute: 0,
+        second: null,
+        createdByUserId: user.id,
+        occurredAt: new Date().toISOString(),
+      }
+      m.events.push(e)
+      return HttpResponse.json({ matchEventId: e.id })
+    }),
+  ),
   http.post(
     "*/api/tournaments/:tid/matches/:mid/goals",
     authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
@@ -771,6 +950,145 @@ const api = [
         homeScore: m.homeScore,
         awayScore: m.awayScore,
       })
+    }),
+  ),
+
+  // --- Panel trenera i rodzica (z seeda: Orły, skład = zawodnicy kadry w bieżącym składzie) ---
+  http.get(
+    "*/api/coach/teams",
+    authed(({ user }) => {
+      const t = findTournament(IDS.tournament)!
+      return HttpResponse.json(
+        user.roles
+          .filter((r) => r.scopeType === "TournamentTeam" && r.role === "Coach")
+          .map((r) => ({
+            tournamentTeamId: r.scopeId,
+            tournamentId: t.id,
+            tournamentName: t.name,
+            teamId: TEAM_NAMES[r.scopeId!]!.id,
+            teamName: TEAM_NAMES[r.scopeId!]!.name,
+            categoryId: IDS.category,
+            groupId: IDS.group,
+            role: "Coach",
+            tournamentStatus: t.status,
+            canEditSquad: t.status !== "InProgress" && t.status !== "Finished",
+          })),
+      )
+    }),
+  ),
+  http.get(
+    "*/api/coach/teams/:id/:part",
+    authed<{ id: string; part: string }>(({ params, user }) => {
+      if (!hasRole(user, "Coach", "TournamentTeam", params.id)) return problem(403, "Forbidden")
+      const squad = squadOf(params.id)
+      if (params.part === "players") return HttpResponse.json(squad)
+      const matches = db.matches
+        .filter((m) => m.home === params.id || m.away === params.id)
+        .map(teamMatch)
+      if (params.part === "schedule") return HttpResponse.json(matches)
+      if (params.part === "results")
+        return HttpResponse.json(matches.filter((m) => m.status === "Finished"))
+      return HttpResponse.json(
+        squad.map((p) => ({
+          tournamentPlayerId: p.id,
+          playerId: p.playerId,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          goals: db.matches
+            .flatMap((m) => m.events)
+            .filter((e) => e.playerId === p.playerId && e.type === "Goal").length,
+          assists: 0,
+          yellowCards: 0,
+          redCards: 0,
+        })),
+      )
+    }),
+  ),
+  http.get(
+    "*/api/parent/players",
+    authed(({ user }) =>
+      HttpResponse.json(
+        db.guardians
+          .filter((g) => g.userId === user.id)
+          .map((g) => {
+            const p = rosterPlayer(g.playerId)!
+            return {
+              playerId: p.playerId,
+              firstName: p.firstName,
+              lastName: p.lastName,
+              birthDate: p.birthDate,
+              defaultPosition: p.defaultPosition,
+              photoUrl: null,
+              relationshipType: "Parent",
+              canEdit: g.canEdit,
+            }
+          }),
+      ),
+    ),
+  ),
+  http.get(
+    "*/api/parent/players/:id/:part",
+    authed<{ id: string; part: string }>(({ params, user }) => {
+      if (!db.guardians.some((g) => g.userId === user.id && g.playerId === params.id))
+        return problem(403, "Forbidden")
+      const t = findTournament(IDS.tournament)!
+      const p = rosterPlayer(params.id)!
+      const team = IDS.homeTeam
+      const childMatch = (m: Match) => ({
+        ...teamMatch(m),
+        tournamentId: t.id,
+        tournamentName: t.name,
+      })
+      const matches = db.matches.filter((m) => m.home === team || m.away === team)
+      if (params.part === "team")
+        return HttpResponse.json([
+          {
+            tournamentPlayerId: `tp-${p.playerId}`,
+            tournamentTeamId: team,
+            tournamentId: t.id,
+            tournamentName: t.name,
+            teamId: TEAM_NAMES[team]!.id,
+            teamName: TEAM_NAMES[team]!.name,
+            groupId: IDS.group,
+            shirtNumber: p.shirtNumber,
+            position: p.defaultPosition,
+          },
+        ])
+      if (params.part === "schedule") return HttpResponse.json(matches.map(childMatch))
+      if (params.part === "results")
+        return HttpResponse.json(matches.filter((m) => m.status === "Finished").map(childMatch))
+      return HttpResponse.json([
+        {
+          tournamentTeamId: team,
+          groupId: IDS.group,
+          groupName: "Grupa A",
+          tournamentName: t.name,
+          teamNames: Object.fromEntries(Object.entries(TEAM_NAMES).map(([id, x]) => [id, x.name])),
+          standings: Object.keys(TEAM_NAMES).map((id, i) => ({
+            tournamentTeamId: id,
+            position: i + 1,
+            points: 0,
+            matchesPlayed: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+          })),
+        },
+      ])
+    }),
+  ),
+  http.patch(
+    "*/api/parent/players/:id",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      const guardian = db.guardians.find((g) => g.userId === user.id && g.playerId === params.id)
+      if (!guardian?.canEdit) return problem(403, "Forbidden")
+      const body = (await request.json()) as { firstName: string; lastName: string }
+      const p = rosterPlayer(params.id)!
+      p.firstName = body.firstName
+      p.lastName = body.lastName
+      return HttpResponse.json({ playerId: p.playerId })
     }),
   ),
 
@@ -838,8 +1156,42 @@ const api = [
     authed(({ user, params }) => {
       if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
       return HttpResponse.json(
-        Object.values(TEAM_NAMES).map((t) => ({ ...t, organizationId: params.id, logoUrl: null })),
+        [...Object.values(TEAM_NAMES).map((t) => ({ ...t, logoUrl: null })), ...db.orgTeams].map((t) => ({
+          ...t,
+          organizationId: params.id,
+        })),
       )
+    }),
+  ),
+  http.post(
+    "*/api/organizations/:id/teams",
+    authed<{ id: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as { name: string; shortName: string | null; logoUrl: string | null }
+      const team = { id: newId(), name: body.name, shortName: body.shortName, logoUrl: body.logoUrl }
+      db.orgTeams.push(team)
+      return HttpResponse.json({ teamId: team.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/teams/:teamId/logo",
+    authed<{ id: string; teamId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const team = db.orgTeams.find((t) => t.id === params.teamId)
+      if (!team) return problem(404, "Team not found")
+      team.logoUrl = ((await request.json()) as { logoUrl: string | null }).logoUrl
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/teams/:teamId",
+    authed<{ id: string; teamId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const team = db.orgTeams.find((t) => t.id === params.teamId)
+      if (!team) return problem(404, "Team not found")
+      const body = (await request.json()) as { name: string; shortName: string | null }
+      Object.assign(team, { name: body.name, shortName: body.shortName })
+      return HttpResponse.json({ teamId: team.id })
     }),
   ),
   http.get(
@@ -937,8 +1289,592 @@ const api = [
 
 // --- Sterowanie mockiem z testów ---------------------------------------------------------------
 
+// --- Konfiguracja turnieju (zasady, portal, kategorie, grupy, boiska, kryteria) ---------------
+// Stan per turniej, reset razem z mockiem. Seedowany turniej ma kategorię U12, grupę i boisko z seeda.
+type Config = {
+  settings: Record<string, unknown>
+  publicSettings: Record<string, boolean>
+  categories: { id: string; tournamentId: string; name: string; minBirthDate: string | null; maxBirthDate: string | null; order: number }[]
+  groups: { id: string; tournamentId: string; categoryId: string; name: string; order: number }[]
+  pitches: { id: string; tournamentId: string; name: string; description: string | null; isActive: boolean }[]
+  tieBreakers: { order: number; type: string }[]
+}
+
+const TIEBREAKERS = ["HeadToHeadPoints", "HeadToHeadGoalDiff", "GoalDifference", "GoalsFor", "Wins", "ManualDecision", "RandomDraw"]
+
+let configs = new Map<string, Config>()
+
+function configOf(tournamentId: string): Config {
+  let c = configs.get(tournamentId)
+  if (c) return c
+  const seeded = tournamentId === IDS.tournament
+  c = {
+    settings: {
+      pointsForWin: 3,
+      pointsForDraw: 1,
+      pointsForLoss: 0,
+      matchDurationMinutes: 20,
+      breakDurationMinutes: 5,
+      isThirdPlaceMatchEnabled: false,
+      refereeEditWindowMinutes: 15,
+      walkoverHomeScore: 3,
+      walkoverAwayScore: 0,
+      canCoachEditSquadAfterStart: false,
+    },
+    publicSettings: {
+      isPublic: seeded,
+      showTeams: true,
+      showPlayers: true,
+      showSchedule: true,
+      showStandings: true,
+      showBracket: true,
+      showLiveMatches: true,
+      showStats: true,
+      abbreviatePlayerNames: true,
+    },
+    categories: seeded
+      ? [{ id: IDS.category, tournamentId, name: "U12", minBirthDate: null, maxBirthDate: null, order: 1 }]
+      : [],
+    groups: seeded ? [{ id: IDS.group, tournamentId, categoryId: IDS.category, name: "Grupa A", order: 1 }] : [],
+    pitches: seeded
+      ? [{ id: IDS.pitch, tournamentId, name: "Boisko Główne", description: null, isActive: true }]
+      : [],
+    tieBreakers: TIEBREAKERS.slice(0, 5).map((type, i) => ({ order: i + 1, type })),
+  }
+  configs.set(tournamentId, c)
+  return c
+}
+
+const validation = (field: string, message: string) =>
+  HttpResponse.json({ code: `Validation.${field}`, message, type: 2 }, { status: 400 })
+
+/** Tylko organizator turnieju zmienia jego konfigurację; tylko przed startem (jak backend dla zasad). */
+const organizerOf = (user: User, tournamentId: string) => hasRole(user, "Organizer", "Tournament", tournamentId)
+
+const config = [
+  http.get(
+    "*/api/tournaments/:id/settings",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).settings)),
+  ),
+  http.put(
+    "*/api/tournaments/:id/settings",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const t = findTournament(params.id)
+      if (t && ["InProgress", "Finished", "Cancelled"].includes(t.status))
+        return validation("Settings", "Tournament settings cannot be changed after the tournament has started")
+      configOf(params.id).settings = (await request.json()) as Record<string, unknown>
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:id",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      const t = findTournament(params.id)
+      if (!t) return problem(404, "Tournament not found")
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as Pick<Tournament, "name" | "startAt" | "endAt" | "teamLimit" | "description">
+      Object.assign(t, {
+        name: body.name,
+        startAt: body.startAt,
+        endAt: body.endAt,
+        teamLimit: body.teamLimit,
+        description: body.description,
+      })
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.get("*/api/tournaments/:id/members", authed(() => HttpResponse.json([]))),
+  http.get(
+    "*/api/tournaments/:id/public-settings",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).publicSettings)),
+  ),
+  http.put(
+    "*/api/tournaments/:id/public-settings",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const c = configOf(params.id)
+      c.publicSettings = { ...c.publicSettings, ...((await request.json()) as Record<string, boolean>) }
+      const t = findTournament(params.id)
+      if (t) t.isPublic = !!c.publicSettings.isPublic
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.patch(
+    "*/api/tournaments/:id/format",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      const t = findTournament(params.id)
+      if (!t) return problem(404, "Tournament not found")
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      if (!["Draft", "RegistrationOpen", "RegistrationClosed"].includes(t.status))
+        return validation("TournamentFormat", "Tournament format cannot be changed after the schedule is generated")
+      const { tournamentFormat } = (await request.json()) as { tournamentFormat: number | string }
+      t.format = typeof tournamentFormat === "string" ? tournamentFormat : ["Group", "Knockout", "GroupAndKnockout"][tournamentFormat - 1]!
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/tiebreaker-rules",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).tieBreakers)),
+  ),
+  http.put(
+    "*/api/tournaments/:id/tiebreaker-rules",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const { rules } = (await request.json()) as { rules: { order: number; type: number | string }[] }
+      configOf(params.id).tieBreakers = rules.map((r) => ({
+        order: r.order,
+        type: typeof r.type === "string" ? r.type : TIEBREAKERS[r.type - 1]!,
+      }))
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/categories",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).categories)),
+  ),
+  http.post(
+    "*/api/tournaments/:id/categories",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const c = configOf(params.id)
+      const body = (await request.json()) as { name: string; minBirthDate: string | null; maxBirthDate: string | null; order: number }
+      if (c.categories.some((x) => x.name.toLowerCase() === body.name.trim().toLowerCase()))
+        return validation("Name", `Tournament category with name '${body.name}' already exists`)
+      const category = { id: newId(), tournamentId: params.id, name: body.name.trim(), minBirthDate: body.minBirthDate, maxBirthDate: body.maxBirthDate, order: body.order }
+      c.categories.push(category)
+      // Jak backend: przy formacie z grupami nowa kategoria dostaje od razu "Grupę A".
+      const format = findTournament(params.id)?.format
+      if (format === "Group" || format === "GroupAndKnockout")
+        c.groups.push({ id: newId(), tournamentId: params.id, categoryId: category.id, name: "Grupa A", order: 1 })
+      return HttpResponse.json({ tournamentCategoryId: category.id }, { status: 201 })
+    }),
+  ),
+  http.delete(
+    "*/api/tournaments/:id/categories/:categoryId",
+    authed<{ id: string; categoryId: string }>(({ params, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const c = configOf(params.id)
+      c.categories = c.categories.filter((x) => x.id !== params.categoryId)
+      c.groups = c.groups.filter((g) => g.categoryId !== params.categoryId)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/groups",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).groups)),
+  ),
+  http.post(
+    "*/api/tournaments/:id/groups",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const c = configOf(params.id)
+      const body = (await request.json()) as { categoryId: string; name: string; order: number }
+      if (c.groups.some((g) => g.categoryId === body.categoryId && g.name.toLowerCase() === body.name.trim().toLowerCase()))
+        return validation("Name", "Name already exists")
+      const group = { id: newId(), tournamentId: params.id, categoryId: body.categoryId, name: body.name.trim(), order: body.order }
+      c.groups.push(group)
+      return HttpResponse.json({ tournamentGroupId: group.id }, { status: 201 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/pitches",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).pitches)),
+  ),
+  http.post(
+    "*/api/tournaments/:id/pitches",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const c = configOf(params.id)
+      const body = (await request.json()) as { name: string; description: string | null }
+      if (c.pitches.some((p) => p.name.toLowerCase() === body.name.trim().toLowerCase()))
+        return validation("Name", `Pitch with name '${body.name}' already exists in this tournament`)
+      const pitch = { id: newId(), tournamentId: params.id, name: body.name.trim(), description: body.description, isActive: true }
+      c.pitches.push(pitch)
+      return HttpResponse.json({ pitchId: pitch.id }, { status: 201 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/schedule",
+    authed<{ id: string }>(({ params }) =>
+      HttpResponse.json(db.matches.filter((m) => m.tournamentId === params.id).map(matchDto)),
+    ),
+  ),
+]
+
+// --- Skład drużyny w turnieju (reguły jak w Players: wiek kategorii, numer, dubel, import) -------
+type SquadEntry = {
+  id: string
+  tournamentTeamId: string
+  playerId: string
+  shirtNumber: number | null
+  position: string | null
+  status: string
+  firstName: string
+  lastName: string
+  birthDate: string | null
+  photoUrl: string | null
+}
+
+const PLAYER_STATUSES = ["Active", "Injured", "Suspended", "Removed"]
+const SQUAD_POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Forward"]
+const enumName = (values: string[], v: unknown) =>
+  v == null ? null : typeof v === "number" ? (values[v - 1] ?? null) : String(v)
+
+let squads = new Map<string, SquadEntry[]>()
+
+function squadEntries(tournamentTeamId: string): SquadEntry[] {
+  let squad = squads.get(tournamentTeamId)
+  if (squad) return squad
+  squad = (db.rosters[TEAM_NAMES[tournamentTeamId]?.id ?? ""] ?? [])
+    .filter((p) => p.inCurrentSquad)
+    .map((p) => ({
+      id: `tp-${p.playerId}`,
+      tournamentTeamId,
+      playerId: p.playerId,
+      shirtNumber: p.shirtNumber,
+      position: p.defaultPosition,
+      status: "Active",
+      firstName: p.firstName,
+      lastName: p.lastName,
+      birthDate: p.birthDate,
+      photoUrl: null,
+    }))
+  squads.set(tournamentTeamId, squad)
+  return squad
+}
+
+/** Wiek względem kategorii zgłoszenia (seed: obie drużyny w kategorii seedowanego turnieju). */
+function ageError(tournamentId: string, birthDate: string | null) {
+  const category = configOf(tournamentId).categories.find((c) => c.id === IDS.category)
+  if (!category || !birthDate) return null
+  const born = birthDate.slice(0, 10)
+  if (category.minBirthDate && born < category.minBirthDate.slice(0, 10))
+    return validation("BirthDate", "Player is too old for this category")
+  if (category.maxBirthDate && born > category.maxBirthDate.slice(0, 10))
+    return validation("BirthDate", "Player is too young for this category")
+  return null
+}
+
+const shirtTaken = (squad: SquadEntry[], shirt: number | null, exceptId?: string) =>
+  shirt != null && squad.some((p) => p.id !== exceptId && p.status !== "Removed" && p.shirtNumber === shirt)
+
+const squadBase = "*/api/tournaments/:tid/tournament-teams/:ttid"
+
+const squad = [
+  http.get(
+    `${squadBase}/players`,
+    authed<{ tid: string; ttid: string }>(({ params }) => HttpResponse.json(squadEntries(params.ttid))),
+  ),
+  http.get(`${squadBase}/staff`, authed(() => HttpResponse.json([]))),
+  http.get(
+    `${squadBase}/roster-sources`,
+    authed<{ tid: string; ttid: string }>(({ params }) => {
+      const inSquad = new Set(squadEntries(params.ttid).map((p) => p.playerId))
+      const roster = db.rosters[TEAM_NAMES[params.ttid]?.id ?? ""] ?? []
+      return HttpResponse.json([
+        {
+          tournamentTeamId: null,
+          tournamentId: null,
+          tournamentName: "Kadra drużyny",
+          tournamentStartAt: null,
+          categoryName: null,
+          kind: "Roster",
+          players: roster
+            .filter((p) => p.status === "Active")
+            .map((p) => ({
+              playerId: p.playerId,
+              firstName: p.firstName,
+              lastName: p.lastName,
+              birthDate: p.birthDate,
+              shirtNumber: p.shirtNumber,
+              position: p.defaultPosition,
+              alreadyInSquad: inSquad.has(p.playerId),
+              ineligibility: null,
+            })),
+        },
+      ])
+    }),
+  ),
+  http.post(
+    `${squadBase}/players/new`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.tid) && !hasRole(user, "Coach", "TournamentTeam", params.ttid))
+        return problem(403, "Forbidden")
+      const body = (await request.json()) as {
+        firstName: string
+        lastName: string
+        birthDate: string
+        defaultPosition: number | string
+        shirtNumber: number | null
+        position: number | string | null
+        allowDuplicate?: boolean
+      }
+      const entries = squadEntries(params.ttid)
+      const age = ageError(params.tid, body.birthDate)
+      if (age) return age
+      const duplicate = entries.some(
+        (p) =>
+          p.firstName.toLowerCase() === body.firstName.trim().toLowerCase() &&
+          p.lastName.toLowerCase() === body.lastName.trim().toLowerCase() &&
+          p.birthDate?.slice(0, 10) === body.birthDate.slice(0, 10),
+      )
+      if (duplicate && !body.allowDuplicate)
+        return validation("LastName", "A player with the same name and birth date is already in this team")
+      if (shirtTaken(entries, body.shirtNumber))
+        return validation("ShirtNumber", "Shirt number is already taken in this team")
+      const entry: SquadEntry = {
+        id: newId(),
+        tournamentTeamId: params.ttid,
+        playerId: newId(),
+        shirtNumber: body.shirtNumber,
+        position: enumName(SQUAD_POSITIONS, body.position ?? body.defaultPosition),
+        status: "Active",
+        firstName: body.firstName.trim(),
+        lastName: body.lastName.trim(),
+        birthDate: body.birthDate,
+        photoUrl: null,
+      }
+      entries.push(entry)
+      return HttpResponse.json({ playerId: entry.playerId, tournamentPlayerId: entry.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    `${squadBase}/players/:tpid`,
+    authed<{ tid: string; ttid: string; tpid: string }>(async ({ params, request }) => {
+      const entries = squadEntries(params.ttid)
+      const entry = entries.find((p) => p.id === params.tpid)
+      if (!entry) return problem(404, "Player not found")
+      const body = (await request.json()) as {
+        firstName: string
+        lastName: string
+        birthDate: string
+        shirtNumber: number | null
+        position: number | string | null
+        status: number | string
+      }
+      const age = ageError(params.tid, body.birthDate)
+      if (age) return age
+      if (shirtTaken(entries, body.shirtNumber, entry.id))
+        return validation("ShirtNumber", "Shirt number is already taken in this team")
+      Object.assign(entry, {
+        firstName: body.firstName,
+        lastName: body.lastName,
+        birthDate: body.birthDate,
+        shirtNumber: body.shirtNumber,
+        position: enumName(SQUAD_POSITIONS, body.position),
+        status: enumName(PLAYER_STATUSES, body.status) ?? entry.status,
+      })
+      return HttpResponse.json({ playerId: entry.playerId, tournamentPlayerId: entry.id })
+    }),
+  ),
+  http.delete(
+    `${squadBase}/players/:tpid`,
+    authed<{ tid: string; ttid: string; tpid: string }>(({ params }) => {
+      squads.set(params.ttid, squadEntries(params.ttid).filter((p) => p.id !== params.tpid))
+      return HttpResponse.json({ tournamentPlayerId: params.tpid, deleted: true })
+    }),
+  ),
+  http.post(
+    `${squadBase}/players/import`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request }) => {
+      const entries = squadEntries(params.ttid)
+      const body = (await request.json()) as {
+        players: { playerId: string; shirtNumber: number | null; position: number | string | null }[]
+      }
+      const roster = db.rosters[TEAM_NAMES[params.ttid]?.id ?? ""] ?? []
+      const added: SquadEntry[] = []
+      for (const item of body.players) {
+        if ([...entries, ...added].some((p) => p.playerId === item.playerId))
+          return validation("Players", "Player is already assigned to this team")
+        if (shirtTaken([...entries, ...added], item.shirtNumber))
+          return validation("Players", "Shirt number is already taken in this team")
+        const source = roster.find((p) => p.playerId === item.playerId)
+        if (!source) return validation("Players", "Player is not part of the source squad")
+        added.push({
+          id: newId(),
+          tournamentTeamId: params.ttid,
+          playerId: source.playerId,
+          shirtNumber: item.shirtNumber,
+          position: enumName(SQUAD_POSITIONS, item.position) ?? source.defaultPosition,
+          status: "Active",
+          firstName: source.firstName,
+          lastName: source.lastName,
+          birthDate: source.birthDate,
+          photoUrl: null,
+        })
+      }
+      entries.push(...added)
+      return HttpResponse.json({ tournamentPlayerIds: added.map((p) => p.id) })
+    }),
+  ),
+]
+
+// --- Drabinka (pary 1. rundy, kolejne rundy ze zwycięzców, wolny los przechodzi od razu) --------
+type Node = {
+  id: string
+  bracketRoundId: string
+  matchId: string | null
+  homeSourceType: string
+  homeTournamentTeamId: string | null
+  awaySourceType: string
+  awayTournamentTeamId: string | null
+  winnerGoesToNodeId: string | null
+  loserGoesToNodeId: string | null
+  winnerGoesToSlot: "Home" | "Away" | null
+  homeSourceGroupId: string | null
+  homeSourcePosition: number | null
+  awaySourceGroupId: string | null
+  awaySourcePosition: number | null
+  plannedPitchId: string | null
+  plannedAt: string | null
+  plannedRefereeId: string | null
+}
+type Round = { id: string; roundNumber: number; roundType: string; name: string; nodes: Node[] }
+
+const SOURCE_TYPES = ["Fixed", "GroupPosition", "MatchWinner", "MatchLoser", "Bye"]
+const ROUND_NAMES: Record<number, string> = { 1: "Finał", 2: "Półfinały", 4: "Ćwierćfinały", 8: "1/8 finału" }
+
+let brackets = new Map<string, { id: string; tournamentId: string; rounds: Round[] }>()
+
+const emptyNode = (roundId: string): Node => ({
+  id: newId(),
+  bracketRoundId: roundId,
+  matchId: null,
+  homeSourceType: "MatchWinner",
+  homeTournamentTeamId: null,
+  awaySourceType: "MatchWinner",
+  awayTournamentTeamId: null,
+  winnerGoesToNodeId: null,
+  loserGoesToNodeId: null,
+  winnerGoesToSlot: null,
+  homeSourceGroupId: null,
+  homeSourcePosition: null,
+  awaySourceGroupId: null,
+  awaySourcePosition: null,
+  plannedPitchId: null,
+  plannedAt: null,
+  plannedRefereeId: null,
+})
+
+const bracketKey = (tournamentId: string, categoryId: string) => `${tournamentId}:${categoryId}`
+
+const bracket = [
+  http.get(
+    "*/api/tournaments/:id/bracket",
+    authed<{ id: string }>(({ params, request }) => {
+      const categoryId = new URL(request.url).searchParams.get("categoryId") ?? ""
+      const b = brackets.get(bracketKey(params.id, categoryId))
+      return b ? HttpResponse.json(b) : problem(404, "Bracket not found")
+    }),
+  ),
+  http.post(
+    "*/api/tournaments/:id/bracket/generate",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as {
+        categoryId: string
+        roundOnePairings: Record<string, string | number | null>[]
+      }
+      if (brackets.has(bracketKey(params.id, body.categoryId)))
+        return validation("CategoryId", "A bracket already exists for this tournament")
+      const pairs = body.roundOnePairings
+      const source = (v: unknown) => (typeof v === "number" ? SOURCE_TYPES[v - 1]! : String(v))
+      if (pairs.some((p) => source(p.homeSourceType) === "Bye" && source(p.awaySourceType) === "Bye"))
+        return validation("RoundOnePairings", "A pairing cannot have Bye on both sides — there would be no team to advance.")
+
+      const rounds: Round[] = []
+      for (let size = pairs.length, number = 1; size >= 1; size /= 2, number++) {
+        const id = newId()
+        rounds.push({ id, roundNumber: number, roundType: "Standard", name: ROUND_NAMES[size] ?? `Runda ${number}`, nodes: Array.from({ length: size }, () => emptyNode(id)) })
+      }
+      rounds[0]!.nodes.forEach((node, i) => {
+        const p = pairs[i]!
+        Object.assign(node, {
+          homeSourceType: source(p.homeSourceType),
+          homeTournamentTeamId: p.homeTournamentTeamId ?? null,
+          homeSourceGroupId: p.homeGroupId ?? null,
+          homeSourcePosition: p.homePosition ?? null,
+          awaySourceType: source(p.awaySourceType),
+          awayTournamentTeamId: p.awayTournamentTeamId ?? null,
+          awaySourceGroupId: p.awayGroupId ?? null,
+          awaySourcePosition: p.awayPosition ?? null,
+        })
+      })
+      for (let r = 0; r < rounds.length - 1; r++) {
+        rounds[r]!.nodes.forEach((node, i) => {
+          const next = rounds[r + 1]!.nodes[Math.floor(i / 2)]!
+          node.winnerGoesToNodeId = next.id
+          node.winnerGoesToSlot = i % 2 === 0 ? "Home" : "Away"
+          // Wolny los: drużyna od razu w kolejnej rundzie.
+          if (r === 0 && (node.homeSourceType === "Bye" || node.awaySourceType === "Bye")) {
+            const team = node.homeSourceType === "Bye" ? node.awayTournamentTeamId : node.homeTournamentTeamId
+            if (i % 2 === 0) Object.assign(next, { homeSourceType: "Fixed", homeTournamentTeamId: team })
+            else Object.assign(next, { awaySourceType: "Fixed", awayTournamentTeamId: team })
+          }
+        })
+      }
+      if (configOf(params.id).settings.isThirdPlaceMatchEnabled && pairs.length >= 2) {
+        const id = newId()
+        const third = emptyNode(id)
+        third.homeSourceType = "MatchLoser"
+        third.awaySourceType = "MatchLoser"
+        rounds[rounds.length - 2]!.nodes.forEach((n) => (n.loserGoesToNodeId = third.id))
+        rounds.push({ id, roundNumber: rounds.length, roundType: "ThirdPlace", name: "Mecz o 3. miejsce", nodes: [third] })
+      }
+      const created = { id: newId(), tournamentId: params.id, rounds }
+      brackets.set(bracketKey(params.id, body.categoryId), created)
+      return HttpResponse.json({ bracketId: created.id, roundCount: rounds.length }, { status: 201 })
+    }),
+  ),
+  http.delete(
+    "*/api/tournaments/:id/bracket",
+    authed<{ id: string }>(({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const categoryId = new URL(request.url).searchParams.get("categoryId") ?? ""
+      brackets.delete(bracketKey(params.id, categoryId))
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+]
+
 const control = [
+  http.post("*/__control/override", async ({ request }) => {
+    const o = (await request.json()) as { method: string; path: string; status?: number; body?: unknown; times?: number }
+    overrides.push({
+      method: o.method.toUpperCase(),
+      pattern: toPattern(o.path),
+      status: o.status ?? 200,
+      body: o.body ?? null,
+      times: o.times ?? null,
+    })
+    return new HttpResponse(null, { status: 204 })
+  }),
+  // Mecz w danym stanie (np. Scheduled - do testu startu), bez zdarzeń i wyniku.
+  http.post("*/__control/matches/:id/status", async ({ params, request }) => {
+    const m = findMatch(String(params.id))
+    if (!m) return problem(404, "Match not found")
+    const { status, editLockedAt } = (await request.json()) as { status: string; editLockedAt?: string | null }
+    m.status = status
+    if (editLockedAt !== undefined) m.editLockedAt = editLockedAt
+    if (status === "Scheduled") {
+      Object.assign(m, { startedAt: null, pausedAt: null, totalPausedSeconds: 0, homeScore: 0, awayScore: 0, events: [] })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+  // Pola turnieju ustawione przez test (np. limit drużyn, status, format).
+  http.post("*/__control/tournaments/:id", async ({ params, request }) => {
+    const t = findTournament(String(params.id))
+    if (!t) return problem(404, "Tournament not found")
+    Object.assign(t, (await request.json()) as Partial<Tournament>)
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/__control/reset", () => {
+    overrides = []
+    requests = []
+    configs = new Map()
+    squads = new Map()
+    brackets = new Map()
     reset()
     closeAll()
     return new HttpResponse(null, { status: 204 })
@@ -972,6 +1908,7 @@ const control = [
         roles: u.roles.map((r) => `${r.role}@${r.scopeType}`),
       })),
       organizations: db.organizations.map((o) => o.name),
+      requests,
       connections: {
         tournaments: connectionCount("tournaments"),
         matches: connectionCount("matches"),
@@ -980,4 +1917,4 @@ const control = [
   ),
 ]
 
-export const handlers = [...keycloak, ...api, ...control]
+export const handlers = [...control, overrideHandler, ...keycloak, ...config, ...squad, ...bracket, ...api]

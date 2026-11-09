@@ -82,7 +82,7 @@ export function PublicSettingsForm({
 
   function submit(values: PublicSettings) {
     if (!isDirty) return onSaved?.()
-    update.mutate(values, {
+    update.mutate({ ...values, expected: settings }, {
       onSuccess: () => {
         toast.success(values.isPublic ? "Portal kibica włączony" : "Portal kibica wyłączony")
         onSaved?.()

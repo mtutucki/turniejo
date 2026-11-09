@@ -1,7 +1,7 @@
 import { expect, loginAs, MATCH_ID, mock, REFEREE, test } from "./fixtures"
 
 test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => {
-  test("sędzia dodaje gola, wynik zapisuje się i zostaje po odświeżeniu", async ({ page }) => {
+  test("[MNZ-004] sędzia dodaje gola, wynik zapisuje się i zostaje po odświeżeniu", async ({ page }) => {
     await loginAs(page, REFEREE)
     await page.goto("/referee/matches")
 
@@ -40,14 +40,43 @@ test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => 
     await expect(page.getByLabel("Lwy E2E: 1", { exact: true })).toHaveText("1")
   })
 
-  test("mecz oddany z innego urządzenia od razu wraca do wolnych", async ({ page }) => {
+  test("[MNZ-029] mecz oddany z innego urządzenia od razu wraca do wolnych", async ({ page }) => {
     await loginAs(page, REFEREE)
     await page.goto("/referee/matches")
     await expect(page.getByRole("link", { name: /Orły E2E/ })).toBeVisible()
     await expect.poll(async () => (await mock.state()).connections.tournaments).toBeGreaterThan(0)
 
     await mock.release(MATCH_ID)
-    await expect(page.getByText("Trwają bez sędziego")).toBeVisible()
+    // Przy pełnym przebiegu (oba projekty) odświeżenie listy po zdarzeniu bywało wolniejsze niż 8 s.
+    await expect(page.getByText("Trwają bez sędziego")).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole("button", { name: /Sędziuję ten mecz: Orły E2E/ })).toBeVisible()
+  })
+
+  test("[MNZ-027] sędzia bierze wolny mecz i trafia do jego panelu", async ({ page }) => {
+    await mock.release(MATCH_ID)
+    await loginAs(page, REFEREE)
+    await page.goto("/referee/matches")
+
+    await page.getByRole("button", { name: /Sędziuję ten mecz: Orły E2E/ }).click()
+
+    await expect(page).toHaveURL(new RegExp(`/matches/${MATCH_ID}/live$`))
+    expect(await mock.calls("POST", "/referee/claim")).toBe(1)
+  })
+
+  test("[MNZ-028] mecz wzięty chwilę wcześniej przez innego sędziego", async ({ page }) => {
+    await mock.release(MATCH_ID)
+    await mock.override({
+      method: "POST",
+      path: "/api/tournaments/:tid/matches/:mid/referee/claim",
+      status: 409,
+      body: { code: "Match.Conflict", message: "Match already has a referee", type: 4 },
+    })
+    await loginAs(page, REFEREE)
+    await page.goto("/referee/matches")
+
+    await page.getByRole("button", { name: /Sędziuję ten mecz: Orły E2E/ }).click()
+
+    await expect(page.getByText("Ten mecz wziął już inny sędzia")).toBeVisible()
+    await expect(page).toHaveURL(/\/referee\/matches$/)
   })
 })
