@@ -86,7 +86,7 @@ public sealed class TournamentScenario
     /// <summary>Puchar: drużyny T1…Tn w parach T1-T2, T3-T4… (n = potęga dwójki).</summary>
     public static async Task<TournamentScenario> KnockoutAsync(
         IntegrationTestWebApplicationFactory factory, int teams = 4, bool thirdPlace = false,
-        bool schedule = true, bool start = true)
+        bool schedule = true, bool start = true, bool bracket = true)
     {
         var scenario = await CreateAsync(factory, TournamentFormat.Knockout);
         if (thirdPlace)
@@ -95,6 +95,8 @@ public sealed class TournamentScenario
         for (var i = 1; i <= teams; i++)
             await scenario.AddAcceptedTeamAsync($"T{i}");
         await scenario.CloseRegistrationAsync();
+        if (!bracket)
+            return scenario;
 
         var pairings = Enumerable.Range(0, teams / 2)
             .Select(i => new BracketsController.BracketPairingRequest(
@@ -135,10 +137,10 @@ public sealed class TournamentScenario
         return scenario;
     }
 
-    public async Task<Guid> AddAcceptedTeamAsync(string name)
+    public async Task<Guid> AddAcceptedTeamAsync(string name, Guid? categoryId = null)
     {
         var teamId = await TournamentFlow.CreateTeamAsync(Organizer, OrganizationId, name);
-        var ttId = await TournamentFlow.AddTeamToTournamentAsync(Organizer, TournamentId, teamId, CategoryId);
+        var ttId = await TournamentFlow.AddTeamToTournamentAsync(Organizer, TournamentId, teamId, categoryId ?? CategoryId);
         await TournamentFlow.AcceptRegistrationAsync(Organizer, TournamentId, ttId);
         _teams[name] = ttId;
         _clubTeams[name] = teamId;
