@@ -229,22 +229,8 @@ const rosterPlayer = (playerId: string) =>
     .flat()
     .find((p) => p.playerId === playerId)
 
-/** Skład zgłoszenia w seedowanym turnieju: zawodnicy kadry z flagą inCurrentSquad. */
-const squadOf = (tournamentTeamId: string) =>
-  (db.rosters[TEAM_NAMES[tournamentTeamId]?.id ?? ""] ?? [])
-    .filter((p) => p.inCurrentSquad)
-    .map((p) => ({
-      id: `tp-${p.playerId}`,
-      tournamentTeamId,
-      playerId: p.playerId,
-      shirtNumber: p.shirtNumber,
-      position: p.defaultPosition,
-      status: "Active",
-      firstName: p.firstName,
-      lastName: p.lastName,
-      birthDate: p.birthDate,
-      photoUrl: null,
-    }))
+/** Skład zgłoszenia - ten sam, który edytuje organizator (sekcja „Skład drużyny w turnieju”). */
+const squadOf = (tournamentTeamId: string) => squadEntries(tournamentTeamId)
 
 const teamMatch = (m: Match) => ({
   matchId: m.id,
@@ -1412,6 +1398,214 @@ const config = [
   ),
 ]
 
+// --- Skład drużyny w turnieju (reguły jak w Players: wiek kategorii, numer, dubel, import) -------
+type SquadEntry = {
+  id: string
+  tournamentTeamId: string
+  playerId: string
+  shirtNumber: number | null
+  position: string | null
+  status: string
+  firstName: string
+  lastName: string
+  birthDate: string | null
+  photoUrl: string | null
+}
+
+const PLAYER_STATUSES = ["Active", "Injured", "Suspended", "Removed"]
+const SQUAD_POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Forward"]
+const enumName = (values: string[], v: unknown) =>
+  v == null ? null : typeof v === "number" ? (values[v - 1] ?? null) : String(v)
+
+let squads = new Map<string, SquadEntry[]>()
+
+function squadEntries(tournamentTeamId: string): SquadEntry[] {
+  let squad = squads.get(tournamentTeamId)
+  if (squad) return squad
+  squad = (db.rosters[TEAM_NAMES[tournamentTeamId]?.id ?? ""] ?? [])
+    .filter((p) => p.inCurrentSquad)
+    .map((p) => ({
+      id: `tp-${p.playerId}`,
+      tournamentTeamId,
+      playerId: p.playerId,
+      shirtNumber: p.shirtNumber,
+      position: p.defaultPosition,
+      status: "Active",
+      firstName: p.firstName,
+      lastName: p.lastName,
+      birthDate: p.birthDate,
+      photoUrl: null,
+    }))
+  squads.set(tournamentTeamId, squad)
+  return squad
+}
+
+/** Wiek względem kategorii zgłoszenia (seed: obie drużyny w kategorii seedowanego turnieju). */
+function ageError(tournamentId: string, birthDate: string | null) {
+  const category = configOf(tournamentId).categories.find((c) => c.id === IDS.category)
+  if (!category || !birthDate) return null
+  const born = birthDate.slice(0, 10)
+  if (category.minBirthDate && born < category.minBirthDate.slice(0, 10))
+    return validation("BirthDate", "Player is too old for this category")
+  if (category.maxBirthDate && born > category.maxBirthDate.slice(0, 10))
+    return validation("BirthDate", "Player is too young for this category")
+  return null
+}
+
+const shirtTaken = (squad: SquadEntry[], shirt: number | null, exceptId?: string) =>
+  shirt != null && squad.some((p) => p.id !== exceptId && p.status !== "Removed" && p.shirtNumber === shirt)
+
+const squadBase = "*/api/tournaments/:tid/tournament-teams/:ttid"
+
+const squad = [
+  http.get(
+    `${squadBase}/players`,
+    authed<{ tid: string; ttid: string }>(({ params }) => HttpResponse.json(squadEntries(params.ttid))),
+  ),
+  http.get(`${squadBase}/staff`, authed(() => HttpResponse.json([]))),
+  http.get(
+    `${squadBase}/roster-sources`,
+    authed<{ tid: string; ttid: string }>(({ params }) => {
+      const inSquad = new Set(squadEntries(params.ttid).map((p) => p.playerId))
+      const roster = db.rosters[TEAM_NAMES[params.ttid]?.id ?? ""] ?? []
+      return HttpResponse.json([
+        {
+          tournamentTeamId: null,
+          tournamentId: null,
+          tournamentName: "Kadra drużyny",
+          tournamentStartAt: null,
+          categoryName: null,
+          kind: "Roster",
+          players: roster
+            .filter((p) => p.status === "Active")
+            .map((p) => ({
+              playerId: p.playerId,
+              firstName: p.firstName,
+              lastName: p.lastName,
+              birthDate: p.birthDate,
+              shirtNumber: p.shirtNumber,
+              position: p.defaultPosition,
+              alreadyInSquad: inSquad.has(p.playerId),
+              ineligibility: null,
+            })),
+        },
+      ])
+    }),
+  ),
+  http.post(
+    `${squadBase}/players/new`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.tid) && !hasRole(user, "Coach", "TournamentTeam", params.ttid))
+        return problem(403, "Forbidden")
+      const body = (await request.json()) as {
+        firstName: string
+        lastName: string
+        birthDate: string
+        defaultPosition: number | string
+        shirtNumber: number | null
+        position: number | string | null
+        allowDuplicate?: boolean
+      }
+      const entries = squadEntries(params.ttid)
+      const age = ageError(params.tid, body.birthDate)
+      if (age) return age
+      const duplicate = entries.some(
+        (p) =>
+          p.firstName.toLowerCase() === body.firstName.trim().toLowerCase() &&
+          p.lastName.toLowerCase() === body.lastName.trim().toLowerCase() &&
+          p.birthDate?.slice(0, 10) === body.birthDate.slice(0, 10),
+      )
+      if (duplicate && !body.allowDuplicate)
+        return validation("LastName", "A player with the same name and birth date is already in this team")
+      if (shirtTaken(entries, body.shirtNumber))
+        return validation("ShirtNumber", "Shirt number is already taken in this team")
+      const entry: SquadEntry = {
+        id: newId(),
+        tournamentTeamId: params.ttid,
+        playerId: newId(),
+        shirtNumber: body.shirtNumber,
+        position: enumName(SQUAD_POSITIONS, body.position ?? body.defaultPosition),
+        status: "Active",
+        firstName: body.firstName.trim(),
+        lastName: body.lastName.trim(),
+        birthDate: body.birthDate,
+        photoUrl: null,
+      }
+      entries.push(entry)
+      return HttpResponse.json({ playerId: entry.playerId, tournamentPlayerId: entry.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    `${squadBase}/players/:tpid`,
+    authed<{ tid: string; ttid: string; tpid: string }>(async ({ params, request }) => {
+      const entries = squadEntries(params.ttid)
+      const entry = entries.find((p) => p.id === params.tpid)
+      if (!entry) return problem(404, "Player not found")
+      const body = (await request.json()) as {
+        firstName: string
+        lastName: string
+        birthDate: string
+        shirtNumber: number | null
+        position: number | string | null
+        status: number | string
+      }
+      const age = ageError(params.tid, body.birthDate)
+      if (age) return age
+      if (shirtTaken(entries, body.shirtNumber, entry.id))
+        return validation("ShirtNumber", "Shirt number is already taken in this team")
+      Object.assign(entry, {
+        firstName: body.firstName,
+        lastName: body.lastName,
+        birthDate: body.birthDate,
+        shirtNumber: body.shirtNumber,
+        position: enumName(SQUAD_POSITIONS, body.position),
+        status: enumName(PLAYER_STATUSES, body.status) ?? entry.status,
+      })
+      return HttpResponse.json({ playerId: entry.playerId, tournamentPlayerId: entry.id })
+    }),
+  ),
+  http.delete(
+    `${squadBase}/players/:tpid`,
+    authed<{ tid: string; ttid: string; tpid: string }>(({ params }) => {
+      squads.set(params.ttid, squadEntries(params.ttid).filter((p) => p.id !== params.tpid))
+      return HttpResponse.json({ tournamentPlayerId: params.tpid, deleted: true })
+    }),
+  ),
+  http.post(
+    `${squadBase}/players/import`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request }) => {
+      const entries = squadEntries(params.ttid)
+      const body = (await request.json()) as {
+        players: { playerId: string; shirtNumber: number | null; position: number | string | null }[]
+      }
+      const roster = db.rosters[TEAM_NAMES[params.ttid]?.id ?? ""] ?? []
+      const added: SquadEntry[] = []
+      for (const item of body.players) {
+        if ([...entries, ...added].some((p) => p.playerId === item.playerId))
+          return validation("Players", "Player is already assigned to this team")
+        if (shirtTaken([...entries, ...added], item.shirtNumber))
+          return validation("Players", "Shirt number is already taken in this team")
+        const source = roster.find((p) => p.playerId === item.playerId)
+        if (!source) return validation("Players", "Player is not part of the source squad")
+        added.push({
+          id: newId(),
+          tournamentTeamId: params.ttid,
+          playerId: source.playerId,
+          shirtNumber: item.shirtNumber,
+          position: enumName(SQUAD_POSITIONS, item.position) ?? source.defaultPosition,
+          status: "Active",
+          firstName: source.firstName,
+          lastName: source.lastName,
+          birthDate: source.birthDate,
+          photoUrl: null,
+        })
+      }
+      entries.push(...added)
+      return HttpResponse.json({ tournamentPlayerIds: added.map((p) => p.id) })
+    }),
+  ),
+]
+
 const control = [
   http.post("*/__control/override", async ({ request }) => {
     const o = (await request.json()) as { method: string; path: string; status?: number; body?: unknown; times?: number }
@@ -1439,6 +1633,7 @@ const control = [
     overrides = []
     requests = []
     configs = new Map()
+    squads = new Map()
     reset()
     closeAll()
     return new HttpResponse(null, { status: 204 })
@@ -1481,4 +1676,4 @@ const control = [
   ),
 ]
 
-export const handlers = [...control, overrideHandler, ...keycloak, ...config, ...api]
+export const handlers = [...control, overrideHandler, ...keycloak, ...config, ...squad, ...api]
