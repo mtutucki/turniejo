@@ -363,7 +363,8 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     tournamentFormat === "Knockout"
       ? autoBracketPairs([], acceptedTeams)
         ? null
-        : "Przy więcej niż 16 drużynach pary trzeba ułożyć samodzielnie."
+        : // QA v3: PUC-020 - organizator ma wiedzieć, ile drużyn się nie zmieści.
+          `Do drabinki zmieści się 16 z ${acceptedTeams.length} drużyn. Wybierz, które zagrają, i ułóż pary samodzielnie.`
       : groupCount === 0 || [1, 2, 4, 8].includes(groupCount)
         ? null
         : `Przy ${groupCount} grupach pary trzeba ułożyć samodzielnie.`
