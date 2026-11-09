@@ -70,6 +70,13 @@ namespace Turniejo.Brackets.Application.Brackets.ResolveGroupPositionSlots
                 }
             }
 
+            if (blockedMatchIds.Count > 0)
+            {
+                var blocked = new BracketSlotChangeBlocked(bracket.TournamentId, blockedMatchIds.Distinct().ToList());
+                await dbContext.AddOutboxMessageAsync(OutboxMessage.Create(
+                    blocked.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(blocked, blocked.GetType())), cancellationToken);
+            }
+
             if (resolvedAny)
             {
                 var domainEvent = new TeamsAdvancedToBracket(bracket.Id, bracket.TournamentId);
@@ -78,8 +85,10 @@ namespace Turniejo.Brackets.Application.Brackets.ResolveGroupPositionSlots
                     JsonSerializer.Serialize(domainEvent, domainEvent.GetType()));
 
                 await dbContext.AddOutboxMessageAsync(outboxMessage, cancellationToken);
-                await dbContext.SaveChangesAsync(cancellationToken);
             }
+
+            if (resolvedAny || blockedMatchIds.Count > 0)
+                await dbContext.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new ResolveGroupPositionSlotsResponse(resolvedAny));
         }

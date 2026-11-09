@@ -5,6 +5,7 @@
     <ProjectReference Include="..\Turniejo.Notifications.Domain\Turniejo.Notifications.Domain.csproj" />
     <ProjectReference Include="..\..\Matches\Turniejo.Matches.Domain\Turniejo.Matches.Domain.csproj" />
     <ProjectReference Include="..\..\Tournaments\Turniejo.Tournaments.Domain\Turniejo.Tournaments.Domain.csproj" />
+    <ProjectReference Include="..\..\Brackets\Turniejo.Brackets.Domain\Turniejo.Brackets.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

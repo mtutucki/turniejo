@@ -10,6 +10,7 @@ namespace Turniejo.Notifications.Domain.Enums
         MatchReminder = 6,
         ScheduleChanged = 7,
         TournamentCancelled = 8,
-        RefereeChanged = 9
+        RefereeChanged = 9,
+        BracketChangeBlocked = 10
     }
 }
