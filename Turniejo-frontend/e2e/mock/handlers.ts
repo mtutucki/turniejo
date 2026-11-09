@@ -35,7 +35,8 @@ function toPattern(path: string) {
 
 const overrideHandler = http.all("*", ({ request }) => {
   const url = new URL(request.url)
-  const hit = overrides.find((o) => o.method === request.method && o.pattern.test(url.pathname))
+  // Najnowszy override wygrywa - test może zmienić odpowiedź w trakcie.
+  const hit = overrides.findLast((o) => o.method === request.method && o.pattern.test(url.pathname))
   if (!hit) return undefined
   if (hit.times !== null && --hit.times <= 0) overrides = overrides.filter((o) => o !== hit)
   return hit.body === null
