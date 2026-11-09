@@ -126,7 +126,7 @@ export function SportSettingsForm({
 
   function submit(values: TournamentSettings) {
     if (!isDirty) return onSaved?.()
-    updateSettings.mutate(values, {
+    updateSettings.mutate({ ...values, expected: settings }, {
       onSuccess: () => {
         toast.success("Zasady gry zapisane")
         onSaved?.()

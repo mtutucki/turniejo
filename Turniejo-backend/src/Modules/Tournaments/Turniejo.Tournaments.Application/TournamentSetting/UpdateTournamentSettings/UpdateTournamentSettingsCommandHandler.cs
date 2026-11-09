@@ -1,4 +1,4 @@
-﻿using Turniejo.SharedKernel.Contracts;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
@@ -13,6 +13,18 @@ namespace Turniejo.Tournaments.Application.Tournaments.TournamentSetting.UpdateT
             var tournament = await dbContext.GetTournamentByIdAsync(request.TournamentId, cancellationToken);
             if (tournament == null)
                 return Result.Failure<UpdateTournamentSettingsResponse>(Error.NotFound("Tournament", request.TournamentId));
+
+            if (request.Expected is { } expected)
+            {
+                var s = tournament.Settings;
+                var current = new ExpectedTournamentSettings(
+                    s.PointsForWin, s.PointsForDraw, s.PointsForLoss, s.MatchDurationMinutes, s.BreakDurationMinutes,
+                    s.IsThirdPlaceMatchEnabled, s.RefereeEditWindowMinutes, s.WalkoverHomeScore, s.WalkoverAwayScore,
+                    s.CanCoachEditSquadAfterStart);
+                if (current != expected)
+                    return Result.Failure<UpdateTournamentSettingsResponse>(Error.Conflict(
+                        "Settings", "The rules were changed by someone else. Refresh to see the latest data."));
+            }
 
             var updateResult = tournament.UpdateSettings(
                 request.PointsForWin, request.PointsForDraw, request.PointsForLoss, request.MatchDurationMinutes, request.BreakDurationMinutes, request.IsThirdPlaceMatchEnabled,

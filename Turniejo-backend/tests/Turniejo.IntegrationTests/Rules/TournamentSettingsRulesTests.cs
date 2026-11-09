@@ -116,4 +116,47 @@ public sealed class TournamentSettingsRulesTests(IntegrationTestWebApplicationFa
         teams.GetInt("rejected").Should().Be(1);
         teams.GetInt("withdrawn").Should().Be(1);
     }
+
+    // QA v3: UST-015 - dwóch organizatorów zapisuje naraz: drugi zapis bez odświeżenia nadpisywał pierwszy.
+    // Zapis z nieaktualnymi wartościami (wczytanymi przed cudzą zmianą) dostaje konflikt.
+    [Fact]
+    public async Task UST_015_StaleRulesSave_IsRejected_FreshOneGoesThrough()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var loaded = await (await s.Organizer.GetAsync($"{T(s)}/settings")).ReadJsonAsync();
+        object Rules(int win, object? expected) => new
+        {
+            pointsForWin = win, pointsForDraw = 1, pointsForLoss = 0, matchDurationMinutes = 30, breakDurationMinutes = 5,
+            isThirdPlaceMatchEnabled = false, refereeEditWindowMinutes = 60, walkoverHomeScore = 3, walkoverAwayScore = 0,
+            canCoachEditSquadAfterStart = false, expected,
+        };
+        var expected = System.Text.Json.JsonSerializer.Deserialize<object>(loaded.GetRawText());
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/settings", Rules(4, expected))).IsSuccessStatusCode.Should().BeTrue();
+
+        var stale = await s.Organizer.PutAsJsonAsync($"{T(s)}/settings", Rules(5, expected));
+        stale.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        (await (await s.Organizer.GetAsync($"{T(s)}/settings")).ReadJsonAsync()).GetInt("pointsForWin").Should().Be(4);
+
+        var fresh = System.Text.Json.JsonSerializer.Deserialize<object>((await (await s.Organizer.GetAsync($"{T(s)}/settings")).ReadJsonAsync()).GetRawText());
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/settings", Rules(5, fresh))).IsSuccessStatusCode.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UST_015_StalePortalSave_IsRejected()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var loaded = System.Text.Json.JsonSerializer.Deserialize<object>(
+            (await (await s.Organizer.GetAsync($"{T(s)}/public-settings")).ReadJsonAsync()).GetRawText());
+        object Portal(bool isPublic, bool showStats) => new
+        {
+            isPublic, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true,
+            showLiveMatches = true, showStats, abbreviatePlayerNames = true, expected = loaded,
+        };
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", Portal(true, true))).IsSuccessStatusCode.Should().BeTrue();
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", Portal(false, false))).StatusCode
+            .Should().Be(System.Net.HttpStatusCode.Conflict);
+    }
 }

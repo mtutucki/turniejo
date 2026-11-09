@@ -235,7 +235,8 @@ namespace Turniejo.Api.Controllers
                 request.RefereeEditWindowMinutes,
                 request.WalkoverHomeScore,
                 request.WalkoverAwayScore,
-                request.CanCoachEditSquadAfterStart);
+                request.CanCoachEditSquadAfterStart,
+                request.Expected);
 
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
@@ -262,7 +263,7 @@ namespace Turniejo.Api.Controllers
             var command = new UpdateTournamentPublicSettingsCommand(
                 tournamentId, request.IsPublic, request.ShowTeams, request.ShowPlayers,
                 request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats,
-                request.AbbreviatePlayerNames);
+                request.AbbreviatePlayerNames, request.Expected);
 
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
@@ -435,8 +436,8 @@ namespace Turniejo.Api.Controllers
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
         public sealed record UpdateTournamentGroupRequest(string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
-        public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart);
-        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats, bool AbbreviatePlayerNames = true);
+        public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart, ExpectedTournamentSettings? Expected = null);
+        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats, bool AbbreviatePlayerNames = true, ExpectedPublicSettings? Expected = null);
         public sealed record AddTeamToTournamentRequest(Guid TeamId, Guid CategoryId);
         public sealed record ChangeTournamentTeamRegistrationStatusRequest(RegistrationStatus RegistrationStatus);
         public sealed record ChangeTournamentTeamPaymentStatusRequest(PaymentStatus PaymentStatus);
