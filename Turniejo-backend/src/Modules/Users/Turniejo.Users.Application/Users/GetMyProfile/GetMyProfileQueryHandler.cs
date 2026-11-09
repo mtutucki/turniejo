@@ -1,3 +1,4 @@
+using Turniejo.Users.Application.Users.SetMyTheme;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
@@ -15,6 +16,6 @@ internal sealed class GetMyProfileQueryHandler(
         if (user is null)
             return Result.Failure<MyProfileDto>(Error.NotFound("User", currentUserContext.UserId));
 
-        return Result.Success(new MyProfileDto(user.Email, user.FirstName, user.LastName, user.PhoneNumber, user.SeenReleaseVersion));
+        return Result.Success(new MyProfileDto(user.Email, user.FirstName, user.LastName, user.PhoneNumber, user.SeenReleaseVersion, ThemeNames.ToName(user.ThemePreference)));
     }
 }

@@ -217,4 +217,24 @@ public sealed class UserTests
         user.MarkReleaseSeen(version).IsFailure.Should().BeTrue();
         user.SeenReleaseVersion.Should().BeNull();
     }
+
+    [Fact]
+    public void ThemePreference_DefaultsToSystem_AndCanBeChanged()
+    {
+        var user = User.Create(ValidId, ValidEmail, ValidFirstName, ValidLastName).Value;
+        user.ThemePreference.Should().Be(ThemePreference.System);
+
+        user.SetThemePreference(ThemePreference.Light).IsSuccess.Should().BeTrue();
+
+        user.ThemePreference.Should().Be(ThemePreference.Light);
+    }
+
+    [Fact]
+    public void SetThemePreference_RejectsUnknownValue()
+    {
+        var user = User.Create(ValidId, ValidEmail, ValidFirstName, ValidLastName).Value;
+
+        user.SetThemePreference((ThemePreference)7).IsFailure.Should().BeTrue();
+        user.ThemePreference.Should().Be(ThemePreference.System);
+    }
 }
