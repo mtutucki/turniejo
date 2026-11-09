@@ -29,6 +29,14 @@ Po podniesieniu liczby te na prawo od niej wracają do zera. Wątpliwość „fu
 - Kategorie: **Nowe**, **Zmienione**, **Poprawione**, **Usunięte**. Zmiany czysto techniczne (testy, porządki, CI) nie trafiają do listy.
 - Z kategorii od razu widać, którą liczbę podnieść: coś w „Nowe” albo „Zmienione” → Y, same „Poprawione” → Z.
 
+## Okno „Co nowego”
+
+- Po zalogowaniu, gdy na serwerze jest wydanie nowsze niż ostatnio obejrzane, aplikacja pokazuje **jedno** okno z punktami „Nowe” i „Zmienione” ze wszystkich pominiętych wydań (najwyżej 5, reszta pod linkiem). Pełna lista: strona `/changelog` (link „Co nowego” w stopce).
+- Ostatnio obejrzana wersja jest zapisana na koncie, więc okno nie wraca na innym urządzeniu. Nowe konto okna nie dostaje.
+- Linijki w „Nowe” i „Zmienione” pisz więc tak, żeby czytał je organizator, trener albo rodzic.
+- Treść pochodzi z `Turniejo-frontend/src/features/whats-new/releases.json`, kopii wydanych wersji z CHANGELOG.md. `release.sh prepare` aktualizuje ją sam. Ręczna poprawka opisu wydanej wersji: `cd Turniejo-frontend && npm run changelog:sync` (test w `check.sh` pilnuje zgodności).
+- Sekcja „Nieopublikowane” nie trafia do okna, nawet jeśli jest już na serwerze.
+
 ## Jak wydać wersję
 
 ```bash
