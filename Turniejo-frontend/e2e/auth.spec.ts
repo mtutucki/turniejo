@@ -97,7 +97,7 @@ test.describe("Rejestracja → Logowanie", () => {
 })
 
 test.describe("Reset hasła", () => {
-  test("link z maila: nowe hasło w aplikacji, stare przestaje działać, link jest jednorazowy", async ({
+  test("[KON-004] link z maila: nowe hasło w aplikacji, stare przestaje działać, link jest jednorazowy", async ({
     page,
   }) => {
     const link = "/password-reset/confirm?token=token-organizator@e2e.pl"
@@ -130,6 +130,15 @@ test.describe("Reset hasła", () => {
       page.getByRole("alert").filter({ hasText: "wygasł albo został już użyty" }),
     ).toBeVisible()
     await expect(page.getByRole("link", { name: "Wyślij nowy link" })).toBeVisible()
+  })
+
+  test("[KON-004] prośba o reset: ten sam komunikat dla istniejącego i nieznanego e-maila", async ({ page }) => {
+    for (const email of ["organizator@e2e.pl", "nie-ma-takiego@e2e.pl"]) {
+      await page.goto("/password-reset")
+      await page.getByLabel("Email").fill(email)
+      await page.getByRole("button", { name: "Wyślij link" }).click()
+      await expect(page.getByText(`Jeśli konto ${email} istnieje`, { exact: false })).toBeVisible()
+    }
   })
 
   test("[KON-039] link bez tokenu nie pokazuje formularza", async ({ page }) => {

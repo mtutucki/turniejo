@@ -365,6 +365,8 @@ const keycloak = [
 
 const api = [
   // Jak ConfirmPasswordResetCommandHandler; rolę maila z linkiem gra stały token "token-<email>".
+  // Jak backend: ta sama odpowiedź dla istniejącego i nieznanego e-maila (nie zdradza, czy konto jest).
+  http.post("*/api/auth/password-reset/request", () => new HttpResponse(null, { status: 204 })),
   http.post("*/api/auth/password-reset/confirm", async ({ request }) => {
     const body = (await request.json()) as { token: string; newPassword: string }
     const user = db.users.find((u) => `token-${u.email}` === body.token)

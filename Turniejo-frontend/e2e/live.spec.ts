@@ -137,3 +137,30 @@ test("[KON-036] sędzia po oknie poprawek nie zmienia rozstrzygnięcia", async (
   await expect(page.getByText("Mecz zakończony - wynik jest zablokowany.")).toBeVisible()
   await expect(page.getByRole("button", { name: /Zmień rozstrzygnięcie/ })).toHaveCount(0)
 })
+
+test("[MNZ-026] panel sędziego na telefonie: wynik widoczny, duże przyciski, dialog w ekranie", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "sprawdzenie układu na telefonie")
+  await loginAs(page, REFEREE)
+  await page.goto(`/matches/${MATCH_ID}/live`)
+  const viewport = page.viewportSize()!
+
+  // Brak przewijania w bok.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width)
+  // Wynik widoczny bez przewijania.
+  await expect(page.getByRole("region", { name: "Wynik" })).toBeInViewport()
+  // Główne przyciski wygodne do kliknięcia palcem (co najmniej 44 px wysokości).
+  for (const name of ["PAUZA", "KONIEC", "GOL", "KARTKA"]) {
+    const box = (await page.getByRole("button", { name, exact: true }).boundingBox())!
+    expect(box.height, name).toBeGreaterThanOrEqual(44)
+  }
+
+  for (const [button, dialogName] of [["KONIEC", "Zakończyć mecz?"], ["KARTKA", "Kartka"]] as const) {
+    await page.getByRole("button", { name: button, exact: true }).click()
+    const box = (await page.getByRole("dialog", { name: dialogName }).boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width)
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height)
+    await page.keyboard.press("Escape")
+    await expect(page.getByRole("dialog")).toBeHidden()
+  }
+})
