@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import type { MatchStatus, MatchTeam } from "@/types/matches"
 
+import { resultNote } from "../result-note"
 import { MatchClock } from "./match-clock"
 import { MatchStatusBadge } from "./match-status-badge"
 
@@ -90,6 +91,8 @@ export type LiveScoreBoardProps = {
   awayScore: number
   homePenaltyScore?: number | null
   awayPenaltyScore?: number | null
+  /** Sposób rozstrzygnięcia (np. "ExtraTime", "Walkover") - dopisek pod wynikiem zakończonego meczu. */
+  resultType?: string | null
   /** Sekundy gry (zegar meczu). */
   seconds: number
   /** Sędzia/organizator: przyciski +/− przy wyniku. */
@@ -109,6 +112,7 @@ export function LiveScoreBoard({
   awayScore,
   homePenaltyScore,
   awayPenaltyScore,
+  resultType,
   seconds,
   canEdit,
   onGoal,
@@ -143,6 +147,13 @@ export function LiveScoreBoard({
         </div>
       </section>
 
+      {/* Karne pokazuje osobny wiersz niżej - tu tylko dogrywka i walkower. */}
+      {(homePenaltyScore == null || awayPenaltyScore == null) &&
+        resultNote({ status, resultType, homePenaltyScore: null, awayPenaltyScore: null }) && (
+          <p className="text-muted-foreground -mt-3 text-center text-sm" data-testid="result-note">
+            {resultNote({ status, resultType, homePenaltyScore: null, awayPenaltyScore: null })}
+          </p>
+        )}
       {homePenaltyScore != null && awayPenaltyScore != null && (
         <p className="text-muted-foreground -mt-3 text-center text-sm" data-testid="penalties">
           karne{" "}

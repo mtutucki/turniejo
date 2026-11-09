@@ -72,6 +72,8 @@ test.describe("Koniec meczu: walidacja rozstrzygnięcia", () => {
     await dialog(page).getByRole("button", { name: "Zakończ mecz" }).click()
     await expect(dialog(page)).toBeHidden()
     expect(await mock.calls("POST", "/finish")).toBe(1)
+    // Zakończony walkowerem mecz nie wygląda jak zwykły wynik.
+    await expect(page.getByTestId("result-note")).toHaveText("walkower")
   })
 })
 

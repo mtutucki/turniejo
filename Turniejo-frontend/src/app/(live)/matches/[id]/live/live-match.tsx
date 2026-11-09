@@ -249,6 +249,7 @@ function LivePanel({
         awayScore={panel.awayScore}
         homePenaltyScore={panel.homePenaltyScore}
         awayPenaltyScore={panel.awayPenaltyScore}
+        resultType={panel.resultType}
         seconds={seconds}
         canEdit={canEdit}
         onGoal={quickGoal}
