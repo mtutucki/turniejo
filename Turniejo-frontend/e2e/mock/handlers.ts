@@ -1606,6 +1606,134 @@ const squad = [
   ),
 ]
 
+// --- Drabinka (pary 1. rundy, kolejne rundy ze zwycięzców, wolny los przechodzi od razu) --------
+type Node = {
+  id: string
+  bracketRoundId: string
+  matchId: string | null
+  homeSourceType: string
+  homeTournamentTeamId: string | null
+  awaySourceType: string
+  awayTournamentTeamId: string | null
+  winnerGoesToNodeId: string | null
+  loserGoesToNodeId: string | null
+  winnerGoesToSlot: "Home" | "Away" | null
+  homeSourceGroupId: string | null
+  homeSourcePosition: number | null
+  awaySourceGroupId: string | null
+  awaySourcePosition: number | null
+  plannedPitchId: string | null
+  plannedAt: string | null
+  plannedRefereeId: string | null
+}
+type Round = { id: string; roundNumber: number; roundType: string; name: string; nodes: Node[] }
+
+const SOURCE_TYPES = ["Fixed", "GroupPosition", "MatchWinner", "MatchLoser", "Bye"]
+const ROUND_NAMES: Record<number, string> = { 1: "Finał", 2: "Półfinały", 4: "Ćwierćfinały", 8: "1/8 finału" }
+
+let brackets = new Map<string, { id: string; tournamentId: string; rounds: Round[] }>()
+
+const emptyNode = (roundId: string): Node => ({
+  id: newId(),
+  bracketRoundId: roundId,
+  matchId: null,
+  homeSourceType: "MatchWinner",
+  homeTournamentTeamId: null,
+  awaySourceType: "MatchWinner",
+  awayTournamentTeamId: null,
+  winnerGoesToNodeId: null,
+  loserGoesToNodeId: null,
+  winnerGoesToSlot: null,
+  homeSourceGroupId: null,
+  homeSourcePosition: null,
+  awaySourceGroupId: null,
+  awaySourcePosition: null,
+  plannedPitchId: null,
+  plannedAt: null,
+  plannedRefereeId: null,
+})
+
+const bracketKey = (tournamentId: string, categoryId: string) => `${tournamentId}:${categoryId}`
+
+const bracket = [
+  http.get(
+    "*/api/tournaments/:id/bracket",
+    authed<{ id: string }>(({ params, request }) => {
+      const categoryId = new URL(request.url).searchParams.get("categoryId") ?? ""
+      const b = brackets.get(bracketKey(params.id, categoryId))
+      return b ? HttpResponse.json(b) : problem(404, "Bracket not found")
+    }),
+  ),
+  http.post(
+    "*/api/tournaments/:id/bracket/generate",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as {
+        categoryId: string
+        roundOnePairings: Record<string, string | number | null>[]
+      }
+      if (brackets.has(bracketKey(params.id, body.categoryId)))
+        return validation("CategoryId", "A bracket already exists for this tournament")
+      const pairs = body.roundOnePairings
+      const source = (v: unknown) => (typeof v === "number" ? SOURCE_TYPES[v - 1]! : String(v))
+      if (pairs.some((p) => source(p.homeSourceType) === "Bye" && source(p.awaySourceType) === "Bye"))
+        return validation("RoundOnePairings", "A pairing cannot have Bye on both sides — there would be no team to advance.")
+
+      const rounds: Round[] = []
+      for (let size = pairs.length, number = 1; size >= 1; size /= 2, number++) {
+        const id = newId()
+        rounds.push({ id, roundNumber: number, roundType: "Standard", name: ROUND_NAMES[size] ?? `Runda ${number}`, nodes: Array.from({ length: size }, () => emptyNode(id)) })
+      }
+      rounds[0]!.nodes.forEach((node, i) => {
+        const p = pairs[i]!
+        Object.assign(node, {
+          homeSourceType: source(p.homeSourceType),
+          homeTournamentTeamId: p.homeTournamentTeamId ?? null,
+          homeSourceGroupId: p.homeGroupId ?? null,
+          homeSourcePosition: p.homePosition ?? null,
+          awaySourceType: source(p.awaySourceType),
+          awayTournamentTeamId: p.awayTournamentTeamId ?? null,
+          awaySourceGroupId: p.awayGroupId ?? null,
+          awaySourcePosition: p.awayPosition ?? null,
+        })
+      })
+      for (let r = 0; r < rounds.length - 1; r++) {
+        rounds[r]!.nodes.forEach((node, i) => {
+          const next = rounds[r + 1]!.nodes[Math.floor(i / 2)]!
+          node.winnerGoesToNodeId = next.id
+          node.winnerGoesToSlot = i % 2 === 0 ? "Home" : "Away"
+          // Wolny los: drużyna od razu w kolejnej rundzie.
+          if (r === 0 && (node.homeSourceType === "Bye" || node.awaySourceType === "Bye")) {
+            const team = node.homeSourceType === "Bye" ? node.awayTournamentTeamId : node.homeTournamentTeamId
+            if (i % 2 === 0) Object.assign(next, { homeSourceType: "Fixed", homeTournamentTeamId: team })
+            else Object.assign(next, { awaySourceType: "Fixed", awayTournamentTeamId: team })
+          }
+        })
+      }
+      if (configOf(params.id).settings.isThirdPlaceMatchEnabled && pairs.length >= 2) {
+        const id = newId()
+        const third = emptyNode(id)
+        third.homeSourceType = "MatchLoser"
+        third.awaySourceType = "MatchLoser"
+        rounds[rounds.length - 2]!.nodes.forEach((n) => (n.loserGoesToNodeId = third.id))
+        rounds.push({ id, roundNumber: rounds.length, roundType: "ThirdPlace", name: "Mecz o 3. miejsce", nodes: [third] })
+      }
+      const created = { id: newId(), tournamentId: params.id, rounds }
+      brackets.set(bracketKey(params.id, body.categoryId), created)
+      return HttpResponse.json({ bracketId: created.id, roundCount: rounds.length }, { status: 201 })
+    }),
+  ),
+  http.delete(
+    "*/api/tournaments/:id/bracket",
+    authed<{ id: string }>(({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const categoryId = new URL(request.url).searchParams.get("categoryId") ?? ""
+      brackets.delete(bracketKey(params.id, categoryId))
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+]
+
 const control = [
   http.post("*/__control/override", async ({ request }) => {
     const o = (await request.json()) as { method: string; path: string; status?: number; body?: unknown; times?: number }
@@ -1641,6 +1769,7 @@ const control = [
     requests = []
     configs = new Map()
     squads = new Map()
+    brackets = new Map()
     reset()
     closeAll()
     return new HttpResponse(null, { status: 204 })
@@ -1683,4 +1812,4 @@ const control = [
   ),
 ]
 
-export const handlers = [...control, overrideHandler, ...keycloak, ...config, ...squad, ...api]
+export const handlers = [...control, overrideHandler, ...keycloak, ...config, ...squad, ...bracket, ...api]
