@@ -26,11 +26,16 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             _authorizationService = Substitute.For<IAuthorizationService>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             var squadEditGuard = new SquadEditGuard(_authorizationService, _tournamentModule);
-            _handler = new AssignPlayerToTournamentTeamCommandHandler(_dbContext, _teamModule, _tournamentModule, squadEditGuard, new TeamRosterSync(_dbContext), _currentUserContext);
+            _handler = new AssignPlayerToTournamentTeamCommandHandler(_dbContext, _teamModule, _tournamentModule, squadEditGuard, new TeamRosterSync(_dbContext),
+                new PlayerAccessGuard(_dbContext, _teamModule, _authorizationService), _currentUserContext);
 
             // domyślnie: organizer -> blokada składu nie dotyczy (bez tego część istniejących testów musiałaby mockować ustawienia turnieju)
             _authorizationService.HasAnyRoleAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
                 .Returns(true);
+
+            // domyślnie: zawodnik jest w kadrze klubu drużyny
+            _dbContext.GetTeamPlayerAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(call => TeamPlayer.Create(Guid.NewGuid(), call.ArgAt<Guid>(0), call.ArgAt<Guid>(1), null).Value);
         }
 
         private static Player CreateFakePlayer(DateTime birthDate)
@@ -255,6 +260,29 @@ namespace Turniejo.Players.UnitTests.TournamentPlayers
             result.IsFailure.Should().BeTrue();
             result.Error.Code.Should().Be("Validation.ShirtNumber");
             await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        // QA v3 (macierz uprawnień): organizator innego turnieju dopisywał cudzego zawodnika po ID
+        // i przez to dostawał prawo edycji jego danych.
+        [Fact]
+        public async Task Handle_ShouldFail_WhenPlayerIsOutsideTheClubAndCallerCannotEditThem()
+        {
+            var tournamentId = Guid.NewGuid();
+            var tournamentTeamId = Guid.NewGuid();
+            var player = CreateFakePlayer(new DateTime(2012, 1, 1));
+            _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentTeamDto(tournamentTeamId, tournamentId, Guid.NewGuid(), Guid.NewGuid(), null, "Accepted"));
+            _dbContext.GetPlayerByIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns(player);
+            _dbContext.GetTeamPlayerAsync(Arg.Any<Guid>(), player.Id, Arg.Any<CancellationToken>()).Returns((TeamPlayer?)null);
+            _dbContext.GetTournamentPlayersByPlayerIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns([]);
+            _dbContext.GetTeamPlayersByPlayerIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns([]);
+            _dbContext.GetPlayerGuardiansByPlayerIdAsync(player.Id, Arg.Any<CancellationToken>()).Returns([]);
+            _currentUserContext.UserId.Returns(Guid.NewGuid());
+
+            var result = await _handler.Handle(new AssignPlayerToTournamentTeamCommand(tournamentId, tournamentTeamId, player.Id, null, null), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            await _dbContext.DidNotReceive().AddTournamentPlayerAsync(Arg.Any<TournamentPlayer>(), Arg.Any<CancellationToken>());
         }
     }
 }

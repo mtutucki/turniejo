@@ -15,6 +15,7 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
         ITournamentModule tournamentModule,
         SquadEditGuard squadEditGuard,
         TeamRosterSync teamRosterSync,
+        PlayerAccessGuard playerAccessGuard,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignPlayerToTournamentTeamCommand, AssignPlayerToTournamentTeamResponse>
     {
         public async Task<Result<AssignPlayerToTournamentTeamResponse>> Handle(AssignPlayerToTournamentTeamCommand request, CancellationToken cancellationToken)
@@ -27,6 +28,13 @@ namespace Turniejo.Players.Application.TournamentPlayers.AssignPlayerToTournamen
 
             var player = await dbContext.GetPlayerByIdAsync(request.PlayerId, cancellationToken);
             if (player == null)
+                return Result.Failure<AssignPlayerToTournamentTeamResponse>(Error.NotFound("Player", request.PlayerId));
+
+            // Uprawnienie do drużyny to za mało: zawodnik musi być z kadry tego klubu albo wywołujący
+            // musi i tak móc edytować jego dane. Inaczej organizator dowolnego turnieju dopisałby sobie
+            // cudzego zawodnika po ID i przez to zyskał dostęp do jego danych (QA: macierz uprawnień).
+            var inClubRoster = await dbContext.GetTeamPlayerAsync(tournamentTeam.TeamId, player.Id, cancellationToken) != null;
+            if (!inClubRoster && !await playerAccessGuard.CanEditAsync(player, currentUserContext.UserId, cancellationToken))
                 return Result.Failure<AssignPlayerToTournamentTeamResponse>(Error.NotFound("Player", request.PlayerId));
 
             var category = await tournamentModule.GetTournamentCategoryAsync(tournamentTeam.CategoryId, cancellationToken);
