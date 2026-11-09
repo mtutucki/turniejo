@@ -51,10 +51,21 @@ public sealed class TournamentScenario
         for (var g = 0; g < groups; g++)
         {
             var groupName = ((char)('A' + g)).ToString();
-            var groupResponse = await scenario.Organizer.PostAsJsonAsync($"/api/tournaments/{scenario.TournamentId}/groups",
-                new TournamentsController.AddTournamentGroupRequest(scenario.CategoryId, groupName, g + 1));
-            groupResponse.IsSuccessStatusCode.Should().BeTrue();
-            var groupId = (await groupResponse.ReadJsonAsync()).GetGuid("tournamentGroupId");
+            Guid groupId;
+            if (g == 0)
+            {
+                // Nowa kategoria ma już domyślną grupę - to ona jest grupą "A", jak w aplikacji.
+                var existing = (await (await scenario.Organizer.GetAsync($"/api/tournaments/{scenario.TournamentId}/groups")).ReadJsonAsync())
+                    .EnumerateArray().ToList();
+                groupId = existing.Single(x => x.GetGuid("categoryId") == scenario.CategoryId).GetGuid("id");
+            }
+            else
+            {
+                var groupResponse = await scenario.Organizer.PostAsJsonAsync($"/api/tournaments/{scenario.TournamentId}/groups",
+                    new TournamentsController.AddTournamentGroupRequest(scenario.CategoryId, groupName, g + 1));
+                groupResponse.IsSuccessStatusCode.Should().BeTrue();
+                groupId = (await groupResponse.ReadJsonAsync()).GetGuid("tournamentGroupId");
+            }
             scenario._groups[groupName] = groupId;
 
             for (var t = 0; t < teamsPerGroup; t++)
