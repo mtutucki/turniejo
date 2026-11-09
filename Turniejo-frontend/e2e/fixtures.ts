@@ -13,6 +13,7 @@ type MockState = {
   matches: { id: string; homeScore: number; awayScore: number }[]
   users: { email: string; roles: string[] }[]
   organizations: string[]
+  requests: string[]
   connections: { tournaments: number; matches: number }
 }
 
@@ -34,6 +35,15 @@ export const mock = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(o),
     }),
+  matchStatus: (matchId: string, status: string) =>
+    fetch(`${MOCK_URL}/__control/matches/${matchId}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    }),
+  /** Ile razy aplikacja wywołała dane API od początku testu, np. "POST", "/start". */
+  calls: async (method: string, pathEnd: string) =>
+    (await mock.state()).requests.filter((r) => r.startsWith(`${method} `) && r.endsWith(pathEnd)).length,
   release: (matchId: string) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/release`, { method: "POST" }),
 }

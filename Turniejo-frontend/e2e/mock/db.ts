@@ -67,6 +67,10 @@ export type Match = {
   homeScore: number
   awayScore: number
   events: MatchEvent[]
+  pausedAt?: string | null
+  totalPausedSeconds?: number
+  resultType?: string
+  winnerTournamentTeamId?: string | null
 }
 
 // Stałe id — testy odwołują się do nich w URL-ach.

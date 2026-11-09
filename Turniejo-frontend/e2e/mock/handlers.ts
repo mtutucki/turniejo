@@ -27,6 +27,8 @@ import { closeAll, connectionCount, negotiateResponse, publish } from "./signalr
  */
 type Override = { method: string; pattern: RegExp; status: number; body: unknown; times: number | null }
 let overrides: Override[] = []
+/** Wywołania API od resetu ("POST /api/..."): test sprawdza np., że podwójny klik wysłał jedno żądanie. */
+let requests: string[] = []
 
 function toPattern(path: string) {
   const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/:[A-Za-z]+/g, "[^/]+")
@@ -35,6 +37,7 @@ function toPattern(path: string) {
 
 const overrideHandler = http.all("*", ({ request }) => {
   const url = new URL(request.url)
+  if (url.pathname.startsWith("/api/")) requests.push(`${request.method} ${url.pathname}`)
   // Najnowszy override wygrywa - test może zmienić odpowiedź w trakcie.
   const hit = overrides.findLast((o) => o.method === request.method && o.pattern.test(url.pathname))
   if (!hit) return undefined
@@ -178,13 +181,17 @@ const matchDto = (m: Match) => ({
   stageType: "Group",
   homeScore: m.homeScore,
   awayScore: m.awayScore,
-  resultType: m.status === "Finished" ? "Regular" : "NotPlayed",
+  resultType: m.resultType ?? (m.status === "Finished" ? "Regular" : "NotPlayed"),
   homePenaltyScore: null,
   awayPenaltyScore: null,
 })
 
-const elapsed = (m: Match) =>
-  m.startedAt ? Math.max(0, Math.floor((Date.now() - new Date(m.startedAt).getTime()) / 1000)) : 0
+const elapsed = (m: Match) => {
+  if (!m.startedAt) return 0
+  const until = m.pausedAt ? new Date(m.pausedAt).getTime() : Date.now()
+  const seconds = (until - new Date(m.startedAt).getTime()) / 1000 - (m.totalPausedSeconds ?? 0)
+  return Math.max(0, Math.floor(seconds))
+}
 
 const matchTeam = (tournamentTeamId: string) => ({
   tournamentTeamId,
@@ -201,13 +208,13 @@ const livePanel = (m: Match) => ({
   stageType: "Group",
   scheduledAt: m.scheduledAt,
   startedAt: m.startedAt,
-  pausedAt: null,
+  pausedAt: m.pausedAt ?? null,
   finishedAt: null,
-  totalPausedSeconds: 0,
+  totalPausedSeconds: m.totalPausedSeconds ?? 0,
   homeScore: m.homeScore,
   awayScore: m.awayScore,
-  resultType: "NotPlayed",
-  winnerTournamentTeamId: null,
+  resultType: m.resultType ?? "NotPlayed",
+  winnerTournamentTeamId: m.winnerTournamentTeamId ?? null,
   homeTeam: matchTeam(m.home),
   awayTeam: matchTeam(m.away),
   events: m.events,
@@ -768,6 +775,50 @@ const api = [
         : problem(404, "Match not found")
     }),
   ),
+  // Start, pauza, wznowienie i koniec: tylko sędzia meczu albo organizator, w dozwolonym stanie (inaczej 409).
+  ...(
+    [
+      ["start", ["Scheduled"], "Live"],
+      ["pause", ["Live"], "Paused"],
+      ["resume", ["Paused"], "Live"],
+      ["finish", ["Live", "Paused"], "Finished"],
+    ] as const
+  ).map(([action, from, to]) =>
+    http.post(
+      `*/api/tournaments/:tid/matches/:mid/${action}`,
+      authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
+        const m = findMatch(params.mid)
+        if (!m) return problem(404, "Match not found")
+        if (m.refereeId !== user.id && !hasRole(user, "Organizer", "Tournament", m.tournamentId)) {
+          return problem(403, "Forbidden")
+        }
+        if (!(from as readonly string[]).includes(m.status)) {
+          return problem(409, `Cannot ${action} a match that is ${m.status}.`)
+        }
+        const now = new Date().toISOString()
+        if (action === "start") m.startedAt = now
+        if (action === "pause") m.pausedAt = now
+        if (action === "resume" && m.pausedAt) {
+          m.totalPausedSeconds =
+            (m.totalPausedSeconds ?? 0) + (Date.now() - new Date(m.pausedAt).getTime()) / 1000
+          m.pausedAt = null
+        }
+        if (action === "finish") {
+          const body = (await request.json().catch(() => ({}))) as {
+            resultType?: string | number
+            winnerTournamentTeamId?: string | null
+          }
+          m.resultType = typeof body.resultType === "string" ? body.resultType : "Regular"
+          m.winnerTournamentTeamId = body.winnerTournamentTeamId ?? null
+          m.pausedAt = null
+        }
+        m.status = to
+        publish("matches", m.id, "MatchStatusChanged", { matchId: m.id, status: to })
+        publish("tournaments", m.tournamentId, "MatchChanged", { tournamentId: m.tournamentId, matchId: m.id })
+        return HttpResponse.json({ matchId: m.id, status: to })
+      }),
+    ),
+  ),
   http.post(
     "*/api/tournaments/:tid/matches/:mid/goals",
     authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
@@ -973,8 +1024,20 @@ const control = [
     })
     return new HttpResponse(null, { status: 204 })
   }),
+  // Mecz w danym stanie (np. Scheduled - do testu startu), bez zdarzeń i wyniku.
+  http.post("*/__control/matches/:id/status", async ({ params, request }) => {
+    const m = findMatch(String(params.id))
+    if (!m) return problem(404, "Match not found")
+    const { status } = (await request.json()) as { status: string }
+    m.status = status
+    if (status === "Scheduled") {
+      Object.assign(m, { startedAt: null, pausedAt: null, totalPausedSeconds: 0, homeScore: 0, awayScore: 0, events: [] })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/__control/reset", () => {
     overrides = []
+    requests = []
     reset()
     closeAll()
     return new HttpResponse(null, { status: 204 })
@@ -1008,6 +1071,7 @@ const control = [
         roles: u.roles.map((r) => `${r.role}@${r.scopeType}`),
       })),
       organizations: db.organizations.map((o) => o.name),
+      requests,
       connections: {
         tournaments: connectionCount("tournaments"),
         matches: connectionCount("matches"),
