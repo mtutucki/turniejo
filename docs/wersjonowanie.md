@@ -16,11 +16,11 @@ Po podniesieniu liczby te na prawo od niej wracają do zera. Wątpliwość „fu
 
 - **Każdy merge do `master` trafia na serwer** - tak jak dotąd. Nie trzeba robić wydania, żeby poprawka zadziałała u ludzi.
 - **Wydanie** to decyzja, że zebrane zmiany dostają numer i opis (np. przed turniejem, po większej funkcji, raz na kilka tygodni).
-- Aplikacja pokazuje, co dokładnie działa na serwerze:
+- Stopka strony i portalu kibica pokazuje sam numer wydania (`wersja 1.4.0`). Co dokładnie działa na serwerze, widać w podpowiedzi po najechaniu na numer i pod `https://TWOJA-DOMENA/backend/version`:
   - `1.4.0` - dokładnie wydanie 1.4.0,
   - `1.4.0+3 (abc1234)` - wydanie 1.4.0 i 3 zmiany po nim (ostatnia to commit `abc1234`).
 
-  Numer jest w stopce strony i portalu kibica oraz pod `https://TWOJA-DOMENA/backend/version`. Przy zgłoszeniu błędu podaj go.
+  Przy zgłoszeniu błędu podaj pełny zapis.
 
 ## Lista zmian: CHANGELOG.md
 

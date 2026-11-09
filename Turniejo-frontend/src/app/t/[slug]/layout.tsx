@@ -25,6 +25,7 @@ export default async function PublicTournamentLayout({
 }: LayoutProps<"/t/[slug]">) {
   const { slug } = await params
   const tournament = await getPublicTournament(slug)
+  const version = formatVersion()
 
   return (
     <PublicTournamentProvider initialTournament={tournament}>
@@ -38,7 +39,7 @@ export default async function PublicTournamentLayout({
         <footer className="text-muted-foreground space-y-2 border-t py-6 text-center text-xs">
           <p>
             Wyniki na żywo · Turniejo
-            {formatVersion() && ` · wersja ${formatVersion()}`}
+            {version && <span title={version.details}> · wersja {version.label}</span>}
           </p>
           <LegalLinks className="justify-center" />
         </footer>
