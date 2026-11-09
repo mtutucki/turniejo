@@ -38,6 +38,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.TermsVersion)
             .HasMaxLength(20);
 
+        builder.Property(x => x.SeenReleaseVersion)
+            .HasMaxLength(20);
+
         builder.Ignore(x => x.DomainEvents);
     }
 }
