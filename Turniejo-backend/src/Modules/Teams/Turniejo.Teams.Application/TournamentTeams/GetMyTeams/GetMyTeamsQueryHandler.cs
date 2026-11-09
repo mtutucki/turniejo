@@ -30,6 +30,9 @@ namespace Turniejo.Teams.Application.TournamentTeams.GetMyTeams
 
                 var team = await dbContext.GetTeamByIdAsync(tournamentTeam.TeamId, cancellationToken);
                 var tournament = await tournamentModule.GetTournamentAsync(tournamentTeam.TournamentId, cancellationToken);
+                // Usunięty turniej: nie pokazujemy go jako „Unknown” z pustym panelem (QA v3: PAN-001).
+                if (tournament == null)
+                    continue;
                 var settings = await tournamentModule.GetTournamentSettingsAsync(tournamentTeam.TournamentId, cancellationToken);
 
                 // Ta sama reguła co SquadEditGuard — trener nie ma dostępu do ustawień turnieju,

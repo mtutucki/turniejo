@@ -13,7 +13,7 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchEvent
             RuleFor(x => x.MatchEventId)
                 .NotEmpty().WithMessage("MatchEventId is required.");
             RuleFor(x => x.Minute)
-                .GreaterThanOrEqualTo(0).WithMessage("Minute cannot be negative.");
+                .InclusiveBetween(0, 300).WithMessage("Minute must be between 0 and 300.");
             RuleFor(x => x.Second)
                 .InclusiveBetween(0, 59).When(x => x.Second.HasValue).WithMessage("Second must be between 0 and 59.");
         }

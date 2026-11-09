@@ -11,6 +11,7 @@ namespace Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistr
     internal sealed class ChangeTournamentTeamRegistrationStatusCommandHandler(
         ITeamsDbContext dbContext,
         ITournamentModule tournamentModule,
+        IMatchModule matchModule,
         ICurrentUserContext currentUserContext) : ICommandHandler<ChangeTournamentTeamRegistrationStatusCommand, ChangeTournamentTeamRegistrationStatusResponse>
     {
         public async Task<Result<ChangeTournamentTeamRegistrationStatusResponse>> Handle(ChangeTournamentTeamRegistrationStatusCommand request, CancellationToken cancellationToken)
@@ -18,6 +19,15 @@ namespace Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistr
             var tournamentTeam = await dbContext.GetTournamentTeamByIdAsync(request.TournamentTeamId, cancellationToken);
             if (tournamentTeam == null || tournamentTeam.TournamentId != request.TournamentId)
                 return Result.Failure<ChangeTournamentTeamRegistrationStatusResponse>(Error.NotFound("TournamentTeam", request.TournamentTeamId));
+
+            // Wycofanie w trakcie meczu odwołałoby mecz, który właśnie trwa. Decyzja: najpierw koniec meczu.
+            if (request.NewStatus == RegistrationStatus.Withdrawn)
+            {
+                var matches = await matchModule.GetMatchesByTournamentTeamIdsAsync([tournamentTeam.Id], cancellationToken);
+                if (matches.Any(m => m.Status is "Live" or "Paused"))
+                    return Result.Failure<ChangeTournamentTeamRegistrationStatusResponse>(
+                        Error.Conflict("RegistrationStatus", "The team is playing a match right now"));
+            }
 
             // Limit drużyn liczy zaakceptowane zgłoszenia. Sprawdzenie tylko przy zgłaszaniu nie wystarczało:
             // oczekujących mogło być więcej niż miejsc, a akceptacja przepuszczała wszystkie.

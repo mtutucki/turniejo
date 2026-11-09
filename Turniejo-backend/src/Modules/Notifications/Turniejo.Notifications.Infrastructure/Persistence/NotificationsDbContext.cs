@@ -22,9 +22,9 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
     // Filtr po Type jest tu krytyczny: bez niego JAKAKOLWIEK notyfikacja o tym meczu (np.
     // MatchTimeChanged po zwykłej zmianie godziny) sprawiała, że to zapytanie myślało, że
     // przypomnienie już wysłano, i mecz nigdy go nie dostawał.
-    public async Task<bool> MatchReminderExistsAsync(Guid matchId, CancellationToken cancellationToken = default) =>
+    public async Task<bool> MatchReminderExistsAsync(Guid matchId, DateTimeOffset createdSince, CancellationToken cancellationToken = default) =>
         await Notifications.AnyAsync(
-            n => n.MatchId == matchId && n.Type == NotificationType.MatchReminder,
+            n => n.MatchId == matchId && n.Type == NotificationType.MatchReminder && n.CreatedAt >= createdSince,
             cancellationToken);
 
     public async Task AddNotificationRecipientAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default) =>

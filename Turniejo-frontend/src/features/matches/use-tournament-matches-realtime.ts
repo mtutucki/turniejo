@@ -14,7 +14,7 @@ import { liveKeys } from "./live-api"
 const HUB_URL = "/backend/hubs/tournaments"
 
 /**
- * Zmiany meczów w turniejach zalogowanego usera (TournamentHub, zdarzenie MatchChanged): wzięcie,
+ * Zmiany meczów i drabinki w turniejach zalogowanego usera (TournamentHub, zdarzenia MatchChanged i BracketUpdated): wzięcie,
  * oddanie i przydzielenie sędziego, start, wynik, koniec. Odświeża listy sędziego (moje i wolne mecze)
  * oraz terminarz turnieju, więc sędziowie i organizator widzą nawzajem swoje zmiany bez odświeżania.
  */
@@ -46,10 +46,18 @@ export function useTournamentMatchesRealtime(tournamentIds: string[]) {
     const refresh = () => {
       // liveKeys.assigned jest prefiksem liveKeys.open, więc jedno unieważnienie odświeża obie listy.
       void queryClient.invalidateQueries({ queryKey: liveKeys.assigned })
-      for (const id of ids) void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(id) })
+      for (const id of ids) {
+        void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(id) })
+        // Wynik meczu pucharowego i awans zwycięzcy widać też na drabince organizatora.
+        void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "bracket"] })
+      }
     }
 
     connection.on("MatchChanged", refresh)
+    // Awans, korekta, uzupełnienie slotów z grup: bez tego drabinka organizatora czekała na odświeżenie strony.
+    connection.on("BracketUpdated", () => {
+      for (const id of ids) void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "bracket"] })
+    })
 
     // Brak dostępu do jednego turnieju (np. usunięty) nie blokuje pozostałych.
     const join = () =>

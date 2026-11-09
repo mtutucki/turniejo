@@ -202,5 +202,60 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             await _matchModule.DidNotReceive().CreateBracketMatchAsync(
                 Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
         }
+            // QA v3: GPK-008 - korekta wyniku grupowego po wypełnieniu drabinki zmieniała tabelę, ale obsadzony
+        // już slot zostawał ze starą drużyną. Decyzja: nierozpoczęty mecz dostaje drużynę z nowego miejsca.
+        private (Guid TournamentId, Guid CategoryId, Guid GroupId, BracketNode Node, Guid OldTeam, Guid NewTeam, Guid Opponent, Guid MatchId) FilledGroupSlot()
+        {
+            var tournamentId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+            var oldTeam = Guid.NewGuid();
+            var newTeam = Guid.NewGuid();
+            var opponent = Guid.NewGuid();
+            var matchId = Guid.NewGuid();
+
+            var bracket = Bracket.Create(Guid.NewGuid(), tournamentId, categoryId).Value;
+            var round = BracketRound.Create(Guid.NewGuid(), bracket.Id, 1, BracketRoundType.Standard, "Round 1").Value;
+            var node = BracketNode.Create(
+                Guid.NewGuid(), round.Id,
+                BracketSourceType.GroupPosition, groupId, 1, null, null,
+                BracketSourceType.Fixed, null, null, null, opponent).Value;
+            node.ResolveSlot(BracketSlot.Home, oldTeam);
+            node.AssignMatch(matchId);
+
+            _dbContext.GetBracketByTournamentAndCategoryAsync(tournamentId, categoryId, Arg.Any<CancellationToken>()).Returns(bracket);
+            _dbContext.GetBracketRoundsByBracketIdAsync(bracket.Id, Arg.Any<CancellationToken>()).Returns([round]);
+            _dbContext.GetBracketNodesByRoundIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([node]);
+            _dbContext.GetTrackedBracketNodesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([node]);
+            _standingModule.GetGroupStandingsAsync(groupId, Arg.Any<CancellationToken>())
+                .Returns([new GroupStandingDto(newTeam, 1, 9), new GroupStandingDto(oldTeam, 2, 6)]);
+            return (tournamentId, categoryId, groupId, node, oldTeam, newTeam, opponent, matchId);
+        }
+
+        [Fact]
+        public async Task GPK_008_CorrectedStandings_SwapTeamInUnstartedMatch()
+        {
+            var s = FilledGroupSlot();
+            _matchModule.ChangeUnstartedMatchTeamsAsync(s.MatchId, s.NewTeam, s.Opponent, Arg.Any<CancellationToken>()).Returns(true);
+
+            var result = await _handler.Handle(new ResolveGroupPositionSlotsCommand(s.TournamentId, s.CategoryId, s.GroupId), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            s.Node.HomeTournamentTeamId.Should().Be(s.NewTeam);
+            await _matchModule.Received(1).ChangeUnstartedMatchTeamsAsync(s.MatchId, s.NewTeam, s.Opponent, Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task GPK_008_CorrectedStandings_LeaveStartedMatchUnchanged()
+        {
+            var s = FilledGroupSlot();
+            _matchModule.ChangeUnstartedMatchTeamsAsync(s.MatchId, s.NewTeam, s.Opponent, Arg.Any<CancellationToken>()).Returns(false);
+
+            var result = await _handler.Handle(new ResolveGroupPositionSlotsCommand(s.TournamentId, s.CategoryId, s.GroupId), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            s.Node.HomeTournamentTeamId.Should().Be(s.OldTeam);
+        }
     }
 }

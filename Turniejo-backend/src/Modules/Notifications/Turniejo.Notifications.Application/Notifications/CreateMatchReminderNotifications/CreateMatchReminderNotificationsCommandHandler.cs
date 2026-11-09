@@ -22,7 +22,8 @@ namespace Turniejo.Notifications.Application.Notifications.CreateMatchReminderNo
             var createdCount = 0;
             foreach (var match in matches)
             {
-                var alreadyReminded = await dbContext.MatchReminderExistsAsync(match.Id, cancellationToken);
+                var alreadyReminded = await dbContext.MatchReminderExistsAsync(
+                    match.Id, match.ScheduledAt.AddMinutes(-request.MinutesBeforeMatch), cancellationToken);
                 if (alreadyReminded)
                     continue;
 
@@ -35,7 +36,7 @@ namespace Turniejo.Notifications.Application.Notifications.CreateMatchReminderNo
                 var awayTeamName = await GetTeamNameAsync(match.AwayTournamentTeamId, cancellationToken);
 
                 var title = "Przypomnienie o meczu";
-                var message = $"Mecz {homeTeamName} vs {awayTeamName} rozpocznie się o {match.ScheduledAt:HH:mm}.";
+                var message = $"Mecz {homeTeamName} vs {awayTeamName} rozpocznie się o {NotificationTime.Time(match.ScheduledAt)}.";
 
                 var publishResult = await publisher.PublishAsync(
                     match.TournamentId, NotificationType.MatchReminder, title, message,

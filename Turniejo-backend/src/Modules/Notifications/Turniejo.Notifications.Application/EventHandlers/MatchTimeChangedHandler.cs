@@ -24,7 +24,7 @@ namespace Turniejo.Notifications.Application.EventHandlers
             if (recipients.Count == 0)
                 return;
 
-            var message = $"Nowy termin meczu: {notification.ScheduledAt:yyyy-MM-dd HH:mm}.";
+            var message = $"Nowy termin meczu: {NotificationTime.DateAndTime(notification.ScheduledAt)}.";
 
             var publishResult = await publisher.PublishAsync(
                 notification.TournamentId, NotificationType.MatchTimeChanged, "Zmiana terminu meczu",

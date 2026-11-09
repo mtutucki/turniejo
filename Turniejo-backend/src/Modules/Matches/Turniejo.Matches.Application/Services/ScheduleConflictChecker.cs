@@ -10,7 +10,7 @@ namespace Turniejo.Matches.Application.Services
     // o 10 minut na zajęte boisko, drużyna grająca jednocześnie na dwóch boiskach albo sędzia z dwoma
     // meczami naraz przechodziły bez błędu. Konflikt liczymy na przedziałach [start, start + czas meczu)
     // z TournamentSettings.
-    public sealed class ScheduleConflictChecker(IMatchesDbContext dbContext, ITournamentModule tournamentModule)
+    public sealed class ScheduleConflictChecker(IMatchesDbContext dbContext, ITournamentModule tournamentModule, ITeamModule teamModule)
     {
         /// <summary>Nowy termin/boisko meczu: boisko z turnieju i aktywne, w datach turnieju, bez nakładek.</summary>
         public async Task<Error?> FindConflictAsync(
@@ -43,8 +43,14 @@ namespace Turniejo.Matches.Application.Services
             if (pitchId.HasValue && others.Any(m => m.PitchId == pitchId))
                 return Error.Validation(pitchErrorField, "Another match is already scheduled on this pitch at this time");
 
-            var teams = new[] { match.HomeTournamentTeamId, match.AwayTournamentTeamId };
-            if (others.Any(m => teams.Contains(m.HomeTournamentTeamId) || teams.Contains(m.AwayTournamentTeamId)))
+            // Ta sama drużyna w dwóch kategoriach ma dwa zgłoszenia - porównujemy klub (TeamId), tak jak generator.
+            var entries = others.Count == 0
+                ? []
+                : await teamModule.GetTournamentTeamsByTournamentIdAsync(match.TournamentId, cancellationToken);
+            var clubByEntry = entries.ToDictionary(t => t.Id, t => t.TeamId);
+            Guid Club(Guid entry) => clubByEntry.GetValueOrDefault(entry, entry);
+            var clubs = new[] { Club(match.HomeTournamentTeamId), Club(match.AwayTournamentTeamId) };
+            if (others.Any(m => clubs.Contains(Club(m.HomeTournamentTeamId)) || clubs.Contains(Club(m.AwayTournamentTeamId))))
                 return Error.Validation("ScheduledAt", "One of the teams already plays another match at this time");
 
             if (match.RefereeId.HasValue && others.Any(m => m.RefereeId == match.RefereeId))

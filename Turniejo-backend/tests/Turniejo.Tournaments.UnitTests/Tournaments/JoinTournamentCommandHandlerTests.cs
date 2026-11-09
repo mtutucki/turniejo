@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using NSubstitute;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Enums;
@@ -151,5 +151,20 @@ public sealed class JoinTournamentCommandHandlerTests
         result.Value.TournamentId.Should().Be(tournament.Id);
         result.Value.TournamentName.Should().Be(tournament.Name);
         result.Value.Role.Should().Be("Coach");
+    }
+
+    // QA v3: KON-018 - decyzja: kodem anulowanego turnieju nie da się dołączyć; zakończonego - tak (do wglądu).
+    [Fact]
+    public async Task KON_018_JoiningACancelledTournament_IsRejected()
+    {
+        var tournament = CreateFakeTournament();
+        tournament.ChangeStatus(Turniejo.Tournaments.Domain.Enums.TournamentStatus.Cancelled, Guid.NewGuid());
+        _dbContext.GetTournamentByCodeAsync(tournament.ViewerCode, Arg.Any<CancellationToken>()).Returns(tournament);
+
+        var result = await _handler.Handle(new JoinTournamentCommand(tournament.ViewerCode), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Be("This tournament has been cancelled");
+        await _userModule.DidNotReceiveWithAnyArgs().AssignRoleAsync(default, default!, default!, default, default);
     }
 }

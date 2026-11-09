@@ -50,6 +50,12 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
         {
             var orderedRules = tieBreakerRules.OrderBy(r => r.Order).ToList();
 
+            // Mecze bezpośrednie liczymy jako małą tabelę wszystkich drużyn z tą samą liczbą punktów.
+            // Porównanie parami przy trzech drużynach (A>B, B>C, C>A) dawało cykl i przypadkową kolejność.
+            var headToHead = stats.ToDictionary(
+                s => s.TournamentTeamId,
+                s => MiniTable(s, stats, matches, pointsForWin, pointsForDraw, pointsForLoss));
+
             var comparer = Comparer<TeamStats>.Create((a, b) =>
             {
                 var byPoints = b.Points.CompareTo(a.Points);
@@ -58,7 +64,7 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
 
                 foreach (var rule in orderedRules)
                 {
-                    var result = CompareByRule(a, b, rule.Type, matches, pointsForWin, pointsForDraw, pointsForLoss);
+                    var result = CompareByRule(a, b, rule.Type, headToHead);
                     if (result != 0)
                         return result;
                 }
@@ -77,16 +83,15 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
         }
 
         private static int CompareByRule(
-            TeamStats a, TeamStats b, string ruleType, IReadOnlyList<GroupMatchDto> matches,
-            int pointsForWin, int pointsForDraw, int pointsForLoss)
+            TeamStats a, TeamStats b, string ruleType, IReadOnlyDictionary<Guid, (int Points, int GoalDiff)> headToHead)
         {
             return ruleType switch
             {
                 "GoalDifference" => (b.GoalsFor - b.GoalsAgainst).CompareTo(a.GoalsFor - a.GoalsAgainst),
                 "GoalsFor" => b.GoalsFor.CompareTo(a.GoalsFor),
                 "Wins" => b.Wins.CompareTo(a.Wins),
-                "HeadToHeadPoints" => CompareHeadToHead(a, b, matches, pointsForWin, pointsForDraw, pointsForLoss, byGoalDiff: false),
-                "HeadToHeadGoalDiff" => CompareHeadToHead(a, b, matches, pointsForWin, pointsForDraw, pointsForLoss, byGoalDiff: true),
+                "HeadToHeadPoints" => headToHead[b.TournamentTeamId].Points.CompareTo(headToHead[a.TournamentTeamId].Points),
+                "HeadToHeadGoalDiff" => headToHead[b.TournamentTeamId].GoalDiff.CompareTo(headToHead[a.TournamentTeamId].GoalDiff),
                 // Prawdziwe losowanie musiałoby być deterministyczne między kolejnymi przeliczeniami
                 // tabeli (StandingUpdated potrafi się odpalić wielokrotnie) — inaczej kolejność
                 // migałaby przy każdym przeliczeniu. Stabilny klucz z ID drużyny daje efekt losowego
@@ -101,48 +106,29 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
 
         private static int StableTieBreakKey(Guid tournamentTeamId) => tournamentTeamId.GetHashCode();
 
-        private static int CompareHeadToHead(
-            TeamStats a, TeamStats b, IReadOnlyList<GroupMatchDto> matches,
-            int pointsForWin, int pointsForDraw, int pointsForLoss, bool byGoalDiff)
+        // Punkty i bilans bramek drużyny w meczach rozegranych tylko między drużynami z tą samą liczbą punktów.
+        private static (int Points, int GoalDiff) MiniTable(
+            TeamStats team, IReadOnlyList<TeamStats> stats, IReadOnlyList<GroupMatchDto> matches,
+            int pointsForWin, int pointsForDraw, int pointsForLoss)
         {
-            var headToHeadMatches = matches
-                .Where(m =>
-                    (m.HomeTournamentTeamId == a.TournamentTeamId && m.AwayTournamentTeamId == b.TournamentTeamId) ||
-                    (m.HomeTournamentTeamId == b.TournamentTeamId && m.AwayTournamentTeamId == a.TournamentTeamId))
-                .ToList();
+            var tied = stats.Where(s => s.Points == team.Points).Select(s => s.TournamentTeamId).ToHashSet();
+            int points = 0, goalDiff = 0;
 
-            if (headToHeadMatches.Count == 0)
-                return 0;
-
-            int aPoints = 0, bPoints = 0, aGoals = 0, bGoals = 0;
-
-            foreach (var match in headToHeadMatches)
+            foreach (var match in matches.Where(m => tied.Contains(m.HomeTournamentTeamId) && tied.Contains(m.AwayTournamentTeamId)))
             {
-                var (aGoalsInMatch, bGoalsInMatch) = match.HomeTournamentTeamId == a.TournamentTeamId
-                    ? (match.HomeScore, match.AwayScore)
-                    : (match.AwayScore, match.HomeScore);
-
-                aGoals += aGoalsInMatch;
-                bGoals += bGoalsInMatch;
-
-                if (aGoalsInMatch > bGoalsInMatch)
-                {
-                    aPoints += pointsForWin;
-                    bPoints += pointsForLoss;
-                }
-                else if (aGoalsInMatch < bGoalsInMatch)
-                {
-                    bPoints += pointsForWin;
-                    aPoints += pointsForLoss;
-                }
+                int own, other;
+                if (match.HomeTournamentTeamId == team.TournamentTeamId)
+                    (own, other) = (match.HomeScore, match.AwayScore);
+                else if (match.AwayTournamentTeamId == team.TournamentTeamId)
+                    (own, other) = (match.AwayScore, match.HomeScore);
                 else
-                {
-                    aPoints += pointsForDraw;
-                    bPoints += pointsForDraw;
-                }
+                    continue;
+
+                goalDiff += own - other;
+                points += own > other ? pointsForWin : own < other ? pointsForLoss : pointsForDraw;
             }
 
-            return byGoalDiff ? bGoals.CompareTo(aGoals) : bPoints.CompareTo(aPoints);
+            return (points, goalDiff);
         }
     }
 }

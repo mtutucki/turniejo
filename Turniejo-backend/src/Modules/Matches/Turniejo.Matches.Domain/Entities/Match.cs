@@ -151,11 +151,12 @@ namespace Turniejo.Matches.Domain.Entities
             if (IsOver)
                 return Result.Failure(Error.Conflict("Status", "Cannot change the referee once the match has finished or been cancelled"));
 
+            var previousRefereeId = RefereeId;
             RefereeId = refereeId;
             Version++;
             SetUpdatedAt();
 
-            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, changedByUserId));
+            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, refereeId, changedByUserId, previousRefereeId));
 
             return Result.Success();
         }
@@ -191,7 +192,7 @@ namespace Turniejo.Matches.Domain.Entities
             Version++;
             SetUpdatedAt();
 
-            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, null, refereeId));
+            _domainEvents.Add(new RefereeAssignedToMatch(Id, TournamentId, null, refereeId, refereeId));
 
             return Result.Success();
         }
@@ -463,6 +464,22 @@ namespace Turniejo.Matches.Domain.Entities
                 return Result.Success();
 
             return Result.Failure(Error.Conflict("Status", "Match events can only be recorded while the match is live, paused, or within the post-match edit window"));
+        }
+
+        /// <summary>
+        /// Poprawka goli w oknie edycji nie może zostawić zakończonego meczu pucharowego z remisem
+        /// rozstrzygniętym w czasie gry - drabinka miałaby zwycięzcę, którego nie widać w wyniku.
+        /// Taki remis trzeba rozstrzygnąć karnymi przez zmianę rozstrzygnięcia.
+        /// </summary>
+        public Result EnsureKnockoutStaysDecided(int homeScore, int awayScore)
+        {
+            if (Status == MatchStatus.Finished &&
+                StageType != StageType.Group &&
+                ResultType is MatchResultType.Regular or MatchResultType.ExtraTime or MatchResultType.ManualDecision &&
+                homeScore == awayScore)
+                return Result.Failure(Error.Validation("ResultType", "A knockout match cannot end in a draw — decide it by penalties"));
+
+            return Result.Success();
         }
 
         public Result UpdateScore(int homeScore, int awayScore)

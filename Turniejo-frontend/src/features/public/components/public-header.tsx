@@ -85,22 +85,25 @@ export function PublicHeader() {
             Turniejo
           </Link>
           <div className="flex items-center gap-3">
-            <span
-              role="status"
-              className="flex items-center gap-1.5 text-xs opacity-80"
-              title="Wyniki aktualizują się same"
-            >
-              {realtime === "connected" ? (
-                <Wifi className="size-3.5" />
-              ) : (
-                <WifiOff className="size-3.5" />
-              )}
-              {realtime === "connected"
-                ? "Na żywo"
-                : realtime === "disconnected"
-                  ? "Offline"
-                  : "Łączenie…"}
-            </span>
+            {/* W odwołanym turnieju nic się już nie aktualizuje (QA v3: PUB-012). */}
+            {tournament.status !== "Cancelled" && (
+              <span
+                role="status"
+                className="flex items-center gap-1.5 text-xs opacity-80"
+                title="Wyniki aktualizują się same"
+              >
+                {realtime === "connected" ? (
+                  <Wifi className="size-3.5" />
+                ) : (
+                  <WifiOff className="size-3.5" />
+                )}
+                {realtime === "connected"
+                  ? "Na żywo"
+                  : realtime === "disconnected"
+                    ? "Offline"
+                    : "Łączenie…"}
+              </span>
+            )}
             <AppLink />
           </div>
         </div>

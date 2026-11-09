@@ -31,8 +31,9 @@ import {
 } from "@/features/matches/api"
 import { BracketBoard } from "@/features/matches/components/bracket-board"
 import { GenerateBracketForm } from "@/features/matches/components/generate-bracket-form"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { autoBracketPairs } from "@/features/matches/suggest-bracket"
-import { bracketChampion } from "@/features/public/components/champion-banner"
+import { bracketChampion, showsChampion } from "@/features/public/components/champion-banner"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups, useTournamentSettings } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
@@ -74,7 +75,9 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     const needsSchedule =
       isOrganizer && tournamentFormat === "Knockout" && tournamentStatus === "RegistrationClosed"
     const champion =
-      tournamentStatus === "Finished" ? bracketChampion(bracket.data, schedule.data ?? []) : null
+      showsChampion(tournamentStatus, tournamentFormat)
+        ? bracketChampion(bracket.data, schedule.data ?? [])
+        : null
     // Drużyna, która już nie gra (wycofana, odrzucona albo usunięta z turnieju), zostaje w swojej parze
     // na stałe (węzły mają zamrożone drużyny), a slot w kolejnej rundzie nigdy by się nie wypełnił —
     // jedyne wyjście to ułożyć drabinkę od nowa, póki nic nie zagrano.
@@ -362,7 +365,8 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     tournamentFormat === "Knockout"
       ? autoBracketPairs([], acceptedTeams)
         ? null
-        : "Przy więcej niż 16 drużynach pary trzeba ułożyć samodzielnie."
+        : // QA v3: PUC-020 - organizator ma wiedzieć, ile drużyn się nie zmieści.
+          `Do drabinki zmieści się 16 z ${acceptedTeams.length} drużyn. Wybierz, które zagrają, i ułóż pary samodzielnie.`
       : groupCount === 0 || [1, 2, 4, 8].includes(groupCount)
         ? null
         : `Przy ${groupCount} grupach pary trzeba ułożyć samodzielnie.`
@@ -429,6 +433,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
 export function TournamentBracketView() {
   const { id, tournament } = useTournamentContext()
   const categories = useCategories(id)
+  useTournamentMatchesRealtime([id])
   // ?category=… otwiera drabinkę konkretnej kategorii (np. link z usuwania kategorii).
   const searchParams = useSearchParams()
   const [selected, setSelected] = useState<string | undefined>(

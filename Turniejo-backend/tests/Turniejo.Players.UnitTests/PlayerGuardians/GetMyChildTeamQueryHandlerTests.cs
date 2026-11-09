@@ -123,4 +123,25 @@ public sealed class GetMyChildTeamQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().BeEmpty();
     }
+
+    // QA v3: PAN-001 - turniej dziecka usunięty przez organizatora zostawał na liście jako „Unknown”.
+    [Fact]
+    public async Task PAN_001_MembershipInADeletedTournament_IsSkipped()
+    {
+        var playerId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var tournamentTeamId = Guid.NewGuid();
+        _currentUserContext.UserId.Returns(userId);
+        var guardian = PlayerGuardian.Create(Guid.NewGuid(), playerId, userId, RelationshipType.Parent, false, true, Guid.NewGuid()).Value;
+        _dbContext.GetPlayerGuardiansByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<PlayerGuardian> { guardian });
+        var tournamentPlayer = TournamentPlayer.Create(Guid.NewGuid(), tournamentTeamId, playerId, 7, PlayerPosition.Midfielder, Guid.NewGuid()).Value;
+        _dbContext.GetTournamentPlayersByPlayerIdAsync(playerId, Arg.Any<CancellationToken>()).Returns(new List<TournamentPlayer> { tournamentPlayer });
+        _teamModule.GetTournamentTeamAsync(tournamentTeamId, Arg.Any<CancellationToken>())
+            .Returns(new TournamentTeamDto(tournamentTeamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, "Accepted"));
+        _tournamentModule.GetTournamentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((TournamentDto?)null);
+
+        var result = await _handler.Handle(new GetMyChildTeamQuery(playerId), CancellationToken.None);
+
+        result.Value.Should().BeEmpty();
+    }
 }

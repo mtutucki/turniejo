@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -65,6 +66,8 @@ type SportSettingsFormProps = {
   disabled: boolean
   /** Tryb kreatora: przycisk prowadzi do kolejnego kroku, także gdy nic się nie zmieniło. */
   onSaved?: () => void
+  /** Kreator pyta przed wyjściem z kroku z niezapisanymi zmianami (QA v3: UST-017). */
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 export function SportSettingsForm({
@@ -72,10 +75,12 @@ export function SportSettingsForm({
   settings,
   disabled,
   onSaved,
+  onDirtyChange,
 }: SportSettingsFormProps) {
   const updateSettings = useUpdateTournamentSettings(tournamentId)
   const form = useForm<TournamentSettings>({ resolver: zodResolver(schema), values: settings })
   const { errors, isDirty } = form.formState
+  useEffect(() => onDirtyChange?.(isDirty), [isDirty, onDirtyChange])
 
   const numberField = (name: NumberField, label: string, suffix?: string) => (
     <Field data-invalid={!!errors[name]}>

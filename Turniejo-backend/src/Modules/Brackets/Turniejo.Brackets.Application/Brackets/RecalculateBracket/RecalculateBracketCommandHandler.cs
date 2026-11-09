@@ -37,6 +37,23 @@ namespace Turniejo.Brackets.Application.Brackets.RecalculateBracket
             var changed = false;
             var blocked = new List<Guid>();
 
+            // Sloty z miejsc w grupach - po korekcie wyniku grupowego tabela mogła się przestawić.
+            var groupIds = nodes
+                .SelectMany(n => new[] { n.HomeSourceGroupId, n.AwaySourceGroupId })
+                .OfType<Guid>()
+                .Distinct()
+                .ToList();
+            foreach (var groupId in groupIds)
+            {
+                foreach (var snapshot in nodes.Where(n => n.HomeSourceGroupId == groupId || n.AwaySourceGroupId == groupId))
+                {
+                    var node = await dbContext.GetBracketNodeByIdAsync(snapshot.Id, cancellationToken);
+                    if (node != null)
+                        changed |= await bracketAdvancer.RefreshResolvedGroupSlotsAsync(
+                            node, groupId, bracket.TournamentId, bracket.CategoryId, blocked, cancellationToken);
+                }
+            }
+
             foreach (var snapshot in nodes.Where(n => n.MatchId.HasValue).OrderBy(n => roundOrder[n.BracketRoundId]))
             {
                 if (!winners.TryGetValue(snapshot.MatchId!.Value, out var winnerId) || winnerId is not { } winner)

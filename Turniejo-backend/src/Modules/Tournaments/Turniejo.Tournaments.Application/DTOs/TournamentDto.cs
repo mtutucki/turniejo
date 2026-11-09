@@ -1,4 +1,4 @@
-﻿namespace Turniejo.Tournaments.Application.DTOs
+namespace Turniejo.Tournaments.Application.DTOs
 {
     public sealed record TournamentDto(
     Guid Id,
@@ -17,6 +17,8 @@
     string? ViewerCode,
     string? Description,
     // Czy portal kibica (/t/{slug}) jest włączony — bez tego link prowadzi na 404.
-    bool IsPublic
+    bool IsPublic,
+    // Do optymistycznej kontroli zapisu formularza danych turnieju (QA v3: UST-015).
+    DateTimeOffset? UpdatedAt = null
     );
 }

@@ -177,6 +177,9 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsSecondYellow")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("MatchId")
                         .HasColumnType("uuid");
 

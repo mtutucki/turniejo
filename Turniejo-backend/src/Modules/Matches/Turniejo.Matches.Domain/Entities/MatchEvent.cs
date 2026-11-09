@@ -16,6 +16,8 @@ namespace Turniejo.Matches.Domain.Entities
         public int? Second { get; private set; }
         public Guid CreatedByUserId { get; private set; }
         public bool IsDeleted { get; private set; }
+        // Czerwona kartka wynikła z drugiej żółtej - po cofnięciu pierwszej żółtej wraca do żółtej.
+        public bool IsSecondYellow { get; private set; }
         public DateTimeOffset? DeletedAt { get; private set; }
         public Guid? DeletedByUserId { get; private set; }
 
@@ -27,7 +29,8 @@ namespace Turniejo.Matches.Domain.Entities
 
         public static Result<MatchEvent> Create(
             Guid id, Guid matchId, MatchEventType type, int minute, Guid createdByUserId,
-            Guid? tournamentTeamId = null, Guid? playerId = null, Guid? relatedPlayerId = null, int? second = null)
+            Guid? tournamentTeamId = null, Guid? playerId = null, Guid? relatedPlayerId = null, int? second = null,
+            bool isSecondYellow = false)
         {
             if (id == Guid.Empty)
                 return Result.Failure<MatchEvent>(Error.Validation("Id", "MatchEvent id cannot be empty"));
@@ -50,7 +53,8 @@ namespace Turniejo.Matches.Domain.Entities
                 Type = type,
                 Minute = minute,
                 Second = second,
-                CreatedByUserId = createdByUserId
+                CreatedByUserId = createdByUserId,
+                IsSecondYellow = isSecondYellow && type == MatchEventType.RedCard
             };
 
             return Result.Success(matchEvent);
@@ -74,6 +78,21 @@ namespace Turniejo.Matches.Domain.Entities
             Second = second;
             PlayerId = playerId;
             RelatedPlayerId = relatedPlayerId;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new MatchEventUpdated(Id, MatchId, tournamentId, changedByUserId));
+
+            return Result.Success();
+        }
+
+        /// <summary>Druga żółta przestaje być drugą (cofnięto pierwszą): czerwona wraca do żółtej.</summary>
+        public Result RevertToYellow(Guid changedByUserId, Guid tournamentId)
+        {
+            if (IsDeleted || !IsSecondYellow)
+                return Result.Failure(Error.Conflict("Type", "Only a red card from a second yellow can turn back into a yellow"));
+
+            Type = MatchEventType.YellowCard;
+            IsSecondYellow = false;
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchEventUpdated(Id, MatchId, tournamentId, changedByUserId));

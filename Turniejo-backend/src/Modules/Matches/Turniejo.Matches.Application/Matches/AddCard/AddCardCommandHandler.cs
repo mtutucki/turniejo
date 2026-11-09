@@ -1,3 +1,4 @@
+using Turniejo.Matches.Domain.Enums;
 using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Services;
@@ -41,7 +42,8 @@ namespace Turniejo.Matches.Application.Matches.AddCard
 
             var eventResult = MatchEvent.Create(
                 Guid.NewGuid(), match.Id, cardType, request.Minute, currentUserContext.UserId,
-                request.TournamentTeamId, request.PlayerId, second: request.Second);
+                request.TournamentTeamId, request.PlayerId, second: request.Second,
+                isSecondYellow: request.CardType == MatchEventType.YellowCard && cardType == MatchEventType.RedCard);
             if (eventResult.IsFailure)
                 return Result.Failure<AddCardResponse>(eventResult.Error);
 

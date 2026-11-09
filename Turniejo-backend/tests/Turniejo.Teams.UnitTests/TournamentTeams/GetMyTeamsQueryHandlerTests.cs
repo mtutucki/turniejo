@@ -128,5 +128,22 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             // Assert
             result.Value[0].CanEditSquad.Should().Be(expected);
         }
+            // QA v3: PAN-001 - drużyna z usuniętego turnieju zostawała w „Moje drużyny” jako „Unknown”.
+        [Fact]
+        public async Task PAN_001_TeamFromADeletedTournament_IsNotListed()
+        {
+            var userId = Guid.NewGuid();
+            var tournamentTeamId = Guid.NewGuid();
+            _currentUserContext.UserId.Returns(userId);
+            var staff = TeamStaff.CreateCoach(Guid.NewGuid(), tournamentTeamId, userId, Guid.NewGuid()).Value;
+            _dbContext.GetTeamStaffByUserIdAsync(userId, Arg.Any<CancellationToken>()).Returns(new List<TeamStaff> { staff });
+            var tournamentTeam = TournamentTeam.Create(tournamentTeamId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()).Value;
+            _dbContext.GetTournamentTeamByIdAsync(tournamentTeamId, Arg.Any<CancellationToken>()).Returns(tournamentTeam);
+            _tournamentModule.GetTournamentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((TournamentDto?)null);
+
+            var result = await _handler.Handle(new GetMyTeamsQuery(), CancellationToken.None);
+
+            result.Value.Should().BeEmpty();
+        }
     }
 }

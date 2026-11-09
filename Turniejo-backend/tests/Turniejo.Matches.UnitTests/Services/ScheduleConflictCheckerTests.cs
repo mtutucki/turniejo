@@ -12,6 +12,7 @@ namespace Turniejo.Matches.UnitTests.Services
     {
         private readonly IMatchesDbContext _dbContext = Substitute.For<IMatchesDbContext>();
         private readonly ITournamentModule _tournamentModule = Substitute.For<ITournamentModule>();
+        private readonly ITeamModule _teamModule = Substitute.For<ITeamModule>();
         private readonly ScheduleConflictChecker _checker;
 
         private readonly Guid _tournamentId = Guid.NewGuid();
@@ -20,7 +21,7 @@ namespace Turniejo.Matches.UnitTests.Services
 
         public ScheduleConflictCheckerTests()
         {
-            _checker = new ScheduleConflictChecker(_dbContext, _tournamentModule);
+            _checker = new ScheduleConflictChecker(_dbContext, _tournamentModule, _teamModule);
             // mecz trwa 30 minut
             _tournamentModule.GetTournamentSettingsAsync(_tournamentId, Arg.Any<CancellationToken>())
                 .Returns(new TournamentSettingsSummaryDto(_tournamentId, 30, 10, 60, 3, 1, 0, false, false, 3, 0));
@@ -72,6 +73,27 @@ namespace Turniejo.Matches.UnitTests.Services
 
             error.Should().NotBeNull();
             error!.Code.Should().Be("Validation.ScheduledAt");
+        }
+
+        // QA v3: PUC-075 - drużyna zgłoszona w dwóch kategoriach ma dwa różne zgłoszenia, więc ręczne
+        // przesunięcie na godzinę jej meczu w drugiej kategorii przechodziło bez błędu.
+        [Fact]
+        public async Task PUC_075_ShouldReportTeamConflict_WhenSameClubPlaysInAnotherCategory()
+        {
+            var club = Guid.NewGuid();
+            var (u12Entry, u14Entry) = (Guid.NewGuid(), Guid.NewGuid());
+            _teamModule.GetTournamentTeamsByTournamentIdAsync(_tournamentId, Arg.Any<CancellationToken>())
+                .Returns([
+                    new TournamentTeamDto(u12Entry, _tournamentId, club, Guid.NewGuid(), null, "Accepted"),
+                    new TournamentTeamDto(u14Entry, _tournamentId, club, Guid.NewGuid(), null, "Accepted"),
+                ]);
+            var moved = NewMatch(null, _tenOClock.AddHours(3), home: u12Entry);
+            Existing(moved, NewMatch(Guid.NewGuid(), _tenOClock, away: u14Entry));
+
+            var error = await _checker.FindConflictAsync(moved, _pitchId, _tenOClock, "PitchId", CancellationToken.None);
+
+            error.Should().NotBeNull();
+            error!.Message.Should().Be("One of the teams already plays another match at this time");
         }
 
         [Fact]

@@ -17,6 +17,16 @@ export function matchWinner(match: Match | undefined) {
   return home > away ? match.homeTournamentTeamId : match.awayTournamentTeamId
 }
 
+/**
+ * Kiedy szukać mistrza. Puchar: zaraz po finale, także gdy turniej formalnie trwa - baner i tak czeka,
+ * aż finał będzie rozegrany (QA v3: PUC-045, PUB-011). Same grupy: lider jest pewny dopiero po zakończeniu.
+ */
+export function showsChampion(status: string | undefined, format: string | null | undefined) {
+  if (!format) return false
+  if (status === "Finished") return true
+  return status === "InProgress" && format !== "Group"
+}
+
 /** Finał = węzeł ostatniej zwykłej rundy (nie meczu o 3. miejsce), z którego nikt dalej nie awansuje. */
 export function bracketChampion(bracket: Bracket, matches: Match[]) {
   const finalRound = bracket.rounds
@@ -64,12 +74,12 @@ function GroupLeader({ groupId, label }: { groupId: string; label: string | null
 }
 
 /**
- * Po zakończeniu turnieju: zwycięzca finału drabinki (formaty z pucharem) albo lider tabeli
+ * Zwycięzca finału drabinki (formaty z pucharem, zaraz po finale) albo lider tabeli
  * (sam format grupowy) — osobno dla każdej kategorii, a przy kilku grupach dla każdej grupy.
  */
 export function ChampionBanner() {
   const { tournament } = usePublicContext()
-  if (tournament.status !== "Finished" || !tournament.format) return null
+  if (!showsChampion(tournament.status, tournament.format)) return null
 
   const knockout = tournament.format !== "Group"
   const multipleCategories = tournament.categories.length > 1

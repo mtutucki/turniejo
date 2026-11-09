@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -112,7 +112,10 @@ export function FinishMatchDialog({
         ? awayTeam.tournamentTeamId
         : null
 
+  // Drugie kliknięcie przed odświeżeniem przycisku wysyłało drugie zakończenie (409, QA v3: MNZ-005).
+  const submitting = useRef(false)
   function confirm() {
+    if (submitting.current) return
     setError(null)
     const goalsMissing = parseGoals(homeGoals) == null || parseGoals(awayGoals) == null
     if (editScore && kind !== "Walkover" && goalsMissing) {
@@ -135,6 +138,7 @@ export function FinishMatchDialog({
         return
       }
     }
+    submitting.current = true
     finish.mutate(
       {
         resultType: kind,
@@ -153,6 +157,7 @@ export function FinishMatchDialog({
       {
         // Bez toastu — status "Zakończony" widać na tablicy (toast zasłaniałby nagłówek na telefonie).
         onSuccess: () => setOpen(false),
+        onSettled: () => (submitting.current = false),
         onError: (e) => {
           if (isApiError(e) && e.fieldErrors.length) setError(e.fieldErrors[0]!.message)
         },

@@ -112,6 +112,27 @@ namespace Turniejo.Brackets.UnitTests.Brackets
             await _dbContext.Received(4).AddBracketNodeAsync(Arg.Any<BracketNode>(), Arg.Any<CancellationToken>());
         }
 
+        // QA v3: PUC-019 - przy 3 drużynach jeden półfinał ma wolny los, więc nie ma przegranego.
+        // Mecz o 3. miejsce czekał wtedy w nieskończoność. Decyzja: bez meczu o 3. miejsce.
+        [Fact]
+        public async Task PUC_019_NoThirdPlaceRound_WhenASemifinalHasABye()
+        {
+            var tournamentId = Guid.NewGuid();
+            var categoryId = Guid.NewGuid();
+            _tournamentModule.GetTournamentAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(tournamentId, "Cup", "InProgress", "Knockout", Guid.NewGuid(), 3));
+            _tournamentModule.GetTournamentSettingsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentSettingsSummaryDto(tournamentId, 30, 10, 60, 3, 1, 0, true, false, 3, 0));
+            WireCreatedNodesAndRoundsForLookup(out _, out var rounds);
+
+            var command = new GenerateBracketCommand(tournamentId, categoryId, [FixedPairing(), ByePairing(Guid.NewGuid())]);
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            rounds.Values.Should().NotContain(r => r.RoundType == BracketRoundType.ThirdPlace);
+        }
+
         [Fact]
         public async Task Handle_ShouldNotCreateMatch_ForGroupPositionPairing_WhenStandingsNotYetAvailable()
         {

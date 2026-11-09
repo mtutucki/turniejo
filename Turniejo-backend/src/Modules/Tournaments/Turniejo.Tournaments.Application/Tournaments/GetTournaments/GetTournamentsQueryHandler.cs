@@ -1,4 +1,4 @@
-﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.DTOs;
@@ -22,7 +22,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournaments
                 t.TeamLimit, t.IsPaid,
                 t.RefereeCode,
                 t.CoachCode, t.ViewerCode, t.Description,
-                t.PublicSettings.IsPublic)).ToList();
+                t.PublicSettings.IsPublic, t.UpdatedAt)).ToList();
 
             return Result.Success<IReadOnlyList<TournamentDto>>(dtos);
         }

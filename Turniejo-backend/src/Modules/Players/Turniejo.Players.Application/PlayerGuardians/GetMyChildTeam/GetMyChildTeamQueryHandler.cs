@@ -33,6 +33,9 @@ namespace Turniejo.Players.Application.PlayerGuardians.GetMyChildTeam
 
                 var team = await teamModule.GetTeamAsync(tournamentTeam.TeamId, cancellationToken);
                 var tournament = await tournamentModule.GetTournamentAsync(tournamentTeam.TournamentId, cancellationToken);
+                // Usunięty turniej: nie pokazujemy go jako „Unknown” (QA v3: PAN-001).
+                if (tournament == null)
+                    continue;
 
                 dtos.Add(new MyChildTeamDto(
                     tournamentPlayer.Id, tournamentTeam.Id, tournamentTeam.TournamentId, tournament?.Name ?? "Unknown",

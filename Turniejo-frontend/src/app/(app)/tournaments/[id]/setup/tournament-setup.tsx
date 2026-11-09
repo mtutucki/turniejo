@@ -224,6 +224,9 @@ export function TournamentSetupView() {
   const progress = useSetupProgress(id, tournament.data)
   // null = dane jeszcze się wczytują: startujemy od kroku z linku albo pierwszego niegotowego.
   const [selected, setSelected] = useState<number | null>(null)
+  // Niezapisane zmiany formularza kroku i krok, na który ktoś chce przejść (QA v3: UST-017).
+  const [dirty, setDirty] = useState(false)
+  const [pendingStep, setPendingStep] = useState<number | null>(null)
   const top = useRef<HTMLDivElement>(null)
   // Krok startowy ustalamy raz, gdy dane się wczytają. Liczony na bieżąco przeskakiwał sam do
   // następnego kroku w chwili, gdy obecny stawał się gotowy (np. po akceptacji drugiej drużyny).
@@ -257,13 +260,25 @@ export function TournamentSetupView() {
   const key = SETUP_STEP_KEYS[step]!
   const lastIndex = SETUP_STEP_KEYS.length - 1
 
+  // Formularz kroku (zasady gry, portal) zgłasza niezapisane zmiany; przejście na inny krok
+  // najpierw pyta, czy je porzucić (QA v3: UST-017).
+
   // Kolejny krok zaczyna się od góry — poprzedni formularz mógł być przewinięty do przycisku.
-  function goTo(index: number) {
-    setSelected(Math.max(0, Math.min(index, lastIndex)))
+  function goTo(index: number, force = false) {
+    const target = Math.max(0, Math.min(index, lastIndex))
+    if (!force && dirty && target !== step) {
+      setPendingStep(target)
+      return
+    }
+    setDirty(false)
+    setPendingStep(null)
+    setSelected(target)
     top.current?.scrollIntoView({ block: "start" })
   }
   const goToKey = (target: SetupStepKey) => goTo(SETUP_STEP_KEYS.indexOf(target))
   const next = () => goTo(step + 1)
+  // Po zapisie formularz może jeszcze chwilę być „zmieniony” - zapis to świadome przejście dalej.
+  const savedNext = () => goTo(step + 1, true)
 
   // Te same blokady co w Ustawieniach (domena backendu).
   const formatLocked = statusAtLeast(data.status, "ScheduleGenerated")
@@ -364,7 +379,8 @@ export function TournamentSetupView() {
                 tournamentId={id}
                 settings={settings.data}
                 disabled={rulesLocked}
-                onSaved={next}
+                onSaved={savedNext}
+                onDirtyChange={setDirty}
               />
             ) : (
               <Skeleton className="h-72" />
@@ -376,7 +392,8 @@ export function TournamentSetupView() {
                 slug={data.slug}
                 settings={publicSettings.data}
                 disabled={data.status === "Cancelled"}
-                onSaved={next}
+                onSaved={savedNext}
+                onDirtyChange={setDirty}
               />
             ) : (
               <Skeleton className="h-72" />
@@ -489,6 +506,22 @@ export function TournamentSetupView() {
     // Kroki z formularzem są wąskie; listy (kategorie, boiska, drużyny) potrzebują miejsca.
     <div ref={top} className={cn("scroll-mt-20 space-y-6", isListStep ? "max-w-5xl" : "max-w-3xl")}>
       <StepIndicator current={step} isDone={isDone} onSelect={goTo} />
+      <AlertDialog open={pendingStep != null} onOpenChange={(open) => !open && setPendingStep(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Masz niezapisane zmiany</AlertDialogTitle>
+            <AlertDialogDescription>
+              Jeśli przejdziesz dalej bez zapisu, zmiany w tym kroku przepadną.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zostaję</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingStep != null && goTo(pendingStep, true)}>
+              Przejdź bez zapisu
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {body}
 

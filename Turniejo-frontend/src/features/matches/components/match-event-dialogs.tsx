@@ -42,6 +42,7 @@ import {
   useAddGoal,
   useSelectMvp,
   useSetGoalPlayers,
+  useUpdateEvent,
 } from "../live-api"
 
 const NONE = "none"
@@ -313,11 +314,29 @@ export function GoalPlayersDialog({
   const [open, setOpen] = useState(false)
   const [playerId, setPlayerId] = useState(NONE)
   const [assistId, setAssistId] = useState(NONE)
+  const [goalMinute, setGoalMinute] = useState(goal.minute)
   const setPlayers = useSetGoalPlayers(tournamentId, panel.matchId)
+  const updateEvent = useUpdateEvent(tournamentId, panel.matchId)
+  const pending = setPlayers.isPending || updateEvent.isPending
   const team = teamById(panel, goal.tournamentTeamId ?? panel.homeTeam.tournamentTeamId)
   const ownGoal = goal.type === "OwnGoal"
 
   function save() {
+    if (Number.isNaN(goalMinute) || goalMinute < 0 || goalMinute > 300) {
+      toast.error("Minuta musi być od 0 do 300")
+      return
+    }
+    const scorer = playerId === NONE ? null : playerId
+    const assist = ownGoal || assistId === NONE ? null : assistId
+    // Inna minuta: pełna edycja zdarzenia (razem z zawodnikami). Sama zmiana zawodników działa
+    // jak dotąd - także dla organizatora po czasie na poprawki.
+    if (goalMinute !== goal.minute) {
+      updateEvent.mutate(
+        { event: goal, minute: goalMinute, playerId: scorer, relatedPlayerId: assist },
+        { onSuccess: () => setOpen(false) },
+      )
+      return
+    }
     setPlayers.mutate(
       {
         eventId: goal.id,
@@ -336,6 +355,7 @@ export function GoalPlayersDialog({
         if (next) {
           setPlayerId(goal.playerId ?? NONE)
           setAssistId(goal.relatedPlayerId ?? NONE)
+          setGoalMinute(goal.minute)
         }
       }}
     >
@@ -373,13 +393,14 @@ export function GoalPlayersDialog({
               cards={NO_CARDS}
             />
           )}
+          <MinuteField value={goalMinute} onChange={setGoalMinute} />
         </div>
         <DialogFooter>
           <Button variant="ghost" className="h-12" onClick={() => setOpen(false)}>
             Anuluj
           </Button>
-          <Button className="h-12" onClick={save} disabled={setPlayers.isPending}>
-            {setPlayers.isPending ? "Zapisywanie…" : "Zapisz"}
+          <Button className="h-12" onClick={save} disabled={pending}>
+            {pending ? "Zapisywanie…" : "Zapisz"}
           </Button>
         </DialogFooter>
       </DialogContent>

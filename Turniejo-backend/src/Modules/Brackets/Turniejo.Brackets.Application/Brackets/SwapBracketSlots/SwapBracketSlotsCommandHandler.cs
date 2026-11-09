@@ -140,6 +140,14 @@ namespace Turniejo.Brackets.Application.Brackets.SwapBracketSlots
                     return created;
             }
 
+            // Zapowiedź nie może zaczynać się razem z meczem, z którego przyjdzie do niej drużyna.
+            var startByNode = new Dictionary<Guid, DateTimeOffset>();
+            foreach (var node in affected.Where(n => n.MatchId.HasValue))
+                if (await matchModule.GetMatchAsync(node.MatchId!.Value, cancellationToken) is { } nodeMatch)
+                    startByNode[node.Id] = nodeMatch.ScheduledAt;
+            PlannedSlotGuard.ClearPlansNotAfterSources(
+                affected, n => startByNode.TryGetValue(n.Id, out var at) ? at : null);
+
             // Para z wolnym losem nigdy nie dostanie meczu — nie może wisieć w terminarzu jako zapowiedź.
             foreach (var node in swapped.Where(n => IsByeNode(n) && n.PlannedAt.HasValue))
                 node.ClearPlannedSlot();

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge"
 import { formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { resultNote } from "@/features/matches/result-note"
 import type { PublicMatch } from "@/types/public"
 
 import { type PublicLiveMatch, usePublicLiveMatch } from "../api"
@@ -61,7 +62,8 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
   const isLive = match.status === "Live" || match.status === "Paused"
   const live = usePublicLiveMatch(slug, match.id, isLive && tournament.settings.showLiveMatches)
   const minute = useLiveMinute(live.data)
-  const showScore = isLive || match.status === "Finished"
+  // Bez „Meczów na żywo” trwający mecz nie pokazuje wyniku ani szczegółów (QA v3: PUB-003f).
+  const showScore = (isLive && tournament.settings.showLiveMatches) || match.status === "Finished"
   const home = lookups.teamName(match.homeTournamentTeamId, "Gospodarze")
   const away = lookups.teamName(match.awayTournamentTeamId, "Goście")
   const pitch = lookups.pitchName(match.pitchId)
@@ -139,13 +141,8 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
           winner={showScore && awayWins}
         />
       </div>
-      {penalties && (
-        <p className="text-muted-foreground mt-1 text-right text-xs">
-          karne{" "}
-          <span className="font-mono tabular-nums">
-            {match.homePenaltyScore}:{match.awayPenaltyScore}
-          </span>
-        </p>
+      {resultNote(match) && (
+        <p className="text-muted-foreground mt-1 text-right text-xs">{resultNote(match)}</p>
       )}
     </article>
   )

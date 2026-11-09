@@ -1,4 +1,4 @@
-﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Enums;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
@@ -43,7 +43,8 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournamentById
                 isOrganizer ? tournament.CoachCode : null,
                 isOrganizer ? tournament.ViewerCode : null,
                 tournament.Description,
-                tournament.PublicSettings.IsPublic
+                tournament.PublicSettings.IsPublic,
+                tournament.UpdatedAt
             );
 
             return Result.Success(tournamentDto);

@@ -1,3 +1,4 @@
+using Turniejo.Matches.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
@@ -20,7 +21,7 @@ namespace Turniejo.Matches.UnitTests.Matches
         public ChangeFinishedMatchResultCommandHandlerTests()
         {
             _currentUserContext.UserId.Returns(Guid.NewGuid());
-            _handler = new ChangeFinishedMatchResultCommandHandler(_dbContext, _tournamentModule, _currentUserContext, _authorizationService);
+            _handler = new ChangeFinishedMatchResultCommandHandler(_dbContext, new GoalAdjuster(_dbContext), _tournamentModule, _currentUserContext, _authorizationService);
         }
 
         private Match ArrangeFinishedMatch(int editWindowMinutes, bool isOrganizer, params (bool Home, MatchEventType Type)[] goals)
@@ -163,6 +164,23 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.Value.AwayScore.Should().Be(1);
             await _dbContext.Received(2).AddMatchEventAsync(
                 Arg.Is<MatchEvent>(e => e.Type == MatchEventType.Goal && e.PlayerId == null), Arg.Any<CancellationToken>());
+        }
+            // QA v3: PUC-076 - decyzja: organizator zmienia wynik bez limitu czasu, ale tylko do zakończenia turnieju.
+        [Theory]
+        [InlineData("Finished")]
+        [InlineData("Cancelled")]
+        public async Task PUC_076_Organizer_CannotChangeResult_AfterTournamentEnded(string status)
+        {
+            var match = ArrangeFinishedMatch(60, isOrganizer: true, (true, MatchEventType.Goal));
+            _tournamentModule.GetTournamentAsync(match.TournamentId, Arg.Any<CancellationToken>())
+                .Returns(new TournamentDto(match.TournamentId, "Cup", status, "Knockout", Guid.NewGuid(), 8));
+            var command = new ChangeFinishedMatchResultCommand(match.TournamentId, match.Id, MatchResultType.Walkover, match.AwayTournamentTeamId);
+
+            var result = await _handler.Handle(command, CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Be("The tournament has finished or been cancelled");
+            await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         }
     }
 }

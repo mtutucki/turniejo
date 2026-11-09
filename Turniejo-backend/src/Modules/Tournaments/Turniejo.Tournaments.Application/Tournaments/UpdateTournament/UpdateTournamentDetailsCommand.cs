@@ -1,4 +1,4 @@
-﻿using Turniejo.SharedKernel.CQRS;
+using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Enums;
 using Turniejo.Tournaments.Application.Authorization;
 
@@ -10,7 +10,9 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournament
         DateTimeOffset StartAt,
         DateTimeOffset EndAt,
         int TeamLimit,
-        string? Description
+        string? Description,
+        // UpdatedAt turnieju z chwili otwarcia formularza; inny w bazie = ktoś zapisał w międzyczasie.
+        DateTimeOffset? ExpectedUpdatedAt = null
     ) : ICommand<UpdateTournamentDetailsResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);

@@ -11,7 +11,8 @@ namespace Turniejo.Notifications.Application.Abstractions
         // Notification
         Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default);
         Task<Notification?> GetNotificationByIdAsync(Guid notificationId, CancellationToken cancellationToken = default);
-        Task<bool> MatchReminderExistsAsync(Guid matchId, CancellationToken cancellationToken = default);
+        // Przypomnienie wysłane od createdSince (okno przed aktualnym terminem). Starsze dotyczyło terminu sprzed przesunięcia.
+        Task<bool> MatchReminderExistsAsync(Guid matchId, DateTimeOffset createdSince, CancellationToken cancellationToken = default);
 
         // NotificationRecipient
         Task AddNotificationRecipientAsync(NotificationRecipient recipient, CancellationToken cancellationToken = default);

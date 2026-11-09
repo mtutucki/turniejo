@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import Link from "next/link"
 import type { ComponentProps } from "react"
 import type { FieldError as RhfFieldError } from "react-hook-form"
 import { useForm, useWatch } from "react-hook-form"
@@ -138,6 +139,7 @@ export function TournamentDetailsForm({
         startAt: zonedToIso(values.startDate, values.startTime),
         endAt: zonedToIso(values.endDate, values.endTime),
         teamLimit: values.teamLimit,
+        expectedUpdatedAt: tournament?.updatedAt ?? null,
       })
       form.reset(values)
     } catch (error) {
@@ -181,8 +183,13 @@ export function TournamentDetailsForm({
             />
           </div>
           {outsideWarning && (
-            <p className="border-live/50 bg-live/10 rounded-lg border px-3 py-2 text-sm">
-              {outsideWarning}
+            <p className="border-destructive/50 bg-destructive/10 rounded-lg border px-3 py-2 text-sm">
+              {outsideWarning}{" "}
+              {tournament && (
+                <Link href={`/tournaments/${tournament.id}/schedule`} className="text-primary underline">
+                  Przejdź do terminarza
+                </Link>
+              )}
             </p>
           )}
           <TextField
@@ -199,7 +206,9 @@ export function TournamentDetailsForm({
           <div>
             <Button
               type="submit"
-              disabled={disabled || isSubmitting || (!!tournament && !form.formState.isDirty)}
+              disabled={
+                disabled || isSubmitting || !!outsideWarning || (!!tournament && !form.formState.isDirty)
+              }
             >
               {isSubmitting ? pendingLabel : submitLabel}
             </Button>
@@ -211,8 +220,8 @@ export function TournamentDetailsForm({
 }
 
 /**
- * Mecze, które nie mieszczą się w nowym terminie. Zapis nadal jest dozwolony (terminarz się nie
- * zmienia), ale organizator powinien o tym wiedzieć przed zapisaniem.
+ * Mecze, które nie mieszczą się w nowym terminie. Zapis jest wtedy zablokowany (decyzja QA v3, UST-004):
+ * najpierw trzeba przesunąć te mecze w terminarzu, inaczej zostałyby poza turniejem.
  */
 function outsideTermWarning(
   matches: { startAt: number; endAt: number }[],
@@ -236,5 +245,5 @@ function outsideTermWarning(
     )
   }
   if (parts.length === 0) return null
-  return `${parts.join(", a ")}. Możesz zapisać, ale terminarz się nie zmieni. Te mecze przesuniesz w terminarzu.`
+  return `${parts.join(", a ")}. Najpierw przesuń te mecze w terminarzu.`
 }

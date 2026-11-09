@@ -210,5 +210,25 @@ namespace Turniejo.Standings.UnitTests.Standings
 
             sorted.Should().Equal(sortedFromReversedInput);
         }
+            // QA v3: GRP-022 - przy trzech drużynach z równą liczbą punktów mecze bezpośrednie były porównywane
+        // parami (A>B, B>C, C>A daje cykl), więc kolejność była przypadkowa. Liczymy małą tabelę z meczów
+        // między wszystkimi drużynami o tej samej liczbie punktów.
+        [Fact]
+        public void GRP_022_HeadToHead_UsesMiniTableOfAllTiedTeams()
+        {
+            var matches = new List<GroupMatchDto>
+            {
+                new(Guid.NewGuid(), Guid.NewGuid(), TeamA, TeamB, 3, 0),
+                new(Guid.NewGuid(), Guid.NewGuid(), TeamB, TeamC, 1, 0),
+                new(Guid.NewGuid(), Guid.NewGuid(), TeamC, TeamA, 1, 0),
+            };
+            var stats = new[] { TeamC, TeamB, TeamA }.Select(t => StandingCalculator.ComputeStats(t, matches, 3, 1, 0)).ToList();
+            var rules = new List<TieBreakerRuleDto> { new(1, "HeadToHeadPoints"), new(2, "HeadToHeadGoalDiff") };
+
+            var order = StandingCalculator.SortTeams(stats, matches, rules, 3, 1, 0);
+
+            // Mała tabela: wszyscy po 3 pkt; bilans: A +2, C 0, B -2.
+            order.Should().Equal(TeamA, TeamC, TeamB);
+        }
     }
 }

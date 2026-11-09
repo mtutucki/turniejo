@@ -109,8 +109,11 @@ namespace Turniejo.Brackets.Application.Brackets.GenerateBracket
                 previousRoundNodes = currentRoundNodes;
             }
 
-            // Optional 3rd place match, sourced from the losers of the two semifinals.
-            if (settings.IsThirdPlaceMatchEnabled && semifinalNodes.Count == 2)
+            // Optional 3rd place match, sourced from the losers of the two semifinals. Półfinał z wolnym
+            // losem nie ma przegranego - mecz o 3. miejsce czekałby wtedy w nieskończoność, więc go nie tworzymy.
+            var semifinalHasBye = semifinalNodes.Any(n =>
+                n.HomeSourceType == BracketSourceType.Bye || n.AwaySourceType == BracketSourceType.Bye);
+            if (settings.IsThirdPlaceMatchEnabled && semifinalNodes.Count == 2 && !semifinalHasBye)
             {
                 var thirdPlaceRoundResult = BracketRound.Create(Guid.NewGuid(), bracket.Id, totalRounds, BracketRoundType.ThirdPlace, "3rd Place");
                 if (thirdPlaceRoundResult.IsFailure)
