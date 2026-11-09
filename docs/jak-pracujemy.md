@@ -14,7 +14,7 @@ Etykiety: `funkcja`, `błąd`, `dług` (porządki techniczne), `pomysł` (na pó
 
 ## 2. Branch i plan
 
-- Branch od aktualnego `master`: `feat/krotka-nazwa`, `fix/krotka-nazwa`, `chore/…`.
+- Branch od aktualnego `master`: `feat/short-name`, `fix/short-name`, `chore/…` (nazwy po angielsku).
 - Krótki plan: które moduły backendu, które ekrany, jakie testy na każde kryterium.
 
 ## 3. Kod i testy razem
