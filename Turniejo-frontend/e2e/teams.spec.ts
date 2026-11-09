@@ -1,4 +1,4 @@
-import { expect, loginAs, ORGANIZER, test } from "./fixtures"
+import { expect, loginAs, mock, ORGANIZER, test, TOURNAMENT_ID } from "./fixtures"
 
 type Page = import("@playwright/test").Page
 
@@ -62,5 +62,40 @@ test.describe("Baza drużyn", () => {
     await page.reload()
     await expect(page.getByRole("link", { name: /Gruby/ })).toContainText("<script>")
     expect(messages.filter((m) => m.includes("xss"))).toEqual([])
+  })
+})
+
+test.describe("Zgłoszenia do turnieju", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, ORGANIZER)
+  })
+
+  test("[DRU-032] przy jednym wolnym miejscu da się zaznaczyć tylko jedną drużynę", async ({ page }) => {
+    await mock.tournament(TOURNAMENT_ID, { teamLimit: 3 })
+    await mock.override({
+      method: "GET",
+      path: "/api/organizations/:id/teams",
+      body: [
+        { id: "x2", name: "Sokoły", shortName: null, logoUrl: null, organizationId: "o" },
+        { id: "x3", name: "Wilki", shortName: null, logoUrl: null, organizationId: "o" },
+      ],
+    })
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+    await page.getByRole("button", { name: "Zgłoś drużynę" }).click()
+    const dialog = page.getByRole("dialog", { name: "Zgłoś drużyny" })
+    await expect(dialog.getByText("Wolne miejsca: 1 z 3")).toBeVisible()
+
+    await dialog.getByRole("checkbox", { name: "Sokoły" }).click()
+    await expect(dialog.getByRole("checkbox", { name: "Wilki" })).toBeDisabled()
+  })
+
+  test("[DRU-010] kategorii z meczami nie da się usunąć, z wyjaśnieniem", async ({ page }) => {
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+    await page.getByRole("button", { name: "Usuń kategorię U12" }).click()
+
+    const dialog = page.getByRole("alertdialog", { name: "Kategorii „U12” nie da się jeszcze usunąć" })
+    await expect(dialog).toContainText("są rozegrane mecze")
+    await dialog.getByRole("button", { name: "Zamknij" }).click()
+    await expect(page.getByText("U12").first()).toBeVisible()
   })
 })

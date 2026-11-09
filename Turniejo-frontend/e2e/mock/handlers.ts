@@ -1629,6 +1629,13 @@ const control = [
     }
     return new HttpResponse(null, { status: 204 })
   }),
+  // Pola turnieju ustawione przez test (np. limit drużyn, status, format).
+  http.post("*/__control/tournaments/:id", async ({ params, request }) => {
+    const t = findTournament(String(params.id))
+    if (!t) return problem(404, "Tournament not found")
+    Object.assign(t, (await request.json()) as Partial<Tournament>)
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/__control/reset", () => {
     overrides = []
     requests = []

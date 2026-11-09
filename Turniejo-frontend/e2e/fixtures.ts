@@ -7,6 +7,7 @@ export const REFEREE = "sedzia@e2e.pl"
 export const PUBLIC_SLUG = "puchar-e2e"
 export const MATCH_ID = "0f000000-0000-4000-8000-000000000060"
 export const VIEWER_CODE = "EE3333"
+export const TOURNAMENT_ID = "0f000000-0000-4000-8000-000000000010"
 
 type MockState = {
   tournaments: { id: string; name: string; status: string }[]
@@ -34,6 +35,12 @@ export const mock = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(o),
+    }),
+  tournament: (id: string, fields: Record<string, unknown>) =>
+    fetch(`${MOCK_URL}/__control/tournaments/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
     }),
   matchStatus: (matchId: string, status: string) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/status`, {
