@@ -284,7 +284,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
             className="flex items-center gap-3 rounded-xl border border-yellow-400/40 bg-yellow-400/10 p-4"
           >
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-yellow-400/20">
-              <Trophy className="size-5 text-yellow-500" aria-hidden />
+              <Trophy className="size-5 text-yellow-700 dark:text-yellow-500" aria-hidden />
             </span>
             <span className="min-w-0">
               <span className="text-muted-foreground block text-xs font-medium tracking-wide uppercase">

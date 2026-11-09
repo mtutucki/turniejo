@@ -435,6 +435,7 @@ const api = [
         lastName: user.lastName,
         phoneNumber: user.phoneNumber ?? null,
         seenReleaseVersion: user.seenReleaseVersion ?? null,
+        theme: user.theme ?? "system",
       }),
     ),
   ),
@@ -464,6 +465,17 @@ const api = [
         return i >= 0 && x![i]! > y![i]!
       }
       if (!user.seenReleaseVersion || newer(version, user.seenReleaseVersion)) user.seenReleaseVersion = version
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  // Jak SetMyThemeCommand: tylko system, light albo dark.
+  http.put(
+    "*/api/me/theme",
+    authed(async ({ user, request }) => {
+      const { theme } = (await request.json()) as { theme: string }
+      if (theme !== "system" && theme !== "light" && theme !== "dark")
+        return problem(422, "Theme must be system, light or dark.")
+      user.theme = theme
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -1892,6 +1904,13 @@ const control = [
     user.seenReleaseVersion = ((await request.json()) as { version: string | null }).version
     return new HttpResponse(null, { status: 204 })
   }),
+  // Motyw na koncie ustawiony przez test (np. wybrany wcześniej na innym urządzeniu).
+  http.post("*/__control/users/:email/theme", async ({ params, request }) => {
+    const user = db.users.find((u) => u.email === String(params.email))
+    if (!user) return problem(404, "User not found")
+    user.theme = ((await request.json()) as { theme: User["theme"] }).theme
+    return new HttpResponse(null, { status: 204 })
+  }),
   http.post("*/__control/reset", () => {
     overrides = []
     requests = []
@@ -1930,6 +1949,7 @@ const control = [
         email: u.email,
         roles: u.roles.map((r) => `${r.role}@${r.scopeType}`),
         seenReleaseVersion: u.seenReleaseVersion ?? null,
+        theme: u.theme ?? "system",
       })),
       organizations: db.organizations.map((o) => o.name),
       requests,

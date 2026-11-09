@@ -23,6 +23,7 @@ Nowa decyzja: dopisz wiersz z datą. Zmiana decyzji: popraw wiersz i dopisz dat�
 | Powiadomienia | tylko w aplikacji; push na później | prostota V1 |
 | Współbieżny zapis | dane turnieju: wersja (`UpdatedAt`); zasady gry i portal: wczytane wartości; konflikt = 409 i prośba o odświeżenie (2026-11-09) | dwóch organizatorów nie nadpisuje się po cichu |
 | Okno „Co nowego” | tylko po wydaniu (X.Y.Z), jedno okno ze wszystkimi pominiętymi wersjami, tylko „Nowe” i „Zmienione”, ostatnia obejrzana wersja na koncie; nowe konto bez okna, istniejące konta startują od 1.0.0 (2026-11-09) | nie zasypujemy wracających wieloma oknami, okno nie wraca na innym urządzeniu |
+| Motyw jasny/ciemny | domyślnie jak w systemie; ikonka na wierzchu nagłówka panelu, portalu i meczu na żywo (nie w ustawieniach); zalogowany ma wybór na koncie i po zalogowaniu wygrywa on z wyborem z przeglądarki, kibic bez konta tylko w przeglądarce; zielony nagłówek marki taki sam w obu motywach (2026-11-10) | sędzia w słońcu przełącza jednym dotknięciem, wybór idzie za kontem między urządzeniami |
 
 ## Produkt
 

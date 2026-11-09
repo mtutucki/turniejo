@@ -12,7 +12,12 @@ export const TOURNAMENT_ID = "0f000000-0000-4000-8000-000000000010"
 type MockState = {
   tournaments: { id: string; name: string; status: string }[]
   matches: { id: string; homeScore: number; awayScore: number }[]
-  users: { email: string; roles: string[]; seenReleaseVersion: string | null }[]
+  users: {
+    email: string
+    roles: string[]
+    seenReleaseVersion: string | null
+    theme: "system" | "light" | "dark"
+  }[]
   organizations: string[]
   requests: string[]
   connections: { tournaments: number; matches: number }
@@ -57,6 +62,13 @@ export const mock = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version }),
+    }),
+  /** Motyw na koncie, jakby wybrany na innym urządzeniu. */
+  theme: (email: string, theme: "system" | "light" | "dark") =>
+    fetch(`${MOCK_URL}/__control/users/${encodeURIComponent(email)}/theme`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme }),
     }),
   release: (matchId: string) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/release`, { method: "POST" }),

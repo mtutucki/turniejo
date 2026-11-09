@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
+import { ThemeToggle } from "@/features/theme/theme-toggle"
 import { DEFAULT_APP_PATH } from "@/lib/auth/public-paths"
 import { formatDateRange, toZonedDateInput } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -104,6 +105,7 @@ export function PublicHeader() {
                     : "Łączenie…"}
               </span>
             )}
+            <ThemeToggle className="-my-1 size-8" />
             <AppLink />
           </div>
         </div>
