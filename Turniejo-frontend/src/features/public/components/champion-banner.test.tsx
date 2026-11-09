@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { Match } from "@/types/matches"
 import type { Bracket, BracketNode } from "@/types/public"
 
-import { bracketChampion, matchWinner } from "./champion-banner"
+import { bracketChampion, matchWinner, showsChampion } from "./champion-banner"
 
 const match = (overrides: Partial<Match>): Match => ({
   id: "m",
@@ -42,6 +42,22 @@ const node = (id: string, matchId: string, winnerGoesToNodeId: string | null): B
   awaySourcePosition: null,
   plannedPitchId: null,
   plannedAt: null,
+})
+
+// QA v3: PUC-045, PUB-011 - decyzja: baner mistrza zaraz po finale, nie dopiero po „Zakończ turniej”.
+describe("showsChampion", () => {
+  it("puchar: od razu w trakcie turnieju (baner sam czeka na rozegrany finał)", () => {
+    expect(showsChampion("InProgress", "Knockout")).toBe(true)
+    expect(showsChampion("InProgress", "GroupAndKnockout")).toBe(true)
+  })
+  it("same grupy: dopiero po zakończeniu turnieju", () => {
+    expect(showsChampion("InProgress", "Group")).toBe(false)
+    expect(showsChampion("Finished", "Group")).toBe(true)
+  })
+  it("przed startem i bez formatu: nigdy", () => {
+    expect(showsChampion("ScheduleGenerated", "Knockout")).toBe(false)
+    expect(showsChampion("Finished", null)).toBe(false)
+  })
 })
 
 describe("matchWinner", () => {
