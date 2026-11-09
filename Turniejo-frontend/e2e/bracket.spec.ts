@@ -82,3 +82,28 @@ test.describe("Drabinka pucharu", () => {
     await expect(page.getByText("Do drabinki zmieści się 16 z 17 drużyn.", { exact: false })).toBeVisible()
   })
 })
+
+test("[PUC-071] przeliczenie drabinki przy rozpoczętym meczu kolejnej rundy", async ({ page }) => {
+  await loginAs(page, ORGANIZER)
+  await mock.tournament(TOURNAMENT_ID, { format: "Knockout", status: "InProgress" })
+  // Finał drabinki to trwający mecz z seeda, więc któryś mecz pucharu już się zaczął.
+  const node = {
+    id: "n-final", bracketRoundId: "r-final", matchId: "0f000000-0000-4000-8000-000000000060",
+    homeSourceType: "Fixed", homeTournamentTeamId: "0f000000-0000-4000-8000-000000000050",
+    awaySourceType: "Fixed", awayTournamentTeamId: "0f000000-0000-4000-8000-000000000051",
+    winnerGoesToNodeId: null, loserGoesToNodeId: null, winnerGoesToSlot: null,
+    homeSourceGroupId: null, homeSourcePosition: null, awaySourceGroupId: null, awaySourcePosition: null,
+    plannedPitchId: null, plannedAt: null, plannedRefereeId: null,
+  }
+  await mock.override({
+    method: "GET",
+    path: "/api/tournaments/:id/bracket",
+    body: { id: "b1", tournamentId: TOURNAMENT_ID, rounds: [{ id: "r-final", roundNumber: 1, roundType: "Standard", name: "Finał", nodes: [node] }] },
+  })
+  await mock.override({ method: "POST", path: "/api/tournaments/:id/bracket/recalculate", body: { changed: false, blockedMatchIds: ["m-sf"] } })
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/bracket`)
+
+  await page.getByRole("button", { name: "Przelicz drabinkę" }).click()
+
+  await expect(page.getByText("Kolejny mecz już się zaczął, więc nie dało się w nim zmienić drużyny.")).toBeVisible()
+})

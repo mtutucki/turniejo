@@ -71,6 +71,7 @@ export type Match = {
   totalPausedSeconds?: number
   resultType?: string
   winnerTournamentTeamId?: string | null
+  editLockedAt?: string | null
 }
 
 // Stałe id — testy odwołują się do nich w URL-ach.

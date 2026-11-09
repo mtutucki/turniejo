@@ -126,3 +126,12 @@ test.describe("Zdarzenia meczu", () => {
     await expect(page.getByRole("region", { name: "MVP meczu" })).toContainText("Adam")
   })
 })
+
+test("[KON-036] sędzia po oknie poprawek nie zmienia rozstrzygnięcia", async ({ page }) => {
+  await mock.matchStatus(MATCH_ID, "Finished", new Date(Date.now() - 60_000).toISOString())
+  await loginAs(page, REFEREE)
+  await page.goto(`/matches/${MATCH_ID}/live`)
+
+  await expect(page.getByText("Mecz zakończony - wynik jest zablokowany.")).toBeVisible()
+  await expect(page.getByRole("button", { name: /Zmień rozstrzygnięcie/ })).toHaveCount(0)
+})

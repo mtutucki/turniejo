@@ -166,3 +166,16 @@ test.describe("Generator terminarza: warunki", () => {
     await expect(generate(page)).toBeDisabled()
   })
 })
+
+test("[PUC-068] puchar: drabinka powstaje sama z propozycji", async ({ page }) => {
+  await loginAs(page, ORGANIZER)
+  await readyToGenerate([1, 2, 3, 4, 5, 6, 7, 8].map((i) => team(i, { groupId: null })))
+  await mock.tournament(TOURNAMENT_ID, { format: "Knockout" })
+  await page.goto(GENERATE_URL)
+
+  // Drabinka powstaje sama po wejściu do generatora, bez klikania „Utwórz drabinkę”.
+  await expect.poll(() => mock.calls("POST", "/bracket/generate")).toBe(1)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/bracket`)
+  await expect(page.getByText("Ćwierćfinały").first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "Utwórz drabinkę" })).toHaveCount(0)
+})

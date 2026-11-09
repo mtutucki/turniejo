@@ -228,7 +228,7 @@ const livePanel = (m: Match) => ({
   homeTeam: matchTeam(m.home),
   awayTeam: matchTeam(m.away),
   events: m.events,
-  editLockedAt: null,
+  editLockedAt: m.editLockedAt ?? null,
   elapsedSeconds: elapsed(m),
   homePenaltyScore: null,
   awayPenaltyScore: null,
@@ -1378,6 +1378,7 @@ const config = [
       return new HttpResponse(null, { status: 204 })
     }),
   ),
+  http.get("*/api/tournaments/:id/members", authed(() => HttpResponse.json([]))),
   http.get(
     "*/api/tournaments/:id/public-settings",
     authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).publicSettings)),
@@ -1847,8 +1848,9 @@ const control = [
   http.post("*/__control/matches/:id/status", async ({ params, request }) => {
     const m = findMatch(String(params.id))
     if (!m) return problem(404, "Match not found")
-    const { status } = (await request.json()) as { status: string }
+    const { status, editLockedAt } = (await request.json()) as { status: string; editLockedAt?: string | null }
     m.status = status
+    if (editLockedAt !== undefined) m.editLockedAt = editLockedAt
     if (status === "Scheduled") {
       Object.assign(m, { startedAt: null, pausedAt: null, totalPausedSeconds: 0, homeScore: 0, awayScore: 0, events: [] })
     }

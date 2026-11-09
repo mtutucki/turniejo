@@ -42,11 +42,11 @@ export const mock = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     }),
-  matchStatus: (matchId: string, status: string) =>
+  matchStatus: (matchId: string, status: string, editLockedAt?: string | null) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, editLockedAt }),
     }),
   /** Ile razy aplikacja wywołała dane API od początku testu, np. "POST", "/start". */
   calls: async (method: string, pathEnd: string) =>

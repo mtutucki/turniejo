@@ -78,3 +78,15 @@ test.describe("Strony dla gościa", () => {
     })
   }
 })
+
+test("[PUB-006] tabela grupy i puchar bez drabinki nie dają błędu", async ({ page }) => {
+  await portalWith({ showStandings: true })
+  const standings = await page.goto(`/t/${PUBLIC_SLUG}/standings`)
+  expect(standings?.status()).toBe(200)
+  await expect(page.getByText(/coś poszło nie tak|błąd/i)).toHaveCount(0)
+
+  await portalWith({ showBracket: true }, "Knockout")
+  const bracket = await page.goto(`/t/${PUBLIC_SLUG}/bracket`)
+  expect(bracket?.status()).toBe(200)
+  await expect(page.getByText(/coś poszło nie tak|błąd/i)).toHaveCount(0)
+})

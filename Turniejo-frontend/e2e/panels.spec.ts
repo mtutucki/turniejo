@@ -1,4 +1,4 @@
-import { expect, loginAs, test } from "./fixtures"
+import { expect, loginAs, mock, test } from "./fixtures"
 
 const COACH = "trener@e2e.pl"
 const PARENT = "rodzic@e2e.pl"
@@ -53,4 +53,29 @@ test.describe("Panel rodzica", () => {
     await expect(page.getByText("Profil zapisany")).toBeVisible()
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Adaś")
   })
+})
+
+test("[PAN-003] trener dodaje zawodnika przed startem turnieju", async ({ page }) => {
+  await mock.tournament("0f000000-0000-4000-8000-000000000010", { status: "RegistrationClosed" })
+  await loginAs(page, COACH)
+  await page.goto(`/coach/teams/${HOME_TEAM}/players`)
+
+  await page.getByRole("button", { name: "Dodaj zawodnika" }).click()
+  const dialog = page.getByRole("dialog", { name: "Nowy zawodnik" })
+  await dialog.getByLabel("Imię").fill("Kamil")
+  await dialog.getByLabel("Nazwisko").fill("Trenerski")
+  await dialog.getByLabel("Data urodzenia").fill("2014-04-04")
+  await dialog.getByRole("button", { name: "Dodaj do składu" }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText("Kamil Trenerski", { exact: true })).toBeVisible()
+})
+
+test("[PAN-014] rodzic w pucharze: bez zakładki tabeli", async ({ page }) => {
+  await mock.override({ method: "GET", path: "/api/parent/players/:id/standing", body: [] })
+  await loginAs(page, PARENT)
+  await page.goto(`/parent/players/${CHILD}/schedule`)
+
+  await expect(page.getByRole("link", { name: "Wyniki", exact: true })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Tabela", exact: true })).toHaveCount(0)
 })

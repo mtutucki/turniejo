@@ -114,3 +114,20 @@ test.describe("Portal kibica", () => {
     await expect(page.getByRole("combobox", { name: "Drużyna" })).toHaveText(/Lwy E2E/)
   })
 })
+
+test("[PUC-033a] przeniesienie meczu na zajęte boisko", async ({ page }) => {
+  await mock.matchStatus("0f000000-0000-4000-8000-000000000060", "Scheduled")
+  await mock.override({
+    method: "PUT",
+    path: "/api/tournaments/:tid/matches/:mid/schedule",
+    status: 400,
+    body: { code: "Validation.ScheduledAt", message: "Another match is already scheduled on this pitch at this time", type: 2 },
+  })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule`)
+  await page.getByRole("button", { name: "Zmień termin: Orły E2E – Lwy E2E" }).click()
+  const dialog = page.getByRole("dialog", { name: "Zmień termin" })
+  await dialog.getByRole("button", { name: "Zapisz" }).click()
+
+  await expect(page.getByText("Na tym boisku trwa wtedy inny mecz")).toBeVisible()
+})
