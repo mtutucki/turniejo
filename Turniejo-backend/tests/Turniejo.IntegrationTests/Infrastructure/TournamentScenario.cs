@@ -187,26 +187,71 @@ public sealed class TournamentScenario
         await _factory.FlushOutboxAsync();
     }
 
+    public async Task AssignRefereeAsync(Guid matchId, Guid refereeId) =>
+        (await Organizer.PatchAsJsonAsync($"/api/tournaments/{TournamentId}/matches/{matchId}/referee", new { refereeId }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+    /// <summary>Trener zgłoszenia <paramref name="team"/>; zwraca teamStaffId.</summary>
+    public async Task<Guid> AssignCoachAsync(string team, Guid userId)
+    {
+        var response = await Organizer.PostAsJsonAsync($"/api/tournaments/{TournamentId}/tournament-teams/{Team(team)}/coaches", new { userId });
+        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+        return (await response.ReadJsonAsync()).GetGuid("teamStaffId");
+    }
+
+    /// <summary>Nowy zawodnik w składzie (i kadrze klubu) drużyny <paramref name="team"/>.</summary>
+    public async Task<(Guid TournamentPlayerId, Guid PlayerId)> CreatePlayerAsync(
+        string team, string firstName, string lastName, int? shirtNumber = null, DateTime? birthDate = null)
+    {
+        var response = await Organizer.PostAsJsonAsync($"/api/tournaments/{TournamentId}/tournament-teams/{Team(team)}/players/new",
+            new { firstName, lastName, birthDate = birthDate ?? new DateTime(2012, 1, 1), defaultPosition = 3, photoUrl = (string?)null, shirtNumber, position = (int?)null });
+        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+        var json = await response.ReadJsonAsync();
+        return (json.GetGuid("tournamentPlayerId"), json.GetGuid("playerId"));
+    }
+
+    public async Task AddGuardianAsync(Guid playerId, string team, Guid userId, bool canEdit = true) =>
+        (await Organizer.PostAsJsonAsync($"/api/players/{playerId}/guardians",
+                new { tournamentId = TournamentId, tournamentTeamId = Team(team), userId, relationshipType = 1, canEdit, canReceiveNotifications = true }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+    /// <summary>Klient zalogowany jako nowy użytkownik bez żadnej roli.</summary>
+    public async Task<(HttpClient Client, Guid UserId)> NewUserAsync(string prefix = "user")
+    {
+        var email = $"{prefix}-{Guid.NewGuid():N}@integration.test";
+        var userId = await TournamentFlow.SeedUserAsync(_factory, email);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.EmailHeader, email);
+        return (client, userId);
+    }
+
+    public async Task<JsonElement> TournamentAsync() =>
+        await (await Organizer.GetAsync($"/api/tournaments/{TournamentId}")).ReadJsonAsync();
+
     /// <summary>Nowy użytkownik dołączony kodem turnieju jako sędzia, trener albo kibic.</summary>
     public async Task<(HttpClient Client, Guid UserId)> JoinAsync(string role)
     {
-        var tournament = await (await Organizer.GetAsync($"/api/tournaments/{TournamentId}")).ReadJsonAsync();
-        var code = role switch
+        var (client, userId) = await NewUserAsync(role.ToLowerInvariant());
+        await JoinWithAsync(client, role);
+        return (client, userId);
+    }
+
+    /// <summary>Kod turnieju dla roli: Referee, Coach albo Viewer.</summary>
+    public async Task<string> CodeAsync(string role)
+    {
+        var tournament = await TournamentAsync();
+        return role switch
         {
             "Referee" => tournament.GetString("refereeCode"),
             "Coach" => tournament.GetString("coachCode"),
             "Viewer" => tournament.GetString("viewerCode"),
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Referee, Coach albo Viewer"),
         };
-
-        var email = $"{role.ToLowerInvariant()}-{Guid.NewGuid():N}@integration.test";
-        var userId = await TournamentFlow.SeedUserAsync(_factory, email);
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.EmailHeader, email);
-        (await client.PostAsJsonAsync("/api/tournaments/join", new { code })).IsSuccessStatusCode.Should().BeTrue();
-        return (client, userId);
     }
+
+    public async Task JoinWithAsync(HttpClient client, string role) =>
+        (await client.PostAsJsonAsync("/api/tournaments/join", new { code = await CodeAsync(role) })).IsSuccessStatusCode.Should().BeTrue();
 
     /// <summary>Powiadomienia użytkownika (po przetworzeniu outboxa).</summary>
     public async Task<List<JsonElement>> NotificationsAsync(HttpClient client)

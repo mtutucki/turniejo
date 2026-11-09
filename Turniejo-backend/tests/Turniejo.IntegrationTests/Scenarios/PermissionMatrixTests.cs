@@ -90,22 +90,19 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
 
         var (r1, r1Id) = await a.JoinAsync("Referee");
         var (r2, r2Id) = await a.JoinAsync("Referee");
-        await AssignRefereeAsync(a, m1, r1Id);
-        await AssignRefereeAsync(a, m2, r2Id);
+        await a.AssignRefereeAsync(m1, r1Id);
+        await a.AssignRefereeAsync(m2, r2Id);
 
         var (c1, c1Id) = await a.JoinAsync("Coach");
         var (c2, c2Id) = await a.JoinAsync("Coach");
-        await AssignCoachAsync(a, "T1", c1Id);
-        var staffC2 = await AssignCoachAsync(a, "T3", c2Id);
+        await a.AssignCoachAsync("T1", c1Id);
+        var staffC2 = await a.AssignCoachAsync("T3", c2Id);
 
-        var (tp1, p1) = await CreatePlayerAsync(a, "T1", "Adam", "Pierwszy");
-        var (tp3, p3) = await CreatePlayerAsync(a, "T3", "Celina", "Trzecia");
+        var (tp1, p1) = await a.CreatePlayerAsync("T1", "Adam", "Pierwszy");
+        var (tp3, p3) = await a.CreatePlayerAsync("T3", "Celina", "Trzecia");
 
-        var parentEmail = $"parent-{Guid.NewGuid():N}@integration.test";
-        var parentId = await TournamentFlow.SeedUserAsync(Factory, parentEmail);
-        (await org.PostAsJsonAsync($"/api/players/{p1}/guardians",
-                new { tournamentId = a.TournamentId, tournamentTeamId = a.Team("T1"), userId = parentId, relationshipType = 1, canEdit = true, canReceiveNotifications = true }))
-            .IsSuccessStatusCode.Should().BeTrue();
+        var (parent, parentId) = await a.NewUserAsync("parent");
+        await a.AddGuardianAsync(p1, "T1", parentId);
 
         var (viewer, viewerId) = await a.JoinAsync("Viewer");
 
@@ -128,7 +125,7 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             Clients = new()
             {
                 [OrgA] = org, [OrgB] = b.Organizer, [R1] = r1, [R2] = r2, [C1] = c1, [C2] = c2,
-                [Parent] = Client(parentId, parentEmail), [Viewer] = viewer, [Anon] = CreateClient(),
+                [Parent] = parent, [Viewer] = viewer, [Anon] = CreateClient(),
             },
             UserIds = new() { [R1] = r1Id, [R2] = r2Id, [C1] = c1Id, [C2] = c2Id, [Parent] = parentId, [Viewer] = viewerId },
             M1 = m1, M2 = m2, MB = mb, Goal1 = goalId, Tp1 = tp1, P1 = p1, Tp3 = tp3, P3 = p3, StaffC2 = staffC2,
@@ -322,33 +319,5 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
         using var request = new HttpRequestMessage(method, url) { Content = body ?? (method == HttpMethod.Get || method == HttpMethod.Delete ? null : new StringContent("", Encoding.UTF8)) };
         using var response = await client.SendAsync(request);
         return response.StatusCode;
-    }
-
-    private HttpClient Client(Guid userId, string email)
-    {
-        var client = CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.EmailHeader, email);
-        return client;
-    }
-
-    private static async Task AssignRefereeAsync(TournamentScenario s, Guid matchId, Guid refereeId) =>
-        (await s.Organizer.PatchAsJsonAsync($"/api/tournaments/{s.TournamentId}/matches/{matchId}/referee", new { refereeId }))
-            .IsSuccessStatusCode.Should().BeTrue();
-
-    private static async Task<Guid> AssignCoachAsync(TournamentScenario s, string team, Guid userId)
-    {
-        var response = await s.Organizer.PostAsJsonAsync($"/api/tournaments/{s.TournamentId}/tournament-teams/{s.Team(team)}/coaches", new { userId });
-        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
-        return (await response.ReadJsonAsync()).GetGuid("teamStaffId");
-    }
-
-    private static async Task<(Guid TournamentPlayerId, Guid PlayerId)> CreatePlayerAsync(TournamentScenario s, string team, string first, string last)
-    {
-        var response = await s.Organizer.PostAsJsonAsync($"/api/tournaments/{s.TournamentId}/tournament-teams/{s.Team(team)}/players/new",
-            new { firstName = first, lastName = last, birthDate = new DateTime(2012, 1, 1), defaultPosition = 3, photoUrl = (string?)null, shirtNumber = (int?)null, position = (int?)null });
-        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
-        var json = await response.ReadJsonAsync();
-        return (json.GetGuid("tournamentPlayerId"), json.GetGuid("playerId"));
     }
 }

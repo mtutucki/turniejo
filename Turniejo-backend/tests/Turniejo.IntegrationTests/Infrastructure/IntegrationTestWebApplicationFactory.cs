@@ -35,7 +35,9 @@ public sealed class IntegrationTestWebApplicationFactory : WebApplicationFactory
         {
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString()
+                ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
+                // Jeden host i jedno IP na cały przebieg: limity żądań blokowałyby kolejne testy rejestracji.
+                ["RateLimiting:Enabled"] = "false",
             });
         });
 
