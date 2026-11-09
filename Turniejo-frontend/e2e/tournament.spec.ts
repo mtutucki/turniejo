@@ -25,7 +25,7 @@ test.describe("Tworzenie turnieju → Zmiana statusu", () => {
     // Przejście wymaga potwierdzenia w dialogu.
     await page.getByRole("button", { name: "Otwórz zapisy" }).click()
     const dialog = page.getByRole("alertdialog")
-    await expect(dialog).toContainText("Nie da się cofnąć")
+    await expect(dialog).toContainText("Status turnieju zmieni się na „Zapisy otwarte”")
     await dialog.getByRole("button", { name: "Otwórz zapisy" }).click()
 
     await expect(steps.locator("[aria-current=step]")).toHaveText("Zapisy otwarte")
