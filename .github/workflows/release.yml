@@ -1,0 +1,33 @@
+# Wydanie: po wypchnięciu tagu vX.Y.Z (scripts/release.sh tag X.Y.Z) tworzy GitHub Release z sekcją
+# tej wersji z CHANGELOG.md. Samo wdrożenie robi deploy.yml. Zasady: docs/wersjonowanie.md.
+name: Wydanie
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Notatki z CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v head="## [$version]" '
+            index($0, head) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ -z "$(tr -d '[:space:]' < notes.md)" ]; then
+            echo "::error::CHANGELOG.md nie ma sekcji [$version] z opisem zmian"
+            exit 1
+          fi
+      - name: Utwórz wydanie
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "Turniejo $GITHUB_REF_NAME" --notes-file notes.md --verify-tag

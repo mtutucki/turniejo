@@ -9,9 +9,10 @@ Pełny opis: [docs/jak-pracujemy.md](docs/jak-pracujemy.md). Skrót:
 1. Każda funkcja i poprawka na osobnym branchu od aktualnego `master`: `feat/…`, `fix/…`, `chore/…`.
 2. Najpierw krótki plan i kryteria akceptacji (z issue na GitHubie albo od użytkownika). Niejasna decyzja produktowa: zapytaj, nie zgaduj. Zapisz ją w [docs/decyzje.md](docs/decyzje.md).
 3. Każde kryterium ma test na właściwej warstwie ([docs/testy.md](docs/testy.md)). Poprawka błędu zaczyna się od testu, który ten błąd pokazuje.
-4. Jeden commit na jedną zmianę (poprawkę, regułę, ekran), z opisem „dlaczego”. Nie mieszaj sprzątania z funkcją.
+4. Jeden commit na jedną zmianę (poprawkę, regułę, ekran), z opisem „dlaczego”. Nie mieszaj sprzątania z funkcją. Zmiana widoczna dla użytkownika dostaje linijkę w „Nieopublikowane” w `CHANGELOG.md` (po polsku, z perspektywy użytkownika).
 5. Przed oddaniem: `bash scripts/check.sh` (a przy zmianach UI także `--e2e`) musi przejść.
 6. Nie pushuj i nie zakładaj PR bez prośby użytkownika. Opis PR po angielsku, z sekcjami Summary i Test plan.
+7. Wydania (numer wersji, tag, GitHub Release) tylko na prośbę użytkownika, według [docs/wersjonowanie.md](docs/wersjonowanie.md) i `scripts/release.sh`.
 
 Do prowadzenia funkcji od początku do końca służy skill [nowa-funkcja](.claude/skills/nowa-funkcja/SKILL.md).
 

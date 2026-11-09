@@ -109,6 +109,9 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
+// Wersja wdrożenia (git describe --tags z deploy/deploy.sh), np. przy zgłaszaniu błędu. Lokalnie "dev".
+app.MapGet("/version", (IConfiguration configuration) =>
+    Results.Ok(new { version = configuration["App:Version"] is { Length: > 0 } version ? version : "dev" }));
 
 app.MapControllers();
 app.MapHub<MatchHub>("/hubs/matches");

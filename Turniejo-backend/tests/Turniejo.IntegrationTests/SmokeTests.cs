@@ -17,6 +17,15 @@ public sealed class SmokeTests(IntegrationTestWebApplicationFactory factory) : I
     }
 
     [Fact]
+    public async Task Version_IsPublic_AndNamesTheDeployedVersion()
+    {
+        var response = await CreateClient().GetAsync("/version");
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+        (await response.ReadJsonAsync()).GetString("version").Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
     public async Task Me_ShouldReturnUnauthorized_WhenNoTestAuthHeaderPresent()
     {
         var client = CreateClient();

@@ -28,11 +28,15 @@ main() {
   "$deploy_dir/backup.sh"
 
   echo "==> Pobieranie kodu ($branch)"
-  git -C "$repo_dir" fetch --prune origin "$branch"
+  git -C "$repo_dir" fetch --prune --tags origin "$branch"
   # reset zamiast pull: serwer zawsze ma dokładnie to, co na GitHubie (lokalne zmiany w plikach
   # z repo są nadpisywane, .env nie jest w gicie, więc zostaje).
   git -C "$repo_dir" reset --hard "origin/$branch"
-  echo "Wersja: $(git -C "$repo_dir" log -1 --format='%h %s')"
+  # Wersja z ostatniego tagu wydania, np. v1.2.0 albo v1.2.0-3-gabc1234 (3 commity po wydaniu).
+  # Trafia do stopki aplikacji i pod /backend/version (docs/wersjonowanie.md).
+  APP_VERSION="$(git -C "$repo_dir" describe --tags --always)"
+  export APP_VERSION
+  echo "Wersja: $APP_VERSION ($(git -C "$repo_dir" log -1 --format='%s'))"
 
   echo "==> Build i restart kontenerów"
   "${compose[@]}" up -d --build --remove-orphans

@@ -39,5 +39,6 @@ bash scripts/check.sh --e2e    # to samo + E2E na mocku (ok. 6 min)
 - [docs/architektura.md](docs/architektura.md) - moduły, przepływ danych, czasu rzeczywistego i uprawnień
 - [docs/testy.md](docs/testy.md) - warstwy testów, kiedy który, jak uruchomić
 - [docs/decyzje.md](docs/decyzje.md) - decyzje architektoniczne i produktowe
+- [docs/wersjonowanie.md](docs/wersjonowanie.md) - numery wersji, lista zmian, wydania ([CHANGELOG.md](CHANGELOG.md))
 - [deploy/README.md](deploy/README.md) - serwer, wdrożenie, backup
 - [CLAUDE.md](CLAUDE.md) - instrukcje dla agenta (Claude Code)

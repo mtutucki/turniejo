@@ -8,6 +8,8 @@ name: Deploy
 on:
   push:
     branches: [master]
+    # Tag wydania (vX.Y.Z) wdraża ten sam kod jeszcze raz, żeby serwer pokazywał dokładny numer wersji.
+    tags: ["v*.*.*"]
   pull_request:
   workflow_dispatch:
 

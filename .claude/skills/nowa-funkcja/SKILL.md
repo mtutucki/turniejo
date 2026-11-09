@@ -36,7 +36,7 @@ bash scripts/check.sh --e2e
 
 Wszystko zielone. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), uruchom też pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`).
 
-Nowe decyzje dopisz do `docs/decyzje.md`, zmiany w architekturze do `docs/architektura.md`.
+Nowe decyzje dopisz do `docs/decyzje.md`, zmiany w architekturze do `docs/architektura.md`. Zmiana widoczna dla użytkownika: jedna linijka w sekcji „Nieopublikowane” w `CHANGELOG.md` (kategoria Nowe / Zmienione / Poprawione / Usunięte, po polsku, z perspektywy użytkownika).
 
 ## 5. Oddanie
 

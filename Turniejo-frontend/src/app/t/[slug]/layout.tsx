@@ -6,6 +6,7 @@ import { ChampionBanner } from "@/features/public/components/champion-banner"
 import { PublicHeader } from "@/features/public/components/public-header"
 import { PublicTournamentProvider } from "@/features/public/public-context"
 import { getPublicTournament } from "@/features/public/server"
+import { formatVersion } from "@/lib/version"
 
 export async function generateMetadata({ params }: LayoutProps<"/t/[slug]">): Promise<Metadata> {
   const { slug } = await params
@@ -35,7 +36,10 @@ export default async function PublicTournamentLayout({
           {children}
         </main>
         <footer className="text-muted-foreground space-y-2 border-t py-6 text-center text-xs">
-          <p>Wyniki na żywo · Turniejo</p>
+          <p>
+            Wyniki na żywo · Turniejo
+            {formatVersion() && ` · wersja ${formatVersion()}`}
+          </p>
           <LegalLinks className="justify-center" />
         </footer>
       </div>
