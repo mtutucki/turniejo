@@ -159,4 +159,25 @@ public sealed class TournamentSettingsRulesTests(IntegrationTestWebApplicationFa
         (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", Portal(false, false))).StatusCode
             .Should().Be(System.Net.HttpStatusCode.Conflict);
     }
+
+    [Fact]
+    public async Task UST_002_TwoTournamentsWithTheSameName_GetSeparatePublicPages()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var first = await s.TournamentAsync();
+        var created = await s.Organizer.PostAsJsonAsync("/api/tournaments", new
+        {
+            organizationId = s.OrganizationId, name = first.GetString("name"), startAt = s.StartsAt, endAt = s.StartsAt.AddDays(1), teamLimit = 8, description = (string?)null,
+        });
+        created.IsSuccessStatusCode.Should().BeTrue(await created.Content.ReadAsStringAsync());
+        var second = await created.ReadJsonAsync();
+        var publicSettings = new { isPublic = true, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true };
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings", publicSettings)).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PutAsJsonAsync($"/api/tournaments/{second.GetGuid("tournamentId")}/public-settings", publicSettings)).IsSuccessStatusCode.Should().BeTrue();
+
+        second.GetString("slug").Should().NotBe(first.GetString("slug"));
+        var anonymous = CreateClient();
+        (await (await anonymous.GetAsync($"/public/tournaments/{first.GetString("slug")}")).ReadJsonAsync()).GetGuid("id").Should().Be(s.TournamentId);
+        (await (await anonymous.GetAsync($"/public/tournaments/{second.GetString("slug")}")).ReadJsonAsync()).GetGuid("id").Should().Be(second.GetGuid("tournamentId"));
+    }
 }
