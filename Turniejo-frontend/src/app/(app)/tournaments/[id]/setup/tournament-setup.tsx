@@ -25,12 +25,14 @@ import { TeamFormDialog } from "@/features/teams/components/team-form-dialog"
 import {
   useMyOrganization,
   usePublicSettings,
+  useTieBreakerRules,
   useTournamentSettings,
 } from "@/features/tournaments/api"
 import { FormatForm } from "@/features/tournaments/components/format-form"
 import { PublicSettingsForm } from "@/features/tournaments/components/public-settings-form"
 import { SportSettingsForm } from "@/features/tournaments/components/sport-settings-form"
-import { SETUP_STEP_KEYS, type SetupStepKey } from "@/features/tournaments/setup-steps"
+import { TieBreakerEditor } from "@/features/tournaments/components/tie-breaker-editor"
+import { setupStepsFor, type SetupStepKey } from "@/features/tournaments/setup-steps"
 import { useSetupProgress } from "@/features/tournaments/use-setup-progress"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { plural } from "@/lib/format"
@@ -53,6 +55,11 @@ const STEPS: Record<SetupStepKey, { title: string; description: string }> = {
     description:
       "Punktacja i czas meczu. Domyślne wartości pasują do większości turniejów - zmień tylko to, co trzeba.",
   },
+  tiebreakers: {
+    title: "Tabela",
+    description:
+      "Kto jest wyżej przy równej liczbie punktów. Domyślna kolejność pasuje do większości turniejów.",
+  },
   portal: {
     title: "Portal kibica",
     description: "Publiczna strona z wynikami na żywo dla rodziców i kibiców, bez logowania.",
@@ -67,17 +74,19 @@ const STEPS: Record<SetupStepKey, { title: string; description: string }> = {
 }
 
 function StepIndicator({
+  steps,
   current,
   isDone,
   onSelect,
 }: {
+  steps: SetupStepKey[]
   current: number
   isDone: (key: SetupStepKey, index: number) => boolean
   onSelect: (index: number) => void
 }) {
   return (
     <ol className="flex flex-wrap gap-x-1 gap-y-2" aria-label="Kroki konfiguracji">
-      {SETUP_STEP_KEYS.map((key, index) => {
+      {steps.map((key, index) => {
         const done = isDone(key, index)
         return (
           <li key={key} className="flex items-center gap-1">
@@ -101,7 +110,7 @@ function StepIndicator({
               </span>
               {STEPS[key].title}
             </button>
-            {index < SETUP_STEP_KEYS.length - 1 && (
+            {index < steps.length - 1 && (
               <span className="bg-border hidden h-px w-3 sm:block" aria-hidden />
             )}
           </li>
@@ -209,8 +218,8 @@ function ReadinessRow({
  * Krok z adresu (?step=…). Czytany w przeglądarce, nie z propsów strony serwerowej: po "wstecz"
  * Next odtwarza stronę z pamięci podręcznej ze starymi propsami, a aktualny jest tylko adres.
  */
-function stepFromUrl() {
-  const index = SETUP_STEP_KEYS.indexOf(
+function stepFromUrl(steps: SetupStepKey[]) {
+  const index = steps.indexOf(
     new URLSearchParams(window.location.search).get("step") as SetupStepKey,
   )
   return index >= 0 ? index : null
@@ -220,8 +229,10 @@ export function TournamentSetupView() {
   const { id, tournament, isOrganizer, rolesLoading } = useTournamentContext()
   const settings = useTournamentSettings(id)
   const publicSettings = usePublicSettings(id, isOrganizer)
+  const tieBreakerRules = useTieBreakerRules(id)
   const organization = useMyOrganization()
   const progress = useSetupProgress(id, tournament.data)
+  const steps = setupStepsFor(tournament.data?.format)
   // null = dane jeszcze się wczytują: startujemy od kroku z linku albo pierwszego niegotowego.
   const [selected, setSelected] = useState<number | null>(null)
   // Niezapisane zmiany formularza kroku i krok, na który ktoś chce przejść (QA v3: UST-017).
@@ -231,15 +242,16 @@ export function TournamentSetupView() {
   // Krok startowy ustalamy raz, gdy dane się wczytają. Liczony na bieżąco przeskakiwał sam do
   // następnego kroku w chwili, gdy obecny stawał się gotowy (np. po akceptacji drugiej drużyny).
   if (selected === null && !progress.isPending) {
-    setSelected(stepFromUrl() ?? SETUP_STEP_KEYS.indexOf(progress.firstIncomplete))
+    setSelected(stepFromUrl(steps) ?? steps.indexOf(progress.firstIncomplete))
   }
   // Bieżący krok trzymamy w adresie. Z kreatora wychodzi się na chwilę (np. do składu drużyny) —
   // po "wstecz" przeglądarka wraca pod ten adres i otwiera ten sam krok, a nie pierwszy niegotowy.
+  const selectedKey = selected !== null ? steps[Math.min(selected, steps.length - 1)] : null
   useEffect(() => {
-    if (selected !== null) {
-      window.history.replaceState(null, "", `?step=${SETUP_STEP_KEYS[selected]}`)
+    if (selectedKey) {
+      window.history.replaceState(null, "", `?step=${selectedKey}`)
     }
-  }, [selected])
+  }, [selectedKey])
   const data = tournament.data!
   const base = `/tournaments/${id}`
 
@@ -256,9 +268,10 @@ export function TournamentSetupView() {
     )
   }
 
-  const step = selected ?? SETUP_STEP_KEYS.indexOf(progress.firstIncomplete)
-  const key = SETUP_STEP_KEYS[step]!
-  const lastIndex = SETUP_STEP_KEYS.length - 1
+  // Zmiana formatu dodaje albo zabiera krok „Tabela”, więc indeks pilnujemy w granicach listy.
+  const lastIndex = steps.length - 1
+  const step = Math.min(selected ?? steps.indexOf(progress.firstIncomplete), lastIndex)
+  const key = steps[step]!
 
   // Formularz kroku (zasady gry, portal) zgłasza niezapisane zmiany; przejście na inny krok
   // najpierw pyta, czy je porzucić (QA v3: UST-017).
@@ -275,7 +288,7 @@ export function TournamentSetupView() {
     setSelected(target)
     top.current?.scrollIntoView({ block: "start" })
   }
-  const goToKey = (target: SetupStepKey) => goTo(SETUP_STEP_KEYS.indexOf(target))
+  const goToKey = (target: SetupStepKey) => goTo(steps.indexOf(target))
   const next = () => goTo(step + 1)
   // Po zapisie formularz może jeszcze chwilę być „zmieniony” - zapis to świadome przejście dalej.
   const savedNext = () => goTo(step + 1, true)
@@ -285,9 +298,11 @@ export function TournamentSetupView() {
   const rulesLocked = statusAtLeast(data.status, "InProgress")
   const knockout = data.format === "Knockout"
 
-  // Zasad gry i portalu nie da się "odhaczyć" z danych (mają domyślne) — liczy się, że je minięto.
+  // Zasad gry, tabeli i portalu nie da się "odhaczyć" z danych (mają domyślne) — liczy się, że je minięto.
   const isDone = (stepKey: SetupStepKey, index: number) =>
-    stepKey === "rules" || stepKey === "portal" ? index < step : progress.done[stepKey]
+    stepKey === "rules" || stepKey === "tiebreakers" || stepKey === "portal"
+      ? index < step
+      : progress.done[stepKey]
 
   // Czego brakuje, żeby pójść dalej z kroku z listą (kategorie, boiska, drużyny).
   // `consequence` trafia do potwierdzenia: sama szara linijka przy przycisku była za słabym sygnałem.
@@ -318,7 +333,8 @@ export function TournamentSetupView() {
   }
   const currentBlocker = blocker[key] ?? null
   const isListStep = key in blocker
-  const isFormStep = key === "format" || key === "rules" || key === "portal"
+  const isFormStep =
+    key === "format" || key === "rules" || key === "tiebreakers" || key === "portal"
 
   let body: ReactNode
   if (key === "categories") {
@@ -379,6 +395,18 @@ export function TournamentSetupView() {
                 tournamentId={id}
                 settings={settings.data}
                 disabled={rulesLocked}
+                onSaved={savedNext}
+                onDirtyChange={setDirty}
+              />
+            ) : (
+              <Skeleton className="h-72" />
+            ))}
+          {key === "tiebreakers" &&
+            (tieBreakerRules.data ? (
+              <TieBreakerEditor
+                tournamentId={id}
+                savedRules={tieBreakerRules.data}
+                canManage
                 onSaved={savedNext}
                 onDirtyChange={setDirty}
               />
@@ -505,7 +533,7 @@ export function TournamentSetupView() {
   return (
     // Kroki z formularzem są wąskie; listy (kategorie, boiska, drużyny) potrzebują miejsca.
     <div ref={top} className={cn("scroll-mt-20 space-y-6", isListStep ? "max-w-5xl" : "max-w-3xl")}>
-      <StepIndicator current={step} isDone={isDone} onSelect={goTo} />
+      <StepIndicator steps={steps} current={step} isDone={isDone} onSelect={goTo} />
       <AlertDialog open={pendingStep != null} onOpenChange={(open) => !open && setPendingStep(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

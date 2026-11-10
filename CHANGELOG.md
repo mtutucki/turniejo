@@ -11,6 +11,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 - Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.
 - Jasny motyw: domyślnie jak w telefonie lub komputerze, a ikonka w nagłówku przełącza między jasnym i ciemnym. Wybór zapisuje się na koncie.
+- Kreator turnieju z grupami ma krok „Tabela”, w którym ustawisz kolejność przy równej liczbie punktów.
 
 ### Zmienione
 
