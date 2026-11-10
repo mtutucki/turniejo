@@ -37,7 +37,7 @@ function MatchInfo({
   return (
     <div className="min-w-0 flex-1 space-y-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <MatchStatusBadge status={match.status} />
+        <MatchStatusBadge status={match.status} awaitingDecision={match.awaitingDecision} />
         {tournamentName && <span className="text-muted-foreground truncate">{tournamentName}</span>}
       </div>
       <p className="flex items-center gap-2 font-medium">

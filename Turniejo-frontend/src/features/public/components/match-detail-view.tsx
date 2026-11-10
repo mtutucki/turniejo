@@ -58,8 +58,8 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
         }
       >
         <div className="mb-4 flex items-center justify-center gap-2">
-          <MatchStatusBadge status={m.status} />
-          {live && minute != null && (
+          <MatchStatusBadge status={m.status} awaitingDecision={m.awaitingDecision} />
+          {live && !m.awaitingDecision && minute != null && (
             <span
               className="text-live font-mono text-sm font-semibold tabular-nums"
               data-testid="live-minute"

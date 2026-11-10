@@ -39,5 +39,7 @@ namespace Turniejo.Matches.Application.DTOs
         // więc przestawiony zegar telefonu kibica nie przesuwa minuty meczu.
         int? ElapsedSeconds = null,
         int? HomePenaltyScore = null,
-        int? AwayPenaltyScore = null);
+        int? AwayPenaltyScore = null,
+        // Porzucony remis w pucharze wstrzymany przez system: zegar nic nie mówi, liczy się rozstrzygnięcie.
+        bool AwaitingDecision = false);
 }

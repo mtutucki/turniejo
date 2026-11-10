@@ -1,7 +1,9 @@
 import { expect, MATCH_ID, mock, PUBLIC_SLUG, test } from "./fixtures"
 
 test.describe("Portal publiczny → Wynik live", () => {
-  test("[PUB-003f] kibic bez logowania widzi mecz LIVE i gol bez przeładowania", async ({ page }) => {
+  test("[PUB-003f] kibic bez logowania widzi mecz LIVE i gol bez przeładowania", async ({
+    page,
+  }) => {
     await page.goto(`/t/${PUBLIC_SLUG}`)
     await expect(page.getByRole("heading", { level: 1, name: "Puchar E2E" })).toBeVisible()
 
@@ -31,6 +33,24 @@ test.describe("Portal publiczny → Wynik live", () => {
     await mock.goal(MATCH_ID, "away")
     await mock.goal(MATCH_ID, "away")
     await expect(score).toHaveText("0:2")
+  })
+
+  test("[MNZ-042] mecz wstrzymany przez system czeka na rozstrzygnięcie, bez absurdalnej minuty", async ({
+    page,
+  }) => {
+    await mock.awaitingDecision(MATCH_ID)
+
+    await page.goto(`/t/${PUBLIC_SLUG}`)
+    const card = page.getByRole("article", { name: "Orły E2E – Lwy E2E" }).first()
+    await expect(card).toContainText("CZEKA NA ROZSTRZYGNIĘCIE")
+    await expect(card).not.toContainText("PRZERWA")
+    await expect(card.getByTestId("live-minute")).toHaveCount(0)
+
+    await page.goto(`/t/${PUBLIC_SLUG}/matches/${MATCH_ID}`)
+    const board = page.getByRole("region", { name: "Wynik" })
+    await expect(board).toContainText("Czeka na rozstrzygnięcie")
+    await expect(board).not.toContainText("Przerwa")
+    await expect(page.getByTestId("live-minute")).toHaveCount(0)
   })
 
   test("[PUB-015] nieistniejący turniej to 404", async ({ page }) => {

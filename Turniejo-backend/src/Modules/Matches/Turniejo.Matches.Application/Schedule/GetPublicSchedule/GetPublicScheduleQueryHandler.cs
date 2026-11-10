@@ -40,7 +40,7 @@ namespace Turniejo.Matches.Application.Schedule.GetPublicSchedule
                     m.HomeTournamentTeamId, m.AwayTournamentTeamId, RefereeId: null, m.ScheduledAt,
                     m.Status.ToString(), m.StageType.ToString(),
                     !showLive && IsLive(m) ? 0 : m.HomeScore, !showLive && IsLive(m) ? 0 : m.AwayScore, m.ResultType.ToString(),
-                    m.HomePenaltyScore, m.AwayPenaltyScore))
+                    m.HomePenaltyScore, m.AwayPenaltyScore, AwaitingDecision: m.IsAwaitingDecision))
                 .ToList();
 
             return Result.Success<IReadOnlyList<MatchDto>>(dtos);

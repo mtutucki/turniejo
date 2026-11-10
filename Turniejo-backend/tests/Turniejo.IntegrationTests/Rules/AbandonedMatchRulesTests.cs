@@ -83,14 +83,19 @@ public sealed class AbandonedMatchRulesTests(IntegrationTestWebApplicationFactor
 
         (await RunAsync(TimeSpan.FromHours(5))).Should().Be(0);
 
-        (await MatchAsync(s, id)).GetString("status").Should().Be("Paused");
+        var paused = await MatchAsync(s, id);
+        paused.GetString("status").Should().Be("Paused");
+        paused.GetProperty("awaitingDecision").GetBoolean().Should().BeTrue();
+        (await (await s.Organizer.GetAsync($"{path}/live-panel")).ReadJsonAsync()).GetProperty("awaitingDecision").GetBoolean().Should().BeTrue();
         (await s.NotificationsAsync(s.Organizer)).Should().ContainSingle(n => n.GetString("type") == "MatchAwaitingDecision");
 
         // Organizer wznawia, żeby rozegrać dogrywkę: system już się nie wtrąca.
         (await s.Organizer.PostAsync($"{path}/resume", null)).IsSuccessStatusCode.Should().BeTrue();
         (await RunAsync(TimeSpan.FromHours(12))).Should().Be(0);
 
-        (await MatchAsync(s, id)).GetString("status").Should().Be("Live");
+        var resumed = await MatchAsync(s, id);
+        resumed.GetString("status").Should().Be("Live");
+        resumed.GetProperty("awaitingDecision").GetBoolean().Should().BeFalse();
         (await s.NotificationsAsync(s.Organizer)).Count(n => n.GetString("type") == "MatchAwaitingDecision").Should().Be(1);
     }
 }

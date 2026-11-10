@@ -210,7 +210,7 @@ function MatchRow({
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             {!unscheduled && (
               <>
-                <MatchStatusBadge status={match.status} />
+                <MatchStatusBadge status={match.status} awaitingDecision={match.awaitingDecision} />
                 <span className="flex items-center gap-1">
                   <MapPin className="size-3" />
                   {pitch ?? "Bez boiska"}

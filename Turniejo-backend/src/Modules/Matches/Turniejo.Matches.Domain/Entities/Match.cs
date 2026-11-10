@@ -214,13 +214,15 @@ namespace Turniejo.Matches.Domain.Entities
             return Result.Success();
         }
 
-        public Result Pause(Guid changedByUserId)
+        public Result Pause(Guid changedByUserId) => PauseAt(DateTimeOffset.UtcNow, changedByUserId);
+
+        private Result PauseAt(DateTimeOffset at, Guid changedByUserId)
         {
             if (Status != MatchStatus.Live)
                 return Result.Failure(Error.Conflict("Status", "Match can only be paused while Live"));
 
             Status = MatchStatus.Paused;
-            PausedAt = DateTimeOffset.UtcNow;
+            PausedAt = at;
             Version++;
             SetUpdatedAt();
 
@@ -230,6 +232,13 @@ namespace Turniejo.Matches.Domain.Entities
         }
 
         /// <summary>Remis poza fazą grupową: <see cref="Finish"/> bez karnych go nie zamknie, bo nie ma zwycięzcy.</summary>
+        /// <summary>
+        /// Stoi w pauzie systemu (albo w pauzie sprzed niej) i czeka na organizatora. Po wznowieniu
+        /// i kolejnej pauzie organizatora to zwykła przerwa.
+        /// </summary>
+        public bool IsAwaitingDecision =>
+            Status == MatchStatus.Paused && AwaitingDecisionSince.HasValue && PausedAt <= AwaitingDecisionSince;
+
         public bool NeedsDecisionToFinish => StageType != StageType.Group && HomeScore == AwayScore;
 
         /// <summary>
@@ -245,8 +254,9 @@ namespace Turniejo.Matches.Domain.Entities
             if (AwaitingDecisionSince.HasValue)
                 return Result.Failure(Error.Conflict("Status", "The organizer has already been asked to decide this match"));
 
+            // Ta sama chwila co AwaitingDecisionSince: po tym IsAwaitingDecision odróżnia pauzę systemu od późniejszej pauzy organizatora.
             if (Status == MatchStatus.Live)
-                Pause(Guid.Empty);
+                PauseAt(now, Guid.Empty);
 
             AwaitingDecisionSince = now;
             Version++;

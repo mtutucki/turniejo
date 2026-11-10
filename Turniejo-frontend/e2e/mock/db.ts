@@ -76,6 +76,7 @@ export type Match = {
   resultType?: string
   winnerTournamentTeamId?: string | null
   editLockedAt?: string | null
+  awaitingDecision?: boolean
 }
 
 // Stałe id — testy odwołują się do nich w URL-ach.

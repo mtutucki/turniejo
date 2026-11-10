@@ -99,5 +99,42 @@ namespace Turniejo.Matches.UnitTests.Entities
 
             match.MarkAwaitingDecision(DateTimeOffset.UtcNow).IsFailure.Should().BeTrue();
         }
+
+        [Fact]
+        public void IsAwaitingDecision_ShouldBeTrue_WhileTheSystemPauseLasts()
+        {
+            var live = LiveMatch();
+            live.MarkAwaitingDecision(DateTimeOffset.UtcNow);
+            live.IsAwaitingDecision.Should().BeTrue();
+            live.PausedAt.Should().Be(live.AwaitingDecisionSince);
+
+            var paused = LiveMatch();
+            paused.Pause(Guid.NewGuid());
+            paused.MarkAwaitingDecision(DateTimeOffset.UtcNow);
+            paused.IsAwaitingDecision.Should().BeTrue();
+        }
+
+        [Fact]
+        public void IsAwaitingDecision_ShouldBeFalse_OnceTheOrganizerResumes_EvenIfTheyPauseAgain()
+        {
+            var match = LiveMatch();
+            match.MarkAwaitingDecision(DateTimeOffset.UtcNow);
+
+            match.Resume(Guid.NewGuid());
+            match.IsAwaitingDecision.Should().BeFalse();
+
+            Thread.Sleep(5);
+            match.Pause(Guid.NewGuid());
+            match.IsAwaitingDecision.Should().BeFalse();
+        }
+
+        [Fact]
+        public void IsAwaitingDecision_ShouldBeFalse_ForAnOrdinaryPause()
+        {
+            var match = LiveMatch();
+            match.Pause(Guid.NewGuid());
+
+            match.IsAwaitingDecision.Should().BeFalse();
+        }
     }
 }

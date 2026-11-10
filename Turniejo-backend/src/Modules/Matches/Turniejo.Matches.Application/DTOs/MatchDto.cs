@@ -16,5 +16,7 @@ namespace Turniejo.Matches.Application.DTOs
         int AwayScore,
         string ResultType,
         int? HomePenaltyScore = null,
-        int? AwayPenaltyScore = null);
+        int? AwayPenaltyScore = null,
+        // Porzucony remis w pucharze wstrzymany przez system: zegar nic nie mówi, liczy się rozstrzygnięcie.
+        bool AwaitingDecision = false);
 }

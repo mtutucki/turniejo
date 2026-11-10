@@ -30,7 +30,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Poprawione
 
-- Mecz, którego nikt nie zakończył, nie trwa już w nieskończoność. Gdy przez 4 godziny nikt nic w nim nie zrobi, kończy się sam z aktualnym wynikiem. Remis w pucharze zostaje wstrzymany, a organizator dostaje powiadomienie, żeby rozstrzygnąć go karnymi.
+- Mecz, którego nikt nie zakończył, nie trwa już w nieskończoność. Gdy przez 4 godziny nikt nic w nim nie zrobi, kończy się sam z aktualnym wynikiem. Remis w pucharze zostaje wstrzymany z napisem „Czeka na rozstrzygnięcie” zamiast zegara, a organizator dostaje powiadomienie, żeby rozstrzygnąć go karnymi.
 - Grupę, z której wycofano wszystkie drużyny, da się już usunąć.
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
 - Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
