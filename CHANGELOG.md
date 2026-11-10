@@ -9,6 +9,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 ### Zmienione
 
 - Mecze w portalu kibica filtrujesz jednym paskiem: drużyna, kategoria, grupa, boisko i dzień. Widać, ile meczów pasuje, a filtry da się usunąć jednym kliknięciem i przesłać linkiem.
+- Terminarz w panelu da się przefiltrować po drużynie. Grupy i drużyny o tej samej nazwie w różnych kategoriach mają przy sobie kategorię (np. „U10 · Grupa B”), a pod filtrami widać, ile meczów pasuje i które filtry są włączone.
 - Podtytuł strony głównej nie sugeruje już, że bez logowania można coś więcej niż oglądać wyniki.
 
 ### Nowe

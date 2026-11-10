@@ -21,7 +21,7 @@ export type PlannedBracketMatch = {
 }
 
 /** known = konkretna drużyna (już awansowała); inaczej opis typu "Zwycięzca meczu A – B". */
-export type PlannedSide = { label: string; known: boolean }
+export type PlannedSide = { label: string; known: boolean; tournamentTeamId?: string }
 
 const STAGES: Record<number, [name: string, genitive: string]> = {
   1: ["Finał", "finału"],
@@ -90,7 +90,7 @@ export function plannedBracketMatches(
 
   function side(target: BracketNode, slot: "Home" | "Away"): PlannedSide {
     const teamId = slot === "Home" ? target.homeTournamentTeamId : target.awayTournamentTeamId
-    if (teamId) return { label: teamName(teamId), known: true }
+    if (teamId) return { label: teamName(teamId), known: true, tournamentTeamId: teamId }
 
     const sourceType = slot === "Home" ? target.homeSourceType : target.awaySourceType
     if (sourceType !== "MatchWinner" && sourceType !== "MatchLoser") {
