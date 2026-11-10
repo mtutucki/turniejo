@@ -1,4 +1,4 @@
-using Turniejo.Brackets.Application.Abstractions;
+﻿using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Domain.Entities;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
@@ -42,6 +42,9 @@ namespace Turniejo.Brackets.Application.SecondStage.SetSecondStageSeats
                 .Where(s => s.CategoryId == request.CategoryId)
                 .ToList();
             dbContext.RemoveSecondStageSeats(existing);
+            // Jeden tryb na kategorię: pojedynczo ustawione miejsca zastępują zakresy.
+            dbContext.RemoveSecondStageRanges((await dbContext.GetTrackedSecondStageRangesAsync(request.TournamentId, cancellationToken))
+                .Where(r => r.CategoryId == request.CategoryId));
             // Usunięcia idą do bazy przed nowymi wierszami: to samo miejsce z fazy 1 (unikalny indeks)
             // zwykle wraca w nowym podziale, tylko w innej grupie albo kolejności.
             await dbContext.SaveChangesAsync(cancellationToken);

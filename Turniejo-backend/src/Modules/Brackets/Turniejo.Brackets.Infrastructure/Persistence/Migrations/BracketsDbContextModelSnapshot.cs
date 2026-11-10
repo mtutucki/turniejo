@@ -224,6 +224,42 @@ namespace Turniejo.Brackets.Infrastructure.Persistence.Migrations
                     b.ToTable("second_stage_fixtures", "brackets");
                 });
 
+            modelBuilder.Entity("Turniejo.Brackets.Domain.Entities.SecondStageRange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FromPosition")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ToPosition")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId")
+                        .IsUnique();
+
+                    b.HasIndex("TournamentId", "CategoryId");
+
+                    b.ToTable("second_stage_ranges", "brackets");
+                });
+
             modelBuilder.Entity("Turniejo.Brackets.Domain.Entities.SecondStageSeat", b =>
                 {
                     b.Property<Guid>("Id")

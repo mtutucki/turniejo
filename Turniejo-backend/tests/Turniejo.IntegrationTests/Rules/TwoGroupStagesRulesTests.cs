@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -30,6 +30,10 @@ public sealed class TwoGroupStagesRulesTests(IntegrationTestWebApplicationFactor
     private static Task<HttpResponseMessage> PutSeatsAsync(TournamentScenario s, params (Guid Group, string Source, int Position)[] seats) =>
         s.Organizer.PutAsJsonAsync($"{T(s)}/second-stage/seats", new SecondStageController.SetSecondStageSeatsRequest(
             s.CategoryId, seats.Select(x => new SecondStageController.SecondStageSeatRequest(x.Group, s.Group(x.Source), x.Position)).ToList()));
+
+    private static Task<HttpResponseMessage> PutRangesAsync(TournamentScenario s, params (Guid Group, int From, int To)[] ranges) =>
+        s.Organizer.PutAsJsonAsync($"{T(s)}/second-stage/ranges", new SecondStageController.SetSecondStageRangesRequest(
+            s.CategoryId, ranges.Select(x => new SecondStageController.SecondStageRangeRequest(x.Group, x.From, x.To)).ToList()));
 
     private static async Task<List<JsonElement>> SeatsAsync(TournamentScenario s) =>
         (await SecondStageAsync(s)).GetProperty("seats").EnumerateArray().ToList();
@@ -375,5 +379,69 @@ public sealed class TwoGroupStagesRulesTests(IntegrationTestWebApplicationFactor
         var hidden = await (await anonymous.GetAsync($"/public/tournaments/{slug}/second-stage")).ReadJsonAsync();
         hidden.GetProperty("seats").GetArrayLength().Should().Be(0);
         hidden.GetProperty("fixtures").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task FAZ_026_RangesOfPlaces_TurnIntoPlacesFromTheRealTablesWhenTheScheduleIsGenerated()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 3, schedule: false, format: TournamentFormat.TwoGroupStages);
+        var first = await SecondStageGroupAsync(s, "Grupa I", 1);
+        var second = await SecondStageGroupAsync(s, "Grupa II", 2);
+        // Ustawione jak w kreatorze, bez wiedzy o liczbie drużyn: grupy mają po 3, a nie po 4.
+        (await PutRangesAsync(s, (first, 1, 2), (second, 3, 4))).IsSuccessStatusCode.Should().BeTrue();
+        (await SecondStageAsync(s)).GetProperty("ranges").GetArrayLength().Should().Be(2);
+        (await SeatsAsync(s)).Should().BeEmpty();
+
+        await s.GenerateScheduleAsync();
+
+        var seats = await SeatsAsync(s);
+        seats.Where(x => x.GetGuid("groupId") == first).Select(x => (x.GetInt("sourcePosition"), x.GetGuid("sourceGroupId")))
+            .Should().BeEquivalentTo([(1, s.Group("A")), (1, s.Group("B")), (2, s.Group("A")), (2, s.Group("B"))]);
+        seats.Where(x => x.GetGuid("groupId") == second).Select(x => x.GetInt("sourcePosition")).Should().Equal(3, 3);
+        (await FixturesAsync(s)).Should().HaveCount(6 + 1);
+    }
+
+    [Fact]
+    public async Task FAZ_027_RangesCannotOverlap()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, schedule: false, format: TournamentFormat.TwoGroupStages);
+        var first = await SecondStageGroupAsync(s, "Grupa I", 1);
+        var second = await SecondStageGroupAsync(s, "Grupa II", 2);
+
+        var response = await PutRangesAsync(s, (first, 1, 2), (second, 2, 3));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Each place can go to only one second-stage group");
+    }
+
+    [Fact]
+    public async Task FAZ_028_WithoutASplit_TheScheduleUsesTheReadyOneSplitEvenly()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 3, schedule: false, format: TournamentFormat.TwoGroupStages);
+        var first = await SecondStageGroupAsync(s, "Grupa I", 1);
+        var second = await SecondStageGroupAsync(s, "Grupa II", 2);
+
+        await s.GenerateScheduleAsync();
+
+        var ranges = (await SecondStageAsync(s)).GetProperty("ranges").EnumerateArray().ToList();
+        ranges.Select(r => (r.GetGuid("groupId"), r.GetInt("fromPosition"), r.GetInt("toPosition")))
+            .Should().BeEquivalentTo([(first, 1, 2), (second, 3, 3)]);
+        (await SeatsAsync(s)).Should().HaveCount(6);
+    }
+
+    [Fact]
+    public async Task FAZ_029_RangesAndSinglePlaces_ReplaceEachOther()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, schedule: false, format: TournamentFormat.TwoGroupStages);
+        var first = await SecondStageGroupAsync(s, "Grupa I", 1);
+
+        (await PutSeatsAsync(s, (first, "A", 1), (first, "B", 1))).IsSuccessStatusCode.Should().BeTrue();
+        (await PutRangesAsync(s, (first, 1, 2))).IsSuccessStatusCode.Should().BeTrue();
+        (await SeatsAsync(s)).Should().BeEmpty();
+
+        (await PutSeatsAsync(s, (first, "A", 1), (first, "B", 2))).IsSuccessStatusCode.Should().BeTrue();
+        var stage = await SecondStageAsync(s);
+        stage.GetProperty("ranges").GetArrayLength().Should().Be(0);
+        stage.GetProperty("seats").GetArrayLength().Should().Be(2);
     }
 }

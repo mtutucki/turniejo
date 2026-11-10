@@ -36,6 +36,13 @@ namespace Turniejo.Brackets.Application.Abstractions
         Task AddSecondStageSeatsAsync(IEnumerable<SecondStageSeat> seats, CancellationToken cancellationToken = default);
         void RemoveSecondStageSeats(IEnumerable<SecondStageSeat> seats);
 
+        // SecondStageRange
+        Task<IReadOnlyList<SecondStageRange>> GetSecondStageRangesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<SecondStageRange>> GetTrackedSecondStageRangesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<SecondStageRange>> GetTrackedSecondStageRangesByGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task AddSecondStageRangesAsync(IEnumerable<SecondStageRange> ranges, CancellationToken cancellationToken = default);
+        void RemoveSecondStageRanges(IEnumerable<SecondStageRange> ranges);
+
         // SecondStageFixture
         Task<IReadOnlyList<SecondStageFixture>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default);

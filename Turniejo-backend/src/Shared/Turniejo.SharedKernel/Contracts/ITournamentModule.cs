@@ -30,7 +30,7 @@ public record TournamentDto(Guid Id, string Name, string Status, string? Format,
     DateTimeOffset? StartAt = null, DateTimeOffset? EndAt = null);
 public record TournamentCategoryDto(Guid Id, Guid TournamentId, string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate);
 // Stage 2: grupa drugiej fazy (format TwoGroupStages), drużyny przychodzą z miejsc w tabelach fazy 1.
-public record TournamentGroupDto(Guid Id, Guid TournamentId, Guid CategoryId, string Name, int Stage = 1);
+public record TournamentGroupDto(Guid Id, Guid TournamentId, Guid CategoryId, string Name, int Stage = 1, int Order = 0);
 public record TournamentSettingsSummaryDto(
     Guid TournamentId, int MatchDurationMinutes, int BreakDurationMinutes, int RefereeEditWindowMinutes,
     int PointsForWin, int PointsForDraw, int PointsForLoss, bool IsThirdPlaceMatchEnabled,

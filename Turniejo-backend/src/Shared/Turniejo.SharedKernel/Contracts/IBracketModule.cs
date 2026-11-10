@@ -16,6 +16,14 @@ public interface IBracketModule
     Task<IReadOnlyList<SecondStageSeatInfoDto>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     /// <summary>Usunięta grupa (fazy 1 albo 2) nie może zostać w podziale drugiej fazy.</summary>
     Task RemoveSecondStageSeatsForGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Przed generowaniem terminarza: kategorie z zakresami miejsc (albo bez żadnego podziału - wtedy
+    /// gotowy podział po równo) dostają konkretne miejsca z prawdziwej liczby drużyn w grupach.
+    /// Pojedynczo ustawione miejsca zostają bez zmian.
+    /// </summary>
+    Task PrepareSecondStageSeatsAsync(
+        Guid tournamentId, IReadOnlyList<TournamentGroupDto> groups, IReadOnlyDictionary<Guid, int> teamsInGroup,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SecondStageFixtureInfoDto>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     /// <summary>Zaplanowane przez generator mecze fazy 2 (zastępują poprzednie). Czyści je <see cref="ClearPlannedSlotsAsync"/>.</summary>
     Task CreateSecondStageFixturesAsync(Guid tournamentId, IReadOnlyCollection<SecondStageFixturePlanDto> fixtures, CancellationToken cancellationToken = default);

@@ -195,6 +195,7 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             C("zamiana slotów", HttpMethod.Post, $"{t}/bracket/swap-slots", new { categoryId = a.CategoryId, firstNodeId = Guid.NewGuid(), firstSlot = 1, secondNodeId = Guid.NewGuid(), secondSlot = 2 }, organizer),
             C("przeliczenie drabinki", HttpMethod.Post, $"{t}/bracket/recalculate?categoryId={a.CategoryId}", null, organizer),
             C("podział drugiej fazy", HttpMethod.Put, $"{t}/second-stage/seats", new { categoryId = a.CategoryId, seats = Array.Empty<object>() }, organizer),
+            C("zakresy drugiej fazy", HttpMethod.Put, $"{t}/second-stage/ranges", new { categoryId = a.CategoryId, ranges = Array.Empty<object>() }, organizer),
 
             // Mecz na żywo (KON-020, KON-027, KON-028, KON-029)
             C("pauza", HttpMethod.Post, $"{m}/pause", null, matchStaff),

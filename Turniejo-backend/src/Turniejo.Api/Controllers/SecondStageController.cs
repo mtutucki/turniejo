@@ -1,7 +1,8 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Brackets.Application.SecondStage.GetSecondStage;
+using Turniejo.Brackets.Application.SecondStage.SetSecondStageRanges;
 using Turniejo.Brackets.Application.SecondStage.SetSecondStageSeats;
 
 namespace Turniejo.Api.Controllers
@@ -29,6 +30,19 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
+        /// <summary>Zakresy miejsc dla grup fazy 2 (np. Grupa I: 1-2). Działa, zanim grupy mają drużyny.</summary>
+        [HttpPut("ranges")]
+        public async Task<IActionResult> SetRanges([FromRoute] Guid tournamentId, [FromBody] SetSecondStageRangesRequest request, CancellationToken cancellationToken)
+        {
+            var ranges = request.Ranges
+                .Select(r => new SecondStageRangeInput(r.GroupId, r.FromPosition, r.ToPosition))
+                .ToList();
+            var result = await sender.Send(new SetSecondStageRangesCommand(tournamentId, request.CategoryId, ranges), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        public sealed record SecondStageRangeRequest(Guid GroupId, int FromPosition, int ToPosition);
+        public sealed record SetSecondStageRangesRequest(Guid CategoryId, IReadOnlyList<SecondStageRangeRequest> Ranges);
         public sealed record SecondStageSeatRequest(Guid GroupId, Guid SourceGroupId, int SourcePosition);
         public sealed record SetSecondStageSeatsRequest(Guid CategoryId, IReadOnlyList<SecondStageSeatRequest> Seats);
     }

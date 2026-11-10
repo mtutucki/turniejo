@@ -1,4 +1,4 @@
-using Turniejo.Brackets.Application.Abstractions;
+﻿using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Application.DTOs;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
@@ -21,7 +21,7 @@ namespace Turniejo.Brackets.Application.SecondStage.GetPublicSecondStage
                 return Result.Failure<SecondStageDto>(Error.NotFound("Tournament", request.Slug));
 
             if (!tournament.Settings.ShowSchedule && !tournament.Settings.ShowStandings)
-                return Result.Success(new SecondStageDto([], []));
+                return Result.Success(new SecondStageDto([], [], []));
 
             return Result.Success(await SecondStageDto.LoadAsync(dbContext, tournament.Id, cancellationToken));
         }

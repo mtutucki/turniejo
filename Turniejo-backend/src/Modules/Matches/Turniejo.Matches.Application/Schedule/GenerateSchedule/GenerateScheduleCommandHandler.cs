@@ -255,6 +255,9 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             Guid tournamentId, List<TournamentTeamDto> accepted, CancellationToken cancellationToken)
         {
             var groups = await tournamentModule.GetTournamentGroupsAsync(tournamentId, cancellationToken);
+            var teamCount = accepted.Where(t => t.GroupId.HasValue).GroupBy(t => t.GroupId!.Value).ToDictionary(g => g.Key, g => g.Count());
+            // Zakresy miejsc (albo gotowy podział) zamieniają się teraz w miejsca z prawdziwej liczby drużyn.
+            await bracketModule.PrepareSecondStageSeatsAsync(tournamentId, groups, teamCount, cancellationToken);
             var seats = await bracketModule.GetSecondStageSeatsAsync(tournamentId, cancellationToken);
             var seatsByGroup = seats.GroupBy(s => s.GroupId).ToDictionary(g => g.Key, g => g.OrderBy(s => s.Order).ToList());
             var secondStageGroups = groups.Where(g => g.Stage == 2).ToList();
@@ -268,7 +271,6 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 return Result.Failure<List<SecondStagePlan>>(Error.Validation(
                     "SecondStage", "Each second-stage group needs at least 2 places"));
 
-            var teamCount = accepted.Where(t => t.GroupId.HasValue).GroupBy(t => t.GroupId!.Value).ToDictionary(g => g.Key, g => g.Count());
             if (seats.Any(s => s.SourcePosition > teamCount.GetValueOrDefault(s.SourceGroupId)))
                 return Result.Failure<List<SecondStagePlan>>(Error.Validation(
                     "SecondStage", "A second-stage place points to a position its group does not have"));

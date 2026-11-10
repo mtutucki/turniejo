@@ -13,6 +13,7 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
     public DbSet<BracketNode> BracketNodes => Set<BracketNode>();
     public DbSet<SecondStageSeat> SecondStageSeats => Set<SecondStageSeat>();
     public DbSet<SecondStageFixture> SecondStageFixtures => Set<SecondStageFixture>();
+    public DbSet<SecondStageRange> SecondStageRanges => Set<SecondStageRange>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
@@ -96,6 +97,28 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
         await SecondStageSeats.AddRangeAsync(seats, cancellationToken);
 
     public void RemoveSecondStageSeats(IEnumerable<SecondStageSeat> seats) => SecondStageSeats.RemoveRange(seats);
+
+    public async Task<IReadOnlyList<SecondStageRange>> GetSecondStageRangesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges
+            .AsNoTracking()
+            .Where(r => r.TournamentId == tournamentId)
+            .OrderBy(r => r.FromPosition)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageRange>> GetTrackedSecondStageRangesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges
+            .Where(r => r.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageRange>> GetTrackedSecondStageRangesByGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges
+            .Where(r => r.GroupId == groupId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddSecondStageRangesAsync(IEnumerable<SecondStageRange> ranges, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges.AddRangeAsync(ranges, cancellationToken);
+
+    public void RemoveSecondStageRanges(IEnumerable<SecondStageRange> ranges) => SecondStageRanges.RemoveRange(ranges);
 
     public async Task<IReadOnlyList<SecondStageFixture>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await SecondStageFixtures
