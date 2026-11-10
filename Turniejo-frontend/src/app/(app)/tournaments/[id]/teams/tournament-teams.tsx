@@ -13,7 +13,11 @@ import { AddTeamDialog } from "@/features/teams/components/add-team-dialog"
 import { TournamentTeamRow } from "@/features/teams/components/tournament-team-row"
 import { useCategories, useGroups, useMyOrganization } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { groupSections } from "@/features/teams/group-sections"
 import { plural } from "@/lib/format"
+import { cn } from "@/lib/utils"
+import type { TournamentTeam } from "@/types/teams"
+import type { TournamentGroup } from "@/types/tournaments"
 
 export function TournamentTeamsView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
@@ -154,28 +158,106 @@ export function TournamentTeamsView() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ul className="divide-y">
-                  {categoryTeams.map((team) => (
-                    <TournamentTeamRow
-                      key={team.id}
-                      tournamentId={id}
-                      team={team}
-                      // Puchar nie używa grup — bez wyboru grupy przy drużynach.
-                      groups={
-                        tournament.data?.format === "Knockout"
-                          ? []
-                          : (groups.data ?? []).filter((g) => g.categoryId === category.id)
-                      }
-                      canManage={isOrganizer}
-                      limitReached={limitReached}
-                    />
-                  ))}
-                </ul>
+                <CategoryTeamList
+                  tournamentId={id}
+                  teams={categoryTeams}
+                  // Puchar nie używa grup — bez wyboru grupy przy drużynach.
+                  groups={
+                    tournament.data?.format === "Knockout"
+                      ? []
+                      : (groups.data ?? []).filter((g) => g.categoryId === category.id)
+                  }
+                  canManage={isOrganizer}
+                  limitReached={limitReached}
+                />
               </CardContent>
             </Card>
           )
         })
       )}
+    </div>
+  )
+}
+
+/**
+ * Drużyny jednej kategorii. Przy kilku grupach każda grupa ma własną ramkę z nagłówkiem, żeby skład
+ * grup było widać bez czytania selectów. Drużyny bez grupy są na górze, wyróżnione: nie zagrają.
+ */
+function CategoryTeamList({
+  tournamentId,
+  teams,
+  groups,
+  canManage,
+  limitReached,
+}: {
+  tournamentId: string
+  teams: TournamentTeam[]
+  groups: TournamentGroup[]
+  canManage: boolean
+  limitReached: boolean
+}) {
+  const sections = groupSections(teams, groups)
+  const row = (team: TournamentTeam) => (
+    <TournamentTeamRow
+      key={team.id}
+      tournamentId={tournamentId}
+      team={team}
+      groups={groups}
+      canManage={canManage}
+      limitReached={limitReached}
+      inGroupSection={!!sections}
+    />
+  )
+
+  if (!sections) return <ul className="divide-y">{teams.map(row)}</ul>
+
+  return (
+    <div className="space-y-4">
+      {sections.map(({ group, teams: sectionTeams }) => {
+        const title = group?.name ?? "Bez grupy"
+        return (
+          <section
+            key={group?.id ?? "none"}
+            aria-label={title}
+            className={cn(
+              "overflow-hidden rounded-lg border",
+              group ? "bg-muted/20" : "border-live/40 bg-live/5",
+            )}
+          >
+            <header
+              className={cn(
+                "flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-3 py-2",
+                group ? "bg-muted/50" : "border-live/40",
+              )}
+            >
+              {group ? (
+                <span
+                  className="bg-primary/15 text-primary flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-semibold"
+                  aria-hidden
+                >
+                  {group.name.replace(/^grupa\s+/i, "").slice(0, 2).toUpperCase()}
+                </span>
+              ) : (
+                <CircleAlert className="text-live size-5 shrink-0" aria-hidden />
+              )}
+              <h3 className="text-sm font-semibold">{title}</h3>
+              <span className="text-muted-foreground font-mono text-xs tabular-nums">
+                {sectionTeams.length}
+              </span>
+              {!group && (
+                <span className="text-muted-foreground basis-full text-xs">
+                  Te drużyny nie zagrają, dopóki nie trafią do grupy.
+                </span>
+              )}
+            </header>
+            {sectionTeams.length > 0 ? (
+              <ul className="divide-y px-3">{sectionTeams.map(row)}</ul>
+            ) : (
+              <p className="text-muted-foreground px-3 py-3 text-sm">Brak drużyn w tej grupie.</p>
+            )}
+          </section>
+        )
+      })}
     </div>
   )
 }

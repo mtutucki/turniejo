@@ -133,6 +133,41 @@ test.describe("Zgłoszenia do turnieju", () => {
     expect(await mock.calls("PATCH", "/registration-status")).toBe(2)
   })
 
+  test("[GRP-030] drużyny pokazane w ramkach swoich grup, przeniesienie zmienia ramkę", async ({ page }) => {
+    const group = (id: string, name: string, order: number) => ({
+      id,
+      tournamentId: TOURNAMENT_ID,
+      categoryId: "0f000000-0000-4000-8000-000000000020",
+      name,
+      order,
+    })
+    await mock.override({
+      method: "GET",
+      path: "/api/tournaments/:id/groups",
+      body: [
+        group("0f000000-0000-4000-8000-000000000030", "Grupa A", 1),
+        group("0f000000-0000-4000-8000-000000000031", "Grupa B", 2),
+      ],
+    })
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+    const groupA = page.getByRole("region", { name: "Grupa A" })
+    const groupB = page.getByRole("region", { name: "Grupa B" })
+    await expect(groupA.getByRole("link", { name: /Orły E2E/ }).first()).toBeVisible()
+    await expect(groupA.getByRole("link", { name: /Lwy E2E/ }).first()).toBeVisible()
+    await expect(groupB.getByText("Brak drużyn w tej grupie.")).toBeVisible()
+
+    await groupA.getByRole("combobox", { name: "Grupa: Lwy E2E" }).click()
+    await page.getByRole("option", { name: "Grupa B" }).click()
+    await expect(groupB.getByRole("link", { name: /Lwy E2E/ }).first()).toBeVisible()
+    await expect(groupA.getByRole("link", { name: /Lwy E2E/ })).toHaveCount(0)
+
+    await groupB.getByRole("combobox", { name: "Grupa: Lwy E2E" }).click()
+    await page.getByRole("option", { name: "Bez grupy" }).click()
+    const none = page.getByRole("region", { name: "Bez grupy" })
+    await expect(none.getByText("Te drużyny nie zagrają, dopóki nie trafią do grupy.")).toBeVisible()
+    await expect(none.getByRole("link", { name: /Lwy E2E/ }).first()).toBeVisible()
+  })
+
   test("[DRU-010] kategorii z meczami nie da się usunąć, z wyjaśnieniem", async ({ page }) => {
     await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
     await page.getByRole("button", { name: "Usuń kategorię U12" }).click()
