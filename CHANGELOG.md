@@ -15,6 +15,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Nowe
 
+- Turnieje łatwiej znaleźć w Google: strona główna i portale kibica mają opisy, sitemapę i dane o meczach. Link do turnieju albo meczu wysłany na Messengerze, WhatsAppie czy Facebooku pokazuje obrazek z nazwą turnieju, a przy meczu z drużynami i aktualnym wynikiem. Turniej ukryty z listy turniejów nie trafia do Google.
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 - Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.
 - Jasny motyw: domyślnie jak w telefonie lub komputerze, a ikonka w nagłówku przełącza między jasnym i ciemnym na każdej stronie, także przy logowaniu. Wybór zapisuje się na koncie.

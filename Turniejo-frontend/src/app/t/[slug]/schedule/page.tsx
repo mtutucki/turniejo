@@ -2,9 +2,13 @@ import type { Metadata } from "next"
 
 import { FullSchedule } from "@/features/public/components/match-sections"
 import { parseMatchFilters } from "@/features/public/match-filters"
-import { requireSection } from "@/features/public/server"
+import { portalPageMetadata, requireSection } from "@/features/public/server"
 
-export const metadata: Metadata = { title: "Terminarz" }
+export async function generateMetadata({
+  params,
+}: PageProps<"/t/[slug]/schedule">): Promise<Metadata> {
+  return portalPageMetadata((await params).slug, "schedule", "Terminarz")
+}
 
 export default async function PublicSchedulePage({
   params,

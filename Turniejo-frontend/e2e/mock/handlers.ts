@@ -1260,6 +1260,7 @@ const api = [
         showBracket: false,
         showLiveMatches: true,
         showStats: true,
+        showInDirectory: configOf(t.id).publicSettings.showInDirectory !== false,
       },
       categories: [{ id: IDS.category, name: "U12", order: 1 }],
       groups: [{ id: IDS.group, categoryId: IDS.category, name: "Grupa A", order: 1 }],

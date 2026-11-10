@@ -17,7 +17,11 @@ ARG NEXT_PUBLIC_UMAMI_WEBSITE_ID=""
 ARG NEXT_PUBLIC_DEMO_MODE=""
 # Wersja z `git describe --tags` na serwerze (deploy/deploy.sh), widoczna w stopce. Pusta = nie pokazujemy.
 ARG NEXT_PUBLIC_APP_VERSION=""
+# Publiczny adres (https://DOMAIN) dla wyszukiwarek: strony budowane z góry (robots.txt, Pomoc,
+# Regulamin) mają go w adresie kanonicznym i podglądzie linku. Bez niego zostałby localhost.
+ARG SITE_URL=""
 ENV API_URL=$API_URL \
+    SITE_URL=$SITE_URL \
     NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION \
     NEXT_PUBLIC_UMAMI_SCRIPT_URL=$NEXT_PUBLIC_UMAMI_SCRIPT_URL \
     NEXT_PUBLIC_UMAMI_WEBSITE_ID=$NEXT_PUBLIC_UMAMI_WEBSITE_ID \
