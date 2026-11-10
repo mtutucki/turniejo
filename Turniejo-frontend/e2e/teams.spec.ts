@@ -65,6 +65,27 @@ test.describe("Baza drużyn", () => {
   })
 })
 
+/** Zgłoszenia turnieju: n oczekujących drużyn „Oczekująca 1…n” w kategorii U12 z seeda. */
+async function pendingTeams(n: number) {
+  await mock.override({
+    method: "GET",
+    path: "/api/tournaments/:id/teams",
+    body: Array.from({ length: n }, (_, i) => ({
+      id: `0f000000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
+      tournamentId: TOURNAMENT_ID,
+      teamId: `p${i}`,
+      categoryId: "0f000000-0000-4000-8000-000000000020",
+      groupId: null,
+      registrationStatus: "Pending",
+      paymentStatus: "NotRequired",
+      seedNumber: null,
+      teamName: `Oczekująca ${i + 1}`,
+      teamShortName: null,
+      teamLogoUrl: null,
+    })),
+  })
+}
+
 test.describe("Zgłoszenia do turnieju", () => {
   test.beforeEach(async ({ page }) => {
     await loginAs(page, ORGANIZER)
@@ -87,6 +108,29 @@ test.describe("Zgłoszenia do turnieju", () => {
 
     await dialog.getByRole("checkbox", { name: "Sokoły" }).click()
     await expect(dialog.getByRole("checkbox", { name: "Wilki" })).toBeDisabled()
+  })
+
+  test("[DRU-037] akceptacja wszystkich oczekujących jednym przyciskiem", async ({ page }) => {
+    await pendingTeams(3)
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+    await expect(page.getByText("3 drużyny czekają na akceptację.", { exact: false })).toBeVisible()
+
+    await page.getByRole("button", { name: "Akceptuj wszystkie" }).click()
+
+    await expect(page.getByText("Zaakceptowano 3 drużyny")).toBeVisible()
+    expect(await mock.calls("PATCH", "/registration-status")).toBe(3)
+  })
+
+  test("[DRU-038] przy małym limicie akceptuje tyle drużyn, ile się zmieści", async ({ page }) => {
+    await mock.tournament(TOURNAMENT_ID, { teamLimit: 2 })
+    await pendingTeams(3)
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+    await expect(page.getByText("W limicie zmieści się jeszcze 2 drużyny.")).toBeVisible()
+
+    await page.getByRole("button", { name: "Akceptuj 2 drużyny" }).click()
+
+    await expect(page.getByText("Zaakceptowano 2 drużyny")).toBeVisible()
+    expect(await mock.calls("PATCH", "/registration-status")).toBe(2)
   })
 
   test("[DRU-010] kategorii z meczami nie da się usunąć, z wyjaśnieniem", async ({ page }) => {

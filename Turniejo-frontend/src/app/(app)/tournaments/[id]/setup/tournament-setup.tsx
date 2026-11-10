@@ -3,7 +3,6 @@
 import { ArrowRight, CalendarCheck, Check, CircleAlert, Network, Plus, Shield } from "lucide-react"
 import Link from "next/link"
 import { type ReactNode, useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import {
@@ -20,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useChangeRegistrationStatus } from "@/features/teams/api"
 import { TeamFormDialog } from "@/features/teams/components/team-form-dialog"
 import {
   useMyOrganization,
@@ -38,7 +36,6 @@ import { useTournamentContext } from "@/features/tournaments/use-tournament-cont
 import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { TOURNAMENT_FORMAT_LABELS, statusAtLeast } from "@/types/tournaments"
-import type { TournamentTeam } from "@/types/teams"
 
 import { TournamentCategoriesView } from "../categories/tournament-categories"
 import { TournamentPitchesView } from "../pitches/tournament-pitches"
@@ -117,64 +114,6 @@ function StepIndicator({
         )
       })}
     </ol>
-  )
-}
-
-/** Organizator zgłasza własne drużyny — akceptowanie każdej osobno to tylko dodatkowe kliknięcia. */
-function AcceptPendingTeams({
-  tournamentId,
-  teams,
-  freeSlots,
-}: {
-  tournamentId: string
-  teams: TournamentTeam[]
-  /** Ile drużyn zmieści się jeszcze w limicie. */
-  freeSlots: number
-}) {
-  const changeStatus = useChangeRegistrationStatus(tournamentId)
-  const [pending, setPending] = useState(false)
-
-  async function acceptAll() {
-    setPending(true)
-    let accepted = 0
-    // Po kolei — limit drużyn backend sprawdza przy każdej akceptacji (błąd pokazuje globalny toast).
-    for (const team of teams.slice(0, freeSlots)) {
-      try {
-        await changeStatus.mutateAsync({ tournamentTeamId: team.id, status: "Accepted" })
-        accepted++
-      } catch {
-        break
-      }
-    }
-    setPending(false)
-    if (accepted > 0) {
-      toast.success(`Zaakceptowano ${plural(accepted, ["drużynę", "drużyny", "drużyn"])}`)
-    }
-  }
-
-  return (
-    <div className="border-primary/40 bg-primary/5 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
-      <p>
-        {plural(teams.length, ["drużyna czeka", "drużyny czekają", "drużyn czeka"])} na akceptację.
-        Dopóki jej nie zaakceptujesz, nie zagra w turnieju.
-        {freeSlots < teams.length && (
-          <span className="text-muted-foreground block text-xs">
-            {freeSlots === 0
-              ? "Limit drużyn jest wyczerpany."
-              : `W limicie zmieści się jeszcze ${plural(freeSlots, ["drużyna", "drużyny", "drużyn"])}.`}
-          </span>
-        )}
-      </p>
-      {freeSlots > 0 && (
-        <Button size="sm" onClick={acceptAll} disabled={pending}>
-          {pending
-            ? "Akceptowanie…"
-            : freeSlots < teams.length
-              ? `Akceptuj ${plural(freeSlots, ["drużynę", "drużyny", "drużyn"])}`
-              : "Akceptuj wszystkie"}
-        </Button>
-      )}
-    </div>
   )
 }
 
@@ -344,16 +283,6 @@ export function TournamentSetupView() {
   } else if (key === "teams") {
     body = (
       <div className="space-y-4">
-        {progress.pendingTeams.length > 0 && (
-          <AcceptPendingTeams
-            tournamentId={id}
-            teams={progress.pendingTeams}
-            freeSlots={Math.max(
-              (tournament.data?.teamLimit ?? 0) - progress.acceptedTeams.length,
-              0,
-            )}
-          />
-        )}
         <TournamentTeamsView />
         {organization.data && progress.done.categories && (
           <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
