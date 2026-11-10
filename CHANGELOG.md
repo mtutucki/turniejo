@@ -15,6 +15,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Nowe
 
+- Drużyny w bazie grupujesz etykietami, np. „Rocznik 2015” albo „Klub Orlik”, a drużyna może mieć kilka. Etykiety dodajesz w zakładce „Etykiety” w bazie drużyn, dla wielu drużyn naraz albo w oknie edycji drużyny. Listę drużyn i wybór drużyn do turnieju filtrujesz po etykiecie i nazwie, a „Zaznacz wszystkie” zgłasza całą etykietę.
 - Drużyna w bazie drużyn ma statystyki ze wszystkich turniejów: bilans, bramki, procent zwycięstw i formę, listę turniejów z wynikiem (np. „Zwycięzca”, „Odpadła w półfinale”, „2. miejsce w Grupie A”), najlepszych zawodników (gole, asysty, MVP, kartki) i bilans z każdym rywalem. Trener ma te statystyki w zakładce „Wszystkie turnieje” swojej drużyny.
 - Każda drużyna ma swoją stronę: miejsce w grupie, bilans, forma z ostatnich meczów, wszystkie mecze z wynikami, droga w pucharze i skład z golami i asystami. Wchodzisz na nią, klikając drużynę w tabeli, drabince, na liście drużyn albo na stronie meczu, w portalu kibica i w panelu.
 - Turnieje łatwiej znaleźć w Google: strona główna i portale kibica mają opisy, sitemapę i dane o meczach. Link do turnieju albo meczu wysłany na Messengerze, WhatsAppie czy Facebooku pokazuje obrazek z nazwą turnieju, a przy meczu z drużynami i aktualnym wynikiem. Turniej ukryty z listy turniejów nie trafia do Google.

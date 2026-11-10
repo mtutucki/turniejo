@@ -30,7 +30,9 @@ import { plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
 import type { TournamentCategory } from "@/types/tournaments"
 
-import { useAddTeamToTournament, useOrganizationTeams } from "../api"
+import { useAddTeamToTournament, useOrganizationTeams, useTeamLabels } from "../api"
+import { ALL_TEAMS, filterTeams, type LabelFilter, MANY_TEAMS } from "../team-labels"
+import { TeamLabelFilter, TeamLabelsHint } from "./team-label-filter"
 
 type AddTeamDialogProps = {
   tournamentId: string
@@ -62,6 +64,8 @@ export function AddTeamDialog({
   const [error, setError] = useState<string>()
   const [pending, setPending] = useState(false)
   const teams = useOrganizationTeams(organizationId)
+  const labels = useTeamLabels(organizationId)
+  const labelList = labels.data ?? []
   const addTeam = useAddTeamToTournament(tournamentId)
 
   // Aktywne zgłoszenie (oczekuje/zaakceptowana) blokuje ponowne — odrzucone i wycofane nie.
@@ -72,10 +76,10 @@ export function AddTeamDialog({
     return !status || status === "Rejected" || status === "Withdrawn"
   })
   const [query, setQuery] = useState("")
-  // Przy dużej bazie — filtr po nazwie (zaznaczenia spoza filtra zostają).
-  const visible = query.trim()
-    ? available.filter((t) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
-    : available
+  const [labelFilter, setLabelFilter] = useState<LabelFilter>(ALL_TEAMS)
+  // Przy dużej bazie: filtr po etykiecie i nazwie (zaznaczenia spoza filtra zostają), więc
+  // „Zaznacz wszystkie” przy wybranej etykiecie zgłasza całą etykietę.
+  const visible = filterTeams(available, labelFilter, query)
   const allSelected = visible.length > 0 && visible.every((t) => selected.has(t.id))
   const limitReached = freeSlots === 0
   // Nie da się zaznaczyć więcej drużyn, niż jest wolnych miejsc.
@@ -87,6 +91,7 @@ export function AddTeamDialog({
     setCategoryId(categories.length === 1 ? categories[0]!.id : undefined)
     setError(undefined)
     setQuery("")
+    setLabelFilter(ALL_TEAMS)
   }
 
   function toggle(teamId: string, checked: boolean) {
@@ -210,7 +215,20 @@ export function AddTeamDialog({
                   </Button>
                 )}
               </div>
-              {available.length > 8 && (
+              {(teams.data?.length ?? 0) > 0 && (
+                <TeamLabelsHint
+                  organizationId={organizationId}
+                  teamCount={teams.data?.length ?? 0}
+                  labelCount={labelList.length}
+                />
+              )}
+              <TeamLabelFilter
+                labels={labelList}
+                teams={available}
+                value={labelFilter}
+                onChange={setLabelFilter}
+              />
+              {(available.length > MANY_TEAMS || labelList.length > 0) && (
                 <Input
                   type="search"
                   placeholder="Szukaj drużyny…"
@@ -235,7 +253,9 @@ export function AddTeamDialog({
                 <ul className="max-h-72 divide-y overflow-y-auto rounded-md border">
                   {visible.length === 0 && (
                     <li className="text-muted-foreground px-3 py-2 text-sm">
-                      Brak drużyn pasujących do „{query}”.
+                      {query.trim()
+                        ? `Brak drużyn pasujących do „${query.trim()}”.`
+                        : "Brak drużyn z tą etykietą do zgłoszenia."}
                     </li>
                   )}
                   {visible.map((team) => {

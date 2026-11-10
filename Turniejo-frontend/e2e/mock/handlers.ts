@@ -1344,6 +1344,7 @@ const api = [
           (t) => ({
             ...t,
             organizationId: params.id,
+            labelIds: db.teamLabelIds[t.id] ?? [],
           }),
         ),
       )
@@ -1366,6 +1367,86 @@ const api = [
       }
       db.orgTeams.push(team)
       return HttpResponse.json({ teamId: team.id }, { status: 201 })
+    }),
+  ),
+  // Etykiety drużyn (TeamLabelsController): jak backend, nazwa unikalna bez wielkości liter.
+  http.get(
+    "*/api/organizations/:id/team-labels",
+    authed(({ user, params }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const counts = Object.values(db.teamLabelIds).flat()
+      return HttpResponse.json(
+        [...db.teamLabels]
+          .sort((a, b) => a.name.localeCompare(b.name, "pl"))
+          .map((l) => ({ ...l, teamCount: counts.filter((id) => id === l.id).length })),
+      )
+    }),
+  ),
+  http.post(
+    "*/api/organizations/:id/team-labels",
+    authed<{ id: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const name = ((await request.json()) as { name: string }).name.trim()
+      if (db.teamLabels.some((l) => l.name.toLowerCase() === name.toLowerCase()))
+        return HttpResponse.json(
+          { code: "Conflict.Name", message: "A label with this name already exists", type: 3 },
+          { status: 409 },
+        )
+      const label = { id: newId(), name }
+      db.teamLabels.push(label)
+      return HttpResponse.json({ labelId: label.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/team-labels/:labelId/teams",
+    authed<{ id: string; labelId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      if (!db.teamLabels.some((l) => l.id === params.labelId))
+        return problem(404, "Label not found")
+      const { teamIds } = (await request.json()) as { teamIds: string[] }
+      const all = [...Object.values(TEAM_NAMES), ...db.orgTeams].map((t) => t.id)
+      for (const teamId of all) {
+        const current = (db.teamLabelIds[teamId] ?? []).filter((id) => id !== params.labelId)
+        db.teamLabelIds[teamId] = teamIds.includes(teamId) ? [...current, params.labelId] : current
+      }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/team-labels/:labelId",
+    authed<{ id: string; labelId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const label = db.teamLabels.find((l) => l.id === params.labelId)
+      if (!label) return problem(404, "Label not found")
+      const name = ((await request.json()) as { name: string }).name.trim()
+      if (
+        db.teamLabels.some((l) => l.id !== label.id && l.name.toLowerCase() === name.toLowerCase())
+      )
+        return HttpResponse.json(
+          { code: "Conflict.Name", message: "A label with this name already exists", type: 3 },
+          { status: 409 },
+        )
+      label.name = name
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.delete(
+    "*/api/organizations/:id/team-labels/:labelId",
+    authed<{ id: string; labelId: string }>(({ user, params }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      db.teamLabels = db.teamLabels.filter((l) => l.id !== params.labelId)
+      for (const teamId of Object.keys(db.teamLabelIds))
+        db.teamLabelIds[teamId] = db.teamLabelIds[teamId]!.filter((id) => id !== params.labelId)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/teams/:teamId/labels",
+    authed<{ id: string; teamId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const { labelIds } = (await request.json()) as { labelIds: string[] }
+      db.teamLabelIds[params.teamId] = [...new Set(labelIds)]
+      return new HttpResponse(null, { status: 204 })
     }),
   ),
   http.put(
