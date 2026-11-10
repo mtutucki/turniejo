@@ -53,6 +53,25 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
     }
 
     [Fact]
+    public async Task GRP_004_GroupWithOnlyWithdrawnTeams_CanBeDeleted()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, schedule: false);
+        (await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{s.Team("T3")}/registration-status", new { registrationStatus = 4 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{s.Team("T4")}/registration-status", new { registrationStatus = 4 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        (await s.Organizer.DeleteAsync($"{T(s)}/groups/{s.Group("B")}")).IsSuccessStatusCode.Should().BeTrue();
+
+        // Wycofane zgłoszenia nie wskazują już na usuniętą grupę.
+        var teams = (await (await s.Organizer.GetAsync($"{T(s)}/teams")).ReadJsonAsync()).EnumerateArray().ToList();
+        teams.Where(t => t.GetGuid("id") == s.Team("T3") || t.GetGuid("id") == s.Team("T4"))
+            .Should().HaveCount(2).And.OnlyContain(t => t.GetGuidOrNull("groupId") == null);
+        var groups = (await (await s.Organizer.GetAsync($"{T(s)}/groups")).ReadJsonAsync()).EnumerateArray();
+        groups.Select(g => g.GetGuid("id")).Should().NotContain(s.Group("B"));
+    }
+
+    [Fact]
     public async Task GRP_005_TieBreakerOrder_IsSaved_AndDuplicateOrderIsRejected()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);

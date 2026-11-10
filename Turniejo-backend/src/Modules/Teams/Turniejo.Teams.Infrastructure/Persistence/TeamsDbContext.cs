@@ -125,8 +125,14 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public async Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
-        await TournamentTeams.AnyAsync(t => t.GroupId == groupId, cancellationToken);
+    public async Task<bool> AnyActiveTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AnyAsync(t =>
+            t.GroupId == groupId &&
+            (t.RegistrationStatus == RegistrationStatus.Pending || t.RegistrationStatus == RegistrationStatus.Accepted),
+            cancellationToken);
+
+    public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByGroupIdForUpdateAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.Where(t => t.GroupId == groupId).ToListAsync(cancellationToken);
 
     public async Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.CountAsync(t =>
