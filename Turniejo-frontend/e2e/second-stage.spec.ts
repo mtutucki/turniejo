@@ -58,11 +58,50 @@ test("[FAZ-016] organizator dodaje grupy drugiej fazy, dostaje gotowy podział i
   expect(await mock.calls("PUT", "/second-stage/seats")).toBe(1)
 })
 
+test("[FAZ-021] podział da się ustawić, zanim grupy mają drużyny", async ({ page }) => {
+  // Kreator: grupy są, drużyn jeszcze nie.
+  await mock.override({ method: "GET", path: `/api/tournaments/${TOURNAMENT_ID}/teams`, body: [] })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+  await addSecondStageGroup(page, "Grupa I")
+  await addSecondStageGroup(page, "Grupa II")
+
+  await page.getByRole("button", { name: "Ustaw podział" }).click()
+  const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
+  const size = dialog.getByLabel("Drużyn w grupie")
+  await expect(size).toHaveValue("4")
+  await expect(dialog.getByRole("combobox", { name: "Grupa dla: 2. miejsce Grupa A" })).toHaveText(
+    "Grupa I",
+  )
+  await expect(dialog.getByRole("combobox", { name: "Grupa dla: 4. miejsce Grupa A" })).toHaveText(
+    "Grupa II",
+  )
+
+  await size.fill("6")
+  await expect(dialog.getByRole("combobox", { name: "Grupa dla: 3. miejsce Grupa A" })).toHaveText(
+    "Grupa I",
+  )
+  await expect(dialog.getByRole("combobox", { name: "Grupa dla: 6. miejsce Grupa A" })).toHaveText(
+    "Grupa II",
+  )
+  await dialog.getByRole("button", { name: "Zapisz podział" }).click()
+  await expect(dialog).toBeHidden()
+
+  await expect(
+    page
+      .getByRole("region", { name: "Faza 2 w kategorii U12" })
+      .getByRole("listitem")
+      .filter({ hasText: "Grupa II" }),
+  ).toContainText("4. miejsce Grupa A, 5. miejsce Grupa A, 6. miejsce Grupa A")
+})
+
 test("[FAZ-017] generowanie terminarza czeka na podział na drugą fazę", async ({ page }) => {
   await loginAs(page, ORGANIZER)
   await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule/generate`)
 
-  await expect(page.getByRole("listitem").filter({ hasText: "Podział na drugą fazę" })).toBeVisible()
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Podział na drugą fazę" }),
+  ).toBeVisible()
   await expect(
     page.getByText("Każda kategoria potrzebuje grup drugiej fazy z ustawionym podziałem."),
   ).toBeVisible()
