@@ -13,7 +13,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { handleApiError } from "@/lib/api/error-handler"
 import { isApiError } from "@/lib/api/errors"
-import { isStartPath } from "@/lib/auth/public-paths"
+import { isPublicPath, isStartPath } from "@/lib/auth/public-paths"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 
 declare module "@tanstack/react-query" {
@@ -30,6 +30,8 @@ declare module "@tanstack/react-query" {
 /** Strony logowania/rejestracji — z nich nigdy nie przekierowujemy na logowanie (inaczej pętla). */
 const AUTH_PAGES = ["/login", "/register", "/password-reset", "/password-reset/confirm"]
 const onAuthPage = () => AUTH_PAGES.includes(window.location.pathname)
+/** Strony bez logowania (portal kibica, lista turniejów, pomoc): koniec sesji nie wyrzuca z nich na logowanie. */
+const onPublicPage = () => isPublicPath(window.location.pathname)
 
 function loginUrl() {
   const { pathname, search } = window.location
@@ -40,8 +42,9 @@ function loginUrl() {
 }
 
 function redirectToLogin() {
-  // 401 z zapytania w tle na stronie logowania to po prostu brak sesji — nic nie robimy.
-  if (onAuthPage()) return
+  // 401 z zapytania w tle na stronie logowania albo w portalu kibica to po prostu brak sesji —
+  // strona działa bez logowania, więc zostajemy na niej.
+  if (onAuthPage() || onPublicPage()) return
   window.location.assign(loginUrl())
 }
 
@@ -86,7 +89,8 @@ function SessionExpiryWatcher() {
   useEffect(() => {
     if (session?.error !== "RefreshTokenError") return
     // Na stronie logowania tylko czyścimy sesję — przekierowanie przeładowałoby ją w kółko.
-    if (onAuthPage()) void signOut({ redirect: false })
+    // Na stronach publicznych (portal kibica) też: kibic ogląda dalej, już jako niezalogowany.
+    if (onAuthPage() || onPublicPage()) void signOut({ redirect: false })
     else void signOut({ redirectTo: loginUrl() })
   }, [session?.error])
   return null

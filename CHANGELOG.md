@@ -36,6 +36,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Poprawione
 
+- Po wygaśnięciu sesji w portalu kibica zostajesz w portalu jako niezalogowany, zamiast trafiać na stronę logowania.
 - Po wygenerowaniu terminarza Terminarz nie odsyła już z powrotem do generatora (także później, po wyczyszczeniu terminarza).
 - Po wygenerowaniu terminarza nie da się już przenieść drużyny do innej grupy ani przyjąć nowej. Wcześniej mecze zostawały ze starym podziałem i tabele grup były błędne. Żeby to zmienić, najpierw wyczyść terminarz.
 - Terminarz turnieju z kilkoma kategoriami powstaje dla wszystkich kategorii naraz i żadna nie zostaje bez meczów. Ta sama drużyna grająca w dwóch kategoriach nigdy nie ma dwóch meczów jednocześnie, a drużyny dostają jak najdłuższe przerwy bez wydłużania dnia. W formacie grupy + puchar mecze pucharu mają godziny od razu, a po wyczyszczeniu terminarza drabinka zostaje i planuje się ponownie.
