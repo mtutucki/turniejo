@@ -166,6 +166,14 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
             .Where(m => m.Status == MatchStatus.Scheduled && m.ScheduledAt >= from && m.ScheduledAt <= to)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, DateTimeOffset>> GetLastEventChangeByMatchIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default) =>
+        await MatchEvents
+            .AsNoTracking()
+            .Where(e => matchIds.Contains(e.MatchId))
+            .GroupBy(e => e.MatchId)
+            .Select(g => new { MatchId = g.Key, LastChange = g.Max(e => e.UpdatedAt) })
+            .ToDictionaryAsync(x => x.MatchId, x => x.LastChange, cancellationToken);
+
     public async Task AddMatchEventAsync(MatchEvent matchEvent, CancellationToken cancellationToken = default) =>
         await MatchEvents.AddAsync(matchEvent, cancellationToken);
 

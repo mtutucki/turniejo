@@ -43,6 +43,8 @@ namespace Turniejo.Matches.Application.Abstractions
 
         // MatchEvent
         Task AddMatchEventAsync(MatchEvent matchEvent, CancellationToken cancellationToken = default);
+        /// <summary>Ostatnia zmiana zdarzeń (dodanie, edycja, cofnięcie) każdego z meczów; mecze bez zdarzeń pomija.</summary>
+        Task<IReadOnlyDictionary<Guid, DateTimeOffset>> GetLastEventChangeByMatchIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<MatchEvent>> GetMatchEventsByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<MatchEvent>> GetActiveMatchEventsByTypeAsync(Guid matchId, MatchEventType type, CancellationToken cancellationToken = default);
         Task<MatchEvent?> GetMatchEventByIdAsync(Guid matchEventId, CancellationToken cancellationToken = default);

@@ -11,8 +11,10 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
 {
     /// <summary>
     /// Mecz, którego nikt nie zakończył, trwał w nieskończoność (zegar pokazywał tysiące minut),
-    /// a tabela i drabinka czekały na wynik. Po 3× czasie meczu od startu (min. 2 h, zapas na
-    /// pauzy, dogrywkę i karne) kończymy go z bieżącym wynikiem. Remisu w pucharze nie da się
+    /// a tabela i drabinka czekały na wynik. Mecz uznajemy za porzucony, gdy od startu minęło 3× czasu
+    /// meczu i od 4 h nikt nic przy nim nie zrobił (gol, kartka, pauza, wznowienie, zmiana wyniku).
+    /// Dogrywka, karne czy długa przerwa nie szkodzą, dopóki ktoś mecz prowadzi. Taki mecz kończymy
+    /// z bieżącym wynikiem. Remisu w pucharze nie da się
     /// zakończyć bez karnych, więc system raz go wstrzymuje i powiadamia organizatora; od tej
     /// chwili mecz należy do organizatora i system go nie rusza.
     /// </summary>
@@ -20,12 +22,16 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
         IMatchesDbContext dbContext,
         ITournamentModule tournamentModule) : ICommandHandler<FinishAbandonedMatchesCommand, FinishAbandonedMatchesResponse>
     {
-        public static readonly TimeSpan MinimumThreshold = TimeSpan.FromHours(2);
+        public static readonly TimeSpan InactivityThreshold = TimeSpan.FromHours(4);
         private const int DurationMultiplier = 3;
 
         public async Task<Result<FinishAbandonedMatchesResponse>> Handle(FinishAbandonedMatchesCommand request, CancellationToken cancellationToken)
         {
-            var candidates = await dbContext.GetTrackedUnfinishedMatchesStartedBeforeAsync(request.Now - MinimumThreshold, cancellationToken);
+            // Start też jest czynnością, więc mecz młodszy niż 4 h nie może być porzucony.
+            var candidates = await dbContext.GetTrackedUnfinishedMatchesStartedBeforeAsync(request.Now - InactivityThreshold, cancellationToken);
+            var lastEventChanges = candidates.Count == 0
+                ? new Dictionary<Guid, DateTimeOffset>()
+                : await dbContext.GetLastEventChangeByMatchIdsAsync(candidates.Select(m => m.Id).ToList(), cancellationToken);
             var finished = 0;
             var awaitingDecision = 0;
 
@@ -35,11 +41,17 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
                 if (settings == null)
                     continue;
 
-                var threshold = TimeSpan.FromMinutes(Math.Max(DurationMultiplier * settings.MatchDurationMinutes, MinimumThreshold.TotalMinutes));
+                var minimumDuration = TimeSpan.FromMinutes(DurationMultiplier * settings.MatchDurationMinutes);
 
                 foreach (var match in tournamentMatches)
                 {
-                    if (match.StartedAt!.Value + threshold > request.Now)
+                    if (match.StartedAt!.Value + minimumDuration > request.Now)
+                        continue;
+                    // Zmiany samego meczu (pauza, wynik) i jego zdarzeń (gole, kartki, cofnięcia).
+                    var lastActivity = lastEventChanges.TryGetValue(match.Id, out var lastEventChange) && lastEventChange > match.UpdatedAt
+                        ? lastEventChange
+                        : match.UpdatedAt;
+                    if (lastActivity + InactivityThreshold > request.Now)
                         continue;
                     if (match.AwaitingDecisionSince.HasValue)
                         continue;
