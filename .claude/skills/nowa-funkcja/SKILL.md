@@ -29,18 +29,18 @@ Pracujesz według [docs/jak-pracujemy.md](../../../docs/jak-pracujemy.md) i zasa
 - W trakcie pracy uruchamiaj tylko testy zmienianego miejsca (jeden plik E2E, `dotnet test --filter …`, `npx vitest run plik`). Pełnej kontroli nie puszczaj po każdej zmianie.
 - Jeden commit na spójną zmianę.
 
-## 4. Kontrola
-
-Raz, gdy wszystkie kryteria są gotowe.
-
-```bash
-bash scripts/check.sh --e2e
-```
-
-Wszystko zielone. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), uruchom też pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`).
+## 4. Dokumenty
 
 Nowe decyzje dopisz do `docs/decyzje.md`, zmiany w architekturze do `docs/architektura.md`. Zmiana widoczna dla użytkownika: jedna linijka w sekcji „Nieopublikowane” w `CHANGELOG.md` (kategoria Nowe / Zmienione / Poprawione / Usunięte, po polsku, z perspektywy użytkownika).
 
 ## 5. Oddanie
 
-Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Nie pushuj i nie zakładaj PR bez prośby. Na prośbę: opis PR po angielsku według `.github/pull_request_template.md`, z `Closes #N`.
+Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Pełnej kontroli tu nie uruchamiaj. Nie pushuj i nie zakładaj PR bez prośby.
+
+Na prośbę o PR: najpierw pełna kontrola, raz, tuż przed pushem:
+
+```bash
+bash scripts/check.sh --e2e
+```
+
+Wszystko zielone. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), także pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`). Potem opis PR po angielsku według `.github/pull_request_template.md`, z `Closes #N`.

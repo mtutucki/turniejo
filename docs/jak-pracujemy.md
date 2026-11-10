@@ -25,9 +25,9 @@ Etykiety: `funkcja`, `błąd`, `dług` (porządki techniczne), `pomysł` (na pó
 - Jeden commit na jedną spójną zmianę, opis mówi „dlaczego”.
 - Zmiana widoczna dla użytkownika: jedna linijka w sekcji „Nieopublikowane” w [../CHANGELOG.md](../CHANGELOG.md).
 
-## 4. Kontrola przed oddaniem
+## 4. Kontrola przed PR
 
-Pełna kontrola raz, gdy funkcja jest gotowa, a nie po każdej zmianie (trwa kilka minut). CI po pushu i tak puszcza wszystko jeszcze raz, łącznie z pełnym stosem.
+Pełna kontrola tylko raz, tuż przed pushem i założeniem PR (trwa kilka minut). Nie uruchamiaj jej po skończeniu funkcji ani po każdej zmianie, wystarczą testy zmienianego miejsca. CI po pushu i tak puszcza wszystko jeszcze raz, łącznie z pełnym stosem.
 
 ```bash
 bash scripts/check.sh --e2e
