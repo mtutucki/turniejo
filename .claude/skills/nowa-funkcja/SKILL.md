@@ -15,7 +15,7 @@ Pracujesz według [docs/jak-pracujemy.md](../../../docs/jak-pracujemy.md) i zasa
 
 ## 2. Plan
 
-- Branch od aktualnego `master`: `feat/…` albo `fix/…`, nazwa po angielsku, krótka, z myślnikami (`feat/whats-new`). Zapytaj, jeśli użytkownik pracuje na innym.
+- Branch od bieżącego brancha wydania `release/X.Y.Z` (`git branch --list 'release/*'`): `feat/…` albo `fix/…`, nazwa po angielsku, krótka, z myślnikami (`feat/whats-new`). Nie ma brancha wydania: zaproponuj numer (nowa funkcja → Y, same poprawki → Z, [docs/wersjonowanie.md](../../../docs/wersjonowanie.md)) i po zgodzie `bash scripts/release.sh start X.Y.Z`.
 - Przeczytaj `CLAUDE.md` części, które zmieniasz (backend, frontend).
 - Krótki plan dla użytkownika: moduły backendu, ekrany, test na każde kryterium (warstwa wg [docs/testy.md](../../../docs/testy.md)).
 
@@ -29,18 +29,20 @@ Pracujesz według [docs/jak-pracujemy.md](../../../docs/jak-pracujemy.md) i zasa
 - W trakcie pracy uruchamiaj tylko testy zmienianego miejsca (jeden plik E2E, `dotnet test --filter …`, `npx vitest run plik`). Pełnej kontroli nie puszczaj po każdej zmianie.
 - Jeden commit na spójną zmianę.
 
-## 4. Kontrola
-
-Raz, gdy wszystkie kryteria są gotowe.
-
-```bash
-bash scripts/check.sh --e2e
-```
-
-Wszystko zielone. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), uruchom też pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`).
+## 4. Dokumenty
 
 Nowe decyzje dopisz do `docs/decyzje.md`, zmiany w architekturze do `docs/architektura.md`. Zmiana widoczna dla użytkownika: jedna linijka w sekcji „Nieopublikowane” w `CHANGELOG.md` (kategoria Nowe / Zmienione / Poprawione / Usunięte, po polsku, z perspektywy użytkownika).
 
 ## 5. Oddanie
 
-Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Nie pushuj i nie zakładaj PR bez prośby. Na prośbę: opis PR po angielsku według `.github/pull_request_template.md`, z `Closes #N`.
+Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Pełnej kontroli tu nie uruchamiaj. Po akceptacji: merge lokalnie do brancha wydania (`git switch release/X.Y.Z && git merge --no-ff feat/…`). Bez pushu i bez PR.
+
+## 6. Wydanie (tylko na prośbę użytkownika)
+
+Na `release/X.Y.Z`: `bash scripts/release.sh prepare X.Y.Z`, potem pełna kontrola, raz:
+
+```bash
+bash scripts/check.sh --e2e
+```
+
+Wszystko zielone. Jeśli w wydaniu jest zmiana kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), także pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`). Potem push i jeden PR do `master`, opis po angielsku według `.github/pull_request_template.md`, z listą zmian i `Closes #N` dla każdego issue. Po merge: `bash scripts/release.sh tag X.Y.Z`.

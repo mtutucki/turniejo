@@ -23,6 +23,7 @@ Nowa decyzja: dopisz wiersz z datą. Zmiana decyzji: popraw wiersz i dopisz dat�
 | Powiadomienia | tylko w aplikacji; push na później | prostota V1 |
 | Współbieżny zapis | dane turnieju: wersja (`UpdatedAt`); zasady gry i portal: wczytane wartości; konflikt = 409 i prośba o odświeżenie (2026-11-09) | dwóch organizatorów nie nadpisuje się po cichu |
 | Okno „Co nowego” | tylko po wydaniu (X.Y.Z), jedno okno ze wszystkimi pominiętymi wersjami, tylko „Nowe” i „Zmienione”, ostatnia obejrzana wersja na koncie; nowe konto bez okna, istniejące konta startują od 1.0.0 (2026-11-09) | nie zasypujemy wracających wieloma oknami, okno nie wraca na innym urządzeniu |
+| Przebieg wydań | funkcje i poprawki zbierane na `release/X.Y.Z` (lokalne merge'e bez PR), do `master` jeden PR na wydanie; pilna poprawka jako osobne mini-wydanie od `master` (2026-11-10) | pełna kontrola, PR i deploy raz na kilka zmian; jeden autor, więc PR na każdą zmianę nic nie daje |
 
 ## Produkt
 
