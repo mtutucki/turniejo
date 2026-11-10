@@ -25,7 +25,7 @@ const OPTIONS: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
 const noopSubscribe = () => () => {}
 
 /**
- * Przełącznik motywu na wierzchu nagłówka (panel, portal, mecz na żywo), nie w ustawieniach.
+ * Przełącznik motywu na wierzchu każdej strony (panel, portal, mecz na żywo, logowanie, pomoc), nie w ustawieniach.
  * Zalogowany zapisuje wybór też na koncie, kibic bez konta tylko w przeglądarce.
  */
 export function ThemeToggle({ className }: { className?: string }) {
