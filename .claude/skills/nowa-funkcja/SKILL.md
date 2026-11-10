@@ -15,7 +15,7 @@ Pracujesz według [docs/jak-pracujemy.md](../../../docs/jak-pracujemy.md) i zasa
 
 ## 2. Plan
 
-- Branch od aktualnego `master`: `feat/…` albo `fix/…`, nazwa po angielsku, krótka, z myślnikami (`feat/whats-new`). Zapytaj, jeśli użytkownik pracuje na innym.
+- Branch od bieżącego brancha wydania `release/X.Y.Z` (`git branch --list 'release/*'`): `feat/…` albo `fix/…`, nazwa po angielsku, krótka, z myślnikami (`feat/whats-new`). Nie ma brancha wydania: zaproponuj numer (nowa funkcja → Y, same poprawki → Z, [docs/wersjonowanie.md](../../../docs/wersjonowanie.md)) i po zgodzie `bash scripts/release.sh start X.Y.Z`.
 - Przeczytaj `CLAUDE.md` części, które zmieniasz (backend, frontend).
 - Krótki plan dla użytkownika: moduły backendu, ekrany, test na każde kryterium (warstwa wg [docs/testy.md](../../../docs/testy.md)).
 
@@ -35,12 +35,14 @@ Nowe decyzje dopisz do `docs/decyzje.md`, zmiany w architekturze do `docs/archit
 
 ## 5. Oddanie
 
-Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Pełnej kontroli tu nie uruchamiaj. Nie pushuj i nie zakładaj PR bez prośby.
+Krótko dla użytkownika: co działa, jak to sprawdzono, co zostało (jeśli coś). Pełnej kontroli tu nie uruchamiaj. Po akceptacji: merge lokalnie do brancha wydania (`git switch release/X.Y.Z && git merge --no-ff feat/…`). Bez pushu i bez PR.
 
-Na prośbę o PR: najpierw pełna kontrola, raz, tuż przed pushem:
+## 6. Wydanie (tylko na prośbę użytkownika)
+
+Na `release/X.Y.Z`: `bash scripts/release.sh prepare X.Y.Z`, potem pełna kontrola, raz:
 
 ```bash
 bash scripts/check.sh --e2e
 ```
 
-Wszystko zielone. Jeśli zmiana dotyka kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), także pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`). Potem opis PR po angielsku według `.github/pull_request_template.md`, z `Closes #N`.
+Wszystko zielone. Jeśli w wydaniu jest zmiana kluczowego przepływu (logowanie, mecz na żywo, drabinka, portal), także pełny stos (`Turniejo-frontend`: `npm run e2e:full:up && npm run test:e2e:full && npm run e2e:full:down`). Potem push i jeden PR do `master`, opis po angielsku według `.github/pull_request_template.md`, z listą zmian i `Closes #N` dla każdego issue. Po merge: `bash scripts/release.sh tag X.Y.Z`.

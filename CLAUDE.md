@@ -6,13 +6,13 @@ Aplikacja do turniejów piłkarskich. Backend .NET (`Turniejo-backend/`), fronte
 
 Pełny opis: [docs/jak-pracujemy.md](docs/jak-pracujemy.md). Skrót:
 
-1. Każda funkcja i poprawka na osobnym branchu od aktualnego `master`: `feat/…`, `fix/…`, `chore/…`. Nazwa po angielsku, krótka, z myślnikami: `feat/whats-new`, `fix/bracket-third-place`.
+1. Zmiany zbieramy na branchu wydania `release/X.Y.Z` (zakłada go `bash scripts/release.sh start X.Y.Z`). Każda funkcja i poprawka na osobnym branchu od niego: `feat/…`, `fix/…`, `chore/…`, nazwa po angielsku, krótka, z myślnikami (`feat/whats-new`). Po akceptacji użytkownika merge lokalnie z powrotem do `release/X.Y.Z` (`git merge --no-ff`), bez PR i bez pushu. Nie ma brancha wydania: zapytaj o numer wersji.
 2. Najpierw krótki plan i kryteria akceptacji (z issue na GitHubie albo od użytkownika). Niejasna decyzja produktowa: zapytaj, nie zgaduj. Zapisz ją w [docs/decyzje.md](docs/decyzje.md).
 3. Każde kryterium ma test na właściwej warstwie ([docs/testy.md](docs/testy.md)). Poprawka błędu zaczyna się od testu, który ten błąd pokazuje.
 4. Jeden commit na jedną zmianę (poprawkę, regułę, ekran), z opisem „dlaczego”. Nie mieszaj sprzątania z funkcją. Zmiana widoczna dla użytkownika dostaje linijkę w „Nieopublikowane” w `CHANGELOG.md` (po polsku, z perspektywy użytkownika).
-5. W trakcie pracy uruchamiaj tylko testy zmienianego miejsca (pojedynczy plik albo `--filter`, [docs/testy.md](docs/testy.md)). Pełna kontrola (`bash scripts/check.sh`, przy zmianach UI `--e2e`) tylko raz, tuż przed pushem i PR, gdy użytkownik o nie poprosi. Nie po skończeniu funkcji, nie „na wszelki wypadek”.
-6. Nie pushuj i nie zakładaj PR bez prośby użytkownika. Opis PR po angielsku, z sekcjami Summary i Test plan.
-7. Wydania (numer wersji, tag, GitHub Release) tylko na prośbę użytkownika, według [docs/wersjonowanie.md](docs/wersjonowanie.md) i `scripts/release.sh`.
+5. Przy funkcjach i poprawkach uruchamiaj tylko testy zmienianego miejsca (pojedynczy plik albo `--filter`, [docs/testy.md](docs/testy.md)). Pełna kontrola (`bash scripts/check.sh --e2e`) raz na wydanie: na `release/X.Y.Z` tuż przed pushem i PR. Nie po skończeniu funkcji, nie „na wszelki wypadek”.
+6. Do `master` trafia tylko PR z brancha wydania (albo pilnej poprawki, [docs/wersjonowanie.md](docs/wersjonowanie.md)). Nie pushuj i nie zakładaj PR bez prośby użytkownika. Opis PR po angielsku, z sekcjami Summary i Test plan.
+7. Wydania (numer wersji, tag, GitHub Release) tylko na prośbę użytkownika, według [docs/wersjonowanie.md](docs/wersjonowanie.md) i `scripts/release.sh`. Merge do `master` wdraża na serwer.
 
 Do prowadzenia funkcji od początku do końca służy skill [nowa-funkcja](.claude/skills/nowa-funkcja/SKILL.md).
 
