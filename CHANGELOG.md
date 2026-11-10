@@ -30,6 +30,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Poprawione
 
+- Terminarz turnieju z kilkoma kategoriami powstaje dla wszystkich kategorii naraz i żadna nie zostaje bez meczów. Ta sama drużyna grająca w dwóch kategoriach nigdy nie ma dwóch meczów jednocześnie, a drużyny dostają jak najdłuższe przerwy bez wydłużania dnia. W formacie grupy + puchar mecze pucharu mają godziny od razu, a po wyczyszczeniu terminarza drabinka zostaje i planuje się ponownie.
 - Mecz, którego nikt nie zakończył, nie trwa już w nieskończoność. Gdy przez 4 godziny nikt nic w nim nie zrobi, kończy się sam z aktualnym wynikiem. Remis w pucharze zostaje wstrzymany z napisem „Czeka na rozstrzygnięcie” zamiast zegara, a organizator dostaje powiadomienie, żeby rozstrzygnąć go karnymi.
 - Grupę, z której wycofano wszystkie drużyny, da się już usunąć.
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.

@@ -147,6 +147,16 @@ public sealed class TournamentScenario
         return ttId;
     }
 
+    /// <summary>Zgłoszenie istniejącej drużyny klubu (np. tej samej w drugiej kategorii) pod nazwą <paramref name="name"/>.</summary>
+    public async Task<Guid> AddAcceptedEntryAsync(string name, Guid clubTeamId, Guid categoryId)
+    {
+        var ttId = await TournamentFlow.AddTeamToTournamentAsync(Organizer, TournamentId, clubTeamId, categoryId);
+        await TournamentFlow.AcceptRegistrationAsync(Organizer, TournamentId, ttId);
+        _teams[name] = ttId;
+        _clubTeams[name] = clubTeamId;
+        return ttId;
+    }
+
     public Task StartAsync() =>
         TournamentFlow.ChangeStatusAsync(Organizer, TournamentId, TournamentStatus.InProgress);
 

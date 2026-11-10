@@ -104,6 +104,12 @@ const EXACT: Record<string, string> = {
     "Brak meczów do rozegrania - każda grupa potrzebuje co najmniej 2 zaakceptowanych drużyn",
   "Tournament cannot transition to ScheduleGenerated from its current status":
     "Terminarz został już wygenerowany albo turniej jest na innym etapie",
+  "Every category needs a knockout bracket before generating the schedule":
+    "Każda kategoria potrzebuje drabinki, ułóż brakujące w zakładce Drabinka",
+  "Each category needs at least 2 accepted teams":
+    "W kategorii jest tylko jedna drużyna, dodaj drugą albo usuń kategorię",
+  "Each group needs at least 2 accepted teams":
+    "W grupie jest tylko jedna drużyna, dodaj jej rywala albo przenieś ją do innej grupy",
   "Some accepted teams are not assigned to a group":
     "Część zaakceptowanych drużyn nie ma grupy - przypisz je, zanim wygenerujesz terminarz",
   "EndAt must be after StartAt.": "Koniec musi być po rozpoczęciu",

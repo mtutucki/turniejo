@@ -18,7 +18,8 @@ public sealed class GroupAndKnockoutRulesTests(IntegrationTestWebApplicationFact
 
     private static async Task<TournamentScenario> CrossBracketAsync(IntegrationTestWebApplicationFactory factory, bool start = true)
     {
-        var s = await TournamentScenario.GroupsAsync(factory, groups: 2, teamsPerGroup: 3, start: start, format: TournamentFormat.GroupAndKnockout);
+        // Drabinka przed terminarzem: generator planuje od razu terminy pucharu po fazie grupowej.
+        var s = await TournamentScenario.GroupsAsync(factory, groups: 2, teamsPerGroup: 3, schedule: false, format: TournamentFormat.GroupAndKnockout);
         object Pair(string homeGroup, int homePos, string awayGroup, int awayPos) => new
         {
             homeSourceType = GroupPosition, homeGroupId = (Guid?)s.Group(homeGroup), homePosition = (int?)homePos, homeTournamentTeamId = (Guid?)null,
@@ -27,6 +28,9 @@ public sealed class GroupAndKnockoutRulesTests(IntegrationTestWebApplicationFact
         var response = await s.Organizer.PostAsJsonAsync($"{T(s)}/bracket/generate",
             new { categoryId = s.CategoryId, roundOnePairings = new[] { Pair("A", 1, "B", 2), Pair("B", 1, "A", 2) } });
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+        await s.GenerateScheduleAsync();
+        if (start)
+            await s.StartAsync();
         return s;
     }
 

@@ -9,6 +9,8 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
 {
     public async Task<IReadOnlyList<BracketNodeInfoDto>> GetNodesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
     {
+        var brackets = await dbContext.GetBracketsByTournamentIdAsync(tournamentId, cancellationToken);
+        var categoryByBracketId = brackets.ToDictionary(b => b.Id, b => b.CategoryId);
         var rounds = await GetRoundsAsync(tournamentId, cancellationToken);
         var roundById = rounds.ToDictionary(r => r.Id);
         var nodes = await dbContext.GetBracketNodesByRoundIdsAsync(roundById.Keys.ToList(), cancellationToken);
@@ -20,7 +22,10 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
                 roundById[n.BracketRoundId].RoundType == BracketRoundType.ThirdPlace,
                 n.MatchId, n.HomeSourceNodeId, n.AwaySourceNodeId,
                 n.HomeSourceType == BracketSourceType.Bye || n.AwaySourceType == BracketSourceType.Bye,
-                n.PlannedPitchId, n.PlannedAt, n.PlannedRefereeId))
+                n.PlannedPitchId, n.PlannedAt, n.PlannedRefereeId,
+                categoryByBracketId[roundById[n.BracketRoundId].BracketId],
+                n.HomeSourceGroupId, n.AwaySourceGroupId,
+                n.HomeTournamentTeamId, n.AwayTournamentTeamId))
             .ToList();
     }
 
