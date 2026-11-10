@@ -30,6 +30,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Poprawione
 
+- Mecz, którego nikt nie zakończył, nie trwa już w nieskończoność. Po trzykrotności czasu meczu (co najmniej 2 godziny) kończy się sam z aktualnym wynikiem. Remis w pucharze organizator rozstrzyga ręcznie.
 - Grupę, z której wycofano wszystkie drużyny, da się już usunąć.
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
 - Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
