@@ -1,20 +1,24 @@
 "use client"
 
-import { Pencil, Plus, Shuffle } from "lucide-react"
+import { ListOrdered, Pencil, Plus, Shuffle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { DeleteGroupDialog } from "@/features/tournaments/components/delete-group-dialog"
 import { GroupFormDialog } from "@/features/tournaments/components/group-form-dialog"
 import { plural } from "@/lib/format"
 import type { Match } from "@/types/matches"
-import type { SecondStageSeat, TournamentGroup } from "@/types/tournaments"
+import type { SecondStageRange, SecondStageSeat, TournamentGroup } from "@/types/tournaments"
 
 import {
   type FirstStageGroup,
+  largestGroupEstimate,
   missingPlaces,
   placesByPosition,
+  proposeRanges,
+  rangeLabel,
   suggestSecondStageGroupName,
 } from "../split"
+import { SecondStageRangesDialog } from "./second-stage-ranges-dialog"
 import { SecondStageSplitDialog } from "./second-stage-split-dialog"
 
 type SecondStageSectionProps = {
@@ -25,6 +29,8 @@ type SecondStageSectionProps = {
   groups: TournamentGroup[]
   firstStage: FirstStageGroup[]
   seats: SecondStageSeat[]
+  /** Zakresy miejsc tej kategorii (Grupa I: miejsca 1-2). */
+  ranges: SecondStageRange[]
   matches: Match[]
   canManage: boolean
   /** Zgłoszone drużyny kategorii, także bez grupy. */
@@ -41,6 +47,7 @@ export function SecondStageSection({
   groups,
   firstStage,
   seats,
+  ranges,
   matches,
   canManage,
   categoryTeams,
@@ -48,7 +55,24 @@ export function SecondStageSection({
 }: SecondStageSectionProps) {
   const secondStage = groups.filter((g) => g.stage === 2)
   const teamsIn = (groupId: string) => firstStage.find((g) => g.id === groupId)?.teams ?? 0
-  const missing = missingPlaces(seats, teamsIn, groups)
+  // Co pokazać: po wygenerowaniu terminarza konkretne miejsca, wcześniej zakresy, pojedyncze miejsca
+  // (tryb zaawansowany) albo gotowy podział, który generator zastosuje sam.
+  const mode =
+    locked && seats.length > 0
+      ? "seats"
+      : ranges.length > 0
+        ? "ranges"
+        : seats.length > 0
+          ? "seats"
+          : "default"
+  const shownRanges =
+    mode === "ranges"
+      ? ranges
+      : proposeRanges(
+          largestGroupEstimate(firstStage, categoryTeams),
+          [...secondStage].sort((a, b) => a.order - b.order).map((g) => g.id),
+        )
+  const missing = mode === "seats" ? missingPlaces(seats, teamsIn, groups) : []
   const nextOrder = Math.max(0, ...groups.map((g) => g.order)) + 1
 
   return (
@@ -58,21 +82,38 @@ export function SecondStageSection({
         {canManage && (
           <div className="flex flex-wrap gap-2">
             {secondStage.length > 0 && !locked && (
-              <SecondStageSplitDialog
-                tournamentId={tournamentId}
-                categoryId={categoryId}
-                categoryName={categoryName}
-                firstStage={firstStage}
-                secondStage={secondStage}
-                seats={seats}
-                categoryTeams={categoryTeams}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Shuffle />
-                    Ustaw podział
-                  </Button>
-                }
-              />
+              <>
+                <SecondStageRangesDialog
+                  tournamentId={tournamentId}
+                  categoryId={categoryId}
+                  categoryName={categoryName}
+                  firstStage={firstStage}
+                  secondStage={secondStage}
+                  ranges={ranges}
+                  categoryTeams={categoryTeams}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <ListOrdered />
+                      Ustaw podział
+                    </Button>
+                  }
+                />
+                <SecondStageSplitDialog
+                  tournamentId={tournamentId}
+                  categoryId={categoryId}
+                  categoryName={categoryName}
+                  firstStage={firstStage}
+                  secondStage={secondStage}
+                  seats={seats}
+                  categoryTeams={categoryTeams}
+                  trigger={
+                    <Button variant="ghost" size="sm">
+                      <Shuffle />
+                      Pojedyncze miejsca
+                    </Button>
+                  }
+                />
+              </>
             )}
             <GroupFormDialog
               tournamentId={tournamentId}
@@ -98,7 +139,8 @@ export function SecondStageSection({
       ) : (
         <ul className="divide-y rounded-md border">
           {secondStage.map((group) => {
-            const places = seats.filter((s) => s.groupId === group.id)
+            const places = mode === "seats" ? seats.filter((s) => s.groupId === group.id) : []
+            const range = shownRanges.find((r) => r.groupId === group.id)
             return (
               <li key={group.id} className="flex items-start gap-2 py-1.5 pr-1 pl-3">
                 <div className="min-w-0 flex-1">
@@ -111,7 +153,13 @@ export function SecondStageSection({
                       </span>
                     )}
                   </p>
-                  {places.length > 0 ? (
+                  {mode !== "seats" ? (
+                    <p className="text-muted-foreground text-xs">
+                      {range
+                        ? `${mode === "default" ? "Domyślnie: " : ""}${capitalize(rangeLabel(range))} z każdej grupy`
+                        : "Bez miejsc - ustaw podział."}
+                    </p>
+                  ) : places.length > 0 ? (
                     <ul className="text-muted-foreground text-xs">
                       {placesByPosition(places, groups).map((line) => (
                         <li key={line}>{line}</li>
@@ -155,6 +203,11 @@ export function SecondStageSection({
           {locked ? "Wyczyść terminarz i popraw podział." : "Popraw podział."}
         </p>
       )}
+      {mode === "default" && secondStage.length > 0 && !locked && (
+        <p className="text-muted-foreground text-xs">
+          Bez zmian terminarz użyje tego podziału, a dokładne miejsca policzy z drużyn w grupach.
+        </p>
+      )}
       {locked && secondStage.length > 0 && (
         <p className="text-muted-foreground text-xs">
           Podział zmienisz po wyczyszczeniu terminarza.
@@ -163,3 +216,5 @@ export function SecondStageSection({
     </section>
   )
 }
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)

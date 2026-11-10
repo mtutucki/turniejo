@@ -211,10 +211,28 @@ export type SecondStageFixture = {
   matchId: string | null
 }
 
+/** SecondStageRangeDto: grupa fazy 2 bierze miejsca od–do z każdej grupy fazy 1. */
+export type SecondStageRange = {
+  id: string
+  categoryId: string
+  groupId: string
+  fromPosition: number
+  toPosition: number
+}
+
 /** SecondStageDto */
 export type SecondStage = {
   seats: SecondStageSeat[]
   fixtures: SecondStageFixture[]
+  /** Zakresy miejsc; z nich generator terminarza robi miejsca (seats). */
+  ranges?: SecondStageRange[]
+}
+
+/** SecondStageRangeRequest */
+export type SecondStageRangeInput = {
+  groupId: string
+  fromPosition: number
+  toPosition: number
 }
 
 /** SecondStageSeatRequest: miejsce z tabeli fazy 1 w grupie fazy 2. */

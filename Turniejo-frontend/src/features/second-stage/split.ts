@@ -1,7 +1,13 @@
 // Format „Dwie fazy grupowe”: podział miejsc z tabel fazy 1 na grupy fazy 2. Czyste funkcje,
 // bez React, żeby dało się je sprawdzić testami (split.test.ts).
 
-import type { SecondStageSeat, SecondStageSeatInput, TournamentGroup } from "@/types/tournaments"
+import type {
+  SecondStageRange,
+  SecondStageRangeInput,
+  SecondStageSeat,
+  SecondStageSeatInput,
+  TournamentGroup,
+} from "@/types/tournaments"
 
 /** Grupa fazy 1 z liczbą drużyn, które mogą w niej zająć miejsce. */
 export type FirstStageGroup = { id: string; name: string; order: number; teams: number }
@@ -156,6 +162,122 @@ export function secondStageMatchCount(seats: Pick<SecondStageSeat, "groupId">[])
 }
 
 /**
+ * Gotowy podział zakresami (jak SecondStagePlanner.DefaultRanges w backendzie): miejsca 1..N po równo
+ * na kolejne przedziały, np. N = 4 i dwie grupy: 1-2 i 3-4.
+ */
+export function proposeRanges(
+  largestGroup: number,
+  secondStageGroupIds: string[],
+): SecondStageRangeInput[] {
+  if (largestGroup < 1 || secondStageGroupIds.length === 0) return []
+  const perGroup = Math.ceil(largestGroup / secondStageGroupIds.length)
+  return secondStageGroupIds.flatMap((groupId, i) => {
+    const fromPosition = i * perGroup + 1
+    return fromPosition > largestGroup
+      ? []
+      : [{ groupId, fromPosition, toPosition: Math.min((i + 1) * perGroup, largestGroup) }]
+  })
+}
+
+/**
+ * Ile miejsc ma największa grupa fazy 1: z drużyn w grupach, a gdy ich tam jeszcze nie ma - drużyny
+ * kategorii po równo na grupy (8 drużyn, 4 grupy = 2), a bez żadnych drużyn 4.
+ */
+export function largestGroupEstimate(firstStage: FirstStageGroup[], categoryTeams: number) {
+  return (
+    Math.max(0, ...firstStage.map((g) => g.teams)) ||
+    (firstStage.length > 0 && categoryTeams > 0
+      ? Math.ceil(categoryTeams / firstStage.length)
+      : 0) ||
+    4
+  )
+}
+
+/** Zakresy jednej kategorii nie mogą się nakładać - to samo miejsce trafiłoby do dwóch grup. */
+export function rangesOverlap(
+  ranges: Pick<SecondStageRangeInput, "fromPosition" | "toPosition">[],
+) {
+  const taken = new Set<number>()
+  for (const r of ranges)
+    for (let p = r.fromPosition; p <= r.toPosition; p++) {
+      if (taken.has(p)) return true
+      taken.add(p)
+    }
+  return false
+}
+
+/** „miejsca 1-2”, „miejsce 3”. */
+export function rangeLabel(range: Pick<SecondStageRangeInput, "fromPosition" | "toPosition">) {
+  return range.fromPosition === range.toPosition
+    ? `miejsce ${range.fromPosition}`
+    : `miejsca ${range.fromPosition}-${range.toPosition}`
+}
+
+/**
+ * Miejsca, które powstaną przy generowaniu terminarza (jak PrepareSecondStageSeatsAsync): z zakresów,
+ * a bez żadnego podziału z gotowego podziału po równo; pojedynczo ustawione miejsca bez zmian.
+ */
+export function effectiveSeats({
+  groups,
+  seats,
+  ranges,
+  teamsInGroup,
+}: {
+  groups: TournamentGroup[]
+  seats: Pick<SecondStageSeat, "groupId" | "sourceGroupId" | "sourcePosition" | "categoryId">[]
+  ranges: Pick<SecondStageRange, "groupId" | "fromPosition" | "toPosition" | "categoryId">[]
+  teamsInGroup: (groupId: string) => number
+}) {
+  const categories = [...new Set(groups.map((g) => g.categoryId))]
+  return categories.flatMap((categoryId) => {
+    const inCategory = groups.filter((g) => g.categoryId === categoryId)
+    const secondStage = inCategory.filter((g) => g.stage === 2).sort((a, b) => a.order - b.order)
+    const firstStage = inCategory
+      .filter((g) => g.stage !== 2)
+      .map((g) => ({ id: g.id, name: g.name, order: g.order, teams: teamsInGroup(g.id) }))
+    const own = ranges.filter((r) => r.categoryId === categoryId)
+    const ownSeats = seats.filter((s) => s.categoryId === categoryId)
+    if (own.length === 0 && ownSeats.length > 0) return ownSeats
+    const used =
+      own.length > 0
+        ? own
+        : proposeRanges(
+            Math.max(0, ...firstStage.map((g) => g.teams)),
+            secondStage.map((g) => g.id),
+          )
+    return seatsFromRanges(
+      used,
+      firstStage,
+      secondStage.map((g) => g.id),
+    ).map((s) => ({
+      ...s,
+      categoryId,
+    }))
+  })
+}
+
+/** Zakresy zamienione na miejsca z prawdziwej liczby drużyn: grupa z 3 drużynami nie ma 4. miejsca. */
+export function seatsFromRanges(
+  ranges: Pick<SecondStageRangeInput, "groupId" | "fromPosition" | "toPosition">[],
+  firstStage: FirstStageGroup[],
+  secondStageGroupIds: string[],
+): SecondStageSeatInput[] {
+  const sources = [...firstStage].sort((a, b) => a.order - b.order)
+  return [...ranges]
+    .sort((a, b) => secondStageGroupIds.indexOf(a.groupId) - secondStageGroupIds.indexOf(b.groupId))
+    .flatMap((r) =>
+      Array.from(
+        { length: r.toPosition - r.fromPosition + 1 },
+        (_, i) => r.fromPosition + i,
+      ).flatMap((position) =>
+        sources
+          .filter((g) => position <= g.teams)
+          .map((g) => ({ groupId: r.groupId, sourceGroupId: g.id, sourcePosition: position })),
+      ),
+    )
+}
+
+/**
  * Te same reguły co generator terminarza (BuildSecondStageAsync): każda grająca kategoria ma grupę
  * fazy 2 z miejscami, grupa fazy 2 ma co najmniej 2 miejsca, a miejsce istnieje w tabeli grupy.
  * Zwraca pierwszy problem albo null.
@@ -178,7 +300,7 @@ export function secondStageProblem({
       (c) => !secondStage.some((g) => g.categoryId === c && withSeats.has(g.id)),
     )
   )
-    return "Każda kategoria potrzebuje grup drugiej fazy z ustawionym podziałem."
+    return "Każda kategoria potrzebuje grup drugiej fazy."
   const tooSmall = secondStage.find((g) => seats.filter((s) => s.groupId === g.id).length === 1)
   if (tooSmall) return `${tooSmall.name} ma tylko jedno miejsce, a potrzebuje co najmniej dwóch.`
   const missing = seats.find((s) => s.sourcePosition > teamsInGroup(s.sourceGroupId))

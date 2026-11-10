@@ -97,6 +97,9 @@ export function TournamentCategoriesView({
                 format={format}
                 canManage={isOrganizer}
                 seats={(secondStage.data?.seats ?? []).filter((s) => s.categoryId === category.id)}
+                ranges={(secondStage.data?.ranges ?? []).filter(
+                  (r) => r.categoryId === category.id,
+                )}
                 scheduleLocked={
                   !!tournament.data && statusAtLeast(tournament.data.status, "ScheduleGenerated")
                 }

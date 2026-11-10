@@ -29,6 +29,7 @@ import { SecondStageSection } from "@/features/second-stage/components/second-st
 import { formatBirthDate, plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
 import type {
+  SecondStageRange,
   SecondStageSeat,
   TournamentCategory,
   TournamentFormat,
@@ -68,6 +69,8 @@ type CategoryCardProps = {
   canManage: boolean
   /** Dwie fazy grupowe: podział tej kategorii na grupy fazy 2. */
   seats?: SecondStageSeat[]
+  /** Dwie fazy grupowe: zakresy miejsc tej kategorii. */
+  ranges?: SecondStageRange[]
   /** Terminarz istnieje - podział na fazę 2 jest zamrożony. */
   scheduleLocked?: boolean
 }
@@ -80,6 +83,7 @@ export function CategoryCard({
   format,
   canManage,
   seats = [],
+  ranges = [],
   scheduleLocked = false,
 }: CategoryCardProps) {
   const twoStages = format === "TwoGroupStages"
@@ -300,6 +304,7 @@ export function CategoryCard({
               teams: teamCount(g.id),
             }))}
             seats={seats}
+            ranges={ranges}
             matches={categoryMatches}
             canManage={canManage}
             categoryTeams={teams.length}

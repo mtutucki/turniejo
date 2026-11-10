@@ -36,7 +36,7 @@ test("[FAZ-016] organizator dodaje grupy drugiej fazy, dostaje gotowy podział i
   await addSecondStageGroup(page, "Grupa I")
   await addSecondStageGroup(page, "Grupa II")
 
-  await section.getByRole("button", { name: "Ustaw podział" }).click()
+  await section.getByRole("button", { name: "Pojedyncze miejsca" }).click()
   const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
   // Gotowy podział: 1. miejsce do pierwszej grupy, 2. miejsce do drugiej.
   await expect(dialog.getByRole("combobox", { name: "Grupa dla: 1. miejsce Grupa A" })).toHaveText(
@@ -67,7 +67,7 @@ test("[FAZ-021] podział da się ustawić, zanim grupy mają drużyny", async ({
   await addSecondStageGroup(page, "Grupa I")
   await addSecondStageGroup(page, "Grupa II")
 
-  await page.getByRole("button", { name: "Ustaw podział" }).click()
+  await page.getByRole("button", { name: "Pojedyncze miejsca" }).click()
   const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
   const size = dialog.getByLabel("Drużyn w grupie")
   await expect(size).toHaveValue("4")
@@ -124,7 +124,7 @@ test("[FAZ-023] miejsce zapisane ponad liczbę drużyn grupy jest oznaczone i wy
   const section = page.getByRole("region", { name: "Faza 2 w kategorii U12" })
   await expect(section).toContainText("których nie ma w tabeli: 3. miejsce Grupa A")
 
-  await section.getByRole("button", { name: "Ustaw podział" }).click()
+  await section.getByRole("button", { name: "Pojedyncze miejsca" }).click()
   const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
   await expect(dialog.getByLabel("Drużyn w grupie")).toHaveCount(0)
   await expect(dialog.getByRole("combobox", { name: /Grupa dla:/ })).toHaveCount(2)
@@ -170,7 +170,7 @@ test("[FAZ-024] 8 drużyn bez grup w 4 grupach: podział domyślnie po 2 miejsca
   await addSecondStageGroup(page, "Grupa I")
   await addSecondStageGroup(page, "Grupa II")
 
-  await page.getByRole("button", { name: "Ustaw podział" }).click()
+  await page.getByRole("button", { name: "Pojedyncze miejsca" }).click()
   const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
   await expect(dialog.getByLabel("Drużyn w grupie")).toHaveValue("2")
   await expect(dialog.getByText("Razem miejsc: 8 · drużyn w kategorii: 8")).toBeVisible()
@@ -188,21 +188,68 @@ test("[FAZ-024] 8 drużyn bez grup w 4 grupach: podział domyślnie po 2 miejsca
   ).toBeVisible()
 })
 
-test("[FAZ-017] generowanie terminarza czeka na podział na drugą fazę", async ({ page }) => {
+test("[FAZ-030] podział zakresami miejsc, zanim grupy mają drużyny", async ({ page }) => {
+  // Kreator: 4 grupy, drużyn jeszcze nie ma, więc grupa liczy się po 4 miejsca.
+  await mock.override({ method: "GET", path: `/api/tournaments/${TOURNAMENT_ID}/teams`, body: [] })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+  for (const name of ["Grupa B", "Grupa C", "Grupa D"]) {
+    await page
+      .getByRole("region", { name: "Grupy w kategorii U12" })
+      .getByRole("button", { name: "Dodaj grupę" })
+      .click()
+    const dialog = page.getByRole("dialog", { name: "Nowa grupa · U12" })
+    await expect(dialog.getByLabel("Nazwa")).toHaveValue(name)
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(dialog).toBeHidden()
+  }
+  await addSecondStageGroup(page, "Grupa I")
+  await addSecondStageGroup(page, "Grupa II")
+  const section = page.getByRole("region", { name: "Faza 2 w kategorii U12" })
+  await expect(section.getByRole("listitem").filter({ hasText: "Grupa II" })).toContainText(
+    "Domyślnie: Miejsca 3-4 z każdej grupy",
+  )
+
+  await section.getByRole("button", { name: "Ustaw podział" }).click()
+  const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
+  await expect(dialog.getByLabel("Grupa I: od miejsca")).toHaveValue("1")
+  await expect(dialog.getByLabel("Grupa I: do miejsca")).toHaveValue("2")
+  await expect(dialog.getByLabel("Grupa II: od miejsca")).toHaveValue("3")
+
+  await dialog.getByLabel("Grupa II: od miejsca").fill("2")
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "To samo miejsce nie może trafić do dwóch grup.",
+  )
+  await expect(dialog.getByRole("button", { name: "Zapisz podział" })).toBeDisabled()
+
+  await dialog.getByLabel("Grupa II: od miejsca").fill("3")
+  await dialog.getByLabel("Grupa II: do miejsca").fill("3")
+  await dialog.getByRole("button", { name: "Zapisz podział" }).click()
+  await expect(dialog).toBeHidden()
+
+  await expect(section.getByRole("listitem").filter({ hasText: "Grupa II" })).toContainText(
+    "Miejsce 3 z każdej grupy",
+  )
+  await expect(section).not.toContainText("Domyślnie")
+  expect(await mock.calls("PUT", "/second-stage/ranges")).toBe(1)
+})
+
+test("[FAZ-017] generowanie terminarza czeka na grupy drugiej fazy, a bez podziału bierze gotowy", async ({
+  page,
+}) => {
   await loginAs(page, ORGANIZER)
   await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule/generate`)
 
   await expect(
     page.getByRole("listitem").filter({ hasText: "Podział na drugą fazę" }),
   ).toBeVisible()
-  await expect(
-    page.getByText("Każda kategoria potrzebuje grup drugiej fazy z ustawionym podziałem."),
-  ).toBeVisible()
+  await expect(page.getByText("Każda kategoria potrzebuje grup drugiej fazy.")).toBeVisible()
 
   await page.getByRole("link", { name: "Przejdź do Kategorii" }).click()
   await addSecondStageGroup(page, "Grupa I")
-  await page.getByRole("button", { name: "Ustaw podział" }).click()
-  await page.getByRole("button", { name: "Zapisz podział" }).click()
+  await expect(page.getByRole("region", { name: "Faza 2 w kategorii U12" })).toContainText(
+    "Domyślnie: Miejsca 1-2 z każdej grupy",
+  )
 
   await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule/generate`)
   await expect(page.getByText("Podział na drugą fazę gotowy")).toBeVisible()

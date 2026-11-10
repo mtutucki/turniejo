@@ -55,7 +55,11 @@ import {
 import { bracketStages } from "@/features/matches/planned-bracket-matches"
 import { autoBracketPairs } from "@/features/matches/suggest-bracket"
 import { useSecondStage } from "@/features/second-stage/api"
-import { secondStageMatchCount, secondStageProblem } from "@/features/second-stage/split"
+import {
+  effectiveSeats,
+  secondStageMatchCount,
+  secondStageProblem,
+} from "@/features/second-stage/split"
 import { useAssignTeamToGroup, useTournamentTeams } from "@/features/teams/api"
 import {
   useCategories,
@@ -1493,7 +1497,15 @@ export function GenerateScheduleView() {
     (groups.data ?? []).filter((g) => g.stage !== 2),
     teams.data ?? [],
   )
-  const seats = secondStage.data?.seats ?? []
+  // Miejsca, które powstaną przy generowaniu: z zakresów albo z gotowego podziału.
+  const seats = twoStages
+    ? effectiveSeats({
+        groups: groups.data ?? [],
+        seats: secondStage.data?.seats ?? [],
+        ranges: secondStage.data?.ranges ?? [],
+        teamsInGroup: (groupId) => plan.find((p) => p.group.id === groupId)?.teams ?? 0,
+      })
+    : []
   const secondStageMatches = twoStages ? secondStageMatchCount(seats) : 0
   const pendingBracket = pendingBracketMatches(schedule.data ?? [])
   const bracketMatches = pendingBracket.length
