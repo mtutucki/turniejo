@@ -72,13 +72,23 @@ public sealed class AbandonedMatchRulesTests(IntegrationTestWebApplicationFactor
     }
 
     [Fact]
-    public async Task MNZ_042_KnockoutDraw_IsLeftForTheOrganizer()
+    public async Task MNZ_042_KnockoutDraw_IsPausedOnce_AndTheOrganizerIsAskedToDecide()
     {
         var s = await TournamentScenario.KnockoutAsync(Factory);
         var id = (await s.ScheduleAsync()).First().GetGuid("id");
-        (await s.Organizer.PostAsync($"/api/tournaments/{s.TournamentId}/matches/{id}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+        var path = $"/api/tournaments/{s.TournamentId}/matches/{id}";
+        (await s.Organizer.PostAsync($"{path}/start", null)).IsSuccessStatusCode.Should().BeTrue();
 
         (await RunAsync(TimeSpan.FromHours(5))).Should().Be(0);
+
+        (await MatchAsync(s, id)).GetString("status").Should().Be("Paused");
+        (await s.NotificationsAsync(s.Organizer)).Should().ContainSingle(n => n.GetString("type") == "MatchAwaitingDecision");
+
+        // Organizer wznawia, żeby rozegrać dogrywkę: system już się nie wtrąca.
+        (await s.Organizer.PostAsync($"{path}/resume", null)).IsSuccessStatusCode.Should().BeTrue();
+        (await RunAsync(TimeSpan.FromHours(6))).Should().Be(0);
+
         (await MatchAsync(s, id)).GetString("status").Should().Be("Live");
+        (await s.NotificationsAsync(s.Organizer)).Count(n => n.GetString("type") == "MatchAwaitingDecision").Should().Be(1);
     }
 }

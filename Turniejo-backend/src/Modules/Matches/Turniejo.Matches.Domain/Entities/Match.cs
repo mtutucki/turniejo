@@ -29,6 +29,8 @@ namespace Turniejo.Matches.Domain.Entities
         public DateTimeOffset? PausedAt { get; private set; }
         public int TotalPausedSeconds { get; private set; }
         public DateTimeOffset? EditLockedAt { get; private set; }
+        /// <summary>Kiedy system wstrzymał porzucony remis w pucharze i poprosił organizatora o rozstrzygnięcie.</summary>
+        public DateTimeOffset? AwaitingDecisionSince { get; private set; }
         public uint Version { get; private set; }
 
         private readonly List<IDomainEvent> _domainEvents = [];
@@ -223,6 +225,34 @@ namespace Turniejo.Matches.Domain.Entities
             SetUpdatedAt();
 
             _domainEvents.Add(new MatchPaused(Id, TournamentId, PausedAt.Value, changedByUserId));
+
+            return Result.Success();
+        }
+
+        /// <summary>Remis poza fazą grupową: <see cref="Finish"/> bez karnych go nie zamknie, bo nie ma zwycięzcy.</summary>
+        public bool NeedsDecisionToFinish => StageType != StageType.Group && HomeScore == AwayScore;
+
+        /// <summary>
+        /// Porzucony remis w pucharze nie może skończyć się sam, więc system raz go wstrzymuje (zegar
+        /// staje) i prosi organizatora o rozstrzygnięcie. Tylko raz: po wznowieniu mecz należy do organizatora.
+        /// </summary>
+        public Result MarkAwaitingDecision(DateTimeOffset now)
+        {
+            if (Status is not (MatchStatus.Live or MatchStatus.Paused))
+                return Result.Failure(Error.Conflict("Status", "Only a live or paused match can await a decision"));
+            if (!NeedsDecisionToFinish)
+                return Result.Failure(Error.Conflict("Status", "This match can be finished without a decision"));
+            if (AwaitingDecisionSince.HasValue)
+                return Result.Failure(Error.Conflict("Status", "The organizer has already been asked to decide this match"));
+
+            if (Status == MatchStatus.Live)
+                Pause(Guid.Empty);
+
+            AwaitingDecisionSince = now;
+            Version++;
+            SetUpdatedAt();
+
+            _domainEvents.Add(new MatchAwaitingDecision(Id, TournamentId, HomeTournamentTeamId, AwayTournamentTeamId, HomeScore, AwayScore));
 
             return Result.Success();
         }

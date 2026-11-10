@@ -124,7 +124,7 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
 
     public async Task<IReadOnlyList<Match>> GetTrackedUnfinishedMatchesStartedBeforeAsync(DateTimeOffset startedBefore, CancellationToken cancellationToken = default) =>
         await Matches
-            .Where(m => (m.Status == MatchStatus.Live || m.Status == MatchStatus.Paused) && m.StartedAt < startedBefore)
+            .Where(m => (m.Status == MatchStatus.Live || m.Status == MatchStatus.Paused) && m.StartedAt < startedBefore && m.AwaitingDecisionSince == null)
             .ToListAsync(cancellationToken);
 
     public async Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>

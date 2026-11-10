@@ -133,6 +133,7 @@ export type NotificationType =
   | "TournamentCancelled"
   | "RefereeChanged"
   | "BracketChangeBlocked"
+  | "MatchAwaitingDecision"
 
 /** NotificationDto */
 export type AppNotification = {
@@ -159,4 +160,5 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   TournamentCancelled: "Turniej odwołany",
   RefereeChanged: "Zmiana sędziego",
   BracketChangeBlocked: "Drabinka do sprawdzenia",
+  MatchAwaitingDecision: "Mecz do rozstrzygnięcia",
 }

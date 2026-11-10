@@ -130,7 +130,7 @@ namespace Turniejo.Matches.UnitTests.Matches
         }
 
         [Fact]
-        public async Task Handle_ShouldLeaveAKnockoutDraw_ButFinishAKnockoutMatchWithALeader()
+        public async Task Handle_ShouldPauseAKnockoutDrawForTheOrganizer_ButFinishAKnockoutMatchWithALeader()
         {
             var tournamentId = Guid.NewGuid();
             GivenSettings(tournamentId, matchMinutes: 30);
@@ -139,12 +139,36 @@ namespace Turniejo.Matches.UnitTests.Matches
             leader.SetManualScore(1, 0, Guid.NewGuid());
             leader.ClearDomainEvents();
             GivenCandidates(draw, leader);
+            var now = leader.StartedAt!.Value.AddHours(3);
 
-            (await RunAsync(leader.StartedAt!.Value.AddHours(3))).Should().Be(1);
+            var result = await _handler.Handle(new FinishAbandonedMatchesCommand(now), CancellationToken.None);
 
-            draw.Status.Should().Be(MatchStatus.Live);
+            result.Value.Should().Be(new FinishAbandonedMatchesResponse(FinishedCount: 1, AwaitingDecisionCount: 1));
+            draw.Status.Should().Be(MatchStatus.Paused);
+            draw.AwaitingDecisionSince.Should().Be(now);
             leader.Status.Should().Be(MatchStatus.Finished);
             leader.WinnerTournamentTeamId.Should().Be(leader.HomeTournamentTeamId);
+            // Pauza + prośba o rozstrzygnięcie (draw), koniec meczu (leader).
+            await _dbContext.Received(3).AddOutboxMessageAsync(Arg.Any<Turniejo.SharedKernel.Outbox.OutboxMessage>(), Arg.Any<CancellationToken>());
+            await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldNotTouchAMatchAlreadyHandedToTheOrganizer_EvenWhenItNowHasALeader()
+        {
+            var tournamentId = Guid.NewGuid();
+            GivenSettings(tournamentId, matchMinutes: 30);
+            var match = LiveMatch(tournamentId, StageType.Knockout);
+            match.MarkAwaitingDecision(DateTimeOffset.UtcNow);
+            match.Resume(Guid.NewGuid());
+            match.SetManualScore(1, 0, Guid.NewGuid()); // gol w dogrywce po wznowieniu
+            match.ClearDomainEvents();
+            GivenCandidates(match);
+
+            (await RunAsync(match.StartedAt!.Value.AddHours(5))).Should().Be(0);
+
+            match.Status.Should().Be(MatchStatus.Live);
+            await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]

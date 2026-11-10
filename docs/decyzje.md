@@ -58,7 +58,7 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 - Organizator zmienia wynik bez limitu czasu do zakończenia turnieju; potem blokada (PUC-076).
 - Drużyny nie można wycofać w trakcie jej meczu (PUC-054). Wycofanie z grupy: rozegrane wyniki zostają, nierozegrane mecze odwołane (GRP-020).
 - Karne w meczu grupowym nie zmieniają tabeli, są tylko informacją (GRP-026).
-- Mecz, którego nikt nie zakończył, kończy się sam z bieżącym wynikiem po 3× czasie meczu od startu (minimum 2 h). Remis w pucharze zostaje dla organizatora, bo bez karnych nie ma zwycięzcy (MNZ-040…042, 2026-11-10).
+- Mecz, którego nikt nie zakończył, kończy się sam z bieżącym wynikiem po 3× czasie meczu od startu (minimum 2 h). Remis w pucharze system raz wstrzymuje i powiadamia organizatorów, bo bez karnych nie ma zwycięzcy; po tym mecz należy do organizatora i system go już nie rusza (MNZ-040…042, 2026-11-10).
 - Usunięcie grupy blokują tylko oczekujące i przyjęte drużyny oraz mecze grupy (także odwołane). Wycofane i odrzucone zgłoszenia tracą wtedy grupę (GRP-004, 2026-11-10).
 - Nowa kategoria w formacie z grupami dostaje od razu wybraną liczbę grup (1-8, domyślnie 1); drużyny bez grupy trafiają do Grupy A (GRP-002, 2026-11-10).
 - Bez zapisanych reguł remisu punktowego obowiązuje domyślna kolejność: punkty i bilans w meczach bezpośrednich, bilans bramek, gole zdobyte, zwycięstwa. Nie jest zapisywana w bazie, więc działa też dla starych turniejów; zapis własnej kolejności ją zastępuje (GRP-005, 2026-11-10).

@@ -7,5 +7,5 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
     public sealed record FinishAbandonedMatchesCommand(DateTimeOffset Now)
         : ICommand<FinishAbandonedMatchesResponse>, IPublicRequest;
 
-    public sealed record FinishAbandonedMatchesResponse(int FinishedCount);
+    public sealed record FinishAbandonedMatchesResponse(int FinishedCount, int AwaitingDecisionCount);
 }
