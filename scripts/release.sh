@@ -29,7 +29,8 @@ git rev-parse -q --verify "refs/tags/v$version" >/dev/null && die "tag v$version
 case "$command" in
   start)
     git rev-parse -q --verify "refs/heads/release/$version" >/dev/null && die "branch release/$version już istnieje"
-    git switch --quiet -c "release/$version" origin/master
+    # --no-track: bez tego zwykłe „git push” z brancha wydania poszłoby prosto do master.
+    git switch --quiet --no-track -c "release/$version" origin/master
     echo "Gotowe: branch release/$version od origin/master."
     echo "Funkcje i poprawki: branch od release/$version, po skończeniu merge z powrotem do release/$version."
     echo "Na koniec cyklu: bash scripts/release.sh prepare $version"
