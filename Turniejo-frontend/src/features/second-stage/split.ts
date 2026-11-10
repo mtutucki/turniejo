@@ -108,6 +108,46 @@ export function pendingPlaces(
     .map((s) => placeLabel(s.sourcePosition, name.get(s.sourceGroupId)))
 }
 
+type SeatRef = Pick<SecondStageSeat, "sourceGroupId" | "sourcePosition">
+
+/**
+ * Miejsca grupy fazy 2 wierszami po pozycji: „1. miejsce: Grupa B, Grupa C, Grupa D”. Grupy fazy 1
+ * w kolejności ich wyświetlania.
+ */
+export function placesByPosition(
+  seats: SeatRef[],
+  groups: Pick<TournamentGroup, "id" | "name" | "order">[],
+) {
+  const order = new Map(groups.map((g) => [g.id, g.order]))
+  const name = new Map(groups.map((g) => [g.id, g.name]))
+  const positions = [...new Set(seats.map((s) => s.sourcePosition))].sort((a, b) => a - b)
+  return positions.map((position) => {
+    const sources = seats
+      .filter((s) => s.sourcePosition === position)
+      .sort((a, b) => (order.get(a.sourceGroupId) ?? 0) - (order.get(b.sourceGroupId) ?? 0))
+      .map((s) => name.get(s.sourceGroupId) ?? "grupa")
+    return `${position}. miejsce: ${sources.join(", ")}`
+  })
+}
+
+/**
+ * Miejsca z podziału, których nie ma w tabeli: grupa ma już drużyny, ale mniej niż numer miejsca
+ * (np. podział zapisany, zanim zgłosiły się drużyny). Grupa bez drużyn jeszcze się nie liczy.
+ */
+export function missingPlaces(
+  seats: SeatRef[],
+  teamsInGroup: (groupId: string) => number,
+  groups: Pick<TournamentGroup, "id" | "name">[],
+) {
+  const name = new Map(groups.map((g) => [g.id, g.name]))
+  return seats
+    .filter((s) => {
+      const teams = teamsInGroup(s.sourceGroupId)
+      return teams > 0 && s.sourcePosition > teams
+    })
+    .map((s) => placeLabel(s.sourcePosition, name.get(s.sourceGroupId)))
+}
+
 /** Każdy z każdym w grupie fazy 2: n(n-1)/2 meczów. */
 export function secondStageMatchCount(seats: Pick<SecondStageSeat, "groupId">[]) {
   const sizes = new Map<string, number>()

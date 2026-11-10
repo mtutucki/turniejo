@@ -51,9 +51,10 @@ test("[FAZ-016] organizator dodaje grupy drugiej fazy, dostaje gotowy podział i
   await expect(dialog).toBeHidden()
 
   const groups = section.getByRole("listitem")
-  await expect(groups.filter({ hasText: "Grupa I" }).first()).toContainText(
-    "1. miejsce Grupa A, 2. miejsce Grupa A",
-  )
+  const first = groups.filter({ hasText: "Grupa I" }).first()
+  await expect(first).toContainText("2 drużyny")
+  await expect(first).toContainText("1. miejsce: Grupa A")
+  await expect(first).toContainText("2. miejsce: Grupa A")
   await expect(groups.filter({ hasText: "Grupa II" })).toContainText("Bez miejsc")
   expect(await mock.calls("PUT", "/second-stage/seats")).toBe(1)
 })
@@ -92,7 +93,45 @@ test("[FAZ-021] podział da się ustawić, zanim grupy mają drużyny", async ({
       .getByRole("region", { name: "Faza 2 w kategorii U12" })
       .getByRole("listitem")
       .filter({ hasText: "Grupa II" }),
-  ).toContainText("4. miejsce Grupa A, 5. miejsce Grupa A, 6. miejsce Grupa A")
+  ).toContainText("4. miejsce: Grupa A5. miejsce: Grupa A6. miejsce: Grupa A")
+})
+
+test("[FAZ-023] miejsce zapisane ponad liczbę drużyn grupy jest oznaczone i wypada przy zapisie", async ({
+  page,
+}) => {
+  // Podział zapisany na 3 miejsca, zanim zgłosiły się drużyny; w Grupie A grają dwie.
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+  await addSecondStageGroup(page, "Grupa I")
+  await mock.override({
+    method: "GET",
+    path: `/api/tournaments/${TOURNAMENT_ID}/second-stage`,
+    times: 1,
+    body: {
+      seats: [1, 2, 3].map((position) => ({
+        id: `seat-${position}`,
+        categoryId: IDS.category,
+        groupId: "placeholder",
+        order: position,
+        sourceGroupId: IDS.group,
+        sourcePosition: position,
+        tournamentTeamId: null,
+      })),
+      fixtures: [],
+    },
+  })
+  await page.reload()
+  const section = page.getByRole("region", { name: "Faza 2 w kategorii U12" })
+  await expect(section).toContainText("których nie ma w tabeli: 3. miejsce Grupa A")
+
+  await section.getByRole("button", { name: "Ustaw podział" }).click()
+  const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
+  await expect(dialog.getByLabel("Drużyn w grupie")).toHaveCount(0)
+  await expect(dialog.getByRole("combobox", { name: /Grupa dla:/ })).toHaveCount(2)
+  await dialog.getByRole("button", { name: "Gotowy podział" }).click()
+  await dialog.getByRole("button", { name: "Zapisz podział" }).click()
+  await expect(dialog).toBeHidden()
+  await expect(section).not.toContainText("których nie ma w tabeli")
 })
 
 test("[FAZ-017] generowanie terminarza czeka na podział na drugą fazę", async ({ page }) => {

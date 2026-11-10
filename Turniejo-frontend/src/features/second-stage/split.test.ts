@@ -4,6 +4,8 @@ import type { TournamentGroup } from "@/types/tournaments"
 
 import {
   assignmentFromSeats,
+  missingPlaces,
+  placesByPosition,
   proposeSplit,
   secondStageMatchCount,
   secondStageProblem,
@@ -132,5 +134,31 @@ describe("secondStageProblem", () => {
     expect(
       secondStageProblem({ playingCategoryIds: ["cat"], groups, seats, teamsInGroup }),
     ).toBeNull()
+  })
+})
+
+describe("placesByPosition", () => {
+  it("[FAZ-022] układa miejsca wierszami po pozycji, grupy w kolejności", () => {
+    const seats = proposeSplit(firstStage.slice(1), ["I", "II"]).filter((s) => s.groupId === "I")
+    expect(placesByPosition(seats, firstStage)).toEqual([
+      "1. miejsce: Grupa B, Grupa C, Grupa D",
+      "2. miejsce: Grupa B, Grupa C, Grupa D",
+    ])
+  })
+})
+
+describe("missingPlaces", () => {
+  it("[FAZ-022] wskazuje miejsca, których grupa z drużynami nie ma", () => {
+    const seats = [
+      { sourceGroupId: "B", sourcePosition: 3 },
+      { sourceGroupId: "D", sourcePosition: 3 },
+      { sourceGroupId: "D", sourcePosition: 4 },
+      { sourceGroupId: "A", sourcePosition: 4 },
+    ]
+    const teams: Record<string, number> = { A: 0, B: 3, D: 2 }
+    expect(missingPlaces(seats, (id) => teams[id] ?? 0, firstStage)).toEqual([
+      "3. miejsce Grupa D",
+      "4. miejsce Grupa D",
+    ])
   })
 })

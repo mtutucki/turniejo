@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { plural } from "@/lib/format"
 import type { SecondStageSeat, TournamentGroup } from "@/types/tournaments"
 
 import { useSaveSecondStageSeats } from "../api"
@@ -66,20 +67,30 @@ export function SecondStageSplitDialog({
   const [open, setOpen] = useState(false)
   const secondStageIds = secondStage.map((g) => g.id)
   const sources = [...firstStage].sort((a, b) => a.order - b.order)
-  // Ile miejsc ma każda grupa fazy 1. Podział ustawia się często przed zgłoszeniem drużyn (kreator),
-  // więc liczba jest do wpisania: domyślnie tyle, ile ma największa grupa (albo zapisany podział), inaczej 4.
+  // Grupa z drużynami ma tyle miejsc, ile drużyn. Podział ustawia się często przed zgłoszeniami
+  // (kreator), więc dla grup bez drużyn liczbę miejsc się wpisuje: domyślnie jak w największej grupie
+  // albo z zapisanego podziału, inaczej 4.
+  const withoutTeams = sources.filter((g) => g.teams === 0)
   const defaultSize =
-    Math.max(...sources.map((g) => g.teams), ...seats.map((x) => x.sourcePosition), 0) ||
+    Math.max(...sources.map((g) => g.teams), 0) ||
+    Math.max(...seats.map((x) => x.sourcePosition), 0) ||
     DEFAULT_GROUP_SIZE
   const [size, setSize] = useState(defaultSize)
-  const sized = (n: number) => sources.map((g) => ({ ...g, teams: n }))
+  const sized = (n: number) => sources.map((g) => ({ ...g, teams: g.teams > 0 ? g.teams : n }))
   const proposal = (n: number) => assignmentFromSeats(proposeSplit(sized(n), secondStageIds))
   const [assignment, setAssignment] = useState<Record<string, string | null>>({})
   const save = useSaveSecondStageSeats(tournamentId)
 
-  const rows = Array.from({ length: size }, (_, i) => i + 1).flatMap((position) =>
-    sources.map((g) => ({ key: placeKey(g.id, position), label: placeLabel(position, g.name) })),
+  const limits = sized(size)
+  const rows = Array.from(
+    { length: Math.max(0, ...limits.map((g) => g.teams)) },
+    (_, i) => i + 1,
+  ).flatMap((position) =>
+    limits
+      .filter((g) => position <= g.teams)
+      .map((g) => ({ key: placeKey(g.id, position), label: placeLabel(position, g.name) })),
   )
+  const smaller = limits.filter((g) => g.teams < Math.max(...limits.map((x) => x.teams)))
 
   function changeSize(value: number) {
     const n = Math.min(MAX_GROUP_SIZE, Math.max(1, Math.floor(value) || 1))
@@ -89,7 +100,15 @@ export function SecondStageSplitDialog({
 
   function submit() {
     save.mutate(
-      { categoryId, seats: seatsFromAssignment(assignment, sized(size), secondStageIds) },
+      {
+        categoryId,
+        // Miejsca, których grupa nie ma (np. zapisane, zanim zgłosiły się drużyny), wypadają z podziału.
+        seats: seatsFromAssignment(
+          Object.fromEntries(rows.map((row) => [row.key, assignment[row.key] ?? null])),
+          limits,
+          secondStageIds,
+        ),
+      },
       {
         onSuccess: () => {
           toast.success("Podział zapisany")
@@ -123,24 +142,38 @@ export function SecondStageSplitDialog({
         ) : (
           <div className="space-y-3">
             <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="second-stage-size">Drużyn w grupie</Label>
-                <Input
-                  id="second-stage-size"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={MAX_GROUP_SIZE}
-                  value={size}
-                  onChange={(e) => changeSize(Number(e.target.value))}
-                  className="w-24 font-mono tabular-nums"
-                />
-              </div>
+              {withoutTeams.length > 0 && (
+                <div className="space-y-1">
+                  <Label htmlFor="second-stage-size">
+                    {withoutTeams.length === sources.length
+                      ? "Drużyn w grupie"
+                      : "Drużyn w grupach bez drużyn"}
+                  </Label>
+                  <Input
+                    id="second-stage-size"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={MAX_GROUP_SIZE}
+                    value={size}
+                    onChange={(e) => changeSize(Number(e.target.value))}
+                    className="w-24 font-mono tabular-nums"
+                  />
+                </div>
+              )}
               <Button type="button" variant="outline" onClick={() => setAssignment(proposal(size))}>
                 <Wand2 />
                 Gotowy podział
               </Button>
             </div>
+            {smaller.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {smaller
+                  .map((g) => `${g.name} ma ${plural(g.teams, ["drużynę", "drużyny", "drużyn"])}`)
+                  .join(", ")}
+                , więc ma mniej miejsc.
+              </p>
+            )}
             <ul className="divide-y rounded-md border" aria-label="Miejsca z pierwszej fazy">
               {rows.map((row) => (
                 <li key={row.key} className="flex items-center gap-2 py-1.5 pr-1.5 pl-3">

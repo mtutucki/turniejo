@@ -5,10 +5,16 @@ import { Pencil, Plus, Shuffle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DeleteGroupDialog } from "@/features/tournaments/components/delete-group-dialog"
 import { GroupFormDialog } from "@/features/tournaments/components/group-form-dialog"
+import { plural } from "@/lib/format"
 import type { Match } from "@/types/matches"
 import type { SecondStageSeat, TournamentGroup } from "@/types/tournaments"
 
-import { type FirstStageGroup, placeLabel, suggestSecondStageGroupName } from "../split"
+import {
+  type FirstStageGroup,
+  missingPlaces,
+  placesByPosition,
+  suggestSecondStageGroupName,
+} from "../split"
 import { SecondStageSplitDialog } from "./second-stage-split-dialog"
 
 type SecondStageSectionProps = {
@@ -38,7 +44,8 @@ export function SecondStageSection({
   locked,
 }: SecondStageSectionProps) {
   const secondStage = groups.filter((g) => g.stage === 2)
-  const nameOf = (groupId: string) => groups.find((g) => g.id === groupId)?.name
+  const teamsIn = (groupId: string) => firstStage.find((g) => g.id === groupId)?.teams ?? 0
+  const missing = missingPlaces(seats, teamsIn, groups)
   const nextOrder = Math.max(0, ...groups.map((g) => g.order)) + 1
 
   return (
@@ -91,14 +98,24 @@ export function SecondStageSection({
             return (
               <li key={group.id} className="flex items-start gap-2 py-1.5 pr-1 pl-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{group.name}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {places.length > 0
-                      ? places
-                          .map((s) => placeLabel(s.sourcePosition, nameOf(s.sourceGroupId)))
-                          .join(", ")
-                      : "Bez miejsc - ustaw podział."}
+                  <p className="truncate text-sm font-medium">
+                    {group.name}
+                    {places.length > 0 && (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}
+                        · {plural(places.length, ["drużyna", "drużyny", "drużyn"])}
+                      </span>
+                    )}
                   </p>
+                  {places.length > 0 ? (
+                    <ul className="text-muted-foreground text-xs">
+                      {placesByPosition(places, groups).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">Bez miejsc - ustaw podział.</p>
+                  )}
                 </div>
                 {canManage && (
                   <div className="flex shrink-0">
@@ -126,6 +143,13 @@ export function SecondStageSection({
             )
           })}
         </ul>
+      )}
+      {missing.length > 0 && (
+        <p className="text-destructive text-xs">
+          W podziale {missing.length === 1 ? "jest miejsce" : "są miejsca"}, których nie ma w
+          tabeli: {missing.join(", ")}.{" "}
+          {locked ? "Wyczyść terminarz i popraw podział." : "Popraw podział."}
+        </p>
       )}
       {locked && secondStage.length > 0 && (
         <p className="text-muted-foreground text-xs">
