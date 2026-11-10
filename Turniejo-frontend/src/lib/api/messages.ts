@@ -154,6 +154,12 @@ const EXACT: Record<string, string> = {
     "Czas na poprawki minął. Rozstrzygnięcie może teraz zmienić tylko organizator",
   "Match must be finished to change its result": "Ten mecz nie jest jeszcze zakończony",
   "Walkover requires a winner": "Wybierz drużynę, która wygrywa walkowerem",
+  // Etykiety drużyn
+  "A label with this name already exists": "Etykieta o tej nazwie już istnieje",
+  "Label name is required.": "Podaj nazwę etykiety",
+  "Label name must not exceed 60 characters.": "Nazwa etykiety może mieć najwyżej 60 znaków",
+  "Team does not belong to this organization": "Ta drużyna nie należy do Twojej organizacji",
+  "Label does not belong to this organization": "Ta etykieta nie należy do Twojej organizacji",
   "Logo must be a PNG, JPEG or WebP image": "Herb musi być obrazkiem PNG, JPG albo WebP",
   "Logo file is too large.": "Plik z herbem jest za duży",
   "Logo file is empty.": "Wybierz plik z herbem",

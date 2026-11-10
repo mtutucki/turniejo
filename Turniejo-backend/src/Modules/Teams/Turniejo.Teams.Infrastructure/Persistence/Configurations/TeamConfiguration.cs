@@ -22,6 +22,10 @@ namespace Turniejo.Teams.Infrastructure.Persistence.Configurations
             builder.Property(x => x.LogoUrl)
                 .HasMaxLength(2048);
 
+            // Tablica uuid[] w Postgresie: etykiety czyta się zawsze razem z drużyną.
+            builder.Property(x => x.LabelIds)
+                .IsRequired();
+
             builder.HasIndex(x => new { x.OrganizationId, x.Name });
         }
     }

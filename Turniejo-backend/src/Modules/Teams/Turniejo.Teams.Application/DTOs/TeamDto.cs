@@ -5,5 +5,6 @@ namespace Turniejo.Teams.Application.DTOs
         Guid OrganizationId,
         string Name,
         string? ShortName,
-        string? LogoUrl);
+        string? LogoUrl,
+        IReadOnlyList<Guid> LabelIds);
 }

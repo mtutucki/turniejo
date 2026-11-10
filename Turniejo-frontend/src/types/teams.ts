@@ -85,6 +85,15 @@ export type Team = {
   name: string
   shortName: string | null
   logoUrl: string | null
+  /** Identyfikatory etykiet z bazy organizacji (TeamLabel). */
+  labelIds: string[]
+}
+
+/** TeamLabelDto — etykieta drużyn w bazie organizacji (np. rocznik, klub). */
+export type TeamLabel = {
+  id: string
+  name: string
+  teamCount: number
 }
 
 /** TournamentTeamDto — zgłoszenie drużyny do turnieju. */
@@ -149,6 +158,8 @@ export type TeamInput = {
   name: string
   shortName: string | null
   logoUrl: string | null
+  /** Etykiety drużyny. Pominięte: bez zmian. */
+  labelIds?: string[]
 }
 
 export type NewPlayerInput = {

@@ -20,6 +20,7 @@ import {
   type SquadPlayerInput,
   type Team,
   type TeamInput,
+  type TeamLabel,
   type TeamHistory,
   type TeamRoster,
   type TeamStaffMember,
@@ -32,6 +33,7 @@ import {
 export const teamKeys = {
   organizationTeams: (organizationId: string) =>
     ["organizations", organizationId, "teams"] as const,
+  labels: (organizationId: string) => ["organizations", organizationId, "team-labels"] as const,
   tournamentTeams: (tournamentId: string) => ["tournaments", tournamentId, "teams"] as const,
   players: (tournamentTeamId: string) => ["tournament-teams", tournamentTeamId, "players"] as const,
   rosterSources: (tournamentTeamId: string) =>
@@ -63,20 +65,91 @@ export function useSaveTeam(organizationId: string) {
   return useMutation({
     mutationFn: async ({ teamId, ...input }: TeamInput & { teamId?: string }) => {
       const base = `/api/organizations/${organizationId}/teams`
-      if (!teamId) return request(base, { method: "POST", body: input })
-      // Edycja: nazwa/skrót i logo to osobne endpointy (UpdateTeam nie przyjmuje LogoUrl).
-      await request(`${base}/${teamId}`, {
-        method: "PUT",
-        body: { name: input.name, shortName: input.shortName },
-      })
-      return request(`${base}/${teamId}/logo`, { method: "PUT", body: { logoUrl: input.logoUrl } })
+      const { labelIds, ...details } = input
+      let id = teamId
+      if (!id) {
+        id = (await request<{ teamId: string }>(base, { method: "POST", body: details })).teamId
+      } else {
+        // Edycja: nazwa/skrót i logo to osobne endpointy (UpdateTeam nie przyjmuje LogoUrl).
+        await request(`${base}/${id}`, {
+          method: "PUT",
+          body: { name: details.name, shortName: details.shortName },
+        })
+        await request(`${base}/${id}/logo`, { method: "PUT", body: { logoUrl: details.logoUrl } })
+      }
+      // Etykiety też osobno. Nowa drużyna bez etykiet nie potrzebuje tego wywołania.
+      if (labelIds && (teamId || labelIds.length > 0)) {
+        await request(`${base}/${id}/labels`, { method: "PUT", body: { labelIds } })
+      }
+      return { teamId: id }
     },
     meta: { handlesValidation: true },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: teamKeys.organizationTeams(organizationId) })
+      void queryClient.invalidateQueries({ queryKey: teamKeys.labels(organizationId) })
       // Nazwy drużyn są też w listach zgłoszeń turniejowych.
       void queryClient.invalidateQueries({ queryKey: ["tournaments"] })
     },
+  })
+}
+
+// --- Etykiety drużyn ------------------------------------------------------------------------
+
+export function useTeamLabels(organizationId: string | undefined) {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: teamKeys.labels(organizationId ?? ""),
+    queryFn: () => request<TeamLabel[]>(`/api/organizations/${organizationId}/team-labels`),
+    enabled: isAuthenticated && !!organizationId,
+  })
+}
+
+function useInvalidateLabels(organizationId: string) {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: teamKeys.labels(organizationId) })
+    void queryClient.invalidateQueries({ queryKey: teamKeys.organizationTeams(organizationId) })
+  }
+}
+
+/** Nowa etykieta albo zmiana nazwy (z labelId). */
+export function useSaveTeamLabel(organizationId: string) {
+  const { request } = useApi()
+  const invalidate = useInvalidateLabels(organizationId)
+  return useMutation({
+    mutationFn: ({ labelId, name }: { labelId?: string; name: string }) => {
+      const base = `/api/organizations/${organizationId}/team-labels`
+      return labelId
+        ? request(`${base}/${labelId}`, { method: "PUT", body: { name } })
+        : request(base, { method: "POST", body: { name } })
+    },
+    // Zajęta nazwa (409) pokazuje formularz pod polem, nie dymek.
+    meta: { handlesValidation: true, handlesConflict: true },
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteTeamLabel(organizationId: string) {
+  const { request } = useApi()
+  const invalidate = useInvalidateLabels(organizationId)
+  return useMutation({
+    mutationFn: (labelId: string) =>
+      request(`/api/organizations/${organizationId}/team-labels/${labelId}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Drużyny z etykietą: z listy ją dostają, pozostałe tracą. */
+export function useSetTeamLabelMembers(organizationId: string) {
+  const { request } = useApi()
+  const invalidate = useInvalidateLabels(organizationId)
+  return useMutation({
+    mutationFn: ({ labelId, teamIds }: { labelId: string; teamIds: string[] }) =>
+      request(`/api/organizations/${organizationId}/team-labels/${labelId}/teams`, {
+        method: "PUT",
+        body: { teamIds },
+      }),
+    onSuccess: invalidate,
   })
 }
 

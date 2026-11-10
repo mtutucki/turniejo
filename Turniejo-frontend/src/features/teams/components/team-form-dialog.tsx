@@ -21,7 +21,8 @@ import {
 import { FieldError, FieldGroup } from "@/components/ui/field"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import { resizeImage } from "@/lib/resize-image"
-import type { Team } from "@/types/teams"
+import { cn } from "@/lib/utils"
+import type { Team, TeamLabel } from "@/types/teams"
 
 import { useSaveTeam, useUploadTeamLogo } from "../api"
 import { TeamLogo } from "./team-logo"
@@ -47,11 +48,19 @@ type TeamValues = z.infer<typeof schema>
 type TeamFormDialogProps = {
   organizationId: string
   team?: Team
+  /** Etykiety organizacji do wyboru. Pusta lista: bez sekcji etykiet. */
+  labels?: TeamLabel[]
   trigger: ReactNode
 }
 
-export function TeamFormDialog({ organizationId, team, trigger }: TeamFormDialogProps) {
+export function TeamFormDialog({
+  organizationId,
+  team,
+  labels = [],
+  trigger,
+}: TeamFormDialogProps) {
   const [open, setOpen] = useState(false)
+  const [labelIds, setLabelIds] = useState<string[]>([])
   const saveTeam = useSaveTeam(organizationId)
   const uploadLogo = useUploadTeamLogo(organizationId)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -88,6 +97,8 @@ export function TeamFormDialog({ organizationId, team, trigger }: TeamFormDialog
         name: values.name,
         shortName: values.shortName || null,
         logoUrl: values.logoUrl || null,
+        // Bez etykiet w organizacji nie ma czego zmieniać.
+        labelIds: labels.length > 0 ? labelIds : undefined,
       },
       {
         onSuccess: () => {
@@ -104,7 +115,10 @@ export function TeamFormDialog({ organizationId, team, trigger }: TeamFormDialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (next) form.reset(defaults)
+        if (next) {
+          form.reset(defaults)
+          setLabelIds(team?.labelIds ?? [])
+        }
       }}
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
@@ -192,6 +206,38 @@ export function TeamFormDialog({ organizationId, team, trigger }: TeamFormDialog
                 />
               </div>
             </div>
+            {labels.length > 0 && (
+              <div role="group" aria-labelledby="team-labels-heading" className="space-y-2">
+                <p id="team-labels-heading" className="text-sm font-medium">
+                  Etykiety (opcjonalnie)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {labels.map((label) => {
+                    const on = labelIds.includes(label.id)
+                    return (
+                      <button
+                        key={label.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setLabelIds((current) =>
+                            on ? current.filter((id) => id !== label.id) : [...current, label.id],
+                          )
+                        }
+                        className={cn(
+                          "max-w-full truncate rounded-full border px-3 py-1 text-sm transition-colors",
+                          on
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "hover:bg-accent",
+                        )}
+                      >
+                        {label.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <FieldError errors={[errors.root]} />
           </FieldGroup>
         </form>

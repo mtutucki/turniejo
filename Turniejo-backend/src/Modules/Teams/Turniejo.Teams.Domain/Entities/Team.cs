@@ -10,6 +10,8 @@ namespace Turniejo.Teams.Domain.Entities
         public string Name { get; private set; } = string.Empty;
         public string? ShortName { get; private set; }
         public string? LogoUrl { get; private set; }
+        /// <summary>Etykiety z bazy organizacji (<see cref="TeamLabel"/>), bez powtórzeń.</summary>
+        public List<Guid> LabelIds { get; private set; } = [];
 
         private readonly List<IDomainEvent> _domainEvents = [];
         public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -62,6 +64,25 @@ namespace Turniejo.Teams.Domain.Entities
             SetUpdatedAt();
 
             return Result.Success();
+        }
+
+        /// <summary>Podmienia etykiety drużyny. Nowa lista, żeby EF na pewno zauważył zmianę kolumny.</summary>
+        public void SetLabels(IEnumerable<Guid> labelIds)
+        {
+            LabelIds = labelIds.Distinct().ToList();
+            SetUpdatedAt();
+        }
+
+        public void AddLabel(Guid labelId)
+        {
+            if (!LabelIds.Contains(labelId))
+                SetLabels([.. LabelIds, labelId]);
+        }
+
+        public void RemoveLabel(Guid labelId)
+        {
+            if (LabelIds.Contains(labelId))
+                SetLabels(LabelIds.Where(id => id != labelId));
         }
 
         public void ClearDomainEvents() => _domainEvents.Clear();

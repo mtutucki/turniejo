@@ -12,7 +12,7 @@ namespace Turniejo.Teams.Application.Teams.GetTeams
             var teams = await dbContext.GetTeamsByOrganizationIdAsync(request.OrganizationId, cancellationToken);
 
             var dtos = teams
-                .Select(t => new TeamDto(t.Id, t.OrganizationId, t.Name, t.ShortName, t.LogoUrl))
+                .Select(t => new TeamDto(t.Id, t.OrganizationId, t.Name, t.ShortName, t.LogoUrl, t.LabelIds))
                 .ToList();
 
             return Result.Success<IReadOnlyList<TeamDto>>(dtos);

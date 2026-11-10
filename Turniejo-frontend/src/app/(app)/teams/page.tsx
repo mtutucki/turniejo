@@ -15,7 +15,9 @@ export default function TeamsShortcutPage() {
   const organizationId = organization.data?.id
 
   useEffect(() => {
-    if (organizationId) router.replace(`/organizations/${organizationId}/teams`)
+    // Zakładka (?tab=labels) przechodzi dalej.
+    if (organizationId)
+      router.replace(`/organizations/${organizationId}/teams${window.location.search}`)
   }, [organizationId, router])
 
   if (organization.data === null) {

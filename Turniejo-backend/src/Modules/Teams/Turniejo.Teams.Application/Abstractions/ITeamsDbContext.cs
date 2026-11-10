@@ -18,6 +18,18 @@ namespace Turniejo.Teams.Application.Abstractions
         /// <summary>Usuwa drużyny organizacji razem ze zgłoszeniami do turniejów i sztabem.</summary>
         Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
+        /// <summary>Śledzone (do zmiany) drużyny organizacji, np. przy zmianie etykiet.</summary>
+        Task<IReadOnlyList<Team>> GetTeamsByOrganizationIdForUpdateAsync(Guid organizationId, CancellationToken cancellationToken = default);
+
+        // TeamLabel
+        Task AddTeamLabelAsync(TeamLabel label, CancellationToken cancellationToken = default);
+        Task<TeamLabel?> GetTeamLabelByIdAsync(Guid labelId, CancellationToken cancellationToken = default);
+        /// <summary>Etykiety organizacji posortowane po nazwie.</summary>
+        Task<IReadOnlyList<TeamLabel>> GetTeamLabelsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+        /// <summary>Czy organizacja ma etykietę o tej nazwie (bez względu na wielkość liter), poza wskazaną.</summary>
+        Task<bool> TeamLabelNameExistsAsync(Guid organizationId, string name, Guid? exceptLabelId, CancellationToken cancellationToken = default);
+        Task RemoveTeamLabelAsync(TeamLabel label, CancellationToken cancellationToken = default);
+
         // TournamentTeam
         Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default);
         Task<TournamentTeam?> GetTournamentTeamByIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
