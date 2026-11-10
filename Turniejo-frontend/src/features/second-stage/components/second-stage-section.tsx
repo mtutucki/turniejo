@@ -27,6 +27,8 @@ type SecondStageSectionProps = {
   seats: SecondStageSeat[]
   matches: Match[]
   canManage: boolean
+  /** Zgłoszone drużyny kategorii, także bez grupy. */
+  categoryTeams: number
   /** Terminarz istnieje: podział jest zamrożony (backend odmawia zmiany). */
   locked: boolean
 }
@@ -41,6 +43,7 @@ export function SecondStageSection({
   seats,
   matches,
   canManage,
+  categoryTeams,
   locked,
 }: SecondStageSectionProps) {
   const secondStage = groups.filter((g) => g.stage === 2)
@@ -62,6 +65,7 @@ export function SecondStageSection({
                 firstStage={firstStage}
                 secondStage={secondStage}
                 seats={seats}
+                categoryTeams={categoryTeams}
                 trigger={
                   <Button variant="outline" size="sm">
                     <Shuffle />

@@ -134,6 +134,60 @@ test("[FAZ-023] miejsce zapisane ponad liczbę drużyn grupy jest oznaczone i wy
   await expect(section).not.toContainText("których nie ma w tabeli")
 })
 
+test("[FAZ-024] 8 drużyn bez grup w 4 grupach: podział domyślnie po 2 miejsca w grupie", async ({
+  page,
+}) => {
+  // Kreator: drużyny zgłoszone do kategorii, jeszcze bez grup.
+  await mock.override({
+    method: "GET",
+    path: `/api/tournaments/${TOURNAMENT_ID}/teams`,
+    body: Array.from({ length: 8 }, (_, i) => ({
+      id: `tt-${i + 1}`,
+      tournamentId: TOURNAMENT_ID,
+      teamId: `team-${i + 1}`,
+      categoryId: IDS.category,
+      groupId: null,
+      registrationStatus: "Accepted",
+      paymentStatus: "NotRequired",
+      seedNumber: null,
+      teamName: `Drużyna ${i + 1}`,
+      teamShortName: null,
+      teamLogoUrl: null,
+    })),
+  })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+  for (const name of ["Grupa B", "Grupa C", "Grupa D"]) {
+    await page
+      .getByRole("region", { name: "Grupy w kategorii U12" })
+      .getByRole("button", { name: "Dodaj grupę" })
+      .click()
+    const dialog = page.getByRole("dialog", { name: "Nowa grupa · U12" })
+    await expect(dialog.getByLabel("Nazwa")).toHaveValue(name)
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(dialog).toBeHidden()
+  }
+  await addSecondStageGroup(page, "Grupa I")
+  await addSecondStageGroup(page, "Grupa II")
+
+  await page.getByRole("button", { name: "Ustaw podział" }).click()
+  const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
+  await expect(dialog.getByLabel("Drużyn w grupie")).toHaveValue("2")
+  await expect(dialog.getByText("Razem miejsc: 8 · drużyn w kategorii: 8")).toBeVisible()
+  await expect(dialog.getByRole("combobox", { name: /Grupa dla:/ })).toHaveCount(8)
+  await expect(dialog.getByRole("combobox", { name: "Grupa dla: 1. miejsce Grupa D" })).toHaveText(
+    "Grupa I",
+  )
+  await expect(dialog.getByRole("combobox", { name: "Grupa dla: 2. miejsce Grupa D" })).toHaveText(
+    "Grupa II",
+  )
+
+  await dialog.getByLabel("Drużyn w grupie").fill("3")
+  await expect(
+    dialog.getByText("Razem miejsc: 12 · drużyn w kategorii: 8. Miejsc jest więcej niż drużyn."),
+  ).toBeVisible()
+})
+
 test("[FAZ-017] generowanie terminarza czeka na podział na drugą fazę", async ({ page }) => {
   await loginAs(page, ORGANIZER)
   await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule/generate`)

@@ -302,6 +302,7 @@ export function CategoryCard({
             seats={seats}
             matches={categoryMatches}
             canManage={canManage}
+            categoryTeams={teams.length}
             locked={scheduleLocked}
           />
         )}

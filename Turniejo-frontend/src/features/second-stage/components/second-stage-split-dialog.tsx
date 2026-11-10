@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { plural } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import type { SecondStageSeat, TournamentGroup } from "@/types/tournaments"
 
 import { useSaveSecondStageSeats } from "../api"
@@ -48,6 +49,8 @@ type SecondStageSplitDialogProps = {
   secondStage: TournamentGroup[]
   /** Zapisany podział tej kategorii. */
   seats: SecondStageSeat[]
+  /** Zgłoszone drużyny kategorii (także bez grupy) - do domyślnej liczby miejsc i kontroli sumy. */
+  categoryTeams: number
   trigger: ReactNode
 }
 
@@ -62,16 +65,21 @@ export function SecondStageSplitDialog({
   firstStage,
   secondStage,
   seats,
+  categoryTeams,
   trigger,
 }: SecondStageSplitDialogProps) {
   const [open, setOpen] = useState(false)
   const secondStageIds = secondStage.map((g) => g.id)
   const sources = [...firstStage].sort((a, b) => a.order - b.order)
-  // Grupa z drużynami ma tyle miejsc, ile drużyn. Podział ustawia się często przed zgłoszeniami
-  // (kreator), więc dla grup bez drużyn liczbę miejsc się wpisuje: domyślnie jak w największej grupie
-  // albo z zapisanego podziału, inaczej 4.
+  // Grupa z drużynami ma tyle miejsc, ile drużyn. Podział ustawia się często przed przydziałem drużyn
+  // do grup (kreator), więc dla grup bez drużyn liczbę miejsc się wpisuje. Domyślnie: drużyny kategorii
+  // bez grupy po równo na te grupy (8 drużyn i 4 puste grupy = po 2), potem największa grupa,
+  // zapisany podział, a bez żadnych drużyn 4.
   const withoutTeams = sources.filter((g) => g.teams === 0)
+  const assigned = sources.reduce((sum, g) => sum + g.teams, 0)
+  const unassigned = Math.max(0, categoryTeams - assigned)
   const defaultSize =
+    (withoutTeams.length > 0 && unassigned > 0 ? Math.ceil(unassigned / withoutTeams.length) : 0) ||
     Math.max(...sources.map((g) => g.teams), 0) ||
     Math.max(...seats.map((x) => x.sourcePosition), 0) ||
     DEFAULT_GROUP_SIZE
@@ -91,6 +99,7 @@ export function SecondStageSplitDialog({
       .map((g) => ({ key: placeKey(g.id, position), label: placeLabel(position, g.name) })),
   )
   const smaller = limits.filter((g) => g.teams < Math.max(...limits.map((x) => x.teams)))
+  const totalPlaces = limits.reduce((sum, g) => sum + g.teams, 0)
 
   function changeSize(value: number) {
     const n = Math.min(MAX_GROUP_SIZE, Math.max(1, Math.floor(value) || 1))
@@ -166,6 +175,19 @@ export function SecondStageSplitDialog({
                 Gotowy podział
               </Button>
             </div>
+            <p
+              className={cn(
+                "text-xs",
+                categoryTeams > 0 && totalPlaces > categoryTeams
+                  ? "text-destructive"
+                  : "text-muted-foreground",
+              )}
+            >
+              Razem miejsc: {totalPlaces} · drużyn w kategorii: {categoryTeams}
+              {categoryTeams > 0 &&
+                totalPlaces > categoryTeams &&
+                ". Miejsc jest więcej niż drużyn."}
+            </p>
             {smaller.length > 0 && (
               <p className="text-muted-foreground text-xs">
                 {smaller
