@@ -21,10 +21,10 @@ const groups = [
   group(12, U12, "Grupa A", 1),
   group(13, U12, "Grupa B", 2),
 ]
-const team = (n: number, categoryId: string, groupId: string, teamName: string) => ({
+const team = (n: number, categoryId: string, groupId: string, teamName: string, baseTeam = n) => ({
   id: id(n),
   tournamentId: TOURNAMENT_ID,
-  teamId: id(n + 100),
+  teamId: id(baseTeam + 100),
   categoryId,
   groupId,
   registrationStatus: "Accepted",
@@ -37,7 +37,8 @@ const team = (n: number, categoryId: string, groupId: string, teamName: string) 
 const teams = [
   team(20, U10, id(11), "Orły"),
   team(21, U10, id(11), "Lwy"),
-  team(22, U12, id(13), "Orły"),
+  // Ta sama drużyna z bazy w obu kategoriach.
+  team(22, U12, id(13), "Orły", 20),
   team(23, U12, id(13), "Żubry"),
   team(24, U10, id(10), "Sokoły"),
   team(25, U10, id(10), "Wilki"),
@@ -82,16 +83,22 @@ const filters = (page: import("@playwright/test").Page) =>
 const rows = (page: import("@playwright/test").Page) =>
   page.getByRole("listitem").filter({ hasText: " vs " })
 
-test("filtr drużyny pokazuje tylko jej mecze i widać go nad listą", async ({ page }) => {
+test("filtr drużyny pokazuje jej mecze ze wszystkich kategorii i widać go nad listą", async ({ page }) => {
   await filters(page).getByRole("combobox", { name: "Drużyna" }).click()
-  // Ta sama nazwa w dwóch kategoriach: opcja mówi, o którą chodzi.
-  await expect(page.getByRole("option", { name: "U10 · Orły" })).toBeVisible()
-  await page.getByRole("option", { name: "U12 · Orły" }).click()
+  // Drużyna zgłoszona do dwóch kategorii jest na liście raz, bez nazwy kategorii.
+  await expect(page.getByRole("option", { name: /Orły/ })).toHaveText(["Orły"])
+  await page.getByRole("option", { name: "Orły" }).click()
 
+  await expect(rows(page)).toHaveCount(2)
+  await expect(page.getByRole("status")).toHaveText("Znaleziono 2 mecze")
+
+  await filters(page).getByRole("combobox", { name: "Kategoria" }).click()
+  await page.getByRole("option", { name: "U12" }).click()
   await expect(rows(page)).toHaveCount(1)
   await expect(rows(page)).toContainText("Żubry")
-  await expect(page.getByRole("status")).toHaveText("Znaleziono 1 mecz")
-  await page.getByRole("button", { name: "Usuń filtr U12 · Orły" }).click()
+
+  await page.getByRole("button", { name: "Usuń filtr Orły" }).click()
+  await page.getByRole("button", { name: "Usuń filtr U12" }).click()
   await expect(rows(page)).toHaveCount(3)
   await expect(page.getByRole("status")).toHaveCount(0)
 })

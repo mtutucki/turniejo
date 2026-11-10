@@ -457,7 +457,7 @@ export function TournamentScheduleView() {
   }, [teams.data, pitches.data, groups.data, categories.data, members.data])
 
   const referees = (members.data ?? []).filter((m) => m.roles.includes(UserRole.Referee))
-  // Przy kilku kategoriach i bez wybranej kategorii „Grupa B” albo „Orły” byłyby niejednoznaczne.
+  // Przy kilku kategoriach i bez wybranej kategorii „Grupa B” byłaby niejednoznaczna.
   const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c.name]))
   const withCategory = (name: string, cid: string) =>
     categoryById.size > 1 && categoryId === ALL ? `${categoryById.get(cid) ?? ""} · ${name}` : name
@@ -465,16 +465,24 @@ export function TournamentScheduleView() {
   const groupOptions = (groups.data ?? [])
     .filter((g) => inCategory(g.categoryId))
     .map((g) => ({ id: g.id, name: withCategory(g.name, g.categoryId) }))
-  const teamOptions = (teams.data ?? [])
-    .filter((t) => inCategory(t.categoryId))
-    .map((t) => ({ id: t.id, name: withCategory(t.teamName, t.categoryId) }))
-    .sort((a, b) => a.name.localeCompare(b.name, "pl", { numeric: true }))
+  // Filtr drużyny działa na drużynie z bazy: zgłoszona do kilku kategorii jest na liście raz,
+  // a filtr pokazuje jej mecze ze wszystkich (albo z wybranej) kategorii.
+  const baseTeamOf = new Map((teams.data ?? []).map((t) => [t.id, t.teamId]))
+  const teamOptions = [
+    ...new Map(
+      (teams.data ?? [])
+        .filter((t) => inCategory(t.categoryId))
+        .map((t) => [t.teamId, { id: t.teamId, name: t.teamName }]),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "pl", { numeric: true }))
+  const isTeam = (tournamentTeamId: string | undefined) =>
+    !!tournamentTeamId && baseTeamOf.get(tournamentTeamId) === teamId
 
   const filtered = (schedule.data ?? [])
     .filter(
       (m) =>
         (categoryId === ALL || m.categoryId === categoryId) &&
-        (teamId === ALL || m.homeTournamentTeamId === teamId || m.awayTournamentTeamId === teamId) &&
+        (teamId === ALL || isTeam(m.homeTournamentTeamId) || isTeam(m.awayTournamentTeamId)) &&
         (groupId === ALL || m.groupId === groupId) &&
         (pitchId === ALL || m.pitchId === pitchId) &&
         (refereeId === ALL || (m.refereeId ?? NO_REFEREE) === refereeId),
@@ -530,9 +538,7 @@ export function TournamentScheduleView() {
   const planned = allPlanned.filter(
     (p) =>
       (categoryId === ALL || p.categoryId === categoryId) &&
-      (teamId === ALL ||
-        p.home.tournamentTeamId === teamId ||
-        p.away.tournamentTeamId === teamId) &&
+      (teamId === ALL || isTeam(p.home.tournamentTeamId) || isTeam(p.away.tournamentTeamId)) &&
       groupId === ALL &&
       (refereeId === ALL || (p.refereeId ?? NO_REFEREE) === refereeId) &&
       (pitchId === ALL || p.pitchId === pitchId),
@@ -596,9 +602,9 @@ export function TournamentScheduleView() {
         onChange={(value) => {
           setCategoryId(value)
           setGroupId(ALL)
-          // Drużyna z innej kategorii dałaby zawsze pustą listę.
-          const team = teams.data?.find((t) => t.id === teamId)
-          if (team && value !== ALL && team.categoryId !== value) setTeamId(ALL)
+          // Drużyna, której nie ma w tej kategorii, dałaby zawsze pustą listę.
+          const playsThere = teams.data?.some((t) => t.teamId === teamId && t.categoryId === value)
+          if (teamId !== ALL && value !== ALL && !playsThere) setTeamId(ALL)
         }}
         allLabel="Wszystkie kategorie"
       >
