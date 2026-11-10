@@ -1,5 +1,6 @@
-using MediatR;
+﻿using MediatR;
 using Turniejo.Brackets.Application.Brackets.ResolveGroupPositionSlots;
+using Turniejo.Brackets.Application.SecondStage.ResolveSecondStageSeats;
 using Turniejo.Standings.Domain.Events;
 
 namespace Turniejo.Brackets.Application.EventHandlers
@@ -10,6 +11,9 @@ namespace Turniejo.Brackets.Application.EventHandlers
         {
             await sender.Send(
                 new ResolveGroupPositionSlotsCommand(notification.TournamentId, notification.CategoryId, notification.GroupId),
+                cancellationToken);
+            await sender.Send(
+                new ResolveSecondStageSeatsCommand(notification.TournamentId, notification.GroupId),
                 cancellationToken);
         }
     }

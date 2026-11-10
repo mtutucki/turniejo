@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
@@ -13,11 +13,12 @@ namespace Turniejo.Standings.Application.Standings.RecalculateStandings
         IStandingsDbContext dbContext,
         ITournamentModule tournamentModule,
         ITeamModule teamModule,
-        IMatchModule matchModule) : ICommandHandler<RecalculateStandingsCommand, RecalculateStandingsResponse>
+        IMatchModule matchModule,
+        IBracketModule bracketModule) : ICommandHandler<RecalculateStandingsCommand, RecalculateStandingsResponse>
     {
         public async Task<Result<RecalculateStandingsResponse>> Handle(RecalculateStandingsCommand request, CancellationToken cancellationToken)
         {
-            var computed = await GroupTable.ComputeAsync(request.GroupId, tournamentModule, teamModule, matchModule, cancellationToken);
+            var computed = await GroupTable.ComputeAsync(request.GroupId, tournamentModule, teamModule, matchModule, bracketModule, cancellationToken);
             if (computed.IsFailure)
                 return Result.Failure<RecalculateStandingsResponse>(computed.Error);
             var group = computed.Value.Group;

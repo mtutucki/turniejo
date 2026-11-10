@@ -1,4 +1,4 @@
-using Turniejo.SharedKernel.Contracts;
+﻿using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
@@ -27,7 +27,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetPublicTournamentPage
                 .ToList();
             var groups = (await dbContext.GetTournamentGroupsByTournamentIdAsync(tournament.Id, cancellationToken))
                 .OrderBy(g => g.Order).ThenBy(g => g.Name)
-                .Select(g => new PublicGroupDto(g.Id, g.CategoryId, g.Name, g.Order))
+                .Select(g => new PublicGroupDto(g.Id, g.CategoryId, g.Name, g.Order, g.Stage))
                 .ToList();
             var pitches = (await matchModule.GetPitchesByTournamentIdAsync(tournament.Id, cancellationToken))
                 .OrderBy(p => p.Name)

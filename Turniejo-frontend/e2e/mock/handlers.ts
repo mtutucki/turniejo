@@ -1267,6 +1267,10 @@ const api = [
       pitches: [{ id: IDS.pitch, name: "Boisko Główne" }],
     })
   }),
+  http.get("*/public/tournaments/:slug/second-stage", ({ params }) => {
+    const t = db.tournaments.find((x) => x.slug === params.slug && x.isPublic)
+    return t ? HttpResponse.json(configOf(t.id).secondStage) : problem(404, "Not found")
+  }),
   http.get("*/public/tournaments/:slug/schedule", ({ params }) => {
     const t = db.tournaments.find((x) => x.slug === params.slug && x.isPublic)
     return t
@@ -1652,7 +1656,26 @@ type Config = {
     maxBirthDate: string | null
     order: number
   }[]
-  groups: { id: string; tournamentId: string; categoryId: string; name: string; order: number }[]
+  groups: {
+    id: string
+    tournamentId: string
+    categoryId: string
+    name: string
+    order: number
+    stage?: 1 | 2
+  }[]
+  /** Dwie fazy grupowe: podział na grupy fazy 2 i zaplanowane mecze (SecondStageDto). */
+  secondStage: {
+    seats: SecondStageSeatMock[]
+    fixtures: Record<string, unknown>[]
+    ranges: {
+      id: string
+      categoryId: string
+      groupId: string
+      fromPosition: number
+      toPosition: number
+    }[]
+  }
   pitches: {
     id: string
     tournamentId: string
@@ -1672,6 +1695,16 @@ const TIEBREAKERS = [
   "ManualDecision",
   "RandomDraw",
 ]
+
+type SecondStageSeatMock = {
+  id: string
+  categoryId: string
+  groupId: string
+  order: number
+  sourceGroupId: string
+  sourcePosition: number
+  tournamentTeamId: string | null
+}
 
 let configs = new Map<string, Config>()
 
@@ -1723,6 +1756,7 @@ function configOf(tournamentId: string): Config {
       ? [{ id: IDS.pitch, tournamentId, name: "Boisko Główne", description: null, isActive: true }]
       : [],
     tieBreakers: TIEBREAKERS.slice(0, 5).map((type, i) => ({ order: i + 1, type })),
+    secondStage: { seats: [], fixtures: [], ranges: [] },
   }
   configs.set(tournamentId, c)
   return c
@@ -1811,7 +1845,7 @@ const config = [
       t.format =
         typeof tournamentFormat === "string"
           ? tournamentFormat
-          : ["Group", "Knockout", "GroupAndKnockout"][tournamentFormat - 1]!
+          : ["Group", "Knockout", "GroupAndKnockout", "TwoGroupStages"][tournamentFormat - 1]!
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -1862,7 +1896,7 @@ const config = [
       c.categories.push(category)
       // Jak backend: przy formacie z grupami nowa kategoria dostaje od razu "Grupę A".
       const format = findTournament(params.id)?.format
-      if (format === "Group" || format === "GroupAndKnockout")
+      if (format === "Group" || format === "GroupAndKnockout" || format === "TwoGroupStages")
         for (let i = 0; i < (body.groupCount ?? 1); i++)
           c.groups.push({
             id: newId(),
@@ -1901,7 +1935,14 @@ const config = [
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const c = configOf(params.id)
-      const body = (await request.json()) as { categoryId: string; name: string; order: number }
+      const body = (await request.json()) as {
+        categoryId: string
+        name: string
+        order: number
+        stage?: 1 | 2
+      }
+      if (body.stage === 2 && findTournament(params.id)?.format !== "TwoGroupStages")
+        return validation("Stage", "Second-stage groups need the two group stages format")
       if (
         c.groups.some(
           (g) =>
@@ -1916,6 +1957,7 @@ const config = [
         categoryId: body.categoryId,
         name: body.name.trim(),
         order: body.order,
+        stage: body.stage ?? 1,
       }
       c.groups.push(group)
       return HttpResponse.json({ tournamentGroupId: group.id }, { status: 201 })
@@ -1949,7 +1991,65 @@ const config = [
         return problem(409, "Cannot delete a group that still has matches scheduled in it")
       const c = configOf(params.id)
       c.groups = c.groups.filter((g) => g.id !== params.groupId)
+      // Jak backend: usunięta grupa znika też z podziału na drugą fazę.
+      c.secondStage.seats = c.secondStage.seats.filter(
+        (s) => s.groupId !== params.groupId && s.sourceGroupId !== params.groupId,
+      )
+      c.secondStage.ranges = c.secondStage.ranges.filter((x) => x.groupId !== params.groupId)
       return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/second-stage",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).secondStage)),
+  ),
+  http.put(
+    "*/api/tournaments/:id/second-stage/seats",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const t = findTournament(params.id)
+      if (t?.format !== "TwoGroupStages")
+        return validation("Format", "Second-stage groups need the two group stages format")
+      if (!["Draft", "RegistrationOpen", "RegistrationClosed"].includes(t.status))
+        return problem(409, "Clear the schedule before changing the second stage")
+      const body = (await request.json()) as {
+        categoryId: string
+        seats: { groupId: string; sourceGroupId: string; sourcePosition: number }[]
+      }
+      const keys = body.seats.map((x) => `${x.sourceGroupId}:${x.sourcePosition}`)
+      if (new Set(keys).size !== keys.length)
+        return validation("Seats", "Each place can go to only one second-stage group")
+      const c = configOf(params.id)
+      // Jak backend: pojedyncze miejsca zastępują zakresy.
+      c.secondStage.ranges = c.secondStage.ranges.filter((x) => x.categoryId !== body.categoryId)
+      c.secondStage.seats = [
+        ...c.secondStage.seats.filter((x) => x.categoryId !== body.categoryId),
+        ...body.seats.map((x, i) => ({
+          id: newId(),
+          categoryId: body.categoryId,
+          order: i + 1,
+          tournamentTeamId: null,
+          ...x,
+        })),
+      ]
+      return HttpResponse.json(body.seats.length)
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:id/second-stage/ranges",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as {
+        categoryId: string
+        ranges: { groupId: string; fromPosition: number; toPosition: number }[]
+      }
+      const c = configOf(params.id)
+      c.secondStage.seats = c.secondStage.seats.filter((x) => x.categoryId !== body.categoryId)
+      c.secondStage.ranges = [
+        ...c.secondStage.ranges.filter((x) => x.categoryId !== body.categoryId),
+        ...body.ranges.map((x) => ({ id: newId(), categoryId: body.categoryId, ...x })),
+      ]
+      return HttpResponse.json(body.ranges.length)
     }),
   ),
   http.get(

@@ -1,4 +1,5 @@
-using Turniejo.Brackets.Application.Abstractions;
+﻿using Turniejo.Brackets.Application.Abstractions;
+using Turniejo.Brackets.Application.SecondStage;
 using Turniejo.Brackets.Domain.Entities;
 using Turniejo.Brackets.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
@@ -44,6 +45,8 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
 
     public async Task ClearPlannedSlotsAsync(Guid tournamentId, CancellationToken cancellationToken = default)
     {
+        await ClearSecondStageAsync(tournamentId, cancellationToken);
+
         var rounds = await GetRoundsAsync(tournamentId, cancellationToken);
         var nodeIds = (await dbContext.GetBracketNodesByRoundIdsAsync(rounds.Select(r => r.Id).ToList(), cancellationToken))
             .Where(n => n.PlannedAt.HasValue)
@@ -63,6 +66,115 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
         foreach (var node in await dbContext.GetTrackedBracketNodesByIdsAsync([nodeId], cancellationToken))
             node.PlanReferee(refereeId);
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SecondStageSeatInfoDto>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        (await dbContext.GetSecondStageSeatsAsync(tournamentId, cancellationToken))
+            .Select(s => new SecondStageSeatInfoDto(s.Id, s.CategoryId, s.GroupId, s.Order, s.SourceGroupId, s.SourcePosition, s.TournamentTeamId))
+            .ToList();
+
+    public async Task RemoveSecondStageSeatsForGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
+    {
+        var seats = await dbContext.GetTrackedSecondStageSeatsByGroupAsync(groupId, cancellationToken);
+        var ranges = await dbContext.GetTrackedSecondStageRangesByGroupAsync(groupId, cancellationToken);
+        if (seats.Count == 0 && ranges.Count == 0)
+            return;
+
+        dbContext.RemoveSecondStageSeats(seats);
+        dbContext.RemoveSecondStageRanges(ranges);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task PrepareSecondStageSeatsAsync(
+        Guid tournamentId, IReadOnlyList<TournamentGroupDto> groups, IReadOnlyDictionary<Guid, int> teamsInGroup,
+        CancellationToken cancellationToken = default)
+    {
+        var allRanges = await dbContext.GetTrackedSecondStageRangesAsync(tournamentId, cancellationToken);
+        var allSeats = await dbContext.GetTrackedSecondStageSeatsAsync(tournamentId, cancellationToken);
+        var teams = (Guid groupId) => teamsInGroup.GetValueOrDefault(groupId);
+
+        foreach (var category in groups.GroupBy(g => g.CategoryId))
+        {
+            var secondStage = category.Where(g => g.Stage == 2).Select(g => new SecondStagePlanner.Group(g.Id, g.Order)).ToList();
+            var firstStage = category.Where(g => g.Stage != 2).Select(g => new SecondStagePlanner.Group(g.Id, g.Order)).ToList();
+            if (secondStage.Count == 0)
+                continue;
+
+            var ranges = allRanges.Where(r => r.CategoryId == category.Key).ToList();
+            var seats = allSeats.Where(s => s.CategoryId == category.Key).ToList();
+            if (ranges.Count == 0 && seats.Count > 0)
+                continue;
+
+            if (ranges.Count == 0)
+            {
+                // Organizator nie ustawił podziału: gotowy podział po równo, zapisany jak jego własny.
+                foreach (var range in SecondStagePlanner.DefaultRanges(secondStage, firstStage.Select(g => teams(g.Id)).DefaultIfEmpty(0).Max()))
+                {
+                    var created = SecondStageRange.Create(Guid.NewGuid(), tournamentId, category.Key, range.GroupId, range.From, range.To);
+                    if (created.IsSuccess)
+                        ranges.Add(created.Value);
+                }
+                await dbContext.AddSecondStageRangesAsync(ranges, cancellationToken);
+            }
+
+            dbContext.RemoveSecondStageSeats(seats);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            var planned = SecondStagePlanner.SeatsFromRanges(
+                ranges.Select(r => new SecondStagePlanner.Range(r.GroupId, r.FromPosition, r.ToPosition)).ToList(),
+                secondStage, firstStage, teams);
+            var newSeats = new List<SecondStageSeat>();
+            foreach (var (seat, order) in planned.Select((s, i) => (s, i + 1)))
+            {
+                var created = SecondStageSeat.Create(
+                    Guid.NewGuid(), tournamentId, category.Key, seat.GroupId, order, seat.SourceGroupId, seat.SourcePosition);
+                if (created.IsSuccess)
+                    newSeats.Add(created.Value);
+            }
+            await dbContext.AddSecondStageSeatsAsync(newSeats, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<IReadOnlyList<SecondStageFixtureInfoDto>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        (await dbContext.GetSecondStageFixturesAsync(tournamentId, cancellationToken))
+            .Select(f => new SecondStageFixtureInfoDto(
+                f.Id, f.CategoryId, f.GroupId, f.HomeSeatId, f.AwaySeatId, f.Round,
+                f.PlannedPitchId, f.PlannedAt, f.PlannedRefereeId, f.MatchId))
+            .ToList();
+
+    public async Task CreateSecondStageFixturesAsync(
+        Guid tournamentId, IReadOnlyCollection<SecondStageFixturePlanDto> fixtures, CancellationToken cancellationToken = default)
+    {
+        dbContext.RemoveSecondStageFixtures(await dbContext.GetTrackedSecondStageFixturesAsync(tournamentId, cancellationToken));
+
+        var created = new List<SecondStageFixture>();
+        foreach (var plan in fixtures)
+        {
+            var fixture = SecondStageFixture.Create(
+                plan.Id, tournamentId, plan.CategoryId, plan.GroupId, plan.HomeSeatId, plan.AwaySeatId, plan.Round, plan.PitchId, plan.ScheduledAt);
+            if (fixture.IsSuccess)
+                created.Add(fixture.Value);
+        }
+
+        await dbContext.AddSecondStageFixturesAsync(created, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    // Mecze fazy 2 znikają razem z terminarzem, więc obsada miejsc (z tabel fazy 1) też przestaje obowiązywać.
+    private async Task ClearSecondStageAsync(Guid tournamentId, CancellationToken cancellationToken)
+    {
+        var fixtures = await dbContext.GetTrackedSecondStageFixturesAsync(tournamentId, cancellationToken);
+        var seats = (await dbContext.GetTrackedSecondStageSeatsAsync(tournamentId, cancellationToken))
+            .Where(s => s.TournamentTeamId.HasValue)
+            .ToList();
+        if (fixtures.Count == 0 && seats.Count == 0)
+            return;
+
+        dbContext.RemoveSecondStageFixtures(fixtures);
+        foreach (var seat in seats)
+            seat.Resolve(null);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

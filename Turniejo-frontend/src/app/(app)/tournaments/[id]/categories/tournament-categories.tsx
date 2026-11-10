@@ -6,13 +6,14 @@ import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useSecondStage } from "@/features/second-stage/api"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups, useTieBreakerRules } from "@/features/tournaments/api"
 import { CategoryCard } from "@/features/tournaments/components/category-card"
 import { CategoryFormDialog } from "@/features/tournaments/components/category-form-dialog"
 import { TieBreakerEditor } from "@/features/tournaments/components/tie-breaker-editor"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
-import { statusAtLeast } from "@/types/tournaments"
+import { hasGroupStage, statusAtLeast } from "@/types/tournaments"
 
 export function TournamentCategoriesView({
   embedded = false,
@@ -27,6 +28,7 @@ export function TournamentCategoriesView({
   const format = tournament.data?.format ?? null
   const knockout = format === "Knockout"
   const tieBreakerRules = useTieBreakerRules(id)
+  const secondStage = useSecondStage(id, format === "TwoGroupStages")
   const nextOrder = Math.max(0, ...(categories.data ?? []).map((c) => c.order)) + 1
 
   const addCategoryButton = isOrganizer && (
@@ -35,7 +37,7 @@ export function TournamentCategoriesView({
       nextOrder={nextOrder}
       // Jak DefaultGroupProvisioner: grupy powstają tylko w formacie z grupami, przed terminarzem.
       withGroups={
-        (format === "Group" || format === "GroupAndKnockout") &&
+        hasGroupStage(format) &&
         !!tournament.data &&
         !statusAtLeast(tournament.data.status, "ScheduleGenerated")
       }
@@ -94,6 +96,17 @@ export function TournamentCategoriesView({
                 )}
                 format={format}
                 canManage={isOrganizer}
+                seats={(secondStage.data?.seats ?? []).filter((s) => s.categoryId === category.id)}
+                ranges={(secondStage.data?.ranges ?? []).filter(
+                  (r) => r.categoryId === category.id,
+                )}
+                // Zanim drużyny się zgłoszą, ich liczbę wyznacza limit turnieju (dzielony na kategorie).
+                teamLimitShare={Math.ceil(
+                  (tournament.data?.teamLimit ?? 0) / Math.max(1, categories.data?.length ?? 1),
+                )}
+                scheduleLocked={
+                  !!tournament.data && statusAtLeast(tournament.data.status, "ScheduleGenerated")
+                }
               />
             ))}
           </div>

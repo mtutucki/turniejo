@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
@@ -37,7 +37,7 @@ namespace Turniejo.Tournaments.Application.Services
             int groupCount,
             CancellationToken cancellationToken = default)
         {
-            if (tournament.Format is not (TournamentFormat.Group or TournamentFormat.GroupAndKnockout))
+            if (tournament.Format is not (TournamentFormat.Group or TournamentFormat.GroupAndKnockout or TournamentFormat.TwoGroupStages))
                 return;
 
             // Po wygenerowaniu terminarza struktura grup jest zamrożona.

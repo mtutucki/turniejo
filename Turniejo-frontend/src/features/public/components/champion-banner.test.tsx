@@ -54,6 +54,10 @@ describe("showsChampion", () => {
     expect(showsChampion("InProgress", "Group")).toBe(false)
     expect(showsChampion("Finished", "Group")).toBe(true)
   })
+  it("[FAZ-018] dwie fazy grupowe: jak grupy, dopiero po zakończeniu turnieju", () => {
+    expect(showsChampion("InProgress", "TwoGroupStages")).toBe(false)
+    expect(showsChampion("Finished", "TwoGroupStages")).toBe(true)
+  })
   it("przed startem i bez formatu: nigdy", () => {
     expect(showsChampion("ScheduleGenerated", "Knockout")).toBe(false)
     expect(showsChampion("Finished", null)).toBe(false)

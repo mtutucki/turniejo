@@ -89,6 +89,8 @@ export function useGenerateSchedule(tournamentId: string) {
       void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
       // Backend przestawia status turnieju na ScheduleGenerated.
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) })
+      // Dwie fazy grupowe: generator planuje mecze fazy 2.
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "second-stage"] })
       void queryClient.invalidateQueries({ queryKey: ["tournaments", "list"] })
     },
   })
@@ -104,6 +106,8 @@ export function useClearSchedule(tournamentId: string) {
       void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
       // Backend cofa etap turnieju do "Zapisy zamknięte".
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) })
+      // Znikają też zaplanowane mecze fazy 2.
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "second-stage"] })
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.dashboard(tournamentId) })
       void queryClient.invalidateQueries({ queryKey: ["tournaments", "list"] })
     },

@@ -1,4 +1,4 @@
-using Turniejo.SharedKernel.Contracts;
+﻿using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Standings.Application.Abstractions;
@@ -10,7 +10,8 @@ namespace Turniejo.Standings.Application.Standings.GetPublicStandings
         IStandingsDbContext dbContext,
         ITournamentModule tournamentModule,
         ITeamModule teamModule,
-        IMatchModule matchModule) : IQueryHandler<GetPublicStandingsQuery, IReadOnlyList<StandingDto>>
+        IMatchModule matchModule,
+        IBracketModule bracketModule) : IQueryHandler<GetPublicStandingsQuery, IReadOnlyList<StandingDto>>
     {
         public async Task<Result<IReadOnlyList<StandingDto>>> Handle(GetPublicStandingsQuery request, CancellationToken cancellationToken)
         {
@@ -27,7 +28,7 @@ namespace Turniejo.Standings.Application.Standings.GetPublicStandings
             // dowolnego publicznego turnieju razem z GroupId z INNEGO turnieju (nawet prywatnego)
             // dostałby jego tabelę. GroupId nie jest sekretem (widoczny w publicznym JSON-ie grup).
             var dtos = await GroupTable.ReadAsync(
-                tournament.Id, request.GroupId, standings, tournamentModule, teamModule, matchModule, cancellationToken);
+                tournament.Id, request.GroupId, standings, tournamentModule, teamModule, matchModule, bracketModule, cancellationToken);
 
             return Result.Success<IReadOnlyList<StandingDto>>(dtos);
         }

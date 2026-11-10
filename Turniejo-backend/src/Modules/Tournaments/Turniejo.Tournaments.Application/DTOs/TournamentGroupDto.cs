@@ -5,5 +5,6 @@
         Guid TournamentId,
         Guid CategoryId,
         string Name,
-        int Order);
+        int Order,
+        int Stage);
 }

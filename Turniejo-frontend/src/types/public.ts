@@ -34,7 +34,8 @@ export type PublicTournament = {
   /** showInDirectory: turniej na liście publicznej. Wyłączony = portal tylko z linku, bez Google. */
   settings: PublicVisibility & { showInDirectory?: boolean }
   categories: { id: string; name: string; order: number }[]
-  groups: { id: string; categoryId: string; name: string; order: number }[]
+  /** stage 2: grupa drugiej fazy (format „Dwie fazy grupowe”), brak = faza 1. */
+  groups: { id: string; categoryId: string; name: string; order: number; stage?: 1 | 2 }[]
   pitches: { id: string; name: string }[]
 }
 

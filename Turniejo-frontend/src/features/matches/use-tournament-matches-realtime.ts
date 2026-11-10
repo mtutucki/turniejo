@@ -57,8 +57,12 @@ export function useTournamentMatchesRealtime(tournamentIds: string[]) {
     connection.on("MatchChanged", refresh)
     // Awans, korekta, uzupełnienie slotów z grup: bez tego drabinka organizatora czekała na odświeżenie strony.
     connection.on("BracketUpdated", () => {
-      for (const id of ids)
+      for (const id of ids) {
         void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "bracket"] })
+        // Dwie fazy grupowe: drużyny trafiły na miejsca fazy 2 i powstały ich mecze.
+        void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "second-stage"] })
+        void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(id) })
+      }
     })
 
     // Tabela przelicza się po zakończonym meczu (później niż MatchChanged), więc czeka na własne zdarzenie.

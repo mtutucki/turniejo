@@ -18,6 +18,11 @@ export type PlannedBracketMatch = {
   stage: string
   home: PlannedSide
   away: PlannedSide
+  /**
+   * Mecz grupy drugiej fazy (format „Dwie fazy grupowe”), a nie drabinki: grupa do filtra, a termin
+   * i sędziego zmienia się dopiero na meczu, gdy powstanie.
+   */
+  secondStageGroupId?: string
 }
 
 /** known = konkretna drużyna (już awansowała); inaczej opis typu "Zwycięzca meczu A – B". */

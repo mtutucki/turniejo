@@ -25,9 +25,16 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { useSchedule } from "@/features/matches/api"
+import { SecondStageSection } from "@/features/second-stage/components/second-stage-section"
 import { formatBirthDate, plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
-import type { TournamentCategory, TournamentFormat, TournamentGroup } from "@/types/tournaments"
+import type {
+  SecondStageRange,
+  SecondStageSeat,
+  TournamentCategory,
+  TournamentFormat,
+  TournamentGroup,
+} from "@/types/tournaments"
 
 import { useDeleteCategory } from "../api"
 import { CategoryFormDialog } from "./category-form-dialog"
@@ -60,16 +67,31 @@ type CategoryCardProps = {
   teams: TournamentTeam[]
   format: TournamentFormat | null
   canManage: boolean
+  /** Dwie fazy grupowe: podział tej kategorii na grupy fazy 2. */
+  seats?: SecondStageSeat[]
+  /** Dwie fazy grupowe: zakresy miejsc tej kategorii. */
+  ranges?: SecondStageRange[]
+  /** Część limitu drużyn turnieju na tę kategorię - liczba drużyn, zanim się zgłoszą. */
+  teamLimitShare?: number
+  /** Terminarz istnieje - podział na fazę 2 jest zamrożony. */
+  scheduleLocked?: boolean
 }
 
 export function CategoryCard({
   tournamentId,
   category,
-  groups,
+  groups: allGroups,
   teams,
   format,
   canManage,
+  seats = [],
+  ranges = [],
+  teamLimitShare = 0,
+  scheduleLocked = false,
 }: CategoryCardProps) {
+  const twoStages = format === "TwoGroupStages"
+  // Grupy drugiej fazy nie mają przydzielonych drużyn - mają własną sekcję poniżej.
+  const groups = allGroups.filter((g) => g.stage !== 2)
   const teamCount = (groupId: string) => teams.filter((t) => t.groupId === groupId).length
   const ungrouped = teams.filter((t) => !t.groupId).length
   const deleteCategory = useDeleteCategory(tournamentId)
@@ -83,7 +105,7 @@ export function CategoryCard({
   const groupMatches = categoryMatches.filter((m) => m.stageType === "Group").length
   const bracketMatches = categoryMatches.length - groupMatches
   const blocked = played || teams.length > 0 || categoryMatches.length > 0
-  const nextGroupOrder = Math.max(0, ...groups.map((g) => g.order)) + 1
+  const nextGroupOrder = Math.max(0, ...allGroups.map((g) => g.order)) + 1
 
   return (
     <Card>
@@ -215,7 +237,7 @@ export function CategoryCard({
         ) : (
           <section aria-label={`Grupy w kategorii ${category.name}`} className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium">Grupy</h3>
+              <h3 className="text-sm font-medium">{twoStages ? "Faza 1" : "Grupy"}</h3>
               {canManage && (
                 <GroupFormDialog
                   tournamentId={tournamentId}
@@ -272,7 +294,28 @@ export function CategoryCard({
             )}
           </section>
         )}
-        {format && format !== "Knockout" && groups.length === 1 && (
+        {twoStages && (
+          <SecondStageSection
+            tournamentId={tournamentId}
+            categoryId={category.id}
+            categoryName={category.name}
+            groups={allGroups}
+            firstStage={groups.map((g) => ({
+              id: g.id,
+              name: g.name,
+              order: g.order,
+              teams: teamCount(g.id),
+            }))}
+            seats={seats}
+            ranges={ranges}
+            matches={categoryMatches}
+            canManage={canManage}
+            categoryTeams={teams.length || teamLimitShare}
+            teamsFromLimit={teams.length === 0 && teamLimitShare > 0}
+            locked={scheduleLocked}
+          />
+        )}
+        {format && format !== "Knockout" && !twoStages && groups.length === 1 && (
           <p className="text-muted-foreground text-xs">
             Jedna grupa - wszystkie drużyny kategorii grają każdy z każdym. Drugą grupę dodaj, gdy
             drużyn jest tyle, że wszystkie mecze by się nie zmieściły.

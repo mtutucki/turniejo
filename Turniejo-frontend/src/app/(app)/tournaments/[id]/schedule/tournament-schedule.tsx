@@ -43,6 +43,8 @@ import {
   type PlannedBracketMatch,
   plannedBracketMatches,
 } from "@/features/matches/planned-bracket-matches"
+import { useSecondStage } from "@/features/second-stage/api"
+import { plannedSecondStageMatches } from "@/features/second-stage/planned"
 import { RescheduleMatchDialog } from "@/features/matches/components/reschedule-match-dialog"
 import {
   type ActiveFilter,
@@ -309,7 +311,9 @@ function PlannedRow({
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span className="flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5">
               <Hourglass className="size-3" />
-              Czeka na wynik wcześniejszych meczów
+              {planned.secondStageGroupId
+                ? "Czeka na koniec pierwszej fazy"
+                : "Czeka na wynik wcześniejszych meczów"}
             </span>
             {!unscheduled && (
               <span className="flex items-center gap-1">
@@ -318,7 +322,7 @@ function PlannedRow({
               </span>
             )}
             <span>{planned.stage}</span>
-            {isOrganizer && !unscheduled && (
+            {isOrganizer && !unscheduled && !planned.secondStageGroupId && (
               <RefereeChip
                 refereeId={planned.refereeId}
                 referee={lookups.referee(planned.refereeId)}
@@ -329,8 +333,9 @@ function PlannedRow({
         </div>
       </div>
 
-      {/* Termin i sędzia zapisują się na drabince; mecz dostanie je, gdy będzie wiadomo, kto gra. */}
-      {isOrganizer && !unscheduled && (
+      {/* Termin i sędzia zapisują się na drabince; mecz dostanie je, gdy będzie wiadomo, kto gra.
+          Mecz drugiej fazy zmienia się dopiero, gdy powstanie. */}
+      {isOrganizer && !unscheduled && !planned.secondStageGroupId && (
         <div className="flex flex-wrap items-center gap-2 pl-16 lg:pl-0">
           <RescheduleMatchDialog
             tournamentId={tournamentId}
@@ -429,6 +434,7 @@ export function TournamentScheduleView() {
     tournament.data?.format === "Knockout" || tournament.data?.format === "GroupAndKnockout"
   const bracketCategoryIds = (categories.data ?? []).map((c) => c.id)
   const brackets = useBrackets(id, bracketCategoryIds, hasBracket)
+  const secondStage = useSecondStage(id, tournament.data?.format === "TwoGroupStages")
 
   const [categoryId, setCategoryId] = useState(ALL)
   const [teamId, setTeamId] = useState(ALL)
@@ -535,11 +541,15 @@ export function TournamentScheduleView() {
         )
       : [],
   )
-  const planned = allPlanned.filter(
+  // Dwie fazy grupowe: mecze drugiej fazy, które czekają na koniec pierwszej.
+  const secondStagePlanned = secondStage.data
+    ? plannedSecondStageMatches(secondStage.data, groups.data ?? [], lookups.teamName)
+    : []
+  const planned = [...allPlanned, ...secondStagePlanned].filter(
     (p) =>
       (categoryId === ALL || p.categoryId === categoryId) &&
       (teamId === ALL || isTeam(p.home.tournamentTeamId) || isTeam(p.away.tournamentTeamId)) &&
-      groupId === ALL &&
+      (groupId === ALL || p.secondStageGroupId === groupId) &&
       (refereeId === ALL || (p.refereeId ?? NO_REFEREE) === refereeId) &&
       (pitchId === ALL || p.pitchId === pitchId),
   )

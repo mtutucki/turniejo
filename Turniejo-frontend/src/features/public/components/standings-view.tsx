@@ -7,6 +7,8 @@ import { useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
+import { usePublicSecondStage } from "@/features/second-stage/api"
+import { pendingPlaces } from "@/features/second-stage/split"
 import { cn } from "@/lib/utils"
 
 import { usePublicStandings } from "../api"
@@ -20,9 +22,12 @@ function GroupTable({
   groupId,
   title,
   headingLevel,
+  pending = [],
 }: {
   groupId: string
   title: string
+  /** Grupa drugiej fazy: miejsca, które czekają na koniec pierwszej fazy. */
+  pending?: string[]
   /** h3 pod nagłówkiem kategorii, h2 gdy kategoria jest jedna (bez przeskoku h1 → h3). */
   headingLevel: "h2" | "h3"
 }) {
@@ -38,7 +43,9 @@ function GroupTable({
       {standings.isPending ? (
         <Skeleton className="m-4 h-32" />
       ) : rows.length === 0 ? (
-        <p className="text-muted-foreground px-4 py-6 text-sm">Brak drużyn w grupie.</p>
+        pending.length === 0 && (
+          <p className="text-muted-foreground px-4 py-6 text-sm">Brak drużyn w grupie.</p>
+        )
       ) : (
         <div className="px-2 pb-2">
           <div
@@ -121,12 +128,32 @@ function GroupTable({
           </LayoutGroup>
         </div>
       )}
+      {!standings.isPending && <PendingPlaces places={pending} />}
     </section>
   )
 }
 
+/** Miejsca grupy drugiej fazy bez drużyny jeszcze: „1. miejsce Grupa A”. */
+function PendingPlaces({ places }: { places: string[] }) {
+  if (places.length === 0) return null
+  return (
+    <div className="border-t px-4 py-3 text-sm">
+      <p className="text-muted-foreground text-xs">Czekają na koniec pierwszej fazy:</p>
+      <ul className="mt-1 space-y-0.5">
+        {places.map((label) => (
+          <li key={label} className="text-muted-foreground italic">
+            {label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function StandingsView() {
-  const { tournament } = usePublicContext()
+  const { slug, tournament } = usePublicContext()
+  const twoStages = tournament.format === "TwoGroupStages"
+  const secondStage = usePublicSecondStage(slug, twoStages)
   if (tournament.groups.length === 0) {
     return <EmptyState icon={ListOrdered} title="Tabele pojawią się po utworzeniu grup" />
   }
@@ -143,16 +170,32 @@ export function StandingsView() {
                 {category.name}
               </h2>
             )}
-            <div className="grid gap-4 lg:grid-cols-2">
-              {groups.map((group) => (
-                <GroupTable
-                  key={group.id}
-                  groupId={group.id}
-                  title={group.name}
-                  headingLevel={tournament.categories.length > 1 ? "h3" : "h2"}
-                />
-              ))}
-            </div>
+            {[1, 2].map((stage) => {
+              const stageGroups = groups.filter((g) => (g.stage === 2 ? 2 : 1) === stage)
+              if (stageGroups.length === 0) return null
+              return (
+                <div key={stage} className="space-y-2">
+                  {twoStages && (
+                    <p className="text-sm font-medium">{stage === 1 ? "Faza 1" : "Faza 2"}</p>
+                  )}
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {stageGroups.map((group) => (
+                      <GroupTable
+                        key={group.id}
+                        groupId={group.id}
+                        title={group.name}
+                        headingLevel={tournament.categories.length > 1 ? "h3" : "h2"}
+                        pending={pendingPlaces(
+                          secondStage.data?.seats ?? [],
+                          group.id,
+                          tournament.groups,
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </section>
         )
       })}

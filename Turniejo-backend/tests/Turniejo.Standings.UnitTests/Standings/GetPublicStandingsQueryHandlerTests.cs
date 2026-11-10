@@ -18,7 +18,7 @@ namespace Turniejo.Standings.UnitTests.Standings
             _dbContext = Substitute.For<IStandingsDbContext>();
             _tournamentModule = Substitute.For<ITournamentModule>();
             _handler = new GetPublicStandingsQueryHandler(
-                _dbContext, _tournamentModule, NoGroupTeams(), Substitute.For<IMatchModule>());
+                _dbContext, _tournamentModule, NoGroupTeams(), Substitute.For<IMatchModule>(), Substitute.For<IBracketModule>());
         }
 
         // Drużyny grupy z modułu Teams: pusto = zapisane wiersze tabeli wystarczą (GroupTable.ReadAsync).

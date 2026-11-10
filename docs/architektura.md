@@ -26,13 +26,13 @@ Modularny monolit: jeden proces, ale każdy moduł ma osobne projekty (Domain / 
 | Players | zawodnicy, kadra drużyny, składy turniejowe, opiekunowie |
 | Matches | boiska, terminarz, mecze na żywo, zdarzenia, statystyki, huby SignalR |
 | Standings | tabele grup (projekcja z meczów) |
-| Brackets | drabinka pucharowa, awans zwycięzców |
+| Brackets | drabinka pucharowa, awans zwycięzców; awans z tabel do grup drugiej fazy (miejsca `SecondStageSeat` i zaplanowane mecze `SecondStageFixture`) |
 | Notifications | powiadomienia w aplikacji i przypomnienia o meczach |
 
 ## Przepływ danych
 
 - **Źródło prawdy:** zdarzenia meczu (`MatchEvent`). Wynik meczu, tabela grupy i drabinka to projekcje przeliczane po zmianie (gol, cofnięcie, korekta, zakończenie).
-- **Outbox:** handler zapisuje zdarzenie domenowe razem ze zmianą w tej samej transakcji. `OutboxProcessor` (usługa w tle w API) publikuje je przez MediatR do handlerów w innych modułach, np. mecz zakończony → przeliczenie tabeli → uzupełnienie drabinki → powiadomienia.
+- **Outbox:** handler zapisuje zdarzenie domenowe razem ze zmianą w tej samej transakcji. `OutboxProcessor` (usługa w tle w API) publikuje je przez MediatR do handlerów w innych modułach, np. mecz zakończony → przeliczenie tabeli → uzupełnienie drabinki (albo miejsc w grupach drugiej fazy) → powiadomienia.
 - **Usługi w tle:** `OutboxProcessor` i `MatchReminderBackgroundService` (przypomnienia przed meczem).
 
 ## Uprawnienia

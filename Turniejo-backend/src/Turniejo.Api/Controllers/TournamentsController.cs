@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
@@ -172,7 +172,7 @@ namespace Turniejo.Api.Controllers
         [HttpPost("{tournamentId}/groups")]
         public async Task<IActionResult> AddTournamentGroup([FromRoute] Guid tournamentId, [FromBody] AddTournamentGroupRequest request, CancellationToken cancellationToken)
         {
-            var command = new AddTournamentGroupCommand(tournamentId, request.CategoryId, request.Name, request.Order);
+            var command = new AddTournamentGroupCommand(tournamentId, request.CategoryId, request.Name, request.Order, request.Stage);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -433,7 +433,7 @@ namespace Turniejo.Api.Controllers
         public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description, DateTimeOffset? ExpectedUpdatedAt = null);
         public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order, int GroupCount = 1);
         public sealed record UpdateTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
-        public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
+        public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order, int Stage = 1);
         public sealed record UpdateTournamentGroupRequest(string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
         public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart, ExpectedTournamentSettings? Expected = null);

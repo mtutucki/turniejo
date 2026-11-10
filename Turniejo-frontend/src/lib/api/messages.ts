@@ -148,6 +148,28 @@ const EXACT: Record<string, string> = {
     "Drabinka została usunięta, ale etap turnieju się nie cofnął - wyczyść terminarz",
   "Bracket generation requires Knockout or GroupAndKnockout format":
     "Drabinka wymaga formatu z fazą pucharową",
+  // Dwie fazy grupowe
+  "Second-stage groups need the two group stages format":
+    "Grupy drugiej fazy są tylko w formacie „Dwie fazy grupowe”",
+  "Teams reach second-stage groups from the first-stage tables":
+    "Do grupy drugiej fazy drużyny trafiają same, z tabel pierwszej fazy",
+  "Remove the second-stage groups before changing the format":
+    "Najpierw usuń grupy drugiej fazy, potem zmień format",
+  "Clear the schedule before changing the second stage":
+    "Wyczyść terminarz, żeby zmienić podział na drugą fazę",
+  "Each place must go to a second-stage group of this category":
+    "Każde miejsce musi trafić do grupy drugiej fazy z tej kategorii",
+  "Each place must come from a first-stage group of this category":
+    "Każde miejsce musi pochodzić z grupy pierwszej fazy z tej kategorii",
+  "Each place can go to only one second-stage group":
+    "Jedno miejsce może trafić tylko do jednej grupy drugiej fazy",
+  "Place in the group must be at least 1": "Miejsce w grupie musi być co najmniej pierwsze",
+  "Every category needs second-stage groups with places before generating the schedule":
+    "Każda kategoria potrzebuje grup drugiej fazy z ustawionym podziałem",
+  "Each second-stage group needs at least 2 places":
+    "Każda grupa drugiej fazy potrzebuje co najmniej dwóch miejsc",
+  "A second-stage place points to a position its group does not have":
+    "W podziale na drugą fazę jest miejsce, którego nie ma w tabeli grupy",
   "Match events can only be recorded while the match is live, paused, or within the post-match edit window":
     "Czas na poprawki minął - wynik meczu jest zablokowany",
   "The post-match edit window has closed":

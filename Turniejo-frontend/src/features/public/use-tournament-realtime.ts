@@ -37,7 +37,12 @@ export function useTournamentRealtime(slug: string, tournamentId: string) {
       invalidate([...publicKeys.all(slug), "live"])
     })
     connection.on("StandingUpdated", () => invalidate([...publicKeys.all(slug), "standings"]))
-    connection.on("BracketUpdated", () => invalidate([...publicKeys.all(slug), "bracket"]))
+    connection.on("BracketUpdated", () => {
+      invalidate([...publicKeys.all(slug), "bracket"])
+      // Dwie fazy grupowe: drużyny trafiły na miejsca fazy 2 i powstały ich mecze.
+      invalidate([...publicKeys.all(slug), "second-stage"])
+      invalidate(publicKeys.schedule(slug))
+    })
 
     const join = async () => {
       await connection.invoke("JoinTournamentGroup", tournamentId)
