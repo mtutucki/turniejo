@@ -131,3 +131,87 @@ test("[PUC-033a] przeniesienie meczu na zajęte boisko", async ({ page }) => {
 
   await expect(page.getByText("Na tym boisku trwa wtedy inny mecz")).toBeVisible()
 })
+
+test("zmiana terminu domyślnie przesuwa kolejne mecze na tym boisku", async ({ page }) => {
+  const matchId = "0f000000-0000-4000-8000-000000000060"
+  await mock.matchStatus(matchId, "Scheduled")
+  await mock.override({
+    method: "PUT",
+    path: "/api/tournaments/:tid/matches/:mid/schedule",
+    body: { matchId },
+  })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule`)
+  const open = page.getByRole("button", { name: "Zmień termin: Orły E2E – Lwy E2E" })
+  const dialog = page.getByRole("dialog", { name: "Zmień termin" })
+  const shift = dialog.getByRole("checkbox", { name: "Przesuń też kolejne mecze na tym boisku" })
+  const saved = () =>
+    page.waitForRequest((r) => r.method() === "PUT" && r.url().endsWith(`/matches/${matchId}/schedule`))
+
+  await open.click()
+  await expect(shift).toBeChecked()
+  let request = saved()
+  await dialog.getByRole("button", { name: "Zapisz" }).click()
+  expect((await request).postDataJSON()).toMatchObject({ shiftFollowing: true })
+  await expect(dialog).toBeHidden()
+
+  await open.click()
+  await shift.click()
+  request = saved()
+  await dialog.getByRole("button", { name: "Zapisz" }).click()
+  expect((await request).postDataJSON()).toMatchObject({ shiftFollowing: false })
+  await expect(dialog).toBeHidden()
+
+  // Inne boisko: kolejne mecze zostają, opcji nie ma.
+  await open.click()
+  await dialog.getByRole("combobox", { name: "Boisko" }).click()
+  await page.getByRole("option", { name: "Bez boiska" }).click()
+  await expect(shift).toBeHidden()
+})
+
+test("przesunięcie, które rusza mecze na innym boisku, wymaga potwierdzenia", async ({ page }) => {
+  const matchId = "0f000000-0000-4000-8000-000000000060"
+  await mock.matchStatus(matchId, "Scheduled")
+  // Ostatnie dodane wygrywa: najpierw 409 (raz), potem sukces.
+  await mock.override({
+    method: "PUT",
+    path: "/api/tournaments/:tid/matches/:mid/schedule",
+    body: { matchId },
+  })
+  await mock.override({
+    method: "PUT",
+    path: "/api/tournaments/:tid/matches/:mid/schedule",
+    status: 409,
+    body: {
+      code: "Conflict.OtherPitches",
+      message: "The shift also moves matches on other pitches",
+      type: 3,
+    },
+    times: 1,
+  })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/tournaments/${TOURNAMENT_ID}/schedule`)
+  await page.getByRole("button", { name: "Zmień termin: Orły E2E – Lwy E2E" }).click()
+  const dialog = page.getByRole("dialog", { name: "Zmień termin" })
+  const saved = () =>
+    page.waitForRequest(
+      (r) => r.method() === "PUT" && r.url().endsWith(`/matches/${matchId}/schedule`),
+    )
+
+  let request = saved()
+  await dialog.getByRole("button", { name: "Zapisz" }).click()
+  expect((await request).postDataJSON()).toMatchObject({
+    shiftFollowing: true,
+    shiftOtherPitches: false,
+  })
+  await expect(dialog.getByText("Przesunąć mimo to?", { exact: false })).toBeVisible()
+
+  request = saved()
+  await dialog.getByRole("button", { name: "Przesuń mimo to" }).click()
+  expect((await request).postDataJSON()).toMatchObject({
+    shiftFollowing: true,
+    shiftOtherPitches: true,
+  })
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText("Termin meczu zapisany")).toBeVisible()
+})

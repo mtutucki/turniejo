@@ -8,6 +8,7 @@ namespace Turniejo.Matches.Application.Abstractions
     {
         Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default);
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        Task ExecuteInTransactionAsync(Func<Task> work, CancellationToken cancellationToken = default);
 
         // Pitch
         Task AddPitchAsync(Pitch pitch, CancellationToken cancellationToken = default);
