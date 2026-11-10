@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { useOrganizationTeams, useTeamRoster } from "@/features/teams/api"
+import { TeamHistorySection } from "@/features/teams/components/team-history-section"
 import { TeamLogo } from "@/features/teams/components/team-logo"
 import { TeamRoster } from "@/features/teams/components/team-roster"
 
@@ -30,11 +31,12 @@ export function TeamRosterPage() {
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold tracking-tight">{name}</h1>
             <p className="text-muted-foreground text-sm">
-              Kadra drużyny. Skład na turniej wybierasz z tej listy.
+              Statystyki ze wszystkich turniejów i kadra, z której wybierasz skład na turniej.
             </p>
           </div>
         </div>
       </div>
+      <TeamHistorySection teamId={teamId} />
       <TeamRoster teamId={teamId} />
     </div>
   )

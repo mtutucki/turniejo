@@ -46,6 +46,8 @@ public record GroupMatchDto(
     int HomeScore,
     int AwayScore);
 
+// Pola od StageType opcjonalne, żeby nie przepisywać istniejących wywołań. Karne rozstrzygają remis
+// w pucharze (historia drużyny liczy z nich zwycięstwo albo porażkę).
 public record TournamentMatchDto(
     Guid Id,
     Guid TournamentId,
@@ -54,7 +56,12 @@ public record TournamentMatchDto(
     Guid HomeTournamentTeamId,
     Guid AwayTournamentTeamId,
     int HomeScore,
-    int AwayScore);
+    int AwayScore,
+    string StageType = "Group",
+    Guid? GroupId = null,
+    Guid? CategoryId = null,
+    int? HomePenaltyScore = null,
+    int? AwayPenaltyScore = null);
 
 public record MatchInfoDto(
     Guid Id,

@@ -49,7 +49,7 @@ export function OutcomeBadge({ outcome, size = "sm" }: { outcome: Outcome; size?
   )
 }
 
-function Tile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+export function Tile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
     <div className="bg-card min-w-0 rounded-xl border p-3">
       <p className="text-muted-foreground text-xs">{label}</p>

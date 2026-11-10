@@ -1389,6 +1389,80 @@ const api = [
       return HttpResponse.json({ teamId: team.id })
     }),
   ),
+  // Historia drużyny z bazy: jak backend liczy z zakończonych meczów jej zgłoszeń (tu jeden turniej).
+  http.get(
+    "*/api/teams/:teamId/history",
+    authed(({ user, params }) => {
+      const own = Object.entries(TEAM_NAMES)
+        .filter(([, t]) => t.id === params.teamId)
+        .map(([ttId]) => ttId)
+      // Jak TeamRosterAccessGuard: organizator organizacji albo sztab któregoś zgłoszenia drużyny.
+      const staff = own.some((tt) =>
+        ["Coach", "AssistantCoach", "Manager"].some((role) =>
+          hasRole(user, role, "TournamentTeam", tt),
+        ),
+      )
+      if (!rosterOf(user, params.teamId) && !staff) return problem(403, "Forbidden")
+      const finished = db.matches
+        .filter((m) => m.status === "Finished" && (own.includes(m.home) || own.includes(m.away)))
+        .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+      const record = (ms: typeof finished) => {
+        const r = { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }
+        for (const m of ms) {
+          const home = own.includes(m.home)
+          const [f, a] = home ? [m.homeScore, m.awayScore] : [m.awayScore, m.homeScore]
+          r.played++
+          r.goalsFor += f
+          r.goalsAgainst += a
+          if (f > a) r.wins++
+          else if (f === a) r.draws++
+          else r.losses++
+        }
+        return r
+      }
+      const outcome = (m: (typeof finished)[number]) => {
+        const home = own.includes(m.home)
+        const [f, a] = home ? [m.homeScore, m.awayScore] : [m.awayScore, m.homeScore]
+        return f > a ? "W" : f === a ? "D" : "L"
+      }
+      const tt = own[0]
+      const t = findTournament(IDS.tournament)!
+      const row = tt
+        ? groupStandings(IDS.tournament, IDS.group).find((r) => r.tournamentTeamId === tt)
+        : undefined
+      const opponentOf = (m: (typeof finished)[number]) => (own.includes(m.home) ? m.away : m.home)
+      const opponents = [...new Set(finished.map(opponentOf))].map((o) => ({
+        teamId: TEAM_NAMES[o]!.id,
+        name: TEAM_NAMES[o]!.name,
+        record: record(finished.filter((m) => opponentOf(m) === o)),
+      }))
+      return HttpResponse.json({
+        summary: record(finished),
+        tournamentCount: tt ? 1 : 0,
+        form: finished.map(outcome).slice(-5),
+        tournaments: tt
+          ? [
+              {
+                tournamentId: t.id,
+                tournamentName: t.name,
+                tournamentStatus: t.status,
+                startAt: t.startAt,
+                endAt: t.endAt,
+                tournamentTeamId: tt,
+                categoryName: "U12",
+                resultKind: row && row.matchesPlayed > 0 ? "Group" : "None",
+                eliminatedRoundFromEnd: null,
+                groupPosition: row && row.matchesPlayed > 0 ? row.position : null,
+                groupName: row && row.matchesPlayed > 0 ? "Grupa A" : null,
+                record: record(finished),
+              },
+            ]
+          : [],
+        players: [],
+        opponents,
+      })
+    }),
+  ),
   http.get(
     "*/api/teams/:teamId/players",
     authed(({ user, params }) => {
