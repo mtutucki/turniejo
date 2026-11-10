@@ -8,6 +8,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Zmienione
 
+- Na liście drużyn turnieju (także w kreatorze) każda grupa ma własną ramkę z nazwą i liczbą drużyn, a drużyny bez grupy są wyróżnione na górze.
 - Mecze w portalu kibica filtrujesz jednym paskiem: drużyna, kategoria, grupa, boisko i dzień. Widać, ile meczów pasuje, a filtry da się usunąć jednym kliknięciem i przesłać linkiem.
 - Podtytuł strony głównej nie sugeruje już, że bez logowania można coś więcej niż oglądać wyniki.
 

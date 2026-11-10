@@ -46,6 +46,8 @@ type TournamentTeamRowProps = {
   canManage: boolean
   /** Komplet zaakceptowanych drużyn: backend i tak odrzuci akceptację. */
   limitReached?: boolean
+  /** Lista jest już podzielona na grupy: nazwa grupy przy drużynie byłaby powtórzeniem. */
+  inGroupSection?: boolean
 }
 
 export function TournamentTeamRow({
@@ -54,6 +56,7 @@ export function TournamentTeamRow({
   groups,
   canManage,
   limitReached = false,
+  inGroupSection = false,
 }: TournamentTeamRowProps) {
   const changeStatus = useChangeRegistrationStatus(tournamentId)
   const changePayment = useChangePaymentStatus(tournamentId)
@@ -79,7 +82,7 @@ export function TournamentTeamRow({
           <span className="block truncate font-medium">{team.teamName}</span>
           <span className="text-muted-foreground flex items-center gap-2 text-xs">
             <RegistrationStatusBadge status={team.registrationStatus} />
-            {!canManage && groupName && <span>{groupName}</span>}
+            {!canManage && !inGroupSection && groupName && <span>{groupName}</span>}
           </span>
         </span>
         <ChevronRight className="text-muted-foreground ml-auto size-4 lg:hidden" />
