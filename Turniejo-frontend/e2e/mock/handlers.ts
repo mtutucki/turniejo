@@ -1162,6 +1162,28 @@ const api = [
   ),
 
   // --- Portal publiczny (bez logowania) ---
+  http.get("*/public/tournaments", () =>
+    HttpResponse.json(
+      db.tournaments
+        .filter((t) => t.isPublic && t.status !== "Draft" && t.status !== "Cancelled")
+        .map((t) => ({
+          name: t.name,
+          slug: t.slug,
+          status: t.status,
+          startAt: t.startAt,
+          endAt: t.endAt,
+          organizer: {
+            id: t.organizationId,
+            name: db.organizations.find((o) => o.id === t.organizationId)?.name ?? "",
+          },
+          categories: t.id === IDS.tournament ? ["U12"] : [],
+          teamCount: tournamentTeams(t.id).length,
+          liveMatchCount: db.matches.filter(
+            (m) => m.tournamentId === t.id && (m.status === "Live" || m.status === "Paused"),
+          ).length,
+        })),
+    ),
+  ),
   http.get("*/public/tournaments/:slug", ({ params }) => {
     const t = db.tournaments.find((x) => x.slug === params.slug && x.isPublic)
     if (!t) return problem(404, "Tournament not found")

@@ -5,7 +5,11 @@ import { cache } from "react"
 
 import { apiFetch } from "@/lib/api/client"
 import { isApiError } from "@/lib/api/errors"
-import type { PublicTournament, PublicVisibility } from "@/types/public"
+import type {
+  PublicTournament,
+  PublicTournamentListItem,
+  PublicVisibility,
+} from "@/types/public"
 
 /**
  * Publiczny turniej po slugu — jedno zapytanie na render (cache), wspólne dla layoutu, metadanych
@@ -30,4 +34,13 @@ export async function requireSection(
   const tournament = await getPublicTournament(slug)
   if (!visible(tournament.settings, tournament)) notFound()
   return tournament
+}
+
+/** Lista turniejów publicznych do pierwszego renderu. Błąd backendu → undefined, lista dociągnie się w przeglądarce. */
+export async function getPublicTournaments() {
+  try {
+    return await apiFetch<PublicTournamentListItem[]>("/public/tournaments", { cache: "no-store" })
+  } catch {
+    return undefined
+  }
 }

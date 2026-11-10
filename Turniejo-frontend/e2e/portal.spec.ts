@@ -61,8 +61,11 @@ test.describe("Portal: sekcje wg ustawień organizatora", () => {
 })
 
 test.describe("Strony dla gościa", () => {
-  test("[PUB-016] strona główna prowadzi do logowania bez callbackUrl", async ({ page }) => {
+  test("[PUB-016] strona główna pokazuje gościowi turnieje publiczne, a logowanie jest o jedno kliknięcie", async ({ page }) => {
     await page.goto("/")
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole("article", { name: "Puchar E2E" })).toBeVisible()
+    await page.getByRole("banner").getByRole("link", { name: "Zaloguj się" }).click()
     await expect(page).toHaveURL(/\/login$/)
   })
 

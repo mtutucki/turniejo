@@ -15,6 +15,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Drabinka pucharu mieści dowolną liczbę drużyn, nie tylko 16. Przy większej liczbie pojawia się 1/16 finału, 1/32 finału i dalej.
 - Na liście drużyn turnieju przycisk „Akceptuj wszystkie” przyjmuje od razu wszystkie oczekujące zgłoszenia, w granicach limitu drużyn.
 - Przy zmianie terminu meczu kolejne mecze na tym samym boisku przesuwają się o tyle samo (opcja domyślnie zaznaczona), więc opóźnienie nie wymaga poprawiania każdego meczu osobno. Jeśli przez to drużyna albo sędzia nie zdążyłby na mecz na innym boisku, aplikacja pyta, czy przesunąć też tamte mecze.
+- Strona główna pokazuje turnieje publiczne: trwające (z liczbą meczów na żywo), nadchodzące i zakończone. Można szukać po nazwie i filtrować po organizatorze, a link z filtrem da się komuś wysłać.
 
 ### Zmienione
 

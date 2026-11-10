@@ -113,3 +113,17 @@ export type RankingEntry = {
 }
 
 export type PublicMatch = Match
+
+/** PublicTournamentListItemDto — karta na liście turniejów publicznych (GET /public/tournaments). */
+export type PublicTournamentListItem = {
+  name: string
+  slug: string
+  status: TournamentStatus
+  startAt: string
+  endAt: string
+  organizer: { id: string; name: string }
+  categories: string[]
+  teamCount: number
+  /** Mecze na żywo albo w przerwie. */
+  liveMatchCount: number
+}

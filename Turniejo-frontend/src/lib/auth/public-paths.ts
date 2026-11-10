@@ -4,8 +4,11 @@
  */
 export const DEFAULT_APP_PATH = "/start"
 
-// Strony dostępne bez logowania. Portal publiczny turnieju (/t/[slug]) dojdzie w Fazie 6.
+// Strony dostępne bez logowania, w tym portal kibica (/t/[slug]).
 const PUBLIC_PATHS = [
+  // Strona główna dla gościa to lista turniejów publicznych (zalogowany idzie dalej na /start).
+  "/",
+  "/t",
   "/login",
   "/register",
   "/password-reset",

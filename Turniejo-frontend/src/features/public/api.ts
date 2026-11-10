@@ -9,6 +9,7 @@ import type {
   PublicMatch,
   PublicTeam,
   PublicTournament,
+  PublicTournamentListItem,
   RankingEntry,
   Standing,
 } from "@/types/public"
@@ -25,6 +26,16 @@ export const publicKeys = {
   bracket: (slug: string, categoryId: string) => ["public", slug, "bracket", categoryId] as const,
   ranking: (slug: string, kind: RankingKind) => ["public", slug, "ranking", kind] as const,
   liveMatch: (slug: string, matchId: string) => ["public", slug, "live", matchId] as const,
+}
+
+/** Lista turniejów publicznych. Odświeża się co minutę, żeby liczba meczów na żywo była aktualna. */
+export function usePublicTournaments(initialData?: PublicTournamentListItem[]) {
+  return useQuery({
+    queryKey: ["public", "list"],
+    queryFn: () => apiFetch<PublicTournamentListItem[]>("/public/tournaments"),
+    initialData,
+    refetchInterval: 60_000,
+  })
 }
 
 export function usePublicTournament(slug: string, initialData?: PublicTournament) {
