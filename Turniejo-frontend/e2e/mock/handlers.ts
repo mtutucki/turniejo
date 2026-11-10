@@ -1735,7 +1735,8 @@ function configOf(tournamentId: string): Config {
       showLiveMatches: true,
       showStats: true,
       abbreviatePlayerNames: true,
-      showInDirectory: true,
+      // Jak backend: nowy turniej jest poza listą, dopóki organizator go tam nie doda.
+      showInDirectory: seeded,
     },
     categories: seeded
       ? [

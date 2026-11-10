@@ -178,6 +178,29 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
     }
 
     [Fact]
+    public async Task PUB_024_NewTournament_IsOffTheList_UntilTheOrganizerAddsIt()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var slug = (await s.TournamentAsync()).GetString("slug");
+        var anonymous = CreateClient();
+        async Task<List<string?>> ListedAsync() =>
+            (await (await anonymous.GetAsync("/public/tournaments")).ReadJsonAsync()).EnumerateArray()
+                .Select(t => t.GetString("slug")).ToList();
+
+        (await (await s.Organizer.GetAsync($"{T(s)}/public-settings")).ReadJsonAsync())
+            .GetProperty("showInDirectory").GetBoolean().Should().BeFalse();
+
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
+                new { isPublic = true, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await anonymous.GetAsync($"/public/tournaments/{slug}")).IsSuccessStatusCode.Should().BeTrue();
+        (await ListedAsync()).Should().NotContain(slug);
+
+        (await PublishAsync(s, true, showInDirectory: true)).IsSuccessStatusCode.Should().BeTrue();
+        (await ListedAsync()).Should().Contain(slug);
+    }
+
+    [Fact]
     public async Task PUB_008_PublicStats_FollowTheEvents_AndOwnGoalsDoNotCount()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
