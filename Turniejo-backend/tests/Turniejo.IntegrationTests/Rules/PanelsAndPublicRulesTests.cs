@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Turniejo.IntegrationTests.Infrastructure;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.IntegrationTests.Rules;
 
@@ -128,6 +129,37 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
         (await PublishAsync(s, true)).IsSuccessStatusCode.Should().BeTrue();
         (await anonymous.GetAsync($"/public/tournaments/{slug}")).IsSuccessStatusCode.Should().BeTrue();
         (await anonymous.GetAsync($"/public/tournaments/{slug}/schedule")).IsSuccessStatusCode.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PUB_020_PublicList_ShowsPublishedTournaments_WithOrganizerTeamsAndLiveMatches()
+    {
+        var live = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        (await PublishAsync(live, true)).IsSuccessStatusCode.Should().BeTrue();
+        var match = (await live.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        (await live.Organizer.PostAsync($"{T(live)}/matches/{match}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+
+        var hidden = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var cancelled = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        (await PublishAsync(cancelled, true)).IsSuccessStatusCode.Should().BeTrue();
+        await TournamentFlow.ChangeStatusAsync(cancelled.Organizer, cancelled.TournamentId, TournamentStatus.Cancelled);
+        var draft = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 1, schedule: false);
+        await TournamentFlow.ChangeStatusAsync(draft.Organizer, draft.TournamentId, TournamentStatus.RegistrationOpen);
+        await TournamentFlow.ChangeStatusAsync(draft.Organizer, draft.TournamentId, TournamentStatus.Draft);
+        (await PublishAsync(draft, true)).IsSuccessStatusCode.Should().BeTrue();
+
+        async Task<string> SlugAsync(TournamentScenario s) => (await s.TournamentAsync()).GetString("slug");
+        var list = (await (await CreateClient().GetAsync("/public/tournaments")).ReadJsonAsync()).EnumerateArray().ToList();
+        var slugs = list.Select(t => t.GetString("slug")).ToList();
+
+        var liveSlug = await SlugAsync(live);
+        var item = list.Single(t => t.GetString("slug") == liveSlug);
+        item.GetString("status").Should().Be("InProgress");
+        item.GetProperty("organizer").GetString("name").Should().StartWith("Org ");
+        item.GetProperty("categories").EnumerateArray().Select(c => c.GetString()).Should().Equal("Open");
+        item.GetInt("teamCount").Should().Be(2);
+        item.GetInt("liveMatchCount").Should().Be(1);
+        slugs.Should().NotContain([await SlugAsync(hidden), await SlugAsync(cancelled), await SlugAsync(draft)]);
     }
 
     [Fact]

@@ -10,6 +10,15 @@ internal sealed class OrganizationModule(
     IPlayerModule playerModule,
     IMatchModule matchModule) : IOrganizationModule
 {
+    public async Task<IReadOnlyDictionary<Guid, string>> GetOrganizationNamesAsync(IReadOnlyCollection<Guid> organizationIds, CancellationToken cancellationToken = default)
+    {
+        if (organizationIds.Count == 0)
+            return new Dictionary<Guid, string>();
+
+        var organizations = await dbContext.GetOrganizationsByIdsAsync(organizationIds, cancellationToken);
+        return organizations.ToDictionary(o => o.Id, o => o.Name);
+    }
+
     // Moduły mają osobne DbContexty, więc nie ma jednej transakcji — kolejność jest dobrana tak, żeby
     // przerwane usuwanie dało się dokończyć ponownym wywołaniem: każdy krok znajduje swoje dane po
     // organizacji, a sama organizacja znika na końcu.

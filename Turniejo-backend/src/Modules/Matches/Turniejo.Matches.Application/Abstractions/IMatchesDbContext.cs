@@ -23,6 +23,7 @@ namespace Turniejo.Matches.Application.Abstractions
         Task AddMatchesAsync(IReadOnlyCollection<Match> matches, CancellationToken cancellationToken = default);
         Task RemoveMatchesAsync(IReadOnlyCollection<Match> matches, CancellationToken cancellationToken = default);
         Task<Match?> GetMatchByIdAsync(Guid matchId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyDictionary<Guid, int>> CountLiveMatchesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
         /// <summary>Śledzone przez EF — do modyfikacji; pozostałe zapytania o listy meczów są tylko do odczytu.</summary>

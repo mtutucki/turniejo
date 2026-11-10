@@ -2,6 +2,8 @@ namespace Turniejo.SharedKernel.Contracts;
 
 public interface IMatchModule
 {
+    /// <summary>Liczba trwających meczów (na żywo albo w przerwie) w każdym z turniejów. Turniej bez nich ma 0.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> CountLiveMatchesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GroupMatchDto>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
     Task<Guid> CreateBracketMatchAsync(
         Guid tournamentId, Guid? categoryId, Guid homeTournamentTeamId, Guid awayTournamentTeamId,
