@@ -7,11 +7,12 @@ test("[GPK-011] grupy + puchar: tabela, drabinka i mistrz zgodne u organizatora 
     homeSourceType: 2, homeGroupId: s.groups.get(homeGroup), homePosition: homePos, homeTournamentTeamId: null,
     awaySourceType: 2, awayGroupId: s.groups.get(awayGroup), awayPosition: awayPos, awayTournamentTeamId: null,
   })
-  await s.start()
+  // Drabinka przed terminarzem: generator od razu planuje mecze pucharu po fazie grupowej.
   await s.organizer.post(`${s.base}/bracket/generate`, {
     categoryId: s.categoryId,
     roundOnePairings: [pair("A", 1, "B", 2), pair("B", 1, "A", 2)],
   })
+  await s.start()
 
   // Grupa A: T1 wygrywa z T2, grupa B: T3 wygrywa z T4 → półfinały T1-T4 i T3-T2.
   await s.play("T1", "T2", "T1")
