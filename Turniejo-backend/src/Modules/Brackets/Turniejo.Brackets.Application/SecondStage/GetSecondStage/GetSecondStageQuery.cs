@@ -3,9 +3,9 @@ using Turniejo.Brackets.Application.DTOs;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Enums;
 
-namespace Turniejo.Brackets.Application.SecondStage.GetSecondStageSeats
+namespace Turniejo.Brackets.Application.SecondStage.GetSecondStage
 {
-    public sealed record GetSecondStageSeatsQuery(Guid TournamentId) : IQuery<IReadOnlyList<SecondStageSeatDto>>, IAuthorizedRequest
+    public sealed record GetSecondStageQuery(Guid TournamentId) : IQuery<SecondStageDto>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

@@ -8,6 +8,7 @@ public interface IBracketModule
 {
     Task<IReadOnlyList<BracketNodeInfoDto>> GetNodesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task SetPlannedSlotsAsync(IReadOnlyCollection<BracketPlannedSlotDto> slots, CancellationToken cancellationToken = default);
+    /// <summary>Po wyczyszczeniu terminarza: terminy kolejnych rund pucharu i zaplanowane mecze fazy 2 (z obsadą miejsc).</summary>
     Task ClearPlannedSlotsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task SetPlannedRefereeAsync(Guid nodeId, Guid? refereeId, CancellationToken cancellationToken = default);
 
@@ -15,7 +16,17 @@ public interface IBracketModule
     Task<IReadOnlyList<SecondStageSeatInfoDto>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     /// <summary>Usunięta grupa (fazy 1 albo 2) nie może zostać w podziale drugiej fazy.</summary>
     Task RemoveSecondStageSeatsForGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SecondStageFixtureInfoDto>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+    /// <summary>Zaplanowane przez generator mecze fazy 2 (zastępują poprzednie). Czyści je <see cref="ClearPlannedSlotsAsync"/>.</summary>
+    Task CreateSecondStageFixturesAsync(Guid tournamentId, IReadOnlyCollection<SecondStageFixturePlanDto> fixtures, CancellationToken cancellationToken = default);
 }
+
+public record SecondStageFixtureInfoDto(
+    Guid Id, Guid CategoryId, Guid GroupId, Guid HomeSeatId, Guid AwaySeatId, int Round,
+    Guid? PlannedPitchId, DateTimeOffset? PlannedAt, Guid? PlannedRefereeId, Guid? MatchId);
+
+public record SecondStageFixturePlanDto(
+    Guid Id, Guid CategoryId, Guid GroupId, Guid HomeSeatId, Guid AwaySeatId, int Round, Guid PitchId, DateTimeOffset ScheduledAt);
 
 public record SecondStageSeatInfoDto(
     Guid Id, Guid CategoryId, Guid GroupId, int Order, Guid SourceGroupId, int SourcePosition, Guid? TournamentTeamId);

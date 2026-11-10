@@ -12,6 +12,7 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
     public DbSet<BracketRound> BracketRounds => Set<BracketRound>();
     public DbSet<BracketNode> BracketNodes => Set<BracketNode>();
     public DbSet<SecondStageSeat> SecondStageSeats => Set<SecondStageSeat>();
+    public DbSet<SecondStageFixture> SecondStageFixtures => Set<SecondStageFixture>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
@@ -95,6 +96,26 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
         await SecondStageSeats.AddRangeAsync(seats, cancellationToken);
 
     public void RemoveSecondStageSeats(IEnumerable<SecondStageSeat> seats) => SecondStageSeats.RemoveRange(seats);
+
+    public async Task<IReadOnlyList<SecondStageFixture>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures
+            .AsNoTracking()
+            .Where(f => f.TournamentId == tournamentId)
+            .OrderBy(f => f.PlannedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures
+            .Where(f => f.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<SecondStageFixture?> GetSecondStageFixtureByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures.FirstOrDefaultAsync(f => f.MatchId == matchId, cancellationToken);
+
+    public async Task AddSecondStageFixturesAsync(IEnumerable<SecondStageFixture> fixtures, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures.AddRangeAsync(fixtures, cancellationToken);
+
+    public void RemoveSecondStageFixtures(IEnumerable<SecondStageFixture> fixtures) => SecondStageFixtures.RemoveRange(fixtures);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

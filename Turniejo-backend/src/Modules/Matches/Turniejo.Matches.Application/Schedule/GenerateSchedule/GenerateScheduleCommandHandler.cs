@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
@@ -25,6 +25,9 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
     {
         private sealed record MatchPair(Guid CategoryId, Guid GroupId, Guid HomeTournamentTeamId, Guid AwayTournamentTeamId);
 
+        // Mecz grupy fazy 2 przed rozstrzygnięciem: para miejsc (Id miejsc w polach drużyn), czeka na grupy źródłowe obu miejsc.
+        private sealed record SecondStagePlan(Guid Key, MatchPair Seats, int Round, IReadOnlySet<Guid> SourceGroupIds);
+
         private static readonly StageType[] BracketStages = [StageType.Knockout, StageType.ThirdPlace, StageType.Final];
 
         public async Task<Result<GenerateScheduleResponse>> Handle(GenerateScheduleCommand request, CancellationToken cancellationToken)
@@ -43,7 +46,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 windows.Any(w => w.StartAt < tournamentStart || w.EndAt > tournamentEnd))
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("StartAt", "Schedule must fit within the tournament dates"));
 
-            if (tournament.Format is not ("Group" or "GroupAndKnockout" or "Knockout"))
+            if (tournament.Format is not ("Group" or "GroupAndKnockout" or "Knockout" or "TwoGroupStages"))
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("Format", "Set the tournament format before generating the schedule"));
 
             var settings = await tournamentModule.GetTournamentSettingsAsync(request.TournamentId, cancellationToken);
@@ -60,7 +63,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             var accepted = tournamentTeams.Where(t => t.RegistrationStatus == "Accepted").ToList();
             var clubOf = ClubLookup(tournamentTeams);
 
-            var withGroups = tournament.Format is "Group" or "GroupAndKnockout";
+            var withGroups = tournament.Format is "Group" or "GroupAndKnockout" or "TwoGroupStages";
             var withBracket = tournament.Format is "Knockout" or "GroupAndKnockout";
 
             var pairs = new List<(Guid Key, MatchPair Pair, int Round)>();
@@ -70,6 +73,15 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 if (groupResult.IsFailure)
                     return Result.Failure<GenerateScheduleResponse>(groupResult.Error);
                 pairs = groupResult.Value;
+            }
+
+            var secondStage = new List<SecondStagePlan>();
+            if (tournament.Format == "TwoGroupStages")
+            {
+                var secondStageResult = await BuildSecondStageAsync(request.TournamentId, accepted, cancellationToken);
+                if (secondStageResult.IsFailure)
+                    return Result.Failure<GenerateScheduleResponse>(secondStageResult.Error);
+                secondStage = secondStageResult.Value;
             }
 
             IReadOnlyList<BracketNodeInfoDto> nodes = withBracket
@@ -110,6 +122,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 : [];
 
             var items = BuildItems(pairs, bracketMatches, nodes, accepted, clubOf);
+            items.AddRange(SecondStageItems(secondStage, pairs, accepted, clubOf));
 
             var fixedMatches = existingMatches
                 .Where(m => m.Status != MatchStatus.Cancelled && m.PitchId.HasValue && !bracketMatchIds.Contains(m.Id))
@@ -173,6 +186,13 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             if (plannedSlots.Count > 0)
                 await bracketModule.SetPlannedSlotsAsync(plannedSlots, cancellationToken);
 
+            if (secondStage.Count > 0)
+                await bracketModule.CreateSecondStageFixturesAsync(request.TournamentId, secondStage
+                    .Select(f => new SecondStageFixturePlanDto(
+                        f.Key, f.Seats.CategoryId, f.Seats.GroupId, f.Seats.HomeTournamentTeamId, f.Seats.AwayTournamentTeamId,
+                        f.Round + 1, result.Slots[f.Key].PitchId, result.Slots[f.Key].StartAt))
+                    .ToList(), cancellationToken);
+
             return await CompleteAsync(
                 request.TournamentId, tournament.Format == "Knockout" ? bracketMatches.Count : newMatches.Count, cancellationToken);
         }
@@ -197,7 +217,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 .ToDictionary(g => g.Key, g => g.Select(t => t.Id).ToList());
 
             var pairs = new List<(Guid Key, MatchPair Pair, int Round)>();
-            foreach (var group in groups)
+            // Grupy drugiej fazy nie mają przydzielonych drużyn, ich mecze planuje BuildSecondStageAsync.
+            foreach (var group in groups.Where(g => g.Stage == 1))
             {
                 if (!teamsByGroup.TryGetValue(group.Id, out var teamIds) || teamIds.Count < 2)
                     continue;
@@ -223,6 +244,74 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
 
             // Kolejka 1 wszystkich grup, potem kolejka 2 itd. — kolejność bazowa dla układacza.
             return Result.Success(pairs.OrderBy(p => p.Round).ToList());
+        }
+
+        /// <summary>
+        /// Format „Dwie fazy grupowe”: każdy z każdym w grupach fazy 2, ale między miejscami („1. miejsce Gr. A”),
+        /// bo drużyny będą znane dopiero po fazie 1. Każda kategoria potrzebuje grup fazy 2 z co najmniej
+        /// dwoma miejscami, a miejsce musi istnieć w tabeli grupy źródłowej.
+        /// </summary>
+        private async Task<Result<List<SecondStagePlan>>> BuildSecondStageAsync(
+            Guid tournamentId, List<TournamentTeamDto> accepted, CancellationToken cancellationToken)
+        {
+            var groups = await tournamentModule.GetTournamentGroupsAsync(tournamentId, cancellationToken);
+            var seats = await bracketModule.GetSecondStageSeatsAsync(tournamentId, cancellationToken);
+            var seatsByGroup = seats.GroupBy(s => s.GroupId).ToDictionary(g => g.Key, g => g.OrderBy(s => s.Order).ToList());
+            var secondStageGroups = groups.Where(g => g.Stage == 2).ToList();
+
+            if (accepted.Select(t => t.CategoryId).Distinct()
+                .Any(c => !secondStageGroups.Any(g => g.CategoryId == c && seatsByGroup.ContainsKey(g.Id))))
+                return Result.Failure<List<SecondStagePlan>>(Error.Validation(
+                    "SecondStage", "Every category needs second-stage groups with places before generating the schedule"));
+
+            if (secondStageGroups.Any(g => seatsByGroup.TryGetValue(g.Id, out var groupSeats) && groupSeats.Count < 2))
+                return Result.Failure<List<SecondStagePlan>>(Error.Validation(
+                    "SecondStage", "Each second-stage group needs at least 2 places"));
+
+            var teamCount = accepted.Where(t => t.GroupId.HasValue).GroupBy(t => t.GroupId!.Value).ToDictionary(g => g.Key, g => g.Count());
+            if (seats.Any(s => s.SourcePosition > teamCount.GetValueOrDefault(s.SourceGroupId)))
+                return Result.Failure<List<SecondStagePlan>>(Error.Validation(
+                    "SecondStage", "A second-stage place points to a position its group does not have"));
+
+            var sourceBySeat = seats.ToDictionary(s => s.Id, s => s.SourceGroupId);
+            var plans = new List<SecondStagePlan>();
+            foreach (var group in secondStageGroups)
+            {
+                if (!seatsByGroup.TryGetValue(group.Id, out var groupSeats))
+                    continue;
+
+                var rounds = BuildRoundRobinRounds(group, groupSeats.Select(x => x.Id).ToList());
+                for (var round = 0; round < rounds.Count; round++)
+                    plans.AddRange(rounds[round].Select(pair => new SecondStagePlan(
+                        Guid.NewGuid(), pair, round,
+                        new HashSet<Guid> { sourceBySeat[pair.HomeTournamentTeamId], sourceBySeat[pair.AwayTournamentTeamId] })));
+            }
+
+            return Result.Success(plans.OrderBy(p => p.Round).ToList());
+        }
+
+        /// <summary>
+        /// Mecz fazy 2 czeka na wszystkie mecze grup źródłowych obu miejsc i może w nim zagrać każda drużyna
+        /// z tych grup (ta sama drużyna z bazy w innej kategorii nie gra wtedy innego meczu, jak w pucharze).
+        /// </summary>
+        private static IEnumerable<ScheduleItem> SecondStageItems(
+            List<SecondStagePlan> plans,
+            List<(Guid Key, MatchPair Pair, int Round)> pairs,
+            List<TournamentTeamDto> accepted,
+            Func<Guid, Guid> clubOf)
+        {
+            var groupRounds = pairs.Count == 0 ? 0 : pairs.Max(p => p.Round) + 1;
+            var pairKeysByGroup = pairs.GroupBy(p => p.Pair.GroupId).ToDictionary(g => g.Key, g => g.Select(p => p.Key).ToList());
+            var clubsByGroup = accepted.Where(t => t.GroupId.HasValue)
+                .GroupBy(t => t.GroupId!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(t => clubOf(t.Id)).ToHashSet());
+
+            foreach (var plan in plans)
+            {
+                var possible = plan.SourceGroupIds.SelectMany(g => clubsByGroup.GetValueOrDefault(g) ?? []).ToHashSet();
+                var after = plan.SourceGroupIds.SelectMany(g => pairKeysByGroup.GetValueOrDefault(g) ?? []).ToList();
+                yield return new ScheduleItem(plan.Key, plan.Seats.CategoryId, new HashSet<Guid>(), possible, after, groupRounds + plan.Round);
+            }
         }
 
         /// <summary>

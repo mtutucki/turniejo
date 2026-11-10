@@ -1,7 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
-using Turniejo.Brackets.Application.SecondStage.GetSecondStageSeats;
+using Turniejo.Brackets.Application.SecondStage.GetSecondStage;
 using Turniejo.Brackets.Application.SecondStage.SetSecondStageSeats;
 
 namespace Turniejo.Api.Controllers
@@ -11,10 +11,11 @@ namespace Turniejo.Api.Controllers
     [ApiController]
     public sealed class SecondStageController(ISender sender) : ControllerBase
     {
-        [HttpGet("seats")]
-        public async Task<IActionResult> GetSeats([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
+        /// <summary>Podział na grupy fazy 2 i zaplanowane mecze (terminarz pokazuje je, zanim znane są drużyny).</summary>
+        [HttpGet]
+        public async Task<IActionResult> Get([FromRoute] Guid tournamentId, CancellationToken cancellationToken)
         {
-            var result = await sender.Send(new GetSecondStageSeatsQuery(tournamentId), cancellationToken);
+            var result = await sender.Send(new GetSecondStageQuery(tournamentId), cancellationToken);
             return result.ToActionResult();
         }
 

@@ -168,6 +168,62 @@ namespace Turniejo.Brackets.Infrastructure.Persistence.Migrations
                     b.ToTable("bracket_rounds", "brackets");
                 });
 
+            modelBuilder.Entity("Turniejo.Brackets.Domain.Entities.SecondStageFixture", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AwaySeatId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("HomeSeatId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PlannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PlannedPitchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PlannedRefereeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AwaySeatId");
+
+                    b.HasIndex("HomeSeatId");
+
+                    b.HasIndex("MatchId")
+                        .IsUnique()
+                        .HasFilter("\"MatchId\" IS NOT NULL");
+
+                    b.HasIndex("TournamentId");
+
+                    b.ToTable("second_stage_fixtures", "brackets");
+                });
+
             modelBuilder.Entity("Turniejo.Brackets.Domain.Entities.SecondStageSeat", b =>
                 {
                     b.Property<Guid>("Id")
@@ -286,6 +342,21 @@ namespace Turniejo.Brackets.Infrastructure.Persistence.Migrations
                     b.HasOne("Turniejo.Brackets.Domain.Entities.Bracket", null)
                         .WithMany()
                         .HasForeignKey("BracketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Turniejo.Brackets.Domain.Entities.SecondStageFixture", b =>
+                {
+                    b.HasOne("Turniejo.Brackets.Domain.Entities.SecondStageSeat", null)
+                        .WithMany()
+                        .HasForeignKey("AwaySeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Turniejo.Brackets.Domain.Entities.SecondStageSeat", null)
+                        .WithMany()
+                        .HasForeignKey("HomeSeatId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
