@@ -1,4 +1,4 @@
-import { expect, MATCH_ID, mock, PUBLIC_SLUG, test } from "./fixtures"
+import { expect, MATCH_ID, mock, PUBLIC_SLUG, test, TOURNAMENT_ID } from "./fixtures"
 
 test.describe("Portal publiczny → Wynik live", () => {
   test("[PUB-003f] kibic bez logowania widzi mecz LIVE i gol bez przeładowania", async ({
@@ -51,6 +51,18 @@ test.describe("Portal publiczny → Wynik live", () => {
     await expect(board).toContainText("Czeka na rozstrzygnięcie")
     await expect(board).not.toContainText("Przerwa")
     await expect(page.getByTestId("live-minute")).toHaveCount(0)
+  })
+
+  test("[PUB-025] portal działa, gdy adres turnieju ma dwukropek (stary slug z godziną w nazwie)", async ({
+    page,
+  }) => {
+    const slug = "puchar---8:00---10:00-ac2cc2"
+    await mock.tournament(TOURNAMENT_ID, { slug })
+
+    await page.goto(`/t/${slug}`)
+    await expect(page.getByRole("heading", { level: 1, name: "Puchar E2E" })).toBeVisible()
+    const response = await page.goto(`/t/${slug}/schedule`)
+    expect(response?.status()).toBe(200)
   })
 
   test("[PUB-015] nieistniejący turniej to 404", async ({ page }) => {
