@@ -149,5 +149,6 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, I
     }
 
     private static TournamentMatchDto ToTournamentMatchDto(Turniejo.Matches.Domain.Entities.Match m) =>
-        new(m.Id, m.TournamentId, m.Status.ToString(), m.ScheduledAt, m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.HomeScore, m.AwayScore);
+        new(m.Id, m.TournamentId, m.Status.ToString(), m.ScheduledAt, m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.HomeScore, m.AwayScore,
+            m.StageType.ToString(), m.GroupId, m.CategoryId, m.HomePenaltyScore, m.AwayPenaltyScore);
 }

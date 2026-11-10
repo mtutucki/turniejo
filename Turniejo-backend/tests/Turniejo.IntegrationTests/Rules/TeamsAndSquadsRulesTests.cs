@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Turniejo.Api.Controllers;
 using Turniejo.IntegrationTests.Infrastructure;
+using Turniejo.Matches.Domain.Enums;
 
 namespace Turniejo.IntegrationTests.Rules;
 
@@ -372,5 +374,57 @@ public sealed class TeamsAndSquadsRulesTests(IntegrationTestWebApplicationFactor
         var (_, playerId) = await s.CreatePlayerAsync("T1", "Jan", "Kadrowy");
 
         (await RosterAsync(coach, s.ClubTeam("T1"))).Should().Contain(p => p.GetGuid("playerId") == playerId);
+    }
+
+    // Statystyki drużyny z bazy we wszystkich turniejach: bilans, miejsce w grupie, zawodnicy, rywale.
+    [Fact]
+    public async Task DRU_044_TeamHistory_SumsFinishedMatches_PlayersAndOpponents()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3);
+        var (_, adam) = await s.CreatePlayerAsync("T1", "Adam", "Strzelec");
+        var (_, bartek) = await s.CreatePlayerAsync("T1", "Bartek", "Podający");
+
+        var first = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        (await s.Organizer.PostAsync($"{T(s)}/matches/{first}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{T(s)}/matches/{first}/goals",
+                new { tournamentTeamId = s.Team("T1"), playerId = adam, assistPlayerId = bartek, goalType = 5, minute = 10, second = (int?)null }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{T(s)}/matches/{first}/finish",
+                new MatchesController.FinishMatchRequest(MatchResultType.Regular, s.Team("T1"))))
+            .IsSuccessStatusCode.Should().BeTrue();
+        await FlushOutboxAsync();
+        await s.PlayAsync((await s.MatchBetweenAsync("T1", "T3")).GetGuid("id"), 1, 1);
+
+        var history = await (await s.Organizer.GetAsync($"/api/teams/{s.ClubTeam("T1")}/history")).ReadJsonAsync();
+
+        var summary = history.GetProperty("summary");
+        (summary.GetProperty("played").GetInt32(), summary.GetProperty("wins").GetInt32(), summary.GetProperty("draws").GetInt32()).Should().Be((2, 1, 1));
+        (summary.GetProperty("goalsFor").GetInt32(), summary.GetProperty("goalsAgainst").GetInt32()).Should().Be((2, 1));
+        history.GetProperty("tournamentCount").GetInt32().Should().Be(1);
+        // Forma idzie w kolejności terminarza, a test gra mecze w innej, więc sprawdza same wyniki.
+        history.GetProperty("form").EnumerateArray().Select(f => f.GetString()).Should().BeEquivalentTo(["W", "D"]);
+
+        var entry = history.GetProperty("tournaments").EnumerateArray().Single();
+        entry.GetString("resultKind").Should().Be("Group");
+        entry.GetProperty("groupPosition").GetInt32().Should().Be(1);
+        entry.GetGuid("tournamentTeamId").Should().Be(s.Team("T1"));
+
+        var players = history.GetProperty("players").EnumerateArray().ToList();
+        players.Single(p => p.GetGuid("playerId") == adam).GetProperty("goals").GetInt32().Should().Be(1);
+        players.Single(p => p.GetGuid("playerId") == bartek).GetProperty("assists").GetInt32().Should().Be(1);
+
+        var opponents = history.GetProperty("opponents").EnumerateArray().ToList();
+        opponents.Select(o => o.GetGuid("teamId")).Should().BeEquivalentTo([s.ClubTeam("T2"), s.ClubTeam("T3")]);
+    }
+
+    [Fact]
+    public async Task DRU_045_TeamHistory_IsOnlyForTheOrganizationAndTeamStaff()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (outsider, _) = await s.NewUserAsync("outsider");
+
+        var response = await outsider.GetAsync($"/api/teams/{s.ClubTeam("T1")}/history");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }
