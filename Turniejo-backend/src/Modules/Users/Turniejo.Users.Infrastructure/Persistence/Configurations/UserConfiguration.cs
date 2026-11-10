@@ -41,6 +41,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.SeenReleaseVersion)
             .HasMaxLength(20);
 
+        // Enum jako int; istniejące konta dostają 0 = System.
+        builder.Property(x => x.ThemePreference);
+
         builder.Ignore(x => x.DomainEvents);
     }
 }

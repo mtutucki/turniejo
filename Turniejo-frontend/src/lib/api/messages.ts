@@ -10,6 +10,7 @@ const EXACT: Record<string, string> = {
   "New password must be different from the current one.": "Nowe hasło musi się różnić od obecnego",
   "Release version is required.": "Brak numeru wersji",
   "Release version must look like 1.2.0.": "Nieprawidłowy numer wersji",
+  "Theme must be system, light or dark.": "Nieznany motyw",
   // Dołączanie kodem
   "Invalid tournament code.": "Nieprawidłowy kod turnieju",
   "This tournament has been cancelled": "Ten turniej został anulowany. Nie można już do niego dołączyć.",

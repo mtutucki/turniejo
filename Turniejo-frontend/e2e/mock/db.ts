@@ -12,6 +12,8 @@ export type User = {
   phoneNumber?: string | null
   /** Ostatnia wersja z okna „Co nowego” (null/brak = nowe konto, okno się nie pokaże). */
   seenReleaseVersion?: string | null
+  /** Motyw na koncie (brak = "system"). */
+  theme?: "system" | "light" | "dark"
   roles: Role[]
 }
 export type Team = { id: string; name: string; shortName: string | null }

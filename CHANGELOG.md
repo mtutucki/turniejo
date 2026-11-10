@@ -10,27 +10,22 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 - Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.
+- Jasny motyw: domyślnie jak w telefonie lub komputerze, a ikonka w nagłówku przełącza między jasnym i ciemnym. Wybór zapisuje się na koncie.
 
 ### Zmienione
 
 - Grupy w karcie kategorii są czytelną listą z liczbą drużyn i przyciskami edycji i usuwania przy każdej grupie.
+- Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
 
 ### Poprawione
 
 - Grupę, z której wycofano wszystkie drużyny, da się już usunąć.
-
-### Poprawione
-
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
 - Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
 
-### Zmienione
-
-- Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
-
 ## [1.0.0] - 2026-11-09
 
-Pierwsza wersja z numerem. Ten wpis streszcza, co aplikacja umie w tym momencie.
+Pierwsze oficjalne wydanie Turniejo: cały turniej, od zapisów drużyn po wyniki na żywo, w jednym miejscu.
 
 ### Nowe
 

@@ -43,7 +43,12 @@ export type MyProfile = {
   phoneNumber: string | null
   /** Ostatnia wersja z okna „Co nowego” (null = nowe konto, okna jeszcze nie było). */
   seenReleaseVersion: string | null
+  /** Motyw zapisany na koncie. */
+  theme: ThemeChoice
 }
+
+/** Motyw aplikacji: jak w systemie, jasny albo ciemny (nazwy jak w next-themes i w API). */
+export type ThemeChoice = "system" | "light" | "dark"
 
 export const accountKeys = {
   profile: ["me", "profile"] as const,
@@ -68,6 +73,19 @@ export function useMarkReleaseSeen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: accountKeys.profile }),
     // Wersja pochodzi z buildu, więc 422 to błąd po naszej stronie: bez toastu, okno i tak znika.
     meta: { handlesValidation: true },
+  })
+}
+
+/** PUT /api/me/theme — motyw idzie za kontem na inne urządzenia. */
+export function useSetMyTheme() {
+  const { request } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (theme: ThemeChoice) => request("/api/me/theme", { method: "PUT", body: { theme } }),
+    // Od razu w cache, żeby profil wczytany chwilę później nie przywrócił starego motywu.
+    onMutate: (theme) =>
+      queryClient.setQueryData<MyProfile>(accountKeys.profile, (old) => old && { ...old, theme }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: accountKeys.profile }),
   })
 }
 

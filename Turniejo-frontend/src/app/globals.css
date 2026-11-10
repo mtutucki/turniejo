@@ -55,12 +55,65 @@
 }
 
 /*
- * Aplikacja ma tylko ciemny motyw (html ma zawsze klasę "dark"), więc jedna paleta
- * obsługuje zarówno :root, jak i warianty dark:.
+ * Motyw jasny w :root, ciemny w .dark (klasę na <html> ustawia next-themes: wybór z konta,
+ * z przeglądarki albo z systemu). Kontrasty obu palet sprawdzone pod WCAG AA (tekst 4.5:1).
+ * Boiskowa zieleń nagłówków (--brand) jest taka sama w obu motywach.
  */
 :root {
   --radius: 0.625rem;
 
+  /* Canvas i powierzchnie */
+  --background: #f5f6f8;
+  --foreground: #14181d;
+  --card: #ffffff;
+  --card-foreground: #14181d;
+  --popover: #ffffff;
+  --popover-foreground: #14181d;
+  --border: #dde1e7;
+  --input: #cfd5dd;
+
+  /* Na jasnym tle #10B981 ma ~2.5:1, więc tekst i przyciski idą ciemniejszą zielenią z białym napisem. */
+  --primary: #047857;
+  --primary-foreground: #ffffff;
+  --ring: #047857;
+  --success: #047857;
+
+  --secondary: #eceff3;
+  --secondary-foreground: #14181d;
+  --muted: #eceff3;
+  --muted-foreground: #5a6470;
+  --accent: #eceff3;
+  --accent-foreground: #14181d;
+  --destructive: #d42020;
+
+  /* Boiskowa zieleń — nagłówki turnieju */
+  --brand: #0a3a2a;
+  --brand-foreground: #e6f4ee;
+
+  /* Bursztyn LIVE — WYŁĄCZNIE indykator, ramka i minuta trwającego meczu (ciemniejszy, żeby był czytelny na bieli) */
+  --live: #b45309;
+  --live-foreground: #ffffff;
+
+  --chart-1: #047857;
+  --chart-2: #10b981;
+  --chart-3: #0a3a2a;
+  --chart-4: #5a6470;
+  --chart-5: #b45309;
+  --chart-bar: #0c8a63;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #14181d;
+  --sidebar-primary: #047857;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eceff3;
+  --sidebar-accent-foreground: #14181d;
+  --sidebar-border: #dde1e7;
+  --sidebar-ring: #047857;
+
+  color-scheme: light;
+}
+
+.dark {
   /* Canvas i powierzchnie */
   --background: #121417;
   --foreground: #e6e8eb;
@@ -99,6 +152,8 @@
   --chart-3: #0a3a2a;
   --chart-4: #8b95a1;
   --chart-5: #f59e0b;
+  /* Słupki rankingu: #0FA676 zamiast #10B981 przechodzi kontrast na kartach #1C2026. */
+  --chart-bar: #0fa676;
 
   --sidebar: #1c2026;
   --sidebar-foreground: #e6e8eb;

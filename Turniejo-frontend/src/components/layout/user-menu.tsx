@@ -56,7 +56,7 @@ export function UserMenu({ showDetails = false }: { showDetails?: boolean }) {
         )}
       >
         <Avatar className="size-8">
-          <AvatarFallback className="bg-primary/25 text-foreground text-xs font-semibold">
+          <AvatarFallback className="bg-primary text-primary-foreground dark:bg-primary/25 dark:text-foreground text-xs font-semibold">
             {initials(user?.name, user?.email)}
           </AvatarFallback>
         </Avatar>

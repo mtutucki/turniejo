@@ -21,15 +21,21 @@ export const metadata: Metadata = {
   description: "Zarządzanie turniejami piłkarskimi",
 }
 
+// Pasek przeglądarki na telefonie w kolorze tła motywu systemowego.
 export const viewport: Viewport = {
-  themeColor: "#121417",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#121417" },
+  ],
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // suppressHydrationWarning: next-themes ustawia klasę motywu na <html> przed hydratacją.
     <html
       lang="pl"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       {/* Rozszerzenia przeglądarki (np. ColorZilla: cz-shortcut-listen) dopisują atrybuty do <body>
           przed hydratacją — wyciszamy tylko różnice atrybutów tego jednego elementu. */}
