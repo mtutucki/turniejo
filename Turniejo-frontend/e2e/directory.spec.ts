@@ -130,6 +130,17 @@ test.describe("Lista turniejów publicznych", () => {
     await expect(page.getByRole("search", { name: "Filtry turniejów" })).toBeVisible()
   })
 
+  test("[PUB-026] zalogowany klika logo na liście turniejów i zostaje na liście", async ({ page }) => {
+    await loginAs(page, ORGANIZER)
+    await page.goto("/t?status=InProgress")
+    await page.getByRole("banner").getByRole("link", { name: "Turniejo" }).click()
+
+    await expect(page).toHaveURL(/\/t$/)
+    await expect(page.getByRole("search", { name: "Filtry turniejów" })).toBeVisible()
+    // Do panelu prowadzi osobny przycisk.
+    await expect(page.getByRole("link", { name: "Mój panel" })).toBeVisible()
+  })
+
   test("[PUB-022] karta prowadzi do portalu turnieju", async ({ page }) => {
     await mock.override({
       method: "GET",

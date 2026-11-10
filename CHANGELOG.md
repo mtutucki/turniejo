@@ -38,6 +38,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Poprawione
 
+- Logo na liście turniejów publicznych nie przenosi już zalogowanego do panelu, tylko zostawia go na liście. Do panelu prowadzi przycisk „Mój panel”.
 - Po wygaśnięciu sesji w portalu kibica zostajesz w portalu jako niezalogowany, zamiast trafiać na stronę logowania.
 - Po wygenerowaniu terminarza Terminarz nie odsyła już z powrotem do generatora (także później, po wyczyszczeniu terminarza).
 - Po wygenerowaniu terminarza nie da się już przenieść drużyny do innej grupy ani przyjąć nowej. Wcześniej mecze zostawały ze starym podziałem i tabele grup były błędne. Żeby to zmienić, najpierw wyczyść terminarz.
