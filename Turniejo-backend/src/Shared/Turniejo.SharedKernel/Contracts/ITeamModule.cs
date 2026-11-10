@@ -2,6 +2,8 @@ namespace Turniejo.SharedKernel.Contracts;
 
 public interface ITeamModule
 {
+    /// <summary>Liczba przyjętych drużyn w każdym z turniejów (lista turniejów publicznych). Turniej bez drużyn ma 0.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> CountAcceptedTeamsByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default);
     Task<TeamDto?> GetTeamAsync(Guid teamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TeamDto>> GetTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default);
     // Kadra drużyny (moduł Players): organizator organizacji, do której należy drużyna, może nią zarządzać.

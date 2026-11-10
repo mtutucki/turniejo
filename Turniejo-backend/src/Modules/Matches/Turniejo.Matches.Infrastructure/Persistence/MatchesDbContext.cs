@@ -86,6 +86,14 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
     public async Task<Match?> GetMatchByIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
         await Matches.FirstOrDefaultAsync(m => m.Id == matchId, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, int>> CountLiveMatchesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default) =>
+        await Matches
+            .AsNoTracking()
+            .Where(m => tournamentIds.Contains(m.TournamentId) && (m.Status == MatchStatus.Live || m.Status == MatchStatus.Paused))
+            .GroupBy(m => m.TournamentId)
+            .Select(g => new { TournamentId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TournamentId, x => x.Count, cancellationToken);
+
     public async Task<IReadOnlyList<Match>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await Matches
             .AsNoTracking()

@@ -4,6 +4,7 @@ using Turniejo.SharedKernel.Exceptions;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Domain.Entities;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Infrastructure.Persistence;
 
@@ -93,6 +94,15 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         return await Tournaments.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Tournament>> GetListedPublicTournamentsAsync(CancellationToken cancellationToken = default) =>
+        await Tournaments
+            .AsNoTracking()
+            .Where(t => t.PublicSettings.IsPublic
+                && t.PublicSettings.ShowInDirectory
+                && t.Status != TournamentStatus.Draft
+                && t.Status != TournamentStatus.Cancelled)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
     await Tournaments
         .AsNoTracking()
@@ -120,6 +130,12 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
 
     public async Task<bool> CategoryNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default) =>
         await TournamentCategories.AnyAsync(c => c.TournamentId == tournamentId && c.Name == name, cancellationToken);
+
+    public async Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default) =>
+        await TournamentCategories
+            .AsNoTracking()
+            .Where(c => tournamentIds.Contains(c.TournamentId))
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TournamentCategories

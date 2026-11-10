@@ -5,13 +5,6 @@ import Link from "next/link"
 import { type ReactNode, useEffect, useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   type BracketStage,
@@ -26,11 +19,22 @@ import { usePublicBrackets, usePublicSchedule } from "../api"
 import { readFavoriteTeam, writeFavoriteTeam } from "../favorite-team"
 import { usePublicContext } from "../public-context"
 import {
-  ALL_MATCHES,
-  type MatchFilter,
-  MatchFilterPills,
-  matchesFilter,
-} from "./match-filter-pills"
+  applyMatchFilters,
+  hasMatchFilters,
+  type MatchFilters,
+  matchFilterOptions,
+  matchFiltersToSearch,
+  NO_MATCH_FILTERS,
+} from "../match-filters"
+import {
+  type ActiveFilter,
+  ActiveFilters,
+  ALL,
+  FilterGrid,
+  FilterOption,
+  FilterPanel,
+  FilterSelect,
+} from "./filter-bar"
 import { PublicMatchCard } from "./public-match-card"
 
 const isLive = (m: PublicMatch) => m.status === "Live" || m.status === "Paused"
@@ -59,96 +63,215 @@ function Grid({ matches }: { matches: PublicMatch[] }) {
   )
 }
 
-const ALL_TEAMS = "all"
-
 /**
- * Filtr "mecze mojej drużyny". Wybór z linku (?team=) ma pierwszeństwo przed zapamiętanym — i sam
- * staje się zapamiętanym, żeby przetrwał przejście do innej sekcji portalu.
+ * Filtry meczów. Drużyna z linku (?team=) ma pierwszeństwo przed zapamiętaną i sama staje się
+ * zapamiętaną, żeby przetrwała przejście do innej sekcji portalu. Reszta filtrów żyje w adresie.
  */
-function useTeamFilter(initialTeamId: string | undefined) {
+function useMatchFilters(initial: MatchFilters) {
   const { slug, teams } = usePublicContext()
-  const [teamId, setTeamId] = useState(() => initialTeamId ?? readFavoriteTeam(slug))
+  const [filters, setFilters] = useState<MatchFilters>(() => ({
+    ...initial,
+    teamId: initial.teamId ?? readFavoriteTeam(slug),
+  }))
   useEffect(() => {
-    if (initialTeamId) writeFavoriteTeam(slug, initialTeamId)
-  }, [slug, initialTeamId])
+    if (initial.teamId) writeFavoriteTeam(slug, initial.teamId)
+  }, [slug, initial.teamId])
 
   // Zapamiętana drużyna mogła zniknąć z turnieju (albo organizator ukrył drużyny).
-  const active = teamId && teams.some((t) => t.tournamentTeamId === teamId) ? teamId : null
+  const teamId =
+    filters.teamId && teams.some((t) => t.tournamentTeamId === filters.teamId)
+      ? filters.teamId
+      : null
+  const active = { ...filters, teamId }
 
-  function select(next: string | null) {
-    setTeamId(next)
-    writeFavoriteTeam(slug, next)
-    // Adres do udostępnienia ("mecze naszej drużyny") — bez przeładowania strony.
-    window.history.replaceState(
-      null,
-      "",
-      next ? `?team=${encodeURIComponent(next)}` : window.location.pathname,
-    )
+  function update(patch: Partial<MatchFilters>) {
+    const next = { ...active, ...patch }
+    if ("teamId" in patch) writeFavoriteTeam(slug, next.teamId)
+    setFilters(next)
+    // Adres do udostępnienia („mecze naszej drużyny na boisku 2”), bez przeładowania strony.
+    const search = matchFiltersToSearch(next)
+    window.history.replaceState(null, "", search ? `?${search}` : window.location.pathname)
   }
-  return { teamId: active, select }
+  return { filters: active, update }
 }
 
-function TeamSelect({
-  value,
-  onChange,
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+function MatchFilterBar({
+  filters,
+  update,
+  matches,
+  count,
 }: {
-  value: string | null
-  onChange: (teamId: string | null) => void
+  filters: MatchFilters
+  update: (patch: Partial<MatchFilters>) => void
+  matches: PublicMatch[]
+  count: number
 }) {
-  const { teams } = usePublicContext()
-  // Bez ShowTeams backend nie zdradza drużyn — nie ma czego filtrować.
-  if (teams.length === 0) return null
-  const sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name, "pl", { numeric: true }))
+  const { tournament, teams } = usePublicContext()
+  const options = matchFilterOptions(tournament, matches, filters.categoryId)
+  const sortedTeams = [...teams].sort((a, b) =>
+    a.name.localeCompare(b.name, "pl", { numeric: true }),
+  )
+  const value = (v: string | null) => v ?? ALL
+  const pick = (v: string) => (v === ALL ? null : v)
+
+  const selects = [
+    // Bez ShowTeams backend nie zdradza drużyn, więc nie ma czego filtrować.
+    sortedTeams.length > 0 && (
+      <FilterSelect
+        key="team"
+        label="Drużyna"
+        value={value(filters.teamId)}
+        onChange={(v) => update({ teamId: pick(v) })}
+        allLabel="Wszystkie drużyny"
+      >
+        {sortedTeams.map((t) => (
+          <FilterOption key={t.tournamentTeamId} value={t.tournamentTeamId}>
+            {t.name}
+          </FilterOption>
+        ))}
+      </FilterSelect>
+    ),
+    options.categories.length > 0 && (
+      <FilterSelect
+        key="category"
+        label="Kategoria"
+        value={value(filters.categoryId)}
+        onChange={(v) => {
+          const categoryId = pick(v)
+          const group = tournament.groups.find((g) => g.id === filters.groupId)
+          // Grupa z innej kategorii dałaby zawsze pustą listę.
+          const otherCategory = !!group && !!categoryId && group.categoryId !== categoryId
+          update(otherCategory ? { categoryId, groupId: null } : { categoryId })
+        }}
+        allLabel="Wszystkie"
+      >
+        {options.categories.map((c) => (
+          <FilterOption key={c.id} value={c.id}>
+            {c.name}
+          </FilterOption>
+        ))}
+      </FilterSelect>
+    ),
+    options.groups.length > 0 && (
+      <FilterSelect
+        key="group"
+        label="Grupa"
+        value={value(filters.groupId)}
+        onChange={(v) => update({ groupId: pick(v) })}
+        allLabel="Wszystkie"
+      >
+        {options.groups.map((g) => (
+          <FilterOption key={g.id} value={g.id}>
+            {g.label}
+          </FilterOption>
+        ))}
+      </FilterSelect>
+    ),
+    options.pitches.length > 0 && (
+      <FilterSelect
+        key="pitch"
+        label="Boisko"
+        value={value(filters.pitchId)}
+        onChange={(v) => update({ pitchId: pick(v) })}
+        allLabel="Wszystkie"
+      >
+        {options.pitches.map((p) => (
+          <FilterOption key={p.id} value={p.id}>
+            {p.name}
+          </FilterOption>
+        ))}
+      </FilterSelect>
+    ),
+    options.days.length > 0 && (
+      <FilterSelect
+        key="day"
+        label="Dzień"
+        value={value(filters.day)}
+        onChange={(v) => update({ day: pick(v) })}
+        allLabel="Wszystkie dni"
+      >
+        {options.days.map((d) => (
+          <FilterOption key={d} value={d}>
+            {capitalize(formatDayLong(d))}
+          </FilterOption>
+        ))}
+      </FilterSelect>
+    ),
+  ].filter(Boolean)
+  if (selects.length === 0) return null
+
+  const name = (list: { id: string; name: string }[], id: string | null) =>
+    list.find((x) => x.id === id)?.name ?? ""
+  const active: ActiveFilter[] = []
+  if (filters.teamId)
+    active.push({
+      key: "team",
+      label: sortedTeams.find((t) => t.tournamentTeamId === filters.teamId)?.name ?? "Drużyna",
+      clear: () => update({ teamId: null }),
+    })
+  if (filters.categoryId)
+    active.push({
+      key: "cat",
+      label: name(tournament.categories, filters.categoryId),
+      clear: () => update({ categoryId: null }),
+    })
+  if (filters.groupId)
+    active.push({
+      key: "group",
+      label: options.groups.find((g) => g.id === filters.groupId)?.label ?? "Grupa",
+      clear: () => update({ groupId: null }),
+    })
+  if (filters.pitchId)
+    active.push({
+      key: "pitch",
+      label: name(tournament.pitches, filters.pitchId),
+      clear: () => update({ pitchId: null }),
+    })
+  if (filters.day)
+    active.push({
+      key: "day",
+      label: capitalize(formatDayLong(filters.day)),
+      clear: () => update({ day: null }),
+    })
 
   return (
-    <Select
-      value={value ?? ALL_TEAMS}
-      onValueChange={(next) => onChange(next === ALL_TEAMS ? null : next)}
-    >
-      <SelectTrigger aria-label="Drużyna" className="w-full sm:w-72">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL_TEAMS}>Wszystkie drużyny</SelectItem>
-        {sorted.map((team) => (
-          <SelectItem key={team.tournamentTeamId} value={team.tournamentTeamId}>
-            {team.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="space-y-3">
+      <FilterPanel label="Filtry meczów">
+        <FilterGrid count={selects.length}>{selects}</FilterGrid>
+      </FilterPanel>
+      {active.length > 0 && (
+        <ActiveFilters
+          summary={`Znaleziono ${plural(count, ["mecz", "mecze", "meczów"])}`}
+          filters={active}
+          onClearAll={() => update(NO_MATCH_FILTERS)}
+        />
+      )}
+    </div>
   )
 }
 
-function useFilteredSchedule(initialTeamId: string | undefined) {
+function useFilteredSchedule(initialFilters: MatchFilters) {
   const { slug, tournament } = usePublicContext()
   // Bez terminarza kibic dalej widzi mecze na żywo (QA v3: PUB-003c) - backend zwraca wtedy tylko je.
   const schedule = usePublicSchedule(
     slug,
     tournament.settings.showSchedule || tournament.settings.showLiveMatches,
   )
-  const [filter, setFilter] = useState<MatchFilter>(ALL_MATCHES)
-  const team = useTeamFilter(initialTeamId)
-  const matches = (schedule.data ?? []).filter(
-    (m) =>
-      matchesFilter(m, filter) &&
-      (!team.teamId ||
-        m.homeTournamentTeamId === team.teamId ||
-        m.awayTournamentTeamId === team.teamId),
-  )
+  const { filters: active, update } = useMatchFilters(initialFilters)
+  const all = schedule.data ?? []
+  const matches = applyMatchFilters(all, active)
   const filters = (
-    <div className="space-y-3">
-      <TeamSelect value={team.teamId} onChange={team.select} />
-      <MatchFilterPills value={filter} onChange={setFilter} />
-    </div>
+    <MatchFilterBar filters={active} update={update} matches={all} count={matches.length} />
   )
-  return { schedule, matches, filters, filtered: !!team.teamId || filter.kind !== "all" }
+  return { schedule, matches, filters, filtered: hasMatchFilters(active) }
 }
 
 /** Strona główna portalu: teraz grane, najbliższe i ostatnie wyniki. */
-export function MatchesOverview({ initialTeamId }: { initialTeamId?: string }) {
+export function MatchesOverview({ initialFilters }: { initialFilters: MatchFilters }) {
   const { slug, tournament } = usePublicContext()
-  const { schedule, matches, filters, filtered } = useFilteredSchedule(initialTeamId)
+  const { schedule, matches, filters, filtered } = useFilteredSchedule(initialFilters)
 
   const { showSchedule, showLiveMatches } = tournament.settings
   const cancelledTournament = tournament.status === "Cancelled"
@@ -342,8 +465,8 @@ function StageSection({
 }
 
 /** Pełny terminarz: mecze grupowe po dniach, faza pucharowa po rundach (ćwierćfinały, półfinały…). */
-export function FullSchedule({ initialTeamId }: { initialTeamId?: string }) {
-  const { schedule, matches, filters, filtered } = useFilteredSchedule(initialTeamId)
+export function FullSchedule({ initialFilters }: { initialFilters: MatchFilters }) {
+  const { schedule, matches, filters, filtered } = useFilteredSchedule(initialFilters)
   const stages = useKnockoutStages()
   if (schedule.isPending) return <Skeleton className="h-64 w-full rounded-xl" />
 

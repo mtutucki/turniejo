@@ -83,6 +83,14 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .OrderBy(t => t.CreatedAt).ThenBy(t => t.Id)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, int>> CountAcceptedTeamsByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .AsNoTracking()
+            .Where(t => tournamentIds.Contains(t.TournamentId) && t.RegistrationStatus == RegistrationStatus.Accepted)
+            .GroupBy(t => t.TournamentId)
+            .Select(g => new { TournamentId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TournamentId, x => x.Count, cancellationToken);
+
     public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
         await TournamentTeams
             .AsNoTracking()

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 const LINKS = [
+  { href: "/t", label: "Turnieje publiczne" },
   { href: "/help", label: "Pomoc" },
   { href: "/changelog", label: "Co nowego" },
   { href: "/terms", label: "Regulamin" },

@@ -271,6 +271,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                             b1.Property<bool>("ShowBracket")
                                 .HasColumnType("boolean");
 
+                            b1.Property<bool>("ShowInDirectory")
+                                .HasColumnType("boolean");
+
                             b1.Property<bool>("ShowLiveMatches")
                                 .HasColumnType("boolean");
 

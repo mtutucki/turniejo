@@ -9,6 +9,15 @@ namespace Turniejo.Matches.Infrastructure;
 
 internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, IUserModule userModule) : IMatchModule
 {
+    public async Task<IReadOnlyDictionary<Guid, int>> CountLiveMatchesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentIds.Count == 0)
+            return new Dictionary<Guid, int>();
+
+        var counts = await dbContext.CountLiveMatchesByTournamentIdsAsync(tournamentIds, cancellationToken);
+        return tournamentIds.Distinct().ToDictionary(id => id, id => counts.GetValueOrDefault(id));
+    }
+
     public async Task<IReadOnlyList<PitchInfoDto>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
     {
         var pitches = await dbContext.GetPitchesByTournamentIdAsync(tournamentId, cancellationToken);

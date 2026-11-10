@@ -13,6 +13,7 @@ using Turniejo.Standings.Application.Standings.GetPublicStandings;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeamProfile;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeams;
 using Turniejo.Tournaments.Application.Tournaments.GetPublicTournamentPage;
+using Turniejo.Tournaments.Application.Tournaments.GetPublicTournaments;
 
 namespace Turniejo.Api.Controllers
 {
@@ -20,6 +21,13 @@ namespace Turniejo.Api.Controllers
     [ApiController]
     public sealed class PublicController(ISender sender) : ControllerBase
     {
+        [HttpGet("tournaments")]
+        public async Task<IActionResult> GetTournaments(CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPublicTournamentsQuery(), cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpGet("tournaments/{slug}")]
         public async Task<IActionResult> GetTournamentPage([FromRoute] string slug, CancellationToken cancellationToken)
         {

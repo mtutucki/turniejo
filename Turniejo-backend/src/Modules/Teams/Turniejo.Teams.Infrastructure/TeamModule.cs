@@ -41,6 +41,15 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         return ToDto(tournamentTeam);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, int>> CountAcceptedTeamsByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentIds.Count == 0)
+            return new Dictionary<Guid, int>();
+
+        var counts = await dbContext.CountAcceptedTeamsByTournamentIdsAsync(tournamentIds, cancellationToken);
+        return tournamentIds.Distinct().ToDictionary(id => id, id => counts.GetValueOrDefault(id));
+    }
+
     public async Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
     {
         var tournamentTeams = await dbContext.GetTournamentTeamsByTournamentIdAsync(tournamentId, cancellationToken);
