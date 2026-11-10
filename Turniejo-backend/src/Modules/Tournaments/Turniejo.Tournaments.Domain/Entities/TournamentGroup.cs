@@ -10,6 +10,8 @@ namespace Turniejo.Tournaments.Domain.Entities
         public Guid CategoryId { get; private set; }
         public string Name { get; private set; } = string.Empty;
         public int Order { get; private set; }
+        /// <summary>1 - grupa z przydzielonymi drużynami; 2 - grupa drugiej fazy, drużyny przychodzą z miejsc w tabelach fazy 1.</summary>
+        public int Stage { get; private set; } = 1;
         private readonly List<IDomainEvent> _domainEvents = [];
         public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
@@ -18,7 +20,7 @@ namespace Turniejo.Tournaments.Domain.Entities
         private TournamentGroup(Guid id) : base(id) { }
 
 
-        public static Result<TournamentGroup> Create(Guid id, Guid organizationId, Guid tournamentId, Guid createdByUserId, Guid categoryId, string name, int order)
+        public static Result<TournamentGroup> Create(Guid id, Guid organizationId, Guid tournamentId, Guid createdByUserId, Guid categoryId, string name, int order, int stage = 1)
         {
             if (id == Guid.Empty)
             {
@@ -50,12 +52,18 @@ namespace Turniejo.Tournaments.Domain.Entities
                 return Result.Failure<TournamentGroup>(Error.Validation("Name", "TournamentGroup name cannot be empty"));
             }
 
+            if (stage is not (1 or 2))
+            {
+                return Result.Failure<TournamentGroup>(Error.Validation("Stage", "TournamentGroup stage must be 1 or 2"));
+            }
+
             TournamentGroup group = new TournamentGroup(id)
             {
                 TournamentId = tournamentId,
                 CategoryId = categoryId,
                 Name = name,
-                Order = order
+                Order = order,
+                Stage = stage
             };
 
             group._domainEvents.Add(new TournamentGroupAdded(

@@ -1,4 +1,4 @@
-using Turniejo.SharedKernel.Contracts;
+﻿using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Teams.Application.Abstractions;
@@ -35,6 +35,10 @@ namespace Turniejo.Teams.Application.TournamentTeams.AssignTeamToGroup
 
                 if (group.CategoryId != tournamentTeam.CategoryId)
                     return Result.Failure<AssignTeamToGroupResponse>(Error.Validation("GroupId", "Group does not belong to the team's category"));
+
+                // Do grupy drugiej fazy drużyny trafiają same, z miejsc w tabelach fazy 1.
+                if (group.Stage == 2)
+                    return Result.Failure<AssignTeamToGroupResponse>(Error.Validation("GroupId", "Teams reach second-stage groups from the first-stage tables"));
             }
 
             var assignResult = tournamentTeam.AssignToGroup(request.GroupId);

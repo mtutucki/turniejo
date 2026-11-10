@@ -230,6 +230,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TournamentId")
                         .HasColumnType("uuid");
 

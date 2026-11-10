@@ -44,7 +44,7 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
     {
         var groups = await dbContext.GetTournamentGroupsByTournamentIdAsync(tournamentId, cancellationToken);
 
-        return groups.Select(g => new TournamentGroupDto(g.Id, g.TournamentId, g.CategoryId, g.Name)).ToList();
+        return groups.Select(g => new TournamentGroupDto(g.Id, g.TournamentId, g.CategoryId, g.Name, g.Stage)).ToList();
     }
 
     public async Task<TournamentGroupDto?> GetTournamentGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
@@ -53,7 +53,7 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         if (group is null)
             return null;
 
-        return new TournamentGroupDto(group.Id, group.TournamentId, group.CategoryId, group.Name);
+        return new TournamentGroupDto(group.Id, group.TournamentId, group.CategoryId, group.Name, group.Stage);
     }
 
     public async Task<TournamentSettingsSummaryDto?> GetTournamentSettingsAsync(Guid tournamentId, CancellationToken cancellationToken = default)

@@ -5,6 +5,7 @@ using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Domain.Entities;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup
 {
@@ -23,11 +24,14 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup
             if (tournamentCategory.TournamentId != request.TournamentId)
                 return Result.Failure<AddTournamentGroupResponse>(Error.Validation("TournamentId", "TournamentId does not match the tournament assigned to this category."));
 
+            if (request.Stage == 2 && tournament.Format != TournamentFormat.TwoGroupStages)
+                return Result.Failure<AddTournamentGroupResponse>(Error.Validation("Stage", "Second-stage groups need the two group stages format"));
+
             if (await tournamentsDbContext.GroupNameExistsAsync(tournamentCategory.Id, request.Name, cancellationToken))
                 return Result.Failure<AddTournamentGroupResponse>(Error.Validation("Name", "Name already exists"));
 
             var result = TournamentGroup.Create(
-                Guid.NewGuid(), tournament.OrganizationId, tournament.Id, currentUserContext.UserId, tournamentCategory.Id, request.Name, request.Order);
+                Guid.NewGuid(), tournament.OrganizationId, tournament.Id, currentUserContext.UserId, tournamentCategory.Id, request.Name, request.Order, request.Stage);
 
             if (result.IsFailure)
                 return Result.Failure<AddTournamentGroupResponse>(result.Error);

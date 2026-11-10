@@ -1,9 +1,10 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Services;
+using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat
 {
@@ -17,6 +18,11 @@ namespace Turniejo.Tournaments.Application.Tournaments.SetTournamentFormat
 
             if (result == null)
                 return Result.Failure<SetTournamentFormatResponse>(Error.NotFound("Tournament", request.TournamentId));
+
+            // Grupy drugiej fazy mają sens tylko w formacie dwóch faz; w innym zostałyby puste i bez meczów.
+            if (result.Format == TournamentFormat.TwoGroupStages && request.TournamentFormat != TournamentFormat.TwoGroupStages &&
+                (await tournamentsDbContext.GetTournamentGroupsByTournamentIdAsync(result.Id, cancellationToken)).Any(g => g.Stage == 2))
+                return Result.Failure<SetTournamentFormatResponse>(Error.Validation("Format", "Remove the second-stage groups before changing the format"));
 
             var setFormatResult = result.SetFormat(request.TournamentFormat);
 
