@@ -1,4 +1,4 @@
-using Turniejo.SharedKernel.Contracts;
+﻿using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Results;
 using Turniejo.Standings.Application.DTOs;
 using Turniejo.Standings.Application.Standings.RecalculateStandings;
@@ -16,7 +16,7 @@ namespace Turniejo.Standings.Application.Standings
 
         public static async Task<Result<GroupTable>> ComputeAsync(
             Guid groupId, ITournamentModule tournamentModule, ITeamModule teamModule, IMatchModule matchModule,
-            CancellationToken cancellationToken)
+            IBracketModule bracketModule, CancellationToken cancellationToken)
         {
             var group = await tournamentModule.GetTournamentGroupAsync(groupId, cancellationToken);
             if (group == null)
@@ -27,7 +27,7 @@ namespace Turniejo.Standings.Application.Standings
                 return Result.Failure<GroupTable>(Error.NotFound("TournamentSettings", group.TournamentId));
 
             var tieBreakerRules = await tournamentModule.GetTieBreakerRulesAsync(group.TournamentId, cancellationToken);
-            var groupTeamIds = await AcceptedTeamIdsAsync(teamModule, group.TournamentId, groupId, cancellationToken);
+            var groupTeamIds = await AcceptedTeamIdsAsync(teamModule, bracketModule, group, cancellationToken);
             var matches = await matchModule.GetFinishedMatchesByGroupIdAsync(groupId, cancellationToken);
 
             var stats = groupTeamIds
@@ -43,12 +43,26 @@ namespace Turniejo.Standings.Application.Standings
             return Result.Success(new GroupTable(group, rows));
         }
 
+        /// <summary>
+        /// Zaakceptowane drużyny grupy. W grupie drugiej fazy (format „Dwie fazy grupowe”) to drużyny
+        /// z obsadzonych miejsc - przypisanie do grupy (GroupId) wskazuje zawsze grupę fazy 1.
+        /// </summary>
         public static async Task<IReadOnlyList<Guid>> AcceptedTeamIdsAsync(
-            ITeamModule teamModule, Guid tournamentId, Guid groupId, CancellationToken cancellationToken) =>
-            (await teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, cancellationToken))
-                .Where(t => t.GroupId == groupId && t.RegistrationStatus == "Accepted")
-                .Select(t => t.Id)
+            ITeamModule teamModule, IBracketModule bracketModule, TournamentGroupDto group, CancellationToken cancellationToken)
+        {
+            var accepted = (await teamModule.GetTournamentTeamsByTournamentIdAsync(group.TournamentId, cancellationToken))
+                .Where(t => t.RegistrationStatus == "Accepted")
                 .ToList();
+            if (group.Stage != 2)
+                return accepted.Where(t => t.GroupId == group.Id).Select(t => t.Id).ToList();
+
+            var acceptedIds = accepted.Select(t => t.Id).ToHashSet();
+            return (await bracketModule.GetSecondStageSeatsAsync(group.TournamentId, cancellationToken))
+                .Where(s => s.GroupId == group.Id && s.TournamentTeamId is { } id && acceptedIds.Contains(id))
+                .OrderBy(s => s.Order)
+                .Select(s => s.TournamentTeamId!.Value)
+                .ToList();
+        }
 
         /// <summary>
         /// Tabela do pokazania: zapisane wiersze, a gdy którejś drużynie grupy wiersza brakuje (żaden mecz grupy
@@ -56,15 +70,19 @@ namespace Turniejo.Standings.Application.Standings
         /// </summary>
         public static async Task<IReadOnlyList<StandingDto>> ReadAsync(
             Guid tournamentId, Guid groupId, IReadOnlyList<Standing> saved,
-            ITournamentModule tournamentModule, ITeamModule teamModule, IMatchModule matchModule,
+            ITournamentModule tournamentModule, ITeamModule teamModule, IMatchModule matchModule, IBracketModule bracketModule,
             CancellationToken cancellationToken)
         {
             var rows = saved.Where(s => s.TournamentId == tournamentId).ToList();
-            var groupTeamIds = await AcceptedTeamIdsAsync(teamModule, tournamentId, groupId, cancellationToken);
+            var groupInfo = await tournamentModule.GetTournamentGroupAsync(groupId, cancellationToken);
+            if (groupInfo == null || groupInfo.TournamentId != tournamentId)
+                return rows.OrderBy(s => s.Position).Select(ToDto).ToList();
+
+            var groupTeamIds = await AcceptedTeamIdsAsync(teamModule, bracketModule, groupInfo, cancellationToken);
             if (groupTeamIds.All(id => rows.Any(r => r.TournamentTeamId == id)))
                 return rows.OrderBy(s => s.Position).Select(ToDto).ToList();
 
-            var table = await ComputeAsync(groupId, tournamentModule, teamModule, matchModule, cancellationToken);
+            var table = await ComputeAsync(groupId, tournamentModule, teamModule, matchModule, bracketModule, cancellationToken);
             // Grupa z innego turnieju niż ten z autoryzacji: nic nie zdradzamy.
             if (table.IsFailure || table.Value.Group.TournamentId != tournamentId)
                 return rows.OrderBy(s => s.Position).Select(ToDto).ToList();

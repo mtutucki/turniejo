@@ -39,6 +39,7 @@ namespace Turniejo.Brackets.Application.Abstractions
         // SecondStageFixture
         Task<IReadOnlyList<SecondStageFixture>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesByGroupIdsAsync(IReadOnlyCollection<Guid> groupIds, CancellationToken cancellationToken = default);
         Task<SecondStageFixture?> GetSecondStageFixtureByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default);
         Task AddSecondStageFixturesAsync(IEnumerable<SecondStageFixture> fixtures, CancellationToken cancellationToken = default);
         void RemoveSecondStageFixtures(IEnumerable<SecondStageFixture> fixtures);

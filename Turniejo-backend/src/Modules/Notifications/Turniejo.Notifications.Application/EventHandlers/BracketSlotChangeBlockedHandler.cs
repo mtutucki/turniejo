@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Turniejo.Brackets.Domain.Events;
 using Turniejo.Notifications.Application.Abstractions;
 using Turniejo.Notifications.Application.Services;
@@ -30,10 +30,15 @@ namespace Turniejo.Notifications.Application.EventHandlers
             if (organizers.Count == 0)
                 return;
 
+            var (title, body) = notification.SecondStage
+                ? ("Druga faza różni się od tabeli",
+                   "Po poprawce wyniku w grupie zmieniła się kolejność, ale mecz drugiej fazy już się zaczął, więc gra w nim " +
+                   "dotychczasowa drużyna. Sprawdź grupy drugiej fazy i zdecyduj, co dalej.")
+                : ("Drabinka różni się od tabeli",
+                   "Po poprawce wyniku w grupie zmieniła się kolejność, ale mecz pucharowy już się zaczął, więc gra w nim " +
+                   "dotychczasowa drużyna. Sprawdź drabinkę i zdecyduj, co dalej.");
             var publishResult = await publisher.PublishAsync(
-                notification.TournamentId, NotificationType.BracketChangeBlocked, "Drabinka różni się od tabeli",
-                "Po poprawce wyniku w grupie zmieniła się kolejność, ale mecz pucharowy już się zaczął, więc gra w nim " +
-                "dotychczasowa drużyna. Sprawdź drabinkę i zdecyduj, co dalej.",
+                notification.TournamentId, NotificationType.BracketChangeBlocked, title, body,
                 createdByUserId: null, organizers, matchId: notification.MatchIds.FirstOrDefault(), cancellationToken);
 
             if (publishResult.IsFailure)

@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Application.Matches.CreateBracketMatch;
 using Turniejo.Matches.Domain.Enums;
@@ -31,6 +31,19 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, I
         return matches
             .Select(m => new GroupMatchDto(m.Id, groupId, m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.HomeScore, m.AwayScore))
             .ToList();
+    }
+
+    public async Task<Guid> CreateSecondStageMatchAsync(
+        Guid tournamentId, Guid categoryId, Guid groupId, Guid homeTournamentTeamId, Guid awayTournamentTeamId,
+        Guid? plannedPitchId, DateTimeOffset? plannedAt, Guid? plannedRefereeId, CancellationToken cancellationToken = default)
+    {
+        var command = new CreateBracketMatchCommand(
+            tournamentId, categoryId, homeTournamentTeamId, awayTournamentTeamId, StageType.Group,
+            plannedPitchId, plannedAt, plannedRefereeId, groupId);
+
+        var result = await sender.Send(command, cancellationToken);
+
+        return result.Value.MatchId;
     }
 
     public async Task<Guid> CreateBracketMatchAsync(

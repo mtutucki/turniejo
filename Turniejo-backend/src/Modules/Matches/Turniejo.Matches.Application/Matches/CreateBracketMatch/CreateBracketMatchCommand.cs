@@ -1,4 +1,4 @@
-using Turniejo.Matches.Domain.Enums;
+﻿using Turniejo.Matches.Domain.Enums;
 using Turniejo.SharedKernel.CQRS;
 
 namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
@@ -13,5 +13,7 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
         Guid? PlannedPitchId = null,
         DateTimeOffset? PlannedAt = null,
         // Sędzia wskazany przez organizatora na węźle drabinki, zanim mecz powstał.
-        Guid? PlannedRefereeId = null) : ICommand<CreateBracketMatchResponse>, IPublicRequest;
+        Guid? PlannedRefereeId = null,
+        // Mecz grupy drugiej fazy (format „Dwie fazy grupowe”) - liczy się do tabeli tej grupy.
+        Guid? GroupId = null) : ICommand<CreateBracketMatchResponse>, IPublicRequest;
 }

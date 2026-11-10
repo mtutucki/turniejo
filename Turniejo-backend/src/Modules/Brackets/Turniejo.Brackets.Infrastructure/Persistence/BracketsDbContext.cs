@@ -109,6 +109,11 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
             .Where(f => f.TournamentId == tournamentId)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesByGroupIdsAsync(IReadOnlyCollection<Guid> groupIds, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures
+            .Where(f => groupIds.Contains(f.GroupId))
+            .ToListAsync(cancellationToken);
+
     public async Task<SecondStageFixture?> GetSecondStageFixtureByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
         await SecondStageFixtures.FirstOrDefaultAsync(f => f.MatchId == matchId, cancellationToken);
 

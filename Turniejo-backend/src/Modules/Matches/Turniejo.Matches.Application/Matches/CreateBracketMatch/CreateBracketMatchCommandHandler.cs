@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
@@ -28,7 +28,7 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
             var (pitchId, scheduledAt) = await ProposeSlotAsync(request, cancellationToken);
 
             var result = Match.Create(
-                Guid.NewGuid(), request.TournamentId, request.CategoryId, null,
+                Guid.NewGuid(), request.TournamentId, request.CategoryId, request.GroupId,
                 request.HomeTournamentTeamId, request.AwayTournamentTeamId, pitchId,
                 scheduledAt, request.StageType);
             if (result.IsFailure)
