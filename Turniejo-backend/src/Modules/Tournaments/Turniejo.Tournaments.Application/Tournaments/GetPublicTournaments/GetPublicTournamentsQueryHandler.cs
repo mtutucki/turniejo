@@ -15,7 +15,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetPublicTournaments
     {
         public async Task<Result<IReadOnlyList<PublicTournamentListItemDto>>> Handle(GetPublicTournamentsQuery request, CancellationToken cancellationToken)
         {
-            // Szkice i odwołane nie trafiają na listę, nawet z włączonym portalem (decyzja 2026-11-10).
+            // Szkice, odwołane i ukryte przez organizatora nie trafiają na listę, nawet z włączonym portalem.
             var tournaments = await dbContext.GetListedPublicTournamentsAsync(cancellationToken);
             if (tournaments.Count == 0)
                 return Result.Success<IReadOnlyList<PublicTournamentListItemDto>>([]);

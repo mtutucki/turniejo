@@ -150,5 +150,5 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         tournament.PublicSettings.ShowPlayers, tournament.PublicSettings.ShowSchedule,
         tournament.PublicSettings.ShowStandings, tournament.PublicSettings.ShowBracket,
         tournament.PublicSettings.ShowLiveMatches, tournament.PublicSettings.ShowStats,
-        tournament.PublicSettings.AbbreviatePlayerNames);
+        tournament.PublicSettings.AbbreviatePlayerNames, tournament.PublicSettings.ShowInDirectory);
 }

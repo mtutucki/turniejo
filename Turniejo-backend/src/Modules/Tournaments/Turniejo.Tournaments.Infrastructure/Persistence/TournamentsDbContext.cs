@@ -98,6 +98,7 @@ public sealed class TournamentsDbContext(DbContextOptions<TournamentsDbContext> 
         await Tournaments
             .AsNoTracking()
             .Where(t => t.PublicSettings.IsPublic
+                && t.PublicSettings.ShowInDirectory
                 && t.Status != TournamentStatus.Draft
                 && t.Status != TournamentStatus.Cancelled)
             .ToListAsync(cancellationToken);

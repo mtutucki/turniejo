@@ -1165,7 +1165,13 @@ const api = [
   http.get("*/public/tournaments", () =>
     HttpResponse.json(
       db.tournaments
-        .filter((t) => t.isPublic && t.status !== "Draft" && t.status !== "Cancelled")
+        .filter(
+          (t) =>
+            t.isPublic &&
+            configOf(t.id).publicSettings.showInDirectory !== false &&
+            t.status !== "Draft" &&
+            t.status !== "Cancelled",
+        )
         .map((t) => ({
           name: t.name,
           slug: t.slug,
@@ -1422,6 +1428,7 @@ function configOf(tournamentId: string): Config {
       showLiveMatches: true,
       showStats: true,
       abbreviatePlayerNames: true,
+      showInDirectory: true,
     },
     categories: seeded
       ? [{ id: IDS.category, tournamentId, name: "U12", minBirthDate: null, maxBirthDate: null, order: 1 }]

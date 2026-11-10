@@ -17,6 +17,8 @@ export type PublicSettings = PublicVisibility & {
   isPublic: boolean
   /** RODO: portal pokazuje "Jan K." zamiast pełnego nazwiska (domyślnie włączone). */
   abbreviatePlayerNames: boolean
+  /** Turniej widać na liście turniejów publicznych; wyłączony: portal tylko przez link. */
+  showInDirectory: boolean
 }
 
 /** PublicTournamentPageDto */

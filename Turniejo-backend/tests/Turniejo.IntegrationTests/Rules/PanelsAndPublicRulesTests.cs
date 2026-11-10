@@ -13,9 +13,9 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
 
     private static string T(TournamentScenario s) => $"/api/tournaments/{s.TournamentId}";
 
-    private static Task<HttpResponseMessage> PublishAsync(TournamentScenario s, bool isPublic, bool showPlayers = true, bool abbreviatePlayerNames = true) =>
+    private static Task<HttpResponseMessage> PublishAsync(TournamentScenario s, bool isPublic, bool showPlayers = true, bool abbreviatePlayerNames = true, bool showInDirectory = true) =>
         s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
-            new { isPublic, showTeams = true, showPlayers, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true, abbreviatePlayerNames });
+            new { isPublic, showTeams = true, showPlayers, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true, abbreviatePlayerNames, showInDirectory });
 
     private static async Task GoalAsync(TournamentScenario s, Guid match, string team, Guid player, int type = Goal) =>
         (await s.Organizer.PostAsJsonAsync($"{T(s)}/matches/{match}/goals",
@@ -160,6 +160,21 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
         item.GetInt("teamCount").Should().Be(2);
         item.GetInt("liveMatchCount").Should().Be(1);
         slugs.Should().NotContain([await SlugAsync(hidden), await SlugAsync(cancelled), await SlugAsync(draft)]);
+    }
+
+    [Fact]
+    public async Task PUB_023_TournamentHiddenFromTheList_StillHasItsPortal()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        (await PublishAsync(s, true, showInDirectory: false)).IsSuccessStatusCode.Should().BeTrue();
+        var slug = (await s.TournamentAsync()).GetString("slug");
+        var anonymous = CreateClient();
+
+        var list = (await (await anonymous.GetAsync("/public/tournaments")).ReadJsonAsync()).EnumerateArray();
+        list.Select(t => t.GetString("slug")).Should().NotContain(slug);
+        (await anonymous.GetAsync($"/public/tournaments/{slug}")).IsSuccessStatusCode.Should().BeTrue();
+        (await (await s.Organizer.GetAsync($"{T(s)}/public-settings")).ReadJsonAsync())
+            .GetProperty("showInDirectory").GetBoolean().Should().BeFalse();
     }
 
     [Fact]
