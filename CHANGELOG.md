@@ -15,6 +15,9 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Mecze w portalu kibica filtrujesz jednym paskiem: drużyna, kategoria, grupa, boisko i dzień. Widać, ile meczów pasuje, a filtry da się usunąć jednym kliknięciem i przesłać linkiem.
 - Terminarz w panelu da się przefiltrować po drużynie. Drużyna grająca w kilku kategoriach jest na liście raz i pokazuje mecze ze wszystkich. Grupy o tej samej nazwie mają przy sobie kategorię (np. „U10 · Grupa B”), a pod filtrami widać, ile meczów pasuje i które filtry są włączone.
 - Podtytuł strony głównej nie sugeruje już, że bez logowania można coś więcej niż oglądać wyniki.
+- Grupy w karcie kategorii są czytelną listą z liczbą drużyn i przyciskami edycji i usuwania przy każdej grupie.
+- Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
+- Turniej ma od razu domyślną kolejność reguł przy równej liczbie punktów (mecze bezpośrednie, bilans, gole, zwycięstwa). Organizator może ją zmienić.
 
 ### Nowe
 
@@ -32,12 +35,6 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Przy zmianie terminu meczu kolejne mecze na tym samym boisku przesuwają się o tyle samo (opcja domyślnie zaznaczona), więc opóźnienie nie wymaga poprawiania każdego meczu osobno. Jeśli przez to drużyna albo sędzia nie zdążyłby na mecz na innym boisku, aplikacja pyta, czy przesunąć też tamte mecze.
 - Strona główna pokazuje turnieje publiczne: trwające (z liczbą meczów na żywo), nadchodzące i zakończone. Można szukać po nazwie i filtrować po statusie, terminie, organizatorze i kategorii, a link z filtrami da się komuś wysłać. Z portalu turnieju wrócisz do listy jednym kliknięciem.
 - W ustawieniach portalu przełącznik „Pokazuj na liście turniejów” ukrywa turniej ze strony głównej, a portal dalej działa przez link.
-
-### Zmienione
-
-- Grupy w karcie kategorii są czytelną listą z liczbą drużyn i przyciskami edycji i usuwania przy każdej grupie.
-- Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
-- Turniej ma od razu domyślną kolejność reguł przy równej liczbie punktów (mecze bezpośrednie, bilans, gole, zwycięstwa). Organizator może ją zmienić.
 
 ### Poprawione
 
