@@ -1,4 +1,4 @@
-import { expect, login, loginAs, test } from "./fixtures"
+import { expect, login, loginAs, PUBLIC_SLUG, test } from "./fixtures"
 
 test.describe("Wygaśnięcie sesji", () => {
   test("[KON-006 MNZ-025] po wygaśnięciu sesji wraca do logowania raz, bez pętli przeładowań", async ({ page }) => {
@@ -24,6 +24,18 @@ test.describe("Wygaśnięcie sesji", () => {
     expect(url.match(/callbackUrl/g)?.length ?? 0).toBeLessThanOrEqual(1)
     expect(url).not.toMatch(/callbackUrl=[^&]*\/login/)
     await expect(page.getByRole("button", { name: "Zaloguj się" })).toBeVisible()
+  })
+
+  test("wygaśnięcie sesji w portalu kibica zostawia kibica w portalu, już wylogowanego", async ({ page }) => {
+    test.setTimeout(90_000)
+    await loginAs(page, "wygasa@e2e.pl")
+    await page.goto(`/t/${PUBLIC_SLUG}`)
+    await expect(page.getByRole("link", { name: "Mój panel" })).toBeVisible()
+
+    // Sesja wygasa (token żyje 35 s): portal jest publiczny, więc zostajemy na nim.
+    await expect(page.getByRole("link", { name: "Zaloguj się" })).toBeVisible({ timeout: 45_000 })
+    await page.waitForTimeout(3_000)
+    await expect(page).toHaveURL(new RegExp(`/t/${PUBLIC_SLUG}$`))
   })
 })
 
