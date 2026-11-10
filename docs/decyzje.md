@@ -63,7 +63,7 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 - Cofnięcie pierwszej z dwóch żółtych cofa też automatyczną czerwoną (MNZ-015).
 - W pucharze korekta nie może zostawić remisu bez karnych, także przy cofaniu goli (PUC-049).
 - Organizator zmienia wynik bez limitu czasu do zakończenia turnieju; potem blokada (PUC-076).
-- Drużyny nie można wycofać w trakcie jej meczu (PUC-054). Wycofanie z grupy: rozegrane wyniki zostają, nierozegrane mecze odwołane (GRP-020).
+- Drużyny nie można wycofać w trakcie jej meczu (PUC-054). Wycofanie z grupy: rozegrane wyniki zostają, nierozegrane mecze odwołane (GRP-020). Gdy terminarz istnieje, „Wycofaj” najpierw pyta i mówi o odwołanych meczach (w trwającym pucharze o walkowerze dla rywala); bez terminarza wycofuje od razu (DRU-056, 2026-11-10).
 - Karne w meczu grupowym nie zmieniają tabeli, są tylko informacją (GRP-026).
 - Mecz, którego nikt nie zakończył, kończy się sam z bieżącym wynikiem, gdy od startu minęło 3× czasu meczu i od 4 h nikt nic przy nim nie zrobił (gol, kartka, pauza, wznowienie, zmiana wyniku), więc dogrywka, karne i długa przerwa nie przeszkadzają (2026-11-10; wcześniej tego dnia: 3× czas meczu od startu, min. 2 h). Remis w pucharze system raz wstrzymuje i powiadamia organizatorów, bo bez karnych nie ma zwycięzcy; po tym mecz należy do organizatora i system go już nie rusza (MNZ-040…042, 2026-11-10).
 - Usunięcie grupy blokują tylko oczekujące i przyjęte drużyny oraz mecze grupy (także odwołane). Wycofane i odrzucone zgłoszenia tracą wtedy grupę (GRP-004, 2026-11-10).

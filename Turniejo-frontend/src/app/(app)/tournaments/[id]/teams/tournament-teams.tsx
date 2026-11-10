@@ -40,6 +40,13 @@ export function TournamentTeamsView() {
   const status = tournament.data?.status
   const scheduleLocked =
     status === "ScheduleGenerated" || status === "InProgress" || status === "Finished"
+  // Wycofanie przy gotowym terminarzu odwołuje mecze drużyny (w trwającym pucharze: walkower dla
+  // rywala, inaczej drabinka by stanęła), więc organizator potwierdza je z tą informacją.
+  const withdrawWarning = !scheduleLocked
+    ? undefined
+    : status === "InProgress" && tournament.data?.format !== "Group"
+      ? "Jej nierozegrane mecze zostaną odwołane, a w pucharze rywal dostanie walkower."
+      : "Jej nierozegrane mecze zostaną odwołane."
   // W kolejności kategorii, tak jak na liście: akceptacja przy małym limicie bierze te z góry.
   const pendingTeams = (categories.data ?? []).flatMap((category) =>
     (active ?? []).filter(
@@ -187,6 +194,7 @@ export function TournamentTeamsView() {
                   canManage={isOrganizer}
                   limitReached={limitReached}
                   scheduleLocked={scheduleLocked}
+                  withdrawWarning={withdrawWarning}
                 />
               </CardContent>
             </Card>
@@ -208,6 +216,7 @@ function CategoryTeamList({
   canManage,
   limitReached,
   scheduleLocked,
+  withdrawWarning,
 }: {
   tournamentId: string
   teams: TournamentTeam[]
@@ -215,6 +224,7 @@ function CategoryTeamList({
   canManage: boolean
   limitReached: boolean
   scheduleLocked: boolean
+  withdrawWarning?: string
 }) {
   const sections = groupSections(teams, groups)
   const row = (team: TournamentTeam) => (
@@ -226,6 +236,7 @@ function CategoryTeamList({
       canManage={canManage}
       limitReached={limitReached}
       scheduleLocked={scheduleLocked}
+      withdrawWarning={withdrawWarning}
       inGroupSection={!!sections}
     />
   )

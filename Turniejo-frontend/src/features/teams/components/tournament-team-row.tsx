@@ -4,6 +4,17 @@ import { ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -50,6 +61,8 @@ type TournamentTeamRowProps = {
   inGroupSection?: boolean
   /** Terminarz już jest: mecze powstały z tych grup, backend odrzuci zmianę grupy i akceptację. */
   scheduleLocked?: boolean
+  /** Terminarz już jest: wycofanie odwoła mecze drużyny, więc „Wycofaj” najpierw pyta z tym tekstem. */
+  withdrawWarning?: string
 }
 
 export function TournamentTeamRow({
@@ -60,6 +73,7 @@ export function TournamentTeamRow({
   limitReached = false,
   inGroupSection = false,
   scheduleLocked = false,
+  withdrawWarning,
 }: TournamentTeamRowProps) {
   const changeStatus = useChangeRegistrationStatus(tournamentId)
   const changePayment = useChangePaymentStatus(tournamentId)
@@ -149,6 +163,32 @@ export function TournamentTeamRow({
           </Select>
           {transitions.map((status) => {
             const blocked = status === "Accepted" && (limitReached || scheduleLocked)
+            if (status === "Withdrawn" && withdrawWarning)
+              return (
+                <AlertDialog key={status}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant={TRANSITION_ACTIONS[status].variant}
+                      disabled={changeStatus.isPending}
+                    >
+                      {TRANSITION_ACTIONS[status].label}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Wycofać drużynę {team.teamName}?</AlertDialogTitle>
+                      <AlertDialogDescription>{withdrawWarning}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                      <AlertDialogAction variant="destructive" onClick={() => setStatus(status)}>
+                        Wycofaj
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )
             return (
               <Button
                 key={status}
