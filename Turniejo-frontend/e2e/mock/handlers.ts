@@ -1870,6 +1870,13 @@ const squad = [
       if (!organizerOf(user, params.tid)) return problem(403, "Forbidden")
       const body = (await request.json()) as { registrationStatus: number }
       const status = ["", "Pending", "Accepted", "Rejected", "Withdrawn"][body.registrationStatus]
+      // Jak backend (ScheduleLock): po wygenerowaniu terminarza nowa drużyna nie miałaby meczów.
+      const tournamentStatus = findTournament(params.tid)?.status
+      if (
+        status === "Accepted" &&
+        ["ScheduleGenerated", "InProgress", "Finished"].includes(tournamentStatus ?? "")
+      )
+        return problem(409, "Clear the schedule before changing teams or groups")
       db.teamChanges[params.ttid] = { ...db.teamChanges[params.ttid], registrationStatus: status }
       return new HttpResponse(null, { status: 204 })
     }),

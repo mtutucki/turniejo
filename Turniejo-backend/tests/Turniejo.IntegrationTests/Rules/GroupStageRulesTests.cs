@@ -457,4 +457,43 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
         table.First().GetGuid("tournamentTeamId").Should().Be(s.Team("T1"));
         table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3, 4);
     }
+
+    // Mecze grupowe powstają z podziału na grupy w chwili generowania. Zmiana grupy albo nowa drużyna
+    // po generowaniu rozjeżdżała mecze z grupami (mecze "Grupy A" z drużyną z Grupy B, błędne tabele).
+    [Fact]
+    public async Task GRP_030_TeamCannotChangeGroup_OnceScheduleIsGenerated()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, start: false);
+
+        var response = await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{s.Team("T1")}/group",
+            new Turniejo.Api.Controllers.TournamentsController.AssignTeamToGroupRequest(s.Group("B")));
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Clear the schedule");
+        var teams = (await (await s.Organizer.GetAsync($"{T(s)}/teams")).ReadJsonAsync()).EnumerateArray();
+        teams.Single(t => t.GetGuid("id") == s.Team("T1")).GetGuid("groupId").Should().Be(s.Group("A"));
+    }
+
+    [Fact]
+    public async Task GRP_031_NewTeamCannotBeAccepted_OnceScheduleIsGenerated()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, start: false);
+        var teamId = await TournamentFlow.CreateTeamAsync(s.Organizer, s.OrganizationId, "Spóźnieni");
+        var tt = await TournamentFlow.AddTeamToTournamentAsync(s.Organizer, s.TournamentId, teamId, s.CategoryId);
+
+        var response = await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{tt}/registration-status",
+            new { registrationStatus = 2 });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Clear the schedule");
+    }
+
+    [Fact]
+    public async Task GRP_032_GroupsCanChangeAgain_AfterClearingTheSchedule()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, start: false);
+        (await s.Organizer.DeleteAsync($"{T(s)}/schedule")).IsSuccessStatusCode.Should().BeTrue();
+
+        await TournamentFlow.AssignTeamToGroupAsync(s.Organizer, s.TournamentId, s.Team("T1"), s.Group("B"));
+    }
 }

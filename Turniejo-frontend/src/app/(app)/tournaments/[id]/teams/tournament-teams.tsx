@@ -32,6 +32,10 @@ export function TournamentTeamsView() {
   // Backend liczy limit po zaakceptowanych: przy komplecie odrzuca akceptację i nowe zgłoszenia.
   const freeSlots = Math.max(teamLimit - accepted, 0)
   const limitReached = !!tournament.data && freeSlots === 0
+  // Mecze powstały z tej listy i grup: backend nie pozwoli zmienić grupy ani przyjąć drużyny.
+  const status = tournament.data?.status
+  const scheduleLocked =
+    status === "ScheduleGenerated" || status === "InProgress" || status === "Finished"
   // W kolejności kategorii, tak jak na liście: akceptacja przy małym limicie bierze te z góry.
   const pendingTeams = (categories.data ?? []).flatMap((category) =>
     (active ?? []).filter(
@@ -129,8 +133,21 @@ export function TournamentTeamsView() {
         </div>
       )}
 
+      {/* Przed startem terminarz da się jeszcze wyczyścić, potem zmiany drużyn i grup są zamknięte. */}
+      {isOrganizer && status === "ScheduleGenerated" && (
+        <div className="bg-muted/50 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
+          <p>
+            Terminarz jest gotowy, więc grup i listy drużyn nie zmienisz. Żeby to zrobić, wyczyść
+            terminarz.
+          </p>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/tournaments/${id}/schedule`}>Terminarz</Link>
+          </Button>
+        </div>
+      )}
+
       {/* Przy wyczerpanym limicie zostaje sam baner o limicie powyżej. */}
-      {isOrganizer && pendingTeams.length > 0 && freeSlots > 0 && (
+      {isOrganizer && !scheduleLocked && pendingTeams.length > 0 && freeSlots > 0 && (
         <AcceptPendingTeams tournamentId={id} teams={pendingTeams} freeSlots={freeSlots} />
       )}
 
@@ -168,6 +185,7 @@ export function TournamentTeamsView() {
                       }
                       canManage={isOrganizer}
                       limitReached={limitReached}
+                      scheduleLocked={scheduleLocked}
                     />
                   ))}
                 </ul>

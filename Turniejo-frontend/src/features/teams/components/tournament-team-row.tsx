@@ -46,6 +46,8 @@ type TournamentTeamRowProps = {
   canManage: boolean
   /** Komplet zaakceptowanych drużyn: backend i tak odrzuci akceptację. */
   limitReached?: boolean
+  /** Terminarz już jest: mecze powstały z tych grup, backend odrzuci zmianę grupy i akceptację. */
+  scheduleLocked?: boolean
 }
 
 export function TournamentTeamRow({
@@ -54,6 +56,7 @@ export function TournamentTeamRow({
   groups,
   canManage,
   limitReached = false,
+  scheduleLocked = false,
 }: TournamentTeamRowProps) {
   const changeStatus = useChangeRegistrationStatus(tournamentId)
   const changePayment = useChangePaymentStatus(tournamentId)
@@ -100,9 +103,14 @@ export function TournamentTeamRow({
                     { onSuccess: () => toast.success(`${team.teamName}: grupa zapisana`) },
                   )
                 }
-                disabled={assignGroup.isPending}
+                disabled={assignGroup.isPending || scheduleLocked}
               >
-                <SelectTrigger size="sm" className="w-36" aria-label={`Grupa: ${team.teamName}`}>
+                <SelectTrigger
+                  size="sm"
+                  className="w-36"
+                  aria-label={`Grupa: ${team.teamName}`}
+                  title={scheduleLocked ? "Grupę zmienisz po wyczyszczeniu terminarza" : undefined}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,14 +145,20 @@ export function TournamentTeamRow({
             </SelectContent>
           </Select>
           {transitions.map((status) => {
-            const blocked = status === "Accepted" && limitReached
+            const blocked = status === "Accepted" && (limitReached || scheduleLocked)
             return (
               <Button
                 key={status}
                 size="sm"
                 variant={TRANSITION_ACTIONS[status].variant}
                 disabled={changeStatus.isPending || blocked}
-                title={blocked ? "Limit drużyn jest wyczerpany" : undefined}
+                title={
+                  !blocked
+                    ? undefined
+                    : scheduleLocked
+                      ? "Drużynę przyjmiesz po wyczyszczeniu terminarza"
+                      : "Limit drużyn jest wyczerpany"
+                }
                 onClick={() => setStatus(status)}
               >
                 {TRANSITION_ACTIONS[status].label}
