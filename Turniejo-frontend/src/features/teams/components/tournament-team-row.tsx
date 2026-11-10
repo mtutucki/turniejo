@@ -182,7 +182,9 @@ export function TournamentTeamRow({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Anuluj</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => setStatus(status)}>Wycofaj</AlertDialogAction>
+                      <AlertDialogAction variant="destructive" onClick={() => setStatus(status)}>
+                        Wycofaj
+                      </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
