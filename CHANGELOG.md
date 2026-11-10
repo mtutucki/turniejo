@@ -6,6 +6,8 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+## [1.1.0] - 2026-11-10
+
 ### Zmienione
 
 - Wycofanie drużyny przy gotowym terminarzu najpierw pyta o potwierdzenie i mówi, że jej nierozegrane mecze zostaną odwołane (w trwającym pucharze rywal dostaje walkower).
