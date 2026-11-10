@@ -47,6 +47,7 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 - Adres publiczny (slug) stały od utworzenia (UST-003).
 - Skrócenie dat turnieju zablokowane, dopóki mecze są poza nowymi datami (UST-004).
 - Wyczyszczenie terminarza w formacie z pucharem zostawia drabinkę, znikają tylko terminy (GPK-010).
+- Zmiana terminu z opcją „Przesuń też kolejne mecze na tym boisku” (domyślnie włączona) przesuwa o tyle samo, w przód i w tył, późniejsze nierozpoczęte mecze tylko na tym boisku; inne boiska zostają. Kolizja przesuniętego meczu z drużyną albo sędzią na innym boisku albo wyjście poza daty turnieju odrzuca całą zmianę. Opcji nie ma przy zmianie boiska (2026-11-10).
 
 **Mecz i wyniki**
 - Gol bez strzelca dozwolony; strzelca i asystę można uzupełnić później (MNZ-010).

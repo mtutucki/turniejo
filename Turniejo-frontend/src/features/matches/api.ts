@@ -128,14 +128,17 @@ export function useUpdateMatchSchedule(tournamentId: string) {
       matchId,
       pitchId,
       scheduledAt,
+      shiftFollowing = false,
     }: {
       matchId: string
       pitchId: string | null
       scheduledAt: string
+      /** Późniejsze, nierozpoczęte mecze na tym samym boisku przesuwają się o tyle samo. */
+      shiftFollowing?: boolean
     }) =>
       request(`${base(tournamentId)}/matches/${matchId}/schedule`, {
         method: "PUT",
-        body: { pitchId, scheduledAt },
+        body: { pitchId, scheduledAt, shiftFollowing },
       }),
     meta: { handlesValidation: true },
     onSuccess: invalidate,

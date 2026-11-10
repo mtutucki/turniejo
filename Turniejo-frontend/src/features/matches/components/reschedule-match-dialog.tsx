@@ -3,12 +3,13 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import Link from "next/link"
 import { type ReactNode, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { TextField } from "@/components/forms/text-field"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ const NO_PITCH = "none"
 const schema = z.object({
   scheduledAt: z.string().min(1, "Podaj datę i godzinę"),
   pitchId: z.string(),
+  shiftFollowing: z.boolean(),
 })
 
 type RescheduleValues = z.infer<typeof schema>
@@ -74,9 +76,13 @@ export function RescheduleMatchDialog({
   const defaults: RescheduleValues = {
     scheduledAt: current ? toDateTimeLocal(current.scheduledAt) : "",
     pitchId: current?.pitchId ?? NO_PITCH,
+    shiftFollowing: true,
   }
   const form = useForm<RescheduleValues>({ resolver: zodResolver(schema), defaultValues: defaults })
   const { errors } = form.formState
+  const selectedPitch = useWatch({ control: form.control, name: "pitchId" })
+  // Opóźnienie na boisku przesuwa kolejne mecze na tym samym boisku, więc opcja ma sens tylko bez zmiany boiska.
+  const canShiftFollowing = !!match?.pitchId && selectedPitch === match.pitchId
 
   function submit(values: RescheduleValues) {
     const scheduledAt = fromDateTimeLocal(values.scheduledAt)
@@ -93,7 +99,8 @@ export function RescheduleMatchDialog({
       if (!pitchId) return form.setError("pitchId", { message: "Wybierz boisko" })
       updatePlanned.mutate({ nodeId: planned.nodeId, scheduledAt, pitchId }, callbacks)
     } else if (match) {
-      updateMatch.mutate({ matchId: match.id, scheduledAt, pitchId }, callbacks)
+      const shiftFollowing = canShiftFollowing && values.shiftFollowing
+      updateMatch.mutate({ matchId: match.id, scheduledAt, pitchId, shiftFollowing }, callbacks)
     }
   }
 
@@ -160,6 +167,24 @@ export function RescheduleMatchDialog({
                 </Field>
               )}
             />
+            {canShiftFollowing && (
+              <Controller
+                control={form.control}
+                name="shiftFollowing"
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id="match-shift-following"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                    <FieldLabel htmlFor="match-shift-following" className="font-normal">
+                      Przesuń też kolejne mecze na tym boisku
+                    </FieldLabel>
+                  </Field>
+                )}
+              />
+            )}
             <FieldError errors={[errors.root]} />
           </FieldGroup>
         </form>
