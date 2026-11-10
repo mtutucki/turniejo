@@ -31,13 +31,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useBrackets, useClearSchedule, usePitches, useSchedule } from "@/features/matches/api"
@@ -51,6 +44,15 @@ import {
   plannedBracketMatches,
 } from "@/features/matches/planned-bracket-matches"
 import { RescheduleMatchDialog } from "@/features/matches/components/reschedule-match-dialog"
+import {
+  type ActiveFilter,
+  ActiveFilters,
+  ALL,
+  FilterGrid,
+  FilterOption,
+  FilterPanel,
+  FilterSelect,
+} from "@/features/public/components/filter-bar"
 import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { useTournamentMembers, useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
@@ -64,7 +66,6 @@ import { UserRole } from "@/types/roles"
 import { resultNote } from "@/features/matches/result-note"
 import { hasScheduleDraft } from "./generate/generate-schedule"
 
-const ALL = "all"
 const NO_REFEREE = "none"
 
 type Lookups = {
@@ -72,36 +73,6 @@ type Lookups = {
   pitchName: (pitchId: string | null) => string | null
   groupLabel: (match: Match) => string | null
   referee: (userId: string | null) => TournamentMember | undefined
-}
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-  allLabel,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: { id: string; name: string }[]
-  allLabel: string
-}) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger size="sm" className="w-full sm:w-44" aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL}>{allLabel}</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o.id} value={o.id}>
-            {o.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
 }
 
 function RefereeChip({
@@ -460,6 +431,7 @@ export function TournamentScheduleView() {
   const brackets = useBrackets(id, bracketCategoryIds, hasBracket)
 
   const [categoryId, setCategoryId] = useState(ALL)
+  const [teamId, setTeamId] = useState(ALL)
   const [groupId, setGroupId] = useState(ALL)
   const [pitchId, setPitchId] = useState(ALL)
   const [refereeId, setRefereeId] = useState(ALL)
@@ -485,14 +457,32 @@ export function TournamentScheduleView() {
   }, [teams.data, pitches.data, groups.data, categories.data, members.data])
 
   const referees = (members.data ?? []).filter((m) => m.roles.includes(UserRole.Referee))
-  const groupOptions = (groups.data ?? []).filter(
-    (g) => categoryId === ALL || g.categoryId === categoryId,
-  )
+  // Przy kilku kategoriach i bez wybranej kategorii „Grupa B” byłaby niejednoznaczna.
+  const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c.name]))
+  const withCategory = (name: string, cid: string) =>
+    categoryById.size > 1 && categoryId === ALL ? `${categoryById.get(cid) ?? ""} · ${name}` : name
+  const inCategory = (cid: string) => categoryId === ALL || cid === categoryId
+  const groupOptions = (groups.data ?? [])
+    .filter((g) => inCategory(g.categoryId))
+    .map((g) => ({ id: g.id, name: withCategory(g.name, g.categoryId) }))
+  // Filtr drużyny działa na drużynie z bazy: zgłoszona do kilku kategorii jest na liście raz,
+  // a filtr pokazuje jej mecze ze wszystkich (albo z wybranej) kategorii.
+  const baseTeamOf = new Map((teams.data ?? []).map((t) => [t.id, t.teamId]))
+  const teamOptions = [
+    ...new Map(
+      (teams.data ?? [])
+        .filter((t) => inCategory(t.categoryId))
+        .map((t) => [t.teamId, { id: t.teamId, name: t.teamName }]),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "pl", { numeric: true }))
+  const isTeam = (tournamentTeamId: string | undefined) =>
+    !!tournamentTeamId && baseTeamOf.get(tournamentTeamId) === teamId
 
   const filtered = (schedule.data ?? [])
     .filter(
       (m) =>
         (categoryId === ALL || m.categoryId === categoryId) &&
+        (teamId === ALL || isTeam(m.homeTournamentTeamId) || isTeam(m.awayTournamentTeamId)) &&
         (groupId === ALL || m.groupId === groupId) &&
         (pitchId === ALL || m.pitchId === pitchId) &&
         (refereeId === ALL || (m.refereeId ?? NO_REFEREE) === refereeId),
@@ -548,6 +538,7 @@ export function TournamentScheduleView() {
   const planned = allPlanned.filter(
     (p) =>
       (categoryId === ALL || p.categoryId === categoryId) &&
+      (teamId === ALL || isTeam(p.home.tournamentTeamId) || isTeam(p.away.tournamentTeamId)) &&
       groupId === ALL &&
       (refereeId === ALL || (p.refereeId ?? NO_REFEREE) === refereeId) &&
       (pitchId === ALL || p.pitchId === pitchId),
@@ -575,10 +566,125 @@ export function TournamentScheduleView() {
   }
 
   const showCategoryFilter = (categories.data?.length ?? 0) > 1
+  const showTeamFilter = teamOptions.length > 1
   // Puchar nie ma grup; pary bez terminu nie mają jeszcze boisk.
   const showGroupFilter = !knockout && groupOptions.length > 1
   const showPitchFilter = !awaitingSchedule && (pitches.data?.length ?? 0) > 1
   const showRefereeFilter = isOrganizer && !awaitingSchedule
+
+  const refereeOptions = [
+    { id: NO_REFEREE, name: "Bez sędziego" },
+    ...referees.map((r) => ({ id: r.userId, name: memberName(r) })),
+  ]
+  const options = (list: { id: string; name: string }[]) =>
+    list.map((o) => (
+      <FilterOption key={o.id} value={o.id}>
+        {o.name}
+      </FilterOption>
+    ))
+  const filterSelects = [
+    showTeamFilter && (
+      <FilterSelect
+        key="team"
+        label="Drużyna"
+        value={teamId}
+        onChange={setTeamId}
+        allLabel="Wszystkie drużyny"
+      >
+        {options(teamOptions)}
+      </FilterSelect>
+    ),
+    showCategoryFilter && (
+      <FilterSelect
+        key="category"
+        label="Kategoria"
+        value={categoryId}
+        onChange={(value) => {
+          setCategoryId(value)
+          setGroupId(ALL)
+          // Drużyna, której nie ma w tej kategorii, dałaby zawsze pustą listę.
+          const playsThere = teams.data?.some((t) => t.teamId === teamId && t.categoryId === value)
+          if (teamId !== ALL && value !== ALL && !playsThere) setTeamId(ALL)
+        }}
+        allLabel="Wszystkie kategorie"
+      >
+        {options(categories.data ?? [])}
+      </FilterSelect>
+    ),
+    showGroupFilter && (
+      <FilterSelect
+        key="group"
+        label="Grupa"
+        value={groupId}
+        onChange={setGroupId}
+        allLabel="Wszystkie grupy"
+      >
+        {options(groupOptions)}
+      </FilterSelect>
+    ),
+    showPitchFilter && (
+      <FilterSelect
+        key="pitch"
+        label="Boisko"
+        value={pitchId}
+        onChange={setPitchId}
+        allLabel="Wszystkie boiska"
+      >
+        {options(pitches.data ?? [])}
+      </FilterSelect>
+    ),
+    showRefereeFilter && (
+      <FilterSelect
+        key="referee"
+        label="Sędzia"
+        value={refereeId}
+        onChange={setRefereeId}
+        allLabel="Wszyscy sędziowie"
+      >
+        {options(refereeOptions)}
+      </FilterSelect>
+    ),
+  ].filter(Boolean)
+
+  const nameOf = (list: { id: string; name: string }[], id: string, fallback: string) =>
+    list.find((o) => o.id === id)?.name ?? fallback
+  const activeFilters: ActiveFilter[] = [
+    teamId !== ALL && {
+      key: "team",
+      label: nameOf(teamOptions, teamId, "Drużyna"),
+      clear: () => setTeamId(ALL),
+    },
+    categoryId !== ALL && {
+      key: "category",
+      label: nameOf(categories.data ?? [], categoryId, "Kategoria"),
+      clear: () => {
+        setCategoryId(ALL)
+        setGroupId(ALL)
+      },
+    },
+    groupId !== ALL && {
+      key: "group",
+      label: nameOf(groupOptions, groupId, "Grupa"),
+      clear: () => setGroupId(ALL),
+    },
+    pitchId !== ALL && {
+      key: "pitch",
+      label: nameOf(pitches.data ?? [], pitchId, "Boisko"),
+      clear: () => setPitchId(ALL),
+    },
+    refereeId !== ALL && {
+      key: "referee",
+      label: nameOf(refereeOptions, refereeId, "Sędzia"),
+      clear: () => setRefereeId(ALL),
+    },
+  ].filter((f): f is ActiveFilter => !!f)
+  function clearFilters() {
+    setTeamId(ALL)
+    setCategoryId(ALL)
+    setGroupId(ALL)
+    setPitchId(ALL)
+    setRefereeId(ALL)
+  }
 
   // Organizator jest w trakcie generowania (otworzył formularz i wyszedł np. dodać drużyny) —
   // wraca prosto do formularza. "Anuluj" i "← Terminarz" kończą ten tryb.
@@ -639,10 +745,7 @@ export function TournamentScheduleView() {
           <p className="text-muted-foreground text-sm">
             {awaitingSchedule
               ? `${plural(rows.length, ["mecz czeka", "mecze czekają", "meczów czeka"])} na godziny i boiska - nadasz je, generując terminarz.`
-              : plural(filtered.length, ["mecz", "mecze", "meczów"])}
-            {!awaitingSchedule &&
-              filtered.length !== schedule.data.length &&
-              ` z ${schedule.data.length}`}
+              : plural(schedule.data.length, ["mecz", "mecze", "meczów"])}
             {isOrganizer && !awaitingSchedule && (
               <>
                 {" · "}
@@ -689,55 +792,31 @@ export function TournamentScheduleView() {
       </div>
 
       {/* Filtr z jedną opcją niczego nie filtruje — pokazujemy tylko te, w których jest wybór. */}
-      {(showCategoryFilter || showGroupFilter || showPitchFilter || showRefereeFilter) && (
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          {showCategoryFilter && (
-            <FilterSelect
-              label="Kategoria"
-              value={categoryId}
-              onChange={(value) => {
-                setCategoryId(value)
-                setGroupId(ALL)
-              }}
-              options={categories.data ?? []}
-              allLabel="Wszystkie kategorie"
-            />
-          )}
-          {showGroupFilter && (
-            <FilterSelect
-              label="Grupa"
-              value={groupId}
-              onChange={setGroupId}
-              options={groupOptions}
-              allLabel="Wszystkie grupy"
-            />
-          )}
-          {showPitchFilter && (
-            <FilterSelect
-              label="Boisko"
-              value={pitchId}
-              onChange={setPitchId}
-              options={pitches.data ?? []}
-              allLabel="Wszystkie boiska"
-            />
-          )}
-          {showRefereeFilter && (
-            <FilterSelect
-              label="Sędzia"
-              value={refereeId}
-              onChange={setRefereeId}
-              options={[
-                { id: NO_REFEREE, name: "Bez sędziego" },
-                ...referees.map((r) => ({ id: r.userId, name: memberName(r) })),
-              ]}
-              allLabel="Wszyscy sędziowie"
+      {filterSelects.length > 0 && (
+        <div className="space-y-3">
+          <FilterPanel label="Filtry terminarza">
+            <FilterGrid count={filterSelects.length}>{filterSelects}</FilterGrid>
+          </FilterPanel>
+          {activeFilters.length > 0 && (
+            <ActiveFilters
+              summary={`Znaleziono ${plural(rows.length, ["mecz", "mecze", "meczów"])}`}
+              filters={activeFilters}
+              onClearAll={clearFilters}
             />
           )}
         </div>
       )}
 
       {rows.length === 0 ? (
-        <EmptyState icon={CalendarClock} title="Brak meczów dla wybranych filtrów" />
+        <EmptyState
+          icon={CalendarClock}
+          title="Brak meczów dla wybranych filtrów"
+          action={
+            <Button variant="outline" onClick={clearFilters}>
+              Wyczyść filtry
+            </Button>
+          }
+        />
       ) : (
         [...days.entries()].map(([day, dayRows]) => (
           <Card key={day} className="gap-0 py-0">
