@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import { Analytics } from "@/components/analytics"
+import { OPEN_GRAPH_DEFAULTS, SITE_NAME, SITE_URL } from "@/lib/site"
 
 import "./globals.css"
 import { Providers } from "./providers"
@@ -16,9 +17,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin", "latin-ext"],
 })
 
+const DESCRIPTION = "Wyniki, terminarze i tabele turniejów piłkarskich na żywo."
+
+// Adresy względne w metadanych (canonical, obrazki podglądu) stają się bezwzględne względem SITE_URL.
 export const metadata: Metadata = {
-  title: { default: "Turniejo", template: "%s · Turniejo" },
-  description: "Zarządzanie turniejami piłkarskimi",
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: DESCRIPTION,
+  openGraph: { ...OPEN_GRAPH_DEFAULTS, description: DESCRIPTION },
+  twitter: { card: "summary_large_image" },
+  formatDetection: { telephone: false },
 }
 
 // Pasek przeglądarki na telefonie w kolorze tła motywu systemowego.

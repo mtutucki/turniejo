@@ -1,9 +1,13 @@
 import type { Metadata } from "next"
 
 import { BracketView } from "@/features/public/components/bracket-view"
-import { requireSection } from "@/features/public/server"
+import { portalPageMetadata, requireSection } from "@/features/public/server"
 
-export const metadata: Metadata = { title: "Drabinka" }
+export async function generateMetadata({
+  params,
+}: PageProps<"/t/[slug]/bracket">): Promise<Metadata> {
+  return portalPageMetadata((await params).slug, "bracket", "Drabinka")
+}
 
 export default async function PublicBracketPage({ params }: PageProps<"/t/[slug]/bracket">) {
   const { slug } = await params

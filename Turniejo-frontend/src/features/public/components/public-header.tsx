@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import type { PublicTournament } from "@/types/public"
 
 import { usePublicContext } from "../public-context"
+import { publicSections } from "../sections"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -34,25 +35,6 @@ function dayBadge(tournament: PublicTournament) {
   const dayNumber = Math.round((Date.parse(today) - Date.parse(start)) / DAY_MS) + 1
   const total = Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS) + 1
   return total > 1 ? `Dzień ${dayNumber} z ${total}` : "Dziś"
-}
-
-export function publicSections(tournament: PublicTournament) {
-  const s = tournament.settings
-  const hasKnockout = tournament.format === "Knockout" || tournament.format === "GroupAndKnockout"
-  return [
-    // Strona główna portalu istnieje zawsze — przy ukrytym terminarzu pokazuje komunikat.
-    { segment: "", label: "Mecze", visible: true },
-    { segment: "schedule", label: "Terminarz", visible: s.showSchedule },
-    // Puchar nie ma fazy grupowej — nie ma tabel do pokazania.
-    {
-      segment: "standings",
-      label: "Tabele",
-      visible: s.showStandings && tournament.format !== "Knockout",
-    },
-    { segment: "bracket", label: "Drabinka", visible: s.showBracket && hasKnockout },
-    { segment: "teams", label: "Drużyny", visible: s.showTeams },
-    { segment: "stats", label: "Statystyki", visible: s.showStats },
-  ].filter((section) => section.visible)
 }
 
 /** Wyjście z portalu do aplikacji: zalogowany → panel, anonim → logowanie (potem /start). */

@@ -31,7 +31,8 @@ export type PublicTournament = {
   startAt: string
   endAt: string
   description: string | null
-  settings: PublicVisibility
+  /** showInDirectory: turniej na liście publicznej. Wyłączony = portal tylko z linku, bez Google. */
+  settings: PublicVisibility & { showInDirectory?: boolean }
   categories: { id: string; name: string; order: number }[]
   groups: { id: string; categoryId: string; name: string; order: number }[]
   pitches: { id: string; name: string }[]
