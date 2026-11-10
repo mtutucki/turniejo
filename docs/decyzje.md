@@ -70,6 +70,11 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 - Nowa kategoria w formacie z grupami dostaje od razu wybraną liczbę grup (1-8, domyślnie 1); drużyny bez grupy trafiają do Grupy A (GRP-002, 2026-11-10).
 - Bez zapisanych reguł remisu punktowego obowiązuje domyślna kolejność: punkty i bilans w meczach bezpośrednich, bilans bramek, gole zdobyte, zwycięstwa. Nie jest zapisywana w bazie, więc działa też dla starych turniejów; zapis własnej kolejności ją zastępuje (GRP-005, 2026-11-10).
 
+**Dwie fazy grupowe**
+- Format „Dwie fazy grupowe”: grupy fazy 1 z przydzielonymi drużynami, potem grupy fazy 2 obsadzane miejscami z tabel fazy 1. Bez pucharu po fazie 2 (na później). Organizator dostaje gotowy podział (miejsca dzielone po równo na kolejne przedziały, np. 1-2 do Grupy I, 3-4 do Grupy II) i może przestawić każde miejsce albo zostawić je poza fazą 2 (drużyna kończy wtedy turniej). Jedno miejsce trafia do najwyżej jednej grupy fazy 2. Tabela fazy 2 liczy się od zera, także dla drużyn, które grały już ze sobą w fazie 1. Wynik turnieju to miejsce w grupie fazy 2, a baner mistrza w portalu pokazuje liderów grup fazy 2 po zakończeniu turnieju (FAZ-001…020, 2026-11-10).
+- Mecze fazy 2 planuje generator terminarza od razu, każdy po wszystkich meczach grup źródłowych obu miejsc. Drużyna trafia na miejsce po ostatnim meczu swojej grupy fazy 1, a mecz powstaje, gdy oba miejsca mają drużyny. Korekta wyniku po fazie 1 działa jak w pucharze: nierozpoczęty mecz dostaje nową drużynę, rozpoczęty zostaje, a organizator dostaje powiadomienie. Podział jest zamrożony, dopóki istnieje terminarz; termin i sędziego meczu fazy 2 zmienia się, gdy mecz powstanie (2026-11-10).
+- Formatu nie da się zmienić, dopóki istnieją grupy fazy 2 (zostałyby puste i bez meczów). Do grupy fazy 2 nie przypisuje się drużyn ręcznie (2026-11-10).
+
 **Drabinka i mistrz**
 - Korekta wyniku zmieniająca awans: nierozpoczęty mecz kolejnej rundy dostaje nową drużynę sam; rozpoczęty zostaje bez zmian, a organizator dostaje powiadomienie (PUC-048, GPK-008).
 - Przy 3 drużynach (półfinał z wolnym losem) nie ma meczu o 3. miejsce; trzecie miejsce zajmuje przegrany rozegranego półfinału (PUC-019).

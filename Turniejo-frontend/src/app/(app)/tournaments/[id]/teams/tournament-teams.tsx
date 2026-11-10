@@ -17,7 +17,7 @@ import { groupSections } from "@/features/teams/group-sections"
 import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { TournamentTeam } from "@/types/teams"
-import type { TournamentGroup } from "@/types/tournaments"
+import { hasKnockoutStage, type TournamentGroup } from "@/types/tournaments"
 
 export function TournamentTeamsView() {
   const { id, tournament, isOrganizer } = useTournamentContext()
@@ -44,7 +44,7 @@ export function TournamentTeamsView() {
   // rywala, inaczej drabinka by stanęła), więc organizator potwierdza je z tą informacją.
   const withdrawWarning = !scheduleLocked
     ? undefined
-    : status === "InProgress" && tournament.data?.format !== "Group"
+    : status === "InProgress" && hasKnockoutStage(tournament.data?.format)
       ? "Jej nierozegrane mecze zostaną odwołane, a w pucharze rywal dostanie walkower."
       : "Jej nierozegrane mecze zostaną odwołane."
   // W kolejności kategorii, tak jak na liście: akceptacja przy małym limicie bierze te z góry.
@@ -185,11 +185,14 @@ export function TournamentTeamsView() {
                 <CategoryTeamList
                   tournamentId={id}
                   teams={categoryTeams}
-                  // Puchar nie używa grup — bez wyboru grupy przy drużynach.
+                  // Puchar nie używa grup — bez wyboru grupy przy drużynach. Do grup drugiej fazy
+                  // drużyny trafiają same, z tabel pierwszej fazy.
                   groups={
                     tournament.data?.format === "Knockout"
                       ? []
-                      : (groups.data ?? []).filter((g) => g.categoryId === category.id)
+                      : (groups.data ?? []).filter(
+                          (g) => g.categoryId === category.id && g.stage !== 2,
+                        )
                   }
                   canManage={isOrganizer}
                   limitReached={limitReached}

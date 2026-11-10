@@ -1,6 +1,6 @@
 "use client"
 
-import { GitBranch, type LucideIcon, ListOrdered, Network } from "lucide-react"
+import { GitBranch, Layers, type LucideIcon, ListOrdered, Network } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -29,6 +29,11 @@ const FORMATS: { value: TournamentFormat; description: string; icon: LucideIcon 
     value: "GroupAndKnockout",
     description: "Najpierw grupy, potem najlepsi grają w drabince.",
     icon: Network,
+  },
+  {
+    value: "TwoGroupStages",
+    description: "Po grupach drugie grupy, np. miejsca 1-2 w jednej, 3-4 w drugiej.",
+    icon: Layers,
   },
 ]
 
@@ -59,7 +64,7 @@ export function FormatForm({
 
   return (
     <div className="space-y-4">
-      <fieldset disabled={disabled} className="grid gap-2 sm:grid-cols-3">
+      <fieldset disabled={disabled} className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <legend className="sr-only">Format turnieju</legend>
         {FORMATS.map(({ value, description, icon: Icon }) => (
           <label

@@ -4,6 +4,7 @@ import { Trophy } from "lucide-react"
 
 import type { Match } from "@/types/matches"
 import type { Bracket } from "@/types/public"
+import { hasKnockoutStage, type TournamentFormat } from "@/types/tournaments"
 
 import { usePublicBracket, usePublicSchedule, usePublicStandings } from "../api"
 import { usePublicContext } from "../public-context"
@@ -19,12 +20,13 @@ export function matchWinner(match: Match | undefined) {
 
 /**
  * Kiedy szukać mistrza. Puchar: zaraz po finale, także gdy turniej formalnie trwa - baner i tak czeka,
- * aż finał będzie rozegrany (QA v3: PUC-045, PUB-011). Same grupy: lider jest pewny dopiero po zakończeniu.
+ * aż finał będzie rozegrany (QA v3: PUC-045, PUB-011). Same grupy (także dwie fazy grupowe): lider jest
+ * pewny dopiero po zakończeniu.
  */
-export function showsChampion(status: string | undefined, format: string | null | undefined) {
+export function showsChampion(status: string | undefined, format: TournamentFormat | null | undefined) {
   if (!format) return false
   if (status === "Finished") return true
-  return status === "InProgress" && format !== "Group"
+  return status === "InProgress" && hasKnockoutStage(format)
 }
 
 /** Finał = węzeł ostatniej zwykłej rundy (nie meczu o 3. miejsce), z którego nikt dalej nie awansuje. */
@@ -132,13 +134,16 @@ function GroupLeader({ groupId, label }: { groupId: string; label: string | null
 
 /**
  * Zwycięzca finału drabinki (formaty z pucharem, zaraz po finale) albo lider tabeli
- * (sam format grupowy) — osobno dla każdej kategorii, a przy kilku grupach dla każdej grupy.
+ * (format grupowy; przy dwóch fazach grupy drugiej fazy) — osobno dla każdej kategorii, a przy kilku
+ * grupach dla każdej grupy.
  */
 export function ChampionBanner() {
   const { tournament } = usePublicContext()
   if (!showsChampion(tournament.status, tournament.format)) return null
 
-  const knockout = tournament.format !== "Group"
+  const knockout = hasKnockoutStage(tournament.format)
+  // Dwie fazy grupowe: o wyniku decydują grupy drugiej fazy.
+  const finalStage = tournament.format === "TwoGroupStages" ? 2 : 1
   const multipleCategories = tournament.categories.length > 1
   const categories = [...tournament.categories].sort((a, b) => a.order - b.order)
 
@@ -148,7 +153,7 @@ export function ChampionBanner() {
       return [<KnockoutChampion key={category.id} categoryId={category.id} label={categoryLabel} />]
     }
     const groups = tournament.groups
-      .filter((g) => g.categoryId === category.id)
+      .filter((g) => g.categoryId === category.id && (g.stage === 2 ? 2 : 1) === finalStage)
       .sort((a, b) => a.order - b.order)
     return groups.map((group) => (
       <GroupLeader

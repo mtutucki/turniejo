@@ -12,8 +12,11 @@ import {
   type PlannedBracketMatch,
   plannedBracketMatches,
 } from "@/features/matches/planned-bracket-matches"
+import { usePublicSecondStage } from "@/features/second-stage/api"
+import { plannedSecondStageMatches } from "@/features/second-stage/planned"
 import { formatDateTime, formatDayLong, plural, toZonedDateInput } from "@/lib/format"
 import type { PublicMatch } from "@/types/public"
+import { hasKnockoutStage } from "@/types/tournaments"
 
 import { usePublicBrackets, usePublicSchedule } from "../api"
 import { readFavoriteTeam, writeFavoriteTeam } from "../favorite-team"
@@ -366,23 +369,45 @@ type KnockoutStage = BracketStage & { planned: PlannedBracketMatch[] }
 /**
  * Rundy drabinek wszystkich kategorii, w kolejności rozgrywania. Każda niesie też zapowiedzi:
  * mecze, których termin jest już zaplanowany, ale pary wyłonią dopiero wcześniejsze mecze.
+ * W formacie „Dwie fazy grupowe” w ten sam sposób idą grupy drugiej fazy.
  */
 function useKnockoutStages(): KnockoutStage[] {
   const { slug, tournament, lookups } = usePublicContext()
   const { settings, format, status, categories } = tournament
-  // Puchar przed wygenerowaniem terminarza nie ma jeszcze obowiązujących terminów.
-  const enabled =
-    settings.showSchedule &&
-    settings.showBracket &&
-    (format === "Knockout" || format === "GroupAndKnockout") &&
-    status !== "Draft" &&
-    status !== "RegistrationOpen" &&
-    status !== "RegistrationClosed"
+  // Przed wygenerowaniem terminarza nie ma jeszcze obowiązujących terminów.
+  const scheduled =
+    status !== "Draft" && status !== "RegistrationOpen" && status !== "RegistrationClosed"
+  const enabled = settings.showSchedule && settings.showBracket && hasKnockoutStage(format) && scheduled
   const brackets = usePublicBrackets(
     slug,
     categories.map((c) => c.id),
     enabled,
   )
+  const secondStage = usePublicSecondStage(
+    slug,
+    settings.showSchedule && format === "TwoGroupStages" && scheduled,
+  )
+
+  if (format === "TwoGroupStages") {
+    const data = secondStage.data
+    if (!data || !scheduled) return []
+    const planned = plannedSecondStageMatches(data, tournament.groups, (id) => lookups.teamName(id))
+    return tournament.groups
+      .filter((g) => g.stage === 2)
+      .sort((a, b) => a.order - b.order)
+      .map((group, i) => ({
+        roundId: group.id,
+        order: i,
+        title:
+          categories.length > 1
+            ? `${categories.find((c) => c.id === group.categoryId)?.name ?? ""} · ${group.name}`
+            : group.name,
+        matchIds: data.fixtures
+          .filter((f) => f.groupId === group.id && f.matchId)
+          .map((f) => f.matchId!),
+        planned: planned.filter((p) => p.secondStageGroupId === group.id),
+      }))
+  }
   if (!enabled) return []
 
   return brackets.flatMap((bracket, i) => {
@@ -408,7 +433,7 @@ function PlannedCard({ planned }: { planned: PlannedBracketMatch }) {
     >
       <p className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
         <Hourglass className="size-3" aria-hidden />
-        {planned.stage} · czeka na wynik
+        {planned.stage} · {planned.secondStageGroupId ? "czeka na koniec fazy 1" : "czeka na wynik"}
       </p>
       {[planned.home, planned.away].map((side, i) => (
         <p key={i} className={side.known ? "font-medium" : "text-muted-foreground italic"}>
@@ -464,7 +489,10 @@ function StageSection({
   )
 }
 
-/** Pełny terminarz: mecze grupowe po dniach, faza pucharowa po rundach (ćwierćfinały, półfinały…). */
+/**
+ * Pełny terminarz: mecze grupowe po dniach, faza pucharowa po rundach (ćwierćfinały, półfinały…),
+ * a grupy drugiej fazy osobno, każda ze swoimi meczami i zapowiedziami.
+ */
 export function FullSchedule({ initialFilters }: { initialFilters: MatchFilters }) {
   const { schedule, matches, filters, filtered } = useFilteredSchedule(initialFilters)
   const stages = useKnockoutStages()

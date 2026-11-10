@@ -63,6 +63,7 @@ export const TournamentFormat = {
   Group: 1,
   Knockout: 2,
   GroupAndKnockout: 3,
+  TwoGroupStages: 4,
 } as const
 export type TournamentFormat = keyof typeof TournamentFormat
 
@@ -70,6 +71,17 @@ export const TOURNAMENT_FORMAT_LABELS: Record<TournamentFormat, string> = {
   Group: "Grupowy",
   Knockout: "Pucharowy",
   GroupAndKnockout: "Grupy + puchar",
+  TwoGroupStages: "Dwie fazy grupowe",
+}
+
+/** Formaty, w których drużyny grają w grupach przydzielonych przez organizatora. */
+export function hasGroupStage(format: TournamentFormat | null | undefined) {
+  return format === "Group" || format === "GroupAndKnockout" || format === "TwoGroupStages"
+}
+
+/** Formaty z drabinką (pucharem). */
+export function hasKnockoutStage(format: TournamentFormat | null | undefined) {
+  return format === "Knockout" || format === "GroupAndKnockout"
 }
 
 // 1:1 z Turniejo.Tournaments.Domain.Enums.TieBreakerType
@@ -171,6 +183,45 @@ export type TournamentGroup = {
   categoryId: string
   name: string
   order: number
+  /** 1 (albo brak) - drużyny przydziela organizator; 2 - grupa drugiej fazy, drużyny przychodzą z tabel fazy 1. */
+  stage?: 1 | 2
+}
+
+/** SecondStageSeatDto: miejsce w grupie fazy 2 („2. miejsce Grupa B”), po fazie 1 z drużyną. */
+export type SecondStageSeat = {
+  id: string
+  categoryId: string
+  groupId: string
+  order: number
+  sourceGroupId: string
+  sourcePosition: number
+  tournamentTeamId: string | null
+}
+
+/** SecondStageFixtureDto: mecz fazy 2 zaplanowany przez generator; matchId, gdy oba miejsca mają drużyny. */
+export type SecondStageFixture = {
+  id: string
+  categoryId: string
+  groupId: string
+  homeSeatId: string
+  awaySeatId: string
+  round: number
+  plannedPitchId: string | null
+  plannedAt: string | null
+  matchId: string | null
+}
+
+/** SecondStageDto */
+export type SecondStage = {
+  seats: SecondStageSeat[]
+  fixtures: SecondStageFixture[]
+}
+
+/** SecondStageSeatRequest: miejsce z tabeli fazy 1 w grupie fazy 2. */
+export type SecondStageSeatInput = {
+  groupId: string
+  sourceGroupId: string
+  sourcePosition: number
 }
 
 /** TieBreakerRuleDto */

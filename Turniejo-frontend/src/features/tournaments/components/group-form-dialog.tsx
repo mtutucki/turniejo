@@ -38,6 +38,8 @@ type GroupFormDialogProps = {
   nextOrder: number
   /** Proponowana nazwa nowej grupy ("Grupa A", "Grupa B", …). */
   suggestedName?: string
+  /** 2: grupa drugiej fazy, drużyny przychodzą z miejsc w tabelach fazy 1. */
+  stage?: 1 | 2
   trigger: ReactNode
 }
 
@@ -48,6 +50,7 @@ export function GroupFormDialog({
   group,
   nextOrder,
   suggestedName = "",
+  stage = group?.stage ?? 1,
   trigger,
 }: GroupFormDialogProps) {
   const [open, setOpen] = useState(false)
@@ -61,7 +64,7 @@ export function GroupFormDialog({
 
   function submit(values: GroupValues) {
     saveGroup.mutate(
-      { groupId: group?.id, categoryId, ...values },
+      { groupId: group?.id, categoryId, stage, ...values },
       {
         onSuccess: () => {
           toast.success(group ? "Grupa zapisana" : "Grupa dodana")
@@ -84,12 +87,13 @@ export function GroupFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {group ? "Edytuj grupę" : "Nowa grupa"} · {categoryName}
+            {group ? "Edytuj grupę" : stage === 2 ? "Nowa grupa drugiej fazy" : "Nowa grupa"} ·{" "}
+            {categoryName}
           </DialogTitle>
           <DialogDescription>
-            Grupa to pula w kategorii {categoryName}: drużyny z jednej grupy grają każdy z każdym i
-            mają wspólną tabelę. Druga grupa ma sens, gdy drużyn jest tyle, że wszystkie mecze by
-            się nie zmieściły.
+            {stage === 2
+              ? "Grupa drugiej fazy: trafiają do niej drużyny z wybranych miejsc w tabelach pierwszej fazy i znów grają każdy z każdym."
+              : `Grupa to pula w kategorii ${categoryName}: drużyny z jednej grupy grają każdy z każdym i mają wspólną tabelę. Druga grupa ma sens, gdy drużyn jest tyle, że wszystkie mecze by się nie zmieściły.`}
           </DialogDescription>
         </DialogHeader>
         <form id="group-form" onSubmit={form.handleSubmit(submit)} noValidate>
