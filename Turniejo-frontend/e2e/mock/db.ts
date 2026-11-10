@@ -249,7 +249,9 @@ function seed() {
   const guardians = [{ playerId: IDS.child, userId: IDS.parent, canEdit: true }]
   /** Drużyny dodane w teście (seedowane Orły i Lwy są w TEAM_NAMES). */
   const orgTeams: (Team & { logoUrl: string | null })[] = []
-  return { users, tournaments, matches, organizations, rosters, guardians, orgTeams, usedResetTokens: [] as string[] }
+  /** Zmiany zgłoszeń seedowanych drużyn w teście (grupa, status), klucz: tournamentTeamId. */
+  const teamChanges: Record<string, { groupId?: string | null; registrationStatus?: string }> = {}
+  return { users, tournaments, matches, organizations, rosters, guardians, orgTeams, teamChanges, usedResetTokens: [] as string[] }
 }
 
 export const db = seed()

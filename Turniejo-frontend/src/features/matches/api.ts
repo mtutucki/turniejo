@@ -16,6 +16,8 @@ export const matchKeys = {
     ["tournaments", tournamentId, "bracket", categoryId] as const,
   standings: (tournamentId: string, groupId: string) =>
     ["tournaments", tournamentId, "standings", groupId] as const,
+  /** Tabele wszystkich grup turnieju (prefiks do unieważnienia). */
+  allStandings: (tournamentId: string) => ["tournaments", tournamentId, "standings"] as const,
   ranking: (tournamentId: string, kind: PlayerRankingKind) =>
     ["tournaments", tournamentId, "ranking", kind] as const,
 }

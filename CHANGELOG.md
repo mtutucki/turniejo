@@ -22,6 +22,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Grupę, z której wycofano wszystkie drużyny, da się już usunąć.
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
 - Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
+- Po przypisaniu drużyny do grupy, dodaniu albo wycofaniu drużyny tabela zmienia się od razu, bez odświeżania strony.
 
 ## [1.0.0] - 2026-11-09
 
