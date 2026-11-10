@@ -14,7 +14,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 - Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.
-- Jasny motyw: domyślnie jak w telefonie lub komputerze, a ikonka w nagłówku przełącza między jasnym i ciemnym. Wybór zapisuje się na koncie.
+- Jasny motyw: domyślnie jak w telefonie lub komputerze, a ikonka w nagłówku przełącza między jasnym i ciemnym na każdej stronie, także przy logowaniu. Wybór zapisuje się na koncie.
 - Kreator turnieju z grupami ma krok „Tabela”, w którym ustawisz kolejność przy równej liczbie punktów.
 - Drabinka pucharu mieści dowolną liczbę drużyn, nie tylko 16. Przy większej liczbie pojawia się 1/16 finału, 1/32 finału i dalej.
 - Na liście drużyn turnieju przycisk „Akceptuj wszystkie” przyjmuje od razu wszystkie oczekujące zgłoszenia, w granicach limitu drużyn.

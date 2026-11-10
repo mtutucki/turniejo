@@ -3,12 +3,14 @@ import Link from "next/link"
 
 import { DemoBanner } from "@/components/demo-banner"
 import { LegalLinks } from "@/components/layout/legal-links"
+import { ThemeToggle } from "@/features/theme/theme-toggle"
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
     <>
       <DemoBanner />
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 p-4">
+      <main className="relative flex flex-1 flex-col items-center justify-center gap-6 p-4">
+        <ThemeToggle className="hover:bg-accent absolute top-3 right-3" />
         <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
             <Trophy className="size-5" />

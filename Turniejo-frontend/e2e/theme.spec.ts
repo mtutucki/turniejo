@@ -70,3 +70,27 @@ test("[MOTYW-05] sędzia przełącza motyw w panelu meczu na żywo", async ({ pa
   await expect(html(page)).not.toHaveClass(/\bdark\b/)
   await expect.poll(() => themeOf(REFEREE)).toBe("light")
 })
+
+// Przełącznik jest też tam, gdzie nie ma jeszcze konta: logowanie, rejestracja, reset hasła, pomoc.
+for (const path of [
+  "/login",
+  "/register",
+  "/password-reset",
+  "/help",
+  "/terms",
+  "/privacy",
+  "/changelog",
+]) {
+  test(`[MOTYW-06] gość przełącza motyw na ${path}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" })
+    await page.goto(path)
+
+    await pick(page, "Ciemny")
+
+    await expect(html(page)).toHaveClass(/\bdark\b/)
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+  })
+}
