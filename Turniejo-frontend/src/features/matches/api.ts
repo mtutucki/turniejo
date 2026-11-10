@@ -129,18 +129,22 @@ export function useUpdateMatchSchedule(tournamentId: string) {
       pitchId,
       scheduledAt,
       shiftFollowing = false,
+      shiftOtherPitches = false,
     }: {
       matchId: string
       pitchId: string | null
       scheduledAt: string
       /** Późniejsze, nierozpoczęte mecze na tym samym boisku przesuwają się o tyle samo. */
       shiftFollowing?: boolean
+      /** Potwierdzenie, że przesunięcie rusza też mecze na innych boiskach (409 Conflict.OtherPitches). */
+      shiftOtherPitches?: boolean
     }) =>
       request(`${base(tournamentId)}/matches/${matchId}/schedule`, {
         method: "PUT",
-        body: { pitchId, scheduledAt, shiftFollowing },
+        body: { pitchId, scheduledAt, shiftFollowing, shiftOtherPitches },
       }),
-    meta: { handlesValidation: true },
+    // 409 pokazuje okno zmiany terminu: pytanie o inne boiska albo komunikat w formularzu.
+    meta: { handlesValidation: true, handlesConflict: true },
     onSuccess: invalidate,
   })
 }

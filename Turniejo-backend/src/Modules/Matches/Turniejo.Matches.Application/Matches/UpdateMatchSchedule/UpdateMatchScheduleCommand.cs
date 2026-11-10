@@ -10,7 +10,9 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
         Guid? PitchId,
         DateTimeOffset ScheduledAt,
         // Opóźnienie na boisku: późniejsze, nierozpoczęte mecze na tym samym boisku przesuwają się o tyle samo.
-        bool ShiftFollowing = false) : ICommand<UpdateMatchScheduleResponse>, IAuthorizedRequest
+        bool ShiftFollowing = false,
+        // Organizator potwierdził, że przesunięcie rusza też mecze na innych boiskach.
+        bool ShiftOtherPitches = false) : ICommand<UpdateMatchScheduleResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

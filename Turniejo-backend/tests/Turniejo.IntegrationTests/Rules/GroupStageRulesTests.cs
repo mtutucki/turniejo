@@ -371,6 +371,40 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
             after[id].Should().Be(at + gap);
     }
 
+    // Grupa 3 drużyn: każde dwa mecze mają wspólną drużynę. Boisko A: pierwszy mecz. Boisko B: drugi zaraz
+    // po nim, trzeci jeszcze później. Opóźnienie pierwszego najeżdża na drugi na boisku B.
+    [Fact]
+    public async Task GRP_Schedule_ShiftThatHitsATeamOnAnotherPitch_AsksFirst_ThenMovesThatPitchToo()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3, start: false);
+        var pitchB = await TournamentFlow.AddPitchAsync(s.Organizer, s.TournamentId, "Boisko 2");
+        var (first, gap) = await FirstMatchAndGapAsync(s);
+        var ordered = (await s.ScheduleAsync()).OrderBy(m => DateTimeOffset.Parse(m.GetString("scheduledAt"))).ToList();
+        var t0 = DateTimeOffset.Parse(first.GetString("scheduledAt"));
+        var (second, third) = (ordered[1].GetGuid("id"), ordered[2].GetGuid("id"));
+        (await s.Organizer.PutAsJsonAsync($"{M(s, third)}/schedule", new { pitchId = pitchB, scheduledAt = t0 + gap * 3 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PutAsJsonAsync($"{M(s, second)}/schedule", new { pitchId = pitchB, scheduledAt = t0 + gap }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        var body = new { pitchId = s.PitchId, scheduledAt = t0 + gap, shiftFollowing = true };
+
+        var asked = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule", body);
+
+        ((int)asked.StatusCode).Should().Be(409);
+        (await asked.Content.ReadAsStringAsync()).Should().Contain("Conflict.OtherPitches");
+        DateTimeOffset At(List<JsonElement> list, Guid id) => DateTimeOffset.Parse(list.Single(m => m.GetGuid("id") == id).GetString("scheduledAt"));
+        At(await s.ScheduleAsync(), first.GetGuid("id")).Should().Be(t0);
+
+        var confirmed = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule",
+            new { body.pitchId, body.scheduledAt, shiftFollowing = true, shiftOtherPitches = true });
+
+        confirmed.IsSuccessStatusCode.Should().BeTrue(await confirmed.Content.ReadAsStringAsync());
+        var after = await s.ScheduleAsync();
+        At(after, first.GetGuid("id")).Should().Be(t0 + gap);
+        At(after, second).Should().Be(t0 + gap * 2);
+        At(after, third).Should().Be(t0 + gap * 4);
+    }
+
     private static async Task<(JsonElement First, TimeSpan Gap)> FirstMatchAndGapAsync(TournamentScenario s)
     {
         var ordered = (await s.ScheduleAsync()).OrderBy(m => DateTimeOffset.Parse(m.GetString("scheduledAt"))).ToList();

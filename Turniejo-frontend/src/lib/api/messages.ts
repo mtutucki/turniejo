@@ -84,6 +84,8 @@ const EXACT: Record<string, string> = {
     "Na tym boisku trwa wtedy inny mecz",
   "Another match is already scheduled on this pitch at this time.":
     "Na tym boisku trwa wtedy inny mecz",
+  "The shift also moves matches on other pitches":
+    "Przesunięcie zmieni też godziny meczów na innych boiskach",
   "One of the teams already plays another match at this time":
     "Jedna z drużyn gra w tym czasie inny mecz",
   "Schedule can only be generated when registration is closed":

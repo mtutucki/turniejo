@@ -23,18 +23,23 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
                 return Result.Failure<UpdateMatchScheduleResponse>(Error.NotFound("Match", request.MatchId));
 
             var delta = request.ScheduledAt - match.ScheduledAt;
-            var followers = request.ShiftFollowing && match.PitchId.HasValue && request.PitchId == match.PitchId && delta != TimeSpan.Zero
-                ? await GetFollowersAsync(match, cancellationToken)
-                : [];
-
-            var moves = followers
-                .Select(f => new ScheduleMove(f, f.PitchId, f.ScheduledAt + delta))
-                .Prepend(new ScheduleMove(match, request.PitchId, request.ScheduledAt))
-                .ToList();
+            var moves = new List<ScheduleMove> { new(match, request.PitchId, request.ScheduledAt) };
+            var otherPitches = false;
+            if (request.ShiftFollowing && match.PitchId.HasValue && request.PitchId == match.PitchId && delta != TimeSpan.Zero)
+            {
+                (var shifted, otherPitches) = await PlanShiftAsync(match, delta, cancellationToken);
+                moves.AddRange(shifted.Select(f => new ScheduleMove(f, f.PitchId, f.ScheduledAt + delta)));
+            }
+            var followers = moves.Skip(1).ToList();
 
             var conflict = await conflictChecker.FindConflictAsync(moves, "PitchId", cancellationToken);
             if (conflict != null)
                 return Result.Failure<UpdateMatchScheduleResponse>(conflict);
+
+            // Pytamy dopiero, gdy wiadomo, że przesunięcie się uda - inaczej po potwierdzeniu przyszedłby błąd.
+            if (otherPitches && !request.ShiftOtherPitches)
+                return Result.Failure<UpdateMatchScheduleResponse>(
+                    Error.Conflict("OtherPitches", "The shift also moves matches on other pitches"));
 
             if (followers.Count == 0)
             {
@@ -57,18 +62,53 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
 
         // Późniejsze mecze na tym boisku, które da się jeszcze przesunąć. Trwający albo zakończony mecz
         // zostaje na miejscu - jeśli przesunięte mecze na niego najadą, zmianę odrzuci sprawdzanie kolizji.
-        private async Task<List<Match>> GetFollowersAsync(Match match, CancellationToken cancellationToken)
+        //
+        // Przy opóźnieniu przesunięty mecz może najechać na mecz tej samej drużyny albo sędziego na innym
+        // boisku (drużyna gra na A, zaraz potem na B). Wtedy przesuwamy też ten mecz i późniejsze na jego
+        // boisku, o tyle samo, aż nic nie koliduje. Inne boiska ruszamy tylko od meczu, który faktycznie
+        // koliduje - wcześniejsze mecze i boiska bez kolizji zostają. Przesunięte o tyle samo mecze nie
+        // kolidują między sobą (wcześniej też nie kolidowały), więc pętla dodaje tylko nowe mecze i się kończy.
+        private async Task<(List<Match> Shifted, bool OtherPitches)> PlanShiftAsync(Match match, TimeSpan delta, CancellationToken cancellationToken)
         {
-            var ids = (await dbContext.GetMatchesByTournamentIdAsync(match.TournamentId, cancellationToken))
-                .Where(m => m.Id != match.Id && m.PitchId == match.PitchId && m.ScheduledAt > match.ScheduledAt)
-                .Where(m => m.Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed)
-                .Select(m => m.Id)
-                .ToList();
+            var all = await dbContext.GetMatchesByTournamentIdAsync(match.TournamentId, cancellationToken);
+            var planned = new Dictionary<Guid, Match> { [match.Id] = match };
+            var otherPitches = false;
 
-            return ids.Count == 0
-                ? []
-                : (await dbContext.GetTrackedMatchesByIdsAsync(ids, cancellationToken)).ToList();
+            void AddFrom(Match start)
+            {
+                planned.TryAdd(start.Id, start);
+                if (!start.PitchId.HasValue)
+                    return;
+                foreach (var m in all.Where(m => m.PitchId == start.PitchId && m.ScheduledAt > start.ScheduledAt && IsSchedulable(m)))
+                    planned.TryAdd(m.Id, m);
+            }
+
+            AddFrom(match);
+
+            // Na wcześniej nic nie przesuwamy na innych boiskach - kolizja zostaje błędem.
+            while (delta > TimeSpan.Zero)
+            {
+                var moves = planned.Values.Select(m => new ScheduleMove(m, m.PitchId, m.ScheduledAt + delta)).ToList();
+                var blockers = await conflictChecker.FindBlockingMatchesAsync(moves, cancellationToken);
+                var next = blockers.Where(IsSchedulable).ToList();
+                if (next.Count == 0 || next.Count < blockers.Count)
+                    break;
+
+                foreach (var blocker in next)
+                {
+                    otherPitches |= blocker.PitchId != match.PitchId;
+                    AddFrom(blocker);
+                }
+            }
+
+            planned.Remove(match.Id);
+            var ids = planned.Keys.ToList();
+            var tracked = ids.Count == 0 ? [] : (await dbContext.GetTrackedMatchesByIdsAsync(ids, cancellationToken)).ToList();
+            return (tracked, otherPitches);
         }
+
+        private static bool IsSchedulable(Match m) =>
+            m.Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed;
 
         // Unikalny indeks (PitchId, ScheduledAt) sprawdza każdy UPDATE osobno. Przy +30 min mecz z 10:30
         // trafiłby na 11:00, gdzie jeszcze stoi następny, więc zapisujemy po kolei od końca (przy

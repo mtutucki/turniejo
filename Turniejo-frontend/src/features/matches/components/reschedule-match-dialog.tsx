@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useTournament } from "@/features/tournaments/api"
+import { isApiError } from "@/lib/api/errors"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from "@/lib/format"
 import type { Match, Pitch } from "@/types/matches"
@@ -67,6 +68,8 @@ export function RescheduleMatchDialog({
   trigger,
 }: RescheduleMatchDialogProps) {
   const [open, setOpen] = useState(false)
+  // Backend odpowiedział, że przesunięcie rusza też mecze na innych boiskach - czekamy na potwierdzenie.
+  const [askOtherPitches, setAskOtherPitches] = useState(false)
   const updateMatch = useUpdateMatchSchedule(tournamentId)
   const updatePlanned = useUpdatePlannedMatchSchedule(tournamentId)
   const isPending = updateMatch.isPending || updatePlanned.isPending
@@ -84,7 +87,7 @@ export function RescheduleMatchDialog({
   // Opóźnienie na boisku przesuwa kolejne mecze na tym samym boisku, więc opcja ma sens tylko bez zmiany boiska.
   const canShiftFollowing = !!match?.pitchId && selectedPitch === match.pitchId
 
-  function submit(values: RescheduleValues) {
+  function submit(values: RescheduleValues, shiftOtherPitches = false) {
     const scheduledAt = fromDateTimeLocal(values.scheduledAt)
     const pitchId = values.pitchId === NO_PITCH ? null : values.pitchId
     const callbacks = {
@@ -92,7 +95,14 @@ export function RescheduleMatchDialog({
         toast.success("Termin meczu zapisany")
         setOpen(false)
       },
-      onError: (error: unknown) => applyFieldErrors(error, form),
+      onError: (error: unknown) => {
+        if (isApiError(error) && error.status === 409) {
+          if (error.code === "Conflict.OtherPitches") setAskOtherPitches(true)
+          else form.setError("root", { type: "server", message: error.message })
+          return
+        }
+        applyFieldErrors(error, form)
+      },
     }
     if (planned) {
       // Planowany mecz musi mieć boisko — generator i przesuwanie terminów liczą na nim kolizje.
@@ -100,7 +110,10 @@ export function RescheduleMatchDialog({
       updatePlanned.mutate({ nodeId: planned.nodeId, scheduledAt, pitchId }, callbacks)
     } else if (match) {
       const shiftFollowing = canShiftFollowing && values.shiftFollowing
-      updateMatch.mutate({ matchId: match.id, scheduledAt, pitchId, shiftFollowing }, callbacks)
+      updateMatch.mutate(
+        { matchId: match.id, scheduledAt, pitchId, shiftFollowing, shiftOtherPitches },
+        callbacks,
+      )
     }
   }
 
@@ -109,6 +122,7 @@ export function RescheduleMatchDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
+        setAskOtherPitches(false)
         if (next) form.reset(defaults)
       }}
     >
@@ -118,7 +132,12 @@ export function RescheduleMatchDialog({
           <DialogTitle>Zmień termin</DialogTitle>
           <DialogDescription>{title}</DialogDescription>
         </DialogHeader>
-        <form id="reschedule-form" onSubmit={form.handleSubmit(submit)} noValidate>
+        <form
+          id="reschedule-form"
+          onSubmit={form.handleSubmit((values) => submit(values))}
+          onChange={() => setAskOtherPitches(false)}
+          noValidate
+        >
           <FieldGroup>
             <TextField
               id="match-scheduled-at"
@@ -188,14 +207,34 @@ export function RescheduleMatchDialog({
             <FieldError errors={[errors.root]} />
           </FieldGroup>
         </form>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            Anuluj
-          </Button>
-          <Button type="submit" form="reschedule-form" disabled={isPending}>
-            {isPending ? "Zapisywanie…" : "Zapisz"}
-          </Button>
-        </DialogFooter>
+        {askOtherPitches ? (
+          <div role="alert" className="flex flex-col gap-3">
+            <p className="text-sm">
+              Przesunięcie zmieni też godziny meczów na innych boiskach, bo grają w nich te same
+              drużyny albo sędziowie. Przesunąć mimo to?
+            </p>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setAskOtherPitches(false)}>
+                Wróć
+              </Button>
+              <Button
+                disabled={isPending}
+                onClick={form.handleSubmit((values) => submit(values, true))}
+              >
+                {isPending ? "Zapisywanie…" : "Przesuń mimo to"}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Anuluj
+            </Button>
+            <Button type="submit" form="reschedule-form" disabled={isPending}>
+              {isPending ? "Zapisywanie…" : "Zapisz"}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

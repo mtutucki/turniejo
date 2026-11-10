@@ -95,6 +95,35 @@ namespace Turniejo.Matches.Application.Services
             return null;
         }
 
+        /// <summary>
+        /// Mecze spoza <paramref name="moves"/>, na które przesunięte mecze najeżdżają: to samo boisko,
+        /// ta sama drużyna (klub) albo ten sam sędzia w tym samym czasie.
+        /// </summary>
+        public async Task<IReadOnlyList<Match>> FindBlockingMatchesAsync(IReadOnlyList<ScheduleMove> moves, CancellationToken cancellationToken)
+        {
+            if (moves.Count == 0)
+                return [];
+
+            var tournamentId = moves[0].Match.TournamentId;
+            var duration = await GetMatchDurationAsync(tournamentId, cancellationToken);
+            var moved = moves.Select(m => m.Match.Id).ToHashSet();
+            var rest = (await dbContext.GetMatchesByTournamentIdAsync(tournamentId, cancellationToken))
+                .Where(m => !moved.Contains(m.Id) && m.Status != MatchStatus.Cancelled)
+                .ToList();
+            var clubByEntry = (await teamModule.GetTournamentTeamsByTournamentIdAsync(tournamentId, cancellationToken))
+                .ToDictionary(t => t.Id, t => t.TeamId);
+            Guid Club(Guid entry) => clubByEntry.GetValueOrDefault(entry, entry);
+
+            return rest
+                .Where(other => moves.Any(move =>
+                    other.ScheduledAt < move.ScheduledAt + duration && move.ScheduledAt < other.ScheduledAt + duration &&
+                    ((move.PitchId.HasValue && other.PitchId == move.PitchId) ||
+                     new[] { Club(move.Match.HomeTournamentTeamId), Club(move.Match.AwayTournamentTeamId) }
+                         .Intersect([Club(other.HomeTournamentTeamId), Club(other.AwayTournamentTeamId)]).Any() ||
+                     (move.Match.RefereeId.HasValue && other.RefereeId == move.Match.RefereeId))))
+                .ToList();
+        }
+
         /// <summary>Przypisanie sędziego do meczu w jego obecnym terminie.</summary>
         public async Task<Error?> FindRefereeConflictAsync(Match match, Guid refereeId, CancellationToken cancellationToken)
         {
