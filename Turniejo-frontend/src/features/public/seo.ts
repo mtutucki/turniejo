@@ -49,6 +49,14 @@ export function tournamentDescription(t: TournamentInfo) {
   return `${t.name}, ${tournamentDates(t.startAt, t.endAt)}. Wyniki na żywo, terminarz i tabele turnieju piłkarskiego.${categories}`
 }
 
+/** „Orły w turnieju Puchar Wiosny (9–10 maja 2026): mecze, wyniki, miejsce w tabeli i skład.” */
+export function teamDescription(
+  teamName: string,
+  t: Pick<TournamentInfo, "name" | "startAt" | "endAt">,
+) {
+  return `${teamName} w turnieju ${t.name} (${tournamentDates(t.startAt, t.endAt)}): mecze, wyniki, miejsce w tabeli i skład.`
+}
+
 const hasScore = (m: MatchInfo) =>
   m.status === "Live" || m.status === "Paused" || m.status === "Finished"
 

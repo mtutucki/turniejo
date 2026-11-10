@@ -41,6 +41,7 @@ import { EditPlayerDialog } from "@/features/teams/components/edit-player-dialog
 import { ImportSquadDialog } from "@/features/teams/components/import-squad-dialog"
 import { RegistrationStatusBadge } from "@/features/teams/components/registration-status-badge"
 import { TeamLogo } from "@/features/teams/components/team-logo"
+import { TeamResultsCard } from "@/features/teams/components/team-results-card"
 import { useCategories } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { useMyRoles } from "@/hooks/use-my-roles"
@@ -219,6 +220,9 @@ export function TournamentTeamDetails() {
           </div>
         </div>
       </div>
+
+      {/* Mecze tylko drużyny, która gra: oczekująca albo wycofana nie ma (już) terminarza. */}
+      {team.registrationStatus === "Accepted" && <TeamResultsCard team={team} />}
 
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <Card>

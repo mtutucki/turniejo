@@ -1,6 +1,7 @@
 "use client"
 
 import { ListOrdered } from "lucide-react"
+import Link from "next/link"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -53,7 +54,14 @@ function GroupTable({
                 <td className="text-muted-foreground px-3 py-2 font-mono tabular-nums">
                   {row.position}
                 </td>
-                <td className="truncate px-2 py-2 font-medium">{teamName(row.tournamentTeamId)}</td>
+                <td className="truncate px-2 py-2 font-medium">
+                  <Link
+                    href={`/tournaments/${id}/teams/${row.tournamentTeamId}`}
+                    className="hover:underline"
+                  >
+                    {teamName(row.tournamentTeamId)}
+                  </Link>
+                </td>
                 <td className="px-2 py-2 text-center font-mono tabular-nums">
                   {row.matchesPlayed}
                 </td>
