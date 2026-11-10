@@ -20,6 +20,7 @@ import {
   type SquadPlayerInput,
   type Team,
   type TeamInput,
+  type TeamHistory,
   type TeamRoster,
   type TeamStaffMember,
   TeamStaffRole,
@@ -38,6 +39,7 @@ export const teamKeys = {
   staff: (tournamentTeamId: string) => ["tournament-teams", tournamentTeamId, "staff"] as const,
   members: (tournamentId: string) => ["tournaments", tournamentId, "members"] as const,
   roster: (teamId: string) => ["team-roster", teamId] as const,
+  history: (teamId: string) => ["team-history", teamId] as const,
   allRosters: ["team-roster"] as const,
 }
 
@@ -356,6 +358,16 @@ export function useTeamRoster(teamId: string | undefined) {
     queryKey: teamKeys.roster(teamId ?? ""),
     queryFn: () => request<TeamRoster>(rosterPath(teamId!)),
     enabled: isAuthenticated && !!teamId,
+  })
+}
+
+/** Statystyki drużyny z bazy we wszystkich turniejach (bilans, historia turniejów, zawodnicy, rywale). */
+export function useTeamHistory(teamId: string) {
+  const { request, isAuthenticated } = useApi()
+  return useQuery({
+    queryKey: teamKeys.history(teamId),
+    queryFn: () => request<TeamHistory>(`/api/teams/${teamId}/history`),
+    enabled: isAuthenticated,
   })
 }
 
