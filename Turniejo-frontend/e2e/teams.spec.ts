@@ -96,6 +96,11 @@ async function newLabel(page: Page, name: string) {
   await expect(dialog).toBeHidden()
 }
 
+const LABELS = [
+  { id: "y2015", name: "Rocznik 2015", teamCount: 10 },
+  { id: "y2016", name: "Rocznik 2016", teamCount: 8 },
+]
+
 const manyTeams = (count: number, labelled: (i: number) => string[] = () => []) =>
   Array.from({ length: count }, (_, i) => ({
     id: `many-${i}`,
@@ -124,15 +129,59 @@ test.describe("Etykiety drużyn", () => {
     await expect(members).toBeHidden()
     await expect(page.getByText("1 drużyna")).toBeVisible()
 
+    // Lista dzieli się na sekcje: etykieta i „Bez etykiety”.
     await page.getByRole("button", { name: "Drużyny", exact: true }).click()
+    await expect(
+      page.getByRole("list", { name: "Rocznik 2015" }).getByRole("link", { name: /Orły E2E/ }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole("list", { name: "Bez etykiety" }).getByRole("link", { name: /Lwy E2E/ }),
+    ).toBeVisible()
+
     const filters = page.getByRole("group", { name: "Etykiety" })
     await filters.getByRole("button", { name: /Rocznik 2015/ }).click()
     await expect(page.getByRole("link", { name: /Orły E2E/ })).toBeVisible()
     await expect(page.getByRole("link", { name: /Lwy E2E/ })).toBeHidden()
 
+    // Drugie kliknięcie wyłącza etykietę, „Bez etykiety” pokazuje resztę.
+    await filters.getByRole("button", { name: /Rocznik 2015/ }).click()
     await filters.getByRole("button", { name: /Bez etykiety/ }).click()
     await expect(page.getByRole("link", { name: /Lwy E2E/ })).toBeVisible()
     await expect(page.getByRole("link", { name: /Orły E2E/ })).toBeHidden()
+  })
+
+  test("[DRU-055] duża baza w zwiniętych sekcjach etykiet, kilka etykiet naraz w filtrze", async ({
+    page,
+  }) => {
+    await mock.override({ method: "GET", path: "/api/organizations/:id/team-labels", body: LABELS })
+    await mock.override({
+      method: "GET",
+      path: "/api/organizations/:id/teams",
+      body: manyTeams(25, (i) => (i < 10 ? ["y2015"] : i < 18 ? ["y2016"] : [])),
+    })
+    await page.reload()
+
+    // Ponad 20 drużyn: sekcje startują zwinięte, widać tylko nagłówki z licznikami.
+    // Nagłówek sekcji (zwija i rozwija), nie przycisk filtra o tej samej nazwie.
+    const sectionHeader = (name: string) => page.locator("button[aria-expanded]", { hasText: name })
+    const section2015 = sectionHeader("Rocznik 2015")
+    await expect(section2015).toContainText("10")
+    await expect(section2015).toHaveAttribute("aria-expanded", "false")
+    await expect(page.getByRole("link", { name: /Drużyna 1$/ })).toBeHidden()
+    await section2015.click()
+    await expect(
+      page.getByRole("list", { name: "Rocznik 2015" }).getByRole("link", { name: /^Drużyna/ }),
+    ).toHaveCount(10)
+
+    // Dwie etykiety naraz: drużyny z którejkolwiek, bez sekcji „Bez etykiety”.
+    const filters = page.getByRole("group", { name: "Etykiety" })
+    await filters.getByRole("button", { name: /Rocznik 2015/ }).click()
+    await filters.getByRole("button", { name: /Rocznik 2016/ }).click()
+    await expect(
+      page.getByRole("list", { name: "Rocznik 2016" }).getByRole("link", { name: /^Drużyna/ }),
+    ).toHaveCount(8)
+    await expect(sectionHeader("Bez etykiety")).toHaveCount(0)
+    await expect(page.getByRole("list", { name: "Bez etykiety" })).toHaveCount(0)
   })
 
   test("[DRU-049] etykiety w oknie edycji drużyny, widoczne na liście", async ({ page }) => {
@@ -155,9 +204,13 @@ test.describe("Etykiety drużyn", () => {
     const card = page
       .getByRole("listitem")
       .filter({ has: page.getByRole("link", { name: /Sokoły/ }) })
-    const badges = card.getByRole("list", { name: "Etykiety drużyny" })
-    await expect(badges).toContainText("Klub Orlik")
-    await expect(badges).toContainText("Rocznik 2016")
+    // Drużyna jest w sekcji każdej swojej etykiety.
+    await expect(card).toHaveCount(2)
+    // W sekcji wiersz pokazuje pozostałe etykiety drużyny, bez etykiety samej sekcji.
+    const badgesIn = (section: string) =>
+      page.getByRole("list", { name: section }).getByRole("list", { name: "Etykiety drużyny" })
+    await expect(badgesIn("Klub Orlik")).toHaveText("Rocznik 2016")
+    await expect(badgesIn("Rocznik 2016")).toHaveText("Klub Orlik")
   })
 
   test("[DRU-050] etykieta o zajętej nazwie nie powstaje, usunięta znika z drużyn", async ({
@@ -212,32 +265,52 @@ test.describe("Zgłoszenia do turnieju", () => {
     await expect(dialog.getByRole("checkbox", { name: "Wilki" })).toBeDisabled()
   })
 
-  test("[DRU-053] w zgłoszeniu filtr etykiety i „Zaznacz wszystkie” wybiera całą etykietę", async ({
+  test("[DRU-053] w zgłoszeniu drużyny są w sekcjach etykiet, a etykietę zaznacza się jednym polem", async ({
     page,
   }) => {
-    await mock.override({
-      method: "GET",
-      path: "/api/organizations/:id/team-labels",
-      body: [{ id: "y2015", name: "Rocznik 2015", teamCount: 3 }],
-    })
+    await mock.override({ method: "GET", path: "/api/organizations/:id/team-labels", body: LABELS })
     await mock.override({
       method: "GET",
       path: "/api/organizations/:id/teams",
-      body: manyTeams(10, (i) => (i < 3 ? ["y2015"] : [])),
+      body: manyTeams(10, (i) => (i < 3 ? ["y2015"] : i < 5 ? ["y2016"] : [])),
     })
     await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
     await page.getByRole("button", { name: "Zgłoś drużynę" }).click()
     const dialog = page.getByRole("dialog", { name: "Zgłoś drużyny" })
 
-    await dialog
-      .getByRole("group", { name: "Etykiety" })
-      .getByRole("button", { name: /Rocznik 2015/ })
-      .click()
-    await expect(dialog.getByRole("checkbox")).toHaveCount(3)
-    await dialog.getByRole("button", { name: "Zaznacz wszystkie" }).click()
+    await expect(
+      dialog.getByRole("list", { name: "Rocznik 2015" }).getByRole("checkbox"),
+    ).toHaveCount(3)
+    await dialog.getByRole("checkbox", { name: "Zaznacz etykietę Rocznik 2015" }).click()
 
     await expect(dialog.getByText(/Zaznaczono 3\./)).toBeVisible()
     await expect(dialog.getByRole("button", { name: "Zgłoś 3 drużyny" })).toBeEnabled()
+    // Drugie kliknięcie odznacza całą etykietę.
+    await dialog.getByRole("checkbox", { name: "Zaznacz etykietę Rocznik 2015" }).click()
+    await expect(dialog.getByText(/Zaznaczono 0\./)).toBeVisible()
+  })
+
+  test("[DRU-054] w zgłoszeniu kilka etykiet naraz i „Zaznacz wszystkie” wybiera drużyny z nich", async ({
+    page,
+  }) => {
+    await mock.override({ method: "GET", path: "/api/organizations/:id/team-labels", body: LABELS })
+    await mock.override({
+      method: "GET",
+      path: "/api/organizations/:id/teams",
+      body: manyTeams(10, (i) => (i < 3 ? ["y2015"] : i < 5 ? ["y2016"] : [])),
+    })
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+    await page.getByRole("button", { name: "Zgłoś drużynę" }).click()
+    const dialog = page.getByRole("dialog", { name: "Zgłoś drużyny" })
+
+    const filters = dialog.getByRole("group", { name: "Etykiety" })
+    await filters.getByRole("button", { name: /Rocznik 2015/ }).click()
+    await filters.getByRole("button", { name: /Rocznik 2016/ }).click()
+    await expect(dialog.getByRole("list", { name: "Bez etykiety" })).toHaveCount(0)
+    await dialog.getByRole("button", { name: "Zaznacz wszystkie" }).click()
+
+    await expect(dialog.getByText(/Zaznaczono 5\./)).toBeVisible()
+    await expect(dialog.getByRole("button", { name: "Zgłoś 5 drużyn" })).toBeEnabled()
   })
 
   test("[DRU-052] zgłoszenie przy dużej bazie bez etykiet podpowiada etykiety", async ({

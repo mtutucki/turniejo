@@ -1,6 +1,6 @@
 "use client"
 
-import { Pencil, Plus, Shield, Tags, Trash2, Users } from "lucide-react"
+import { ChevronRight, Pencil, Plus, Shield, Tags, Trash2, Users } from "lucide-react"
 import Link from "next/link"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDeleteTeamLabel, useOrganizationTeams, useTeamLabels } from "@/features/teams/api"
@@ -32,7 +31,16 @@ import {
 import { TeamLabelFilter, TeamLabelsHint } from "@/features/teams/components/team-label-filter"
 import { TeamFormDialog } from "@/features/teams/components/team-form-dialog"
 import { TeamLogo } from "@/features/teams/components/team-logo"
-import { ALL_TEAMS, filterTeams, type LabelFilter, MANY_TEAMS } from "@/features/teams/team-labels"
+import {
+  ALL_TEAMS,
+  filterTeams,
+  groupByLabel,
+  isAllTeams,
+  type LabelFilter,
+  MANY_TEAMS,
+  NO_LABEL,
+  pruneFilter,
+} from "@/features/teams/team-labels"
 import { useMyOrganization } from "@/features/tournaments/api"
 import { isApiError } from "@/lib/api/errors"
 import { plural } from "@/lib/format"
@@ -142,6 +150,9 @@ export function OrganizationTeams() {
   )
 }
 
+/** Powyżej tylu drużyn sekcje startują zwinięte (chyba że szukasz albo filtrujesz). */
+const COLLAPSE_ABOVE = 20
+
 function TeamsTab({
   organizationId,
   teams,
@@ -153,11 +164,28 @@ function TeamsTab({
 }) {
   const [filter, setFilter] = useState<LabelFilter>(ALL_TEAMS)
   const [query, setQuery] = useState("")
-  // Usunięta etykieta nie może zostać wybranym filtrem z pustą listą.
-  const activeFilter =
-    filter.kind === "label" && !labels.some((l) => l.id === filter.labelId) ? ALL_TEAMS : filter
-  const visible = filterTeams(teams, activeFilter, query)
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  // Usunięta etykieta nie może zostać w filtrze.
+  const activeFilter = pruneFilter(filter, labels)
+  const searching = query.trim() !== ""
   const labelName = new Map(labels.map((l) => [l.id, l.name]))
+  const matching = filterTeams(teams, ALL_TEAMS, query)
+  const sections = labels.length > 0 ? groupByLabel(matching, labels, activeFilter) : []
+  // Szukanie i filtr rozwijają sekcje, żeby wynik był od razu widać.
+  const openByDefault = searching || !isAllTeams(activeFilter) || teams.length <= COLLAPSE_ABOVE
+  const isOpen = (key: string) => open[key] ?? openByDefault
+  const allOpen = sections.every((s) => isOpen(s.key))
+
+  const row = (team: Team, sectionKey?: string) => (
+    <TeamRow
+      key={team.id}
+      sectionKey={sectionKey}
+      organizationId={organizationId}
+      team={team}
+      labels={labels}
+      labelName={labelName}
+    />
+  )
 
   return (
     <div className="space-y-3">
@@ -178,72 +206,144 @@ function TeamsTab({
       )}
       <TeamLabelFilter labels={labels} teams={teams} value={activeFilter} onChange={setFilter} />
 
-      {visible.length === 0 ? (
-        <p className="text-muted-foreground py-6 text-center text-sm">
-          {query.trim()
-            ? `Brak drużyn pasujących do „${query.trim()}”.`
-            : "Brak drużyn w tym widoku."}
-        </p>
+      {labels.length === 0 ? (
+        matching.length === 0 ? (
+          <NoTeams query={query} />
+        ) : (
+          <ul className="bg-card divide-y rounded-xl border">
+            {matching.map((team) => row(team))}
+          </ul>
+        )
+      ) : sections.length === 0 ? (
+        <NoTeams query={query} />
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {visible.map((team) => (
-            // min-w-0: element siatki nie kurczy się poniżej treści, więc długa nazwa wypychała
-            // przyciski poza ekran telefonu zamiast się skracać (QA v3: DRU-023).
-            <li key={team.id} className="min-w-0">
-              <Card className="min-w-0 py-4">
-                <CardContent className="flex items-center gap-3 px-4">
-                  <TeamLogo name={team.name} logoUrl={team.logoUrl} size={44} />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/organizations/${organizationId}/teams/${team.id}`}
-                      className="block hover:underline"
-                    >
-                      <p className="truncate font-medium">{team.name}</p>
-                      {team.shortName && (
-                        <p className="text-muted-foreground font-mono text-xs">{team.shortName}</p>
+        <div className="space-y-2">
+          {sections.length > 1 && (
+            <div className="flex justify-end">
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto px-0"
+                onClick={() => setOpen(Object.fromEntries(sections.map((s) => [s.key, !allOpen])))}
+              >
+                {allOpen ? "Zwiń wszystkie" : "Rozwiń wszystkie"}
+              </Button>
+            </div>
+          )}
+          {sections.map((section) => {
+            const expanded = isOpen(section.key)
+            const listId = `team-section-${section.key}`
+            return (
+              <section key={section.key} className="bg-card rounded-xl border">
+                <h2>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={listId}
+                    onClick={() => setOpen((current) => ({ ...current, [section.key]: !expanded }))}
+                    className="hover:bg-accent/50 flex w-full items-center gap-2 rounded-xl px-4 py-3 text-left"
+                  >
+                    <ChevronRight
+                      aria-hidden
+                      className={cn(
+                        "size-4 shrink-0 transition-transform",
+                        expanded && "rotate-90",
                       )}
-                    </Link>
-                    {team.labelIds.length > 0 && (
-                      <ul aria-label="Etykiety drużyny" className="mt-1 flex flex-wrap gap-1">
-                        {team.labelIds
-                          .filter((labelId) => labelName.has(labelId))
-                          .map((labelId) => (
-                            <li key={labelId} className="max-w-full">
-                              <Badge variant="secondary" className="max-w-full">
-                                <span className="truncate">{labelName.get(labelId)}</span>
-                              </Badge>
-                            </li>
-                          ))}
-                      </ul>
-                    )}
-                  </div>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href={`/organizations/${organizationId}/teams/${team.id}`}>
-                      <Users />
-                      Kadra
-                    </Link>
-                  </Button>
-                  <TeamFormDialog
-                    organizationId={organizationId}
-                    team={team}
-                    labels={labels}
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Edytuj drużynę ${team.name}`}
-                      >
-                        <Pencil />
-                      </Button>
-                    }
-                  />
-                </CardContent>
-              </Card>
-            </li>
-          ))}
-        </ul>
+                    />
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate font-medium",
+                        section.key === NO_LABEL && "text-muted-foreground",
+                      )}
+                    >
+                      {section.title}
+                    </span>
+                    <span className="text-muted-foreground text-sm tabular-nums">
+                      {section.teams.length}
+                    </span>
+                  </button>
+                </h2>
+                {expanded && (
+                  <ul id={listId} aria-label={section.title} className="divide-y border-t">
+                    {section.teams.map((team) => row(team, section.key))}
+                  </ul>
+                )}
+              </section>
+            )
+          })}
+        </div>
       )}
     </div>
+  )
+}
+
+function NoTeams({ query }: { query: string }) {
+  return (
+    <p className="text-muted-foreground py-6 text-center text-sm">
+      {query.trim() ? `Brak drużyn pasujących do „${query.trim()}”.` : "Brak drużyn w tym widoku."}
+    </p>
+  )
+}
+
+/** Zwarty wiersz drużyny: herb, nazwa ze skrótem, etykiety, kadra i edycja. */
+function TeamRow({
+  sectionKey,
+  organizationId,
+  team,
+  labels,
+  labelName,
+}: {
+  /** Etykieta sekcji, w której jest wiersz: nie powtarzamy jej przy drużynie. */
+  sectionKey?: string
+  organizationId: string
+  team: Team
+  labels: TeamLabel[]
+  labelName: Map<string, string>
+}) {
+  const href = `/organizations/${organizationId}/teams/${team.id}`
+  const teamLabels = team.labelIds.filter((id) => id !== sectionKey && labelName.has(id))
+  return (
+    // min-w-0: długa nazwa skraca się zamiast wypychać przyciski poza ekran telefonu (QA v3: DRU-023).
+    <li className="flex min-w-0 items-center gap-3 px-4 py-2.5">
+      <TeamLogo name={team.name} logoUrl={team.logoUrl} size={32} />
+      <div className="min-w-0 flex-1">
+        <Link href={href} className="flex min-w-0 items-baseline gap-2 hover:underline">
+          <span className="truncate font-medium">{team.name}</span>
+          {team.shortName && (
+            <span className="text-muted-foreground shrink-0 font-mono text-xs">
+              {team.shortName}
+            </span>
+          )}
+        </Link>
+        {teamLabels.length > 0 && (
+          <ul aria-label="Etykiety drużyny" className="mt-0.5 flex flex-wrap gap-1">
+            {teamLabels.map((labelId) => (
+              <li key={labelId} className="max-w-full">
+                <Badge variant="secondary" className="max-w-full">
+                  <span className="truncate">{labelName.get(labelId)}</span>
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <Button asChild variant="ghost" size="sm">
+        <Link href={href}>
+          <Users />
+          <span className="sr-only sm:not-sr-only">Kadra</span>
+        </Link>
+      </Button>
+      <TeamFormDialog
+        organizationId={organizationId}
+        team={team}
+        labels={labels}
+        trigger={
+          <Button variant="ghost" size="icon" aria-label={`Edytuj drużynę ${team.name}`}>
+            <Pencil />
+          </Button>
+        }
+      />
+    </li>
   )
 }
 

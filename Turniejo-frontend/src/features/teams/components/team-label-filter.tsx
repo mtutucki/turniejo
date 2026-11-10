@@ -6,7 +6,15 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import type { TeamLabel } from "@/types/teams"
 
-import { countByFilter, type LabelFilter, MANY_TEAMS } from "../team-labels"
+import {
+  ALL_TEAMS,
+  countByFilter,
+  isAllTeams,
+  type LabelFilter,
+  MANY_TEAMS,
+  NO_LABEL,
+  toggleLabel,
+} from "../team-labels"
 
 type TeamLabelFilterProps = {
   labels: TeamLabel[]
@@ -15,52 +23,72 @@ type TeamLabelFilterProps = {
   onChange: (filter: LabelFilter) => void
 }
 
-/** Przełączniki „Wszystkie / etykieta / Bez etykiety” nad listą drużyn. Bez etykiet nic nie pokazuje. */
+/**
+ * Przełączniki etykiet nad listą drużyn: można włączyć kilka naraz (drużyny z którąkolwiek z nich),
+ * „Wszystkie” czyści wybór. Bez etykiet nic nie pokazuje.
+ */
 export function TeamLabelFilter({ labels, teams, value, onChange }: TeamLabelFilterProps) {
   if (labels.length === 0) return null
   const counts = countByFilter(teams)
-  const options: { key: string; label: string; count: number; filter: LabelFilter }[] = [
-    { key: "all", label: "Wszystkie", count: counts.all, filter: { kind: "all" } },
+  const options = [
     ...labels.map((l) => ({
       key: l.id,
       label: l.name,
       count: counts.byLabel.get(l.id) ?? 0,
-      filter: { kind: "label", labelId: l.id } as LabelFilter,
+      active: value.labelIds.includes(l.id),
     })),
-    { key: "none", label: "Bez etykiety", count: counts.none, filter: { kind: "none" } },
+    { key: NO_LABEL, label: "Bez etykiety", count: counts.none, active: value.none },
   ]
-  const activeKey = value.kind === "label" ? value.labelId : value.kind
 
   return (
     <div role="group" aria-label="Etykiety" className="flex flex-wrap gap-1.5">
-      {options.map((o) => {
-        const active = o.key === activeKey
-        return (
-          <button
-            key={o.key}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(o.filter)}
-            className={cn(
-              "inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
-              active
-                ? "border-primary bg-primary text-primary-foreground"
-                : "hover:bg-accent text-foreground",
-            )}
-          >
-            <span className="truncate">{o.label}</span>
-            <span
-              className={cn(
-                "text-xs tabular-nums",
-                active ? "opacity-80" : "text-muted-foreground",
-              )}
-            >
-              {o.count}
-            </span>
-          </button>
-        )
-      })}
+      <Chip
+        label="Wszystkie"
+        count={counts.all}
+        active={isAllTeams(value)}
+        onClick={() => onChange(ALL_TEAMS)}
+      />
+      {options.map((o) => (
+        <Chip
+          key={o.key}
+          label={o.label}
+          count={o.count}
+          active={o.active}
+          onClick={() => onChange(toggleLabel(value, o.key))}
+        />
+      ))}
     </div>
+  )
+}
+
+function Chip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "hover:bg-accent text-foreground",
+      )}
+    >
+      <span className="truncate">{label}</span>
+      <span className={cn("text-xs tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>
+        {count}
+      </span>
+    </button>
   )
 }
 
