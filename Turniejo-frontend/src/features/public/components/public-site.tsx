@@ -31,8 +31,10 @@ export async function PublicSite({
       <header className="bg-brand text-brand-foreground">
         <div className="mx-auto max-w-5xl px-4 pt-4 pb-8">
           <div className="flex items-center justify-between gap-3">
+            {/* Zalogowanego "/" przekierowuje do panelu, więc logo prowadzi go do listy turniejów
+                (do panelu jest „Mój panel”). Gość na "/" widzi tę samą listę. */}
             <Link
-              href="/"
+              href={signedIn ? "/t" : "/"}
               className="flex items-center gap-2 text-sm font-semibold tracking-tight opacity-90 hover:opacity-100"
             >
               <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
