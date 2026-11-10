@@ -338,6 +338,46 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
         (await response.Content.ReadAsStringAsync()).Should().Contain("One of the teams already plays another match at this time");
     }
 
+    // Opóźnienie na boisku: przesunięcie meczu o cały slot bez przesuwania kolejnych trafia na następny mecz.
+    [Fact]
+    public async Task GRP_Schedule_DelayingAMatchIntoTheNextOne_WithoutShiftingFollowing_IsRejected()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4, start: false);
+        var (first, gap) = await FirstMatchAndGapAsync(s);
+
+        var response = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule",
+            new { pitchId = s.PitchId, scheduledAt = DateTimeOffset.Parse(first.GetString("scheduledAt")) + gap });
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Another match is already scheduled on this pitch at this time");
+    }
+
+    // Każdy mecz ląduje dokładnie na starym terminie następnego - sprawdza też, że zapis nie potyka się
+    // o unikalny indeks (boisko, godzina) w trakcie przesuwania.
+    [Fact]
+    public async Task GRP_Schedule_ShiftingFollowing_MovesEveryLaterMatchOnThePitchByTheSameAmount()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4, start: false);
+        var before = (await s.ScheduleAsync()).ToDictionary(m => m.GetGuid("id"), m => DateTimeOffset.Parse(m.GetString("scheduledAt")));
+        var (first, gap) = await FirstMatchAndGapAsync(s);
+
+        var response = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule",
+            new { pitchId = s.PitchId, scheduledAt = before[first.GetGuid("id")] + gap, shiftFollowing = true });
+
+        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+        var after = (await s.ScheduleAsync()).ToDictionary(m => m.GetGuid("id"), m => DateTimeOffset.Parse(m.GetString("scheduledAt")));
+        after.Should().HaveCount(6);
+        foreach (var (id, at) in before)
+            after[id].Should().Be(at + gap);
+    }
+
+    private static async Task<(JsonElement First, TimeSpan Gap)> FirstMatchAndGapAsync(TournamentScenario s)
+    {
+        var ordered = (await s.ScheduleAsync()).OrderBy(m => DateTimeOffset.Parse(m.GetString("scheduledAt"))).ToList();
+        var gap = DateTimeOffset.Parse(ordered[1].GetString("scheduledAt")) - DateTimeOffset.Parse(ordered[0].GetString("scheduledAt"));
+        return (ordered[0], gap);
+    }
+
     // Tabela to projekcja liczona po zakończonym meczu. Zanim pierwszy mecz grupy się skończy, drużyny
     // grupy mają być w tabeli z zerami, a nie "Brak drużyn w grupie".
     [Fact]

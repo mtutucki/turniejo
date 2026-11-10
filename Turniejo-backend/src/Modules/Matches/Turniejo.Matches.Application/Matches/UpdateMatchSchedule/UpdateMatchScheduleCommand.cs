@@ -8,7 +8,9 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
         Guid TournamentId,
         Guid MatchId,
         Guid? PitchId,
-        DateTimeOffset ScheduledAt) : ICommand<UpdateMatchScheduleResponse>, IAuthorizedRequest
+        DateTimeOffset ScheduledAt,
+        // Opóźnienie na boisku: późniejsze, nierozpoczęte mecze na tym samym boisku przesuwają się o tyle samo.
+        bool ShiftFollowing = false) : ICommand<UpdateMatchScheduleResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

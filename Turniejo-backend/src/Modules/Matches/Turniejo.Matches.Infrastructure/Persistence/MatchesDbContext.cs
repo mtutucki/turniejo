@@ -37,6 +37,13 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
         }
     }
 
+    public async Task ExecuteInTransactionAsync(Func<Task> work, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        await work();
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task AddPitchAsync(Pitch pitch, CancellationToken cancellationToken = default) =>
         await Pitches.AddAsync(pitch, cancellationToken);
 

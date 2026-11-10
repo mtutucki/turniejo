@@ -97,5 +97,82 @@ namespace Turniejo.Matches.UnitTests.Matches
             result.Error.Code.Should().Be("Validation.PitchId");
             await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         }
+
+        private void ShiftScenario(Guid tournamentId, params Match[] matches)
+        {
+            _dbContext.GetMatchesByTournamentIdAsync(tournamentId, Arg.Any<CancellationToken>()).Returns(matches.ToList());
+            _dbContext.GetTrackedMatchesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+                .Returns(ci => matches.Where(m => ci.Arg<IReadOnlyCollection<Guid>>().Contains(m.Id)).ToList());
+            _dbContext.ExecuteInTransactionAsync(Arg.Any<Func<Task>>(), Arg.Any<CancellationToken>())
+                .Returns(ci => ci.Arg<Func<Task>>()());
+        }
+
+        [Fact]
+        public async Task Handle_ShiftFollowing_MovesLaterMatchesOnTheSamePitchOnly()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitch = Guid.NewGuid();
+            var otherPitch = Guid.NewGuid();
+            var ten = DateTimeOffset.UtcNow.AddDays(1);
+            var match = OtherMatch(tournamentId, pitch, ten);
+            var earlier = OtherMatch(tournamentId, pitch, ten.AddMinutes(-30));
+            var next = OtherMatch(tournamentId, pitch, ten.AddMinutes(30));
+            var last = OtherMatch(tournamentId, pitch, ten.AddMinutes(60));
+            var elsewhere = OtherMatch(tournamentId, otherPitch, ten.AddMinutes(30));
+            ShiftScenario(tournamentId, match, earlier, next, last, elsewhere);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+
+            var result = await _handler.Handle(
+                new UpdateMatchScheduleCommand(tournamentId, match.Id, pitch, ten.AddMinutes(15), ShiftFollowing: true), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            match.ScheduledAt.Should().Be(ten.AddMinutes(15));
+            next.ScheduledAt.Should().Be(ten.AddMinutes(45));
+            last.ScheduledAt.Should().Be(ten.AddMinutes(75));
+            earlier.ScheduledAt.Should().Be(ten.AddMinutes(-30));
+            elsewhere.ScheduledAt.Should().Be(ten.AddMinutes(30));
+        }
+
+        [Fact]
+        public async Task Handle_ShiftFollowing_LeavesAMatchThatAlreadyStarted()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitch = Guid.NewGuid();
+            var ten = DateTimeOffset.UtcNow.AddDays(1);
+            var match = OtherMatch(tournamentId, pitch, ten);
+            var live = OtherMatch(tournamentId, pitch, ten.AddMinutes(30));
+            live.Start(Guid.NewGuid());
+            ShiftScenario(tournamentId, match, live);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+
+            var result = await _handler.Handle(
+                new UpdateMatchScheduleCommand(tournamentId, match.Id, pitch, ten.AddMinutes(10), ShiftFollowing: true), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            live.ScheduledAt.Should().Be(ten.AddMinutes(30));
+        }
+
+        [Fact]
+        public async Task Handle_ShiftFollowing_IsRejected_WhenAShiftedMatchHitsATeamOnAnotherPitch()
+        {
+            var tournamentId = Guid.NewGuid();
+            var pitch = Guid.NewGuid();
+            var ten = DateTimeOffset.UtcNow.AddDays(1);
+            var match = OtherMatch(tournamentId, pitch, ten);
+            var next = OtherMatch(tournamentId, pitch, ten.AddMinutes(30));
+            var sameTeamElsewhere = Match.Create(Guid.NewGuid(), tournamentId, null, null, next.HomeTournamentTeamId, Guid.NewGuid(),
+                Guid.NewGuid(), ten.AddMinutes(40), StageType.Group).Value;
+            ShiftScenario(tournamentId, match, next, sameTeamElsewhere);
+            _dbContext.GetMatchByIdAsync(match.Id, Arg.Any<CancellationToken>()).Returns(match);
+
+            var result = await _handler.Handle(
+                new UpdateMatchScheduleCommand(tournamentId, match.Id, pitch, ten.AddMinutes(10), ShiftFollowing: true), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Message.Should().Be("One of the teams already plays another match at this time");
+            match.ScheduledAt.Should().Be(ten);
+            next.ScheduledAt.Should().Be(ten.AddMinutes(30));
+            await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
     }
 }
