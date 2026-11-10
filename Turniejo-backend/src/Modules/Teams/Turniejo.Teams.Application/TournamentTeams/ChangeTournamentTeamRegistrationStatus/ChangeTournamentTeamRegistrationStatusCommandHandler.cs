@@ -36,6 +36,9 @@ namespace Turniejo.Teams.Application.TournamentTeams.ChangeTournamentTeamRegistr
                 var tournament = await tournamentModule.GetTournamentAsync(request.TournamentId, cancellationToken);
                 if (tournament == null)
                     return Result.Failure<ChangeTournamentTeamRegistrationStatusResponse>(Error.NotFound("Tournament", request.TournamentId));
+                // Drużyna przyjęta po generowaniu nie miałaby żadnego meczu.
+                if (ScheduleLock.IsLocked(tournament))
+                    return Result.Failure<ChangeTournamentTeamRegistrationStatusResponse>(ScheduleLock.Error);
 
                 var acceptedCount = await dbContext.CountAcceptedTournamentTeamsAsync(request.TournamentId, cancellationToken);
                 if (acceptedCount >= tournament.TeamLimit)

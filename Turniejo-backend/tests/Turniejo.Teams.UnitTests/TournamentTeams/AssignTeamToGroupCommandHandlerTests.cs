@@ -18,6 +18,9 @@ namespace Turniejo.Teams.UnitTests.TournamentTeams
             _dbContext = Substitute.For<ITeamsDbContext>();
             _tournamentModule = Substitute.For<ITournamentModule>();
             _handler = new AssignTeamToGroupCommandHandler(_dbContext, _tournamentModule);
+            // Domyślnie turniej przed terminarzem: grupy można zmieniać.
+            _tournamentModule.GetTournamentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(call => new TournamentDto(call.Arg<Guid>(), "Cup", "RegistrationClosed", "Group", Guid.NewGuid(), 16));
         }
 
         private static TournamentTeam CreateFakeTournamentTeam(Guid tournamentId, Guid categoryId)

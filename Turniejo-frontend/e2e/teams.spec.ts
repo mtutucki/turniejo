@@ -111,6 +111,7 @@ test.describe("Zgłoszenia do turnieju", () => {
   })
 
   test("[DRU-037] akceptacja wszystkich oczekujących jednym przyciskiem", async ({ page }) => {
+    await mock.tournament(TOURNAMENT_ID, { status: "RegistrationOpen" })
     await pendingTeams(3)
     await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
     await expect(page.getByText("3 drużyny czekają na akceptację.", { exact: false })).toBeVisible()
@@ -122,7 +123,7 @@ test.describe("Zgłoszenia do turnieju", () => {
   })
 
   test("[DRU-038] przy małym limicie akceptuje tyle drużyn, ile się zmieści", async ({ page }) => {
-    await mock.tournament(TOURNAMENT_ID, { teamLimit: 2 })
+    await mock.tournament(TOURNAMENT_ID, { teamLimit: 2, status: "RegistrationOpen" })
     await pendingTeams(3)
     await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
     await expect(page.getByText("W limicie zmieści się jeszcze 2 drużyny.")).toBeVisible()
@@ -134,6 +135,8 @@ test.describe("Zgłoszenia do turnieju", () => {
   })
 
   test("[GRP-030] drużyny pokazane w ramkach swoich grup, przeniesienie zmienia ramkę", async ({ page }) => {
+    // Przed terminarzem: po jego wygenerowaniu grup nie da się już zmienić (GRP-031).
+    await mock.tournament(TOURNAMENT_ID, { status: "RegistrationClosed" })
     const group = (id: string, name: string, order: number) => ({
       id,
       tournamentId: TOURNAMENT_ID,
@@ -166,6 +169,29 @@ test.describe("Zgłoszenia do turnieju", () => {
     const none = page.getByRole("region", { name: "Bez grupy" })
     await expect(none.getByText("Te drużyny nie zagrają, dopóki nie trafią do grupy.")).toBeVisible()
     await expect(none.getByRole("link", { name: /Lwy E2E/ }).first()).toBeVisible()
+  })
+
+  test("[GRP-031 GRP-032] po wygenerowaniu terminarza grup i listy drużyn nie da się zmienić", async ({ page }) => {
+    const category = "0f000000-0000-4000-8000-000000000020"
+    await mock.tournament(TOURNAMENT_ID, { status: "ScheduleGenerated" })
+    await mock.override({
+      method: "GET",
+      path: "/api/tournaments/:id/groups",
+      body: ["Grupa A", "Grupa B"].map((name, i) => ({
+        id: `0f000000-0000-4000-8000-00000000003${i}`,
+        tournamentId: TOURNAMENT_ID,
+        categoryId: category,
+        name,
+        order: i + 1,
+      })),
+    })
+    await pendingTeams(2)
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+
+    await expect(page.getByText("Terminarz jest gotowy, więc grup i listy drużyn nie zmienisz.", { exact: false })).toBeVisible()
+    await expect(page.getByRole("combobox", { name: "Grupa: Oczekująca 1" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "Akceptuj", exact: true }).first()).toBeDisabled()
+    await expect(page.getByRole("button", { name: "Akceptuj wszystkie" })).toHaveCount(0)
   })
 
   test("[DRU-010] kategorii z meczami nie da się usunąć, z wyjaśnieniem", async ({ page }) => {

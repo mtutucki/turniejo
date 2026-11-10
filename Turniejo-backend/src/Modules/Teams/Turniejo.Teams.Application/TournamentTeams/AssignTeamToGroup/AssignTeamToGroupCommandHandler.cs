@@ -18,6 +18,12 @@ namespace Turniejo.Teams.Application.TournamentTeams.AssignTeamToGroup
             if (tournamentTeam == null || tournamentTeam.TournamentId != request.TournamentId)
                 return Result.Failure<AssignTeamToGroupResponse>(Error.NotFound("TournamentTeam", request.TournamentTeamId));
 
+            var tournament = await tournamentModule.GetTournamentAsync(request.TournamentId, cancellationToken);
+            if (tournament == null)
+                return Result.Failure<AssignTeamToGroupResponse>(Error.NotFound("Tournament", request.TournamentId));
+            if (ScheduleLock.IsLocked(tournament) && tournamentTeam.GroupId != request.GroupId)
+                return Result.Failure<AssignTeamToGroupResponse>(ScheduleLock.Error);
+
             if (request.GroupId.HasValue)
             {
                 var group = await tournamentModule.GetTournamentGroupAsync(request.GroupId.Value, cancellationToken);
