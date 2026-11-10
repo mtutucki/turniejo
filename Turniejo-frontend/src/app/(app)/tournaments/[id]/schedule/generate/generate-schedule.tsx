@@ -190,6 +190,8 @@ type GroupPlan = { group: TournamentGroup; teams: number; matches: number; round
 type Workload = {
   totalMatches: number
   maxRounds: number
+  /** Grupy + puchar: ile z totalMatches to mecze pucharu (dostaną termin po fazie grupowej). */
+  knockoutMatches?: number
   /** Puchar: etap każdego meczu w kolejności, w jakiej generator rozdaje je dniom. */
   stages?: string[]
 }
@@ -221,6 +223,18 @@ function bracketSequence(brackets: Bracket[], pending: Match[]) {
   return items.sort((a, b) => a.phase - b.phase || a.order - b.order).map((item) => item.title)
 }
 
+/**
+ * Ile meczów będzie miała drabinka z tych par (1. runda bez wolnych losów, kolejne rundy i mecz
+ * o 3. miejsce). Generator planuje je od razu, więc liczą się do meczów dnia.
+ */
+function bracketMatchCount(
+  pairs: { home: { kind: string }; away: { kind: string } }[],
+  thirdPlace: boolean,
+) {
+  const byes = pairs.filter((p) => p.home.kind === "bye" || p.away.kind === "bye").length
+  return pairs.length - byes + (pairs.length - 1) + (thirdPlace && pairs.length >= 2 ? 1 : 0)
+}
+
 /** "Półfinały × 2, Finał" — etapy meczów jednego dnia. */
 function summarizeStages(titles: string[]) {
   const groups: { title: string; count: number }[] = []
@@ -250,7 +264,10 @@ const pendingBracketMatches = (matches: Match[]) =>
       (m.status === "Scheduled" || m.status === "Ready" || m.status === "Postponed"),
   )
 
-/** Te same reguły co GenerateScheduleCommandHandler: grupa gra, jeśli ma ≥ 2 zaakceptowane drużyny. */
+/**
+ * Te same reguły co GenerateScheduleCommandHandler: grupa gra, jeśli ma ≥ 2 zaakceptowane drużyny.
+ * Pusta grupa nie przeszkadza, grupa z jedną drużyną blokuje generowanie (ta drużyna nie miałaby meczu).
+ */
 function planGroups(groups: TournamentGroup[], teams: TournamentTeam[]): GroupPlan[] {
   return groups.map((group) => {
     const n = teams.filter(
@@ -522,6 +539,8 @@ function Requirements({
   teams,
   groups,
   categories,
+  manualBrackets,
+  lonelyCategories,
 }: {
   tournament: Tournament
   plan: GroupPlan[]
@@ -530,10 +549,15 @@ function Requirements({
   teams: TournamentTeam[]
   groups: TournamentGroup[]
   categories: TournamentCategory[]
+  /** Kategorie, w których drabinkę musi ułożyć organizator. */
+  manualBrackets: TournamentCategory[]
+  /** Kategorie z jedną zaakceptowaną drużyną. */
+  lonelyCategories: TournamentCategory[]
 }) {
   const id = tournament.id
   const playable = plan.filter((p) => p.matches > 0)
-  const incomplete = plan.filter((p) => p.matches === 0)
+  const incomplete = plan.filter((p) => p.teams === 0)
+  const singleTeam = plan.filter((p) => p.teams === 1)
   // Diagnoza "dlaczego grupa nie gra": drużyny bez grupy i czekające na akceptację.
   const accepted = teams.filter((t) => t.registrationStatus === "Accepted")
   const unassigned = accepted.filter((t) => !t.groupId)
@@ -630,7 +654,7 @@ function Requirements({
             : "Co najmniej jedna grupa z 2 zaakceptowanymi drużynami"}
           {incomplete.length > 0 && (
             <span className="text-muted-foreground block text-xs">
-              Pominięte (mniej niż 2 drużyny): {incomplete.map((p) => p.group.name).join(", ")}
+              Pominięte (bez drużyn): {incomplete.map((p) => p.group.name).join(", ")}
             </span>
           )}
           {!tournament.format && (
@@ -659,6 +683,42 @@ function Requirements({
                 teams={categoryTeams}
               />
             ))}
+        </Requirement>
+      )}
+      {singleTeam.length > 0 && (
+        <Requirement ok={false}>
+          Tylko jedna drużyna w grupie: {singleTeam.map((p) => p.group.name).join(", ")}
+          <span className="text-muted-foreground block text-xs">
+            Ta drużyna nie miałaby meczu, dodaj jej rywala albo przenieś ją do innej grupy.{" "}
+            <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
+              Przejdź do Drużyn
+            </Link>
+          </span>
+        </Requirement>
+      )}
+      {lonelyCategories.length > 0 && (
+        <Requirement ok={false}>
+          Tylko jedna drużyna w kategorii: {lonelyCategories.map((c) => c.name).join(", ")}
+          <span className="text-muted-foreground block text-xs">
+            Ta drużyna nie miałaby z kim grać, dodaj drugą albo usuń kategorię.{" "}
+            <Link href={`/tournaments/${id}/teams`} className="text-primary underline">
+              Przejdź do Drużyn
+            </Link>
+          </span>
+        </Requirement>
+      )}
+      {manualBrackets.length > 0 && (!isKnockout(tournament) || categories.length > 1) && (
+        <Requirement ok={false}>
+          Brak drabinki
+          {categories.length > 1 && `: ${manualBrackets.map((c) => c.name).join(", ")}`}{" "}
+          <Link href={`/tournaments/${id}/bracket`} className="text-primary underline">
+            (ułóż pary)
+          </Link>
+          <span className="text-muted-foreground block text-xs">
+            {isKnockout(tournament)
+              ? "Terminarz powstaje dla wszystkich kategorii naraz, więc każda potrzebuje drabinki."
+              : "Pary z miejsc w grupach nie ułożyły się same, a terminarz od razu planuje mecze pucharu."}
+          </span>
         </Requirement>
       )}
       {!isKnockout(tournament) && unassigned.length > 0 && (
@@ -724,7 +784,7 @@ function GenerateForm({
   acceptedTeams,
   waitingTeams,
   notReadyReason,
-  afterGenerate,
+  beforeGenerate,
 }: {
   tournament: Tournament
   settings: TournamentSettings
@@ -736,12 +796,16 @@ function GenerateForm({
   waitingTeams: string[]
   /** Dlaczego przycisk jest wyłączony, gdy warunki nie są spełnione. */
   notReadyReason: string
-  /** Grupy + puchar: po terminarzu tworzymy brakujące drabinki (miejsca w grupach). */
-  afterGenerate?: () => Promise<void>
+  /**
+   * Grupy + puchar: przed terminarzem tworzymy brakujące drabinki (miejsca w grupach), bo generator
+   * od razu planuje terminy pucharu. false = nie wszystkie powstały, nie generujemy.
+   */
+  beforeGenerate?: () => Promise<boolean>
 }) {
   const router = useRouter()
   const generate = useGenerateSchedule(tournament.id)
-  const { totalMatches, stages } = workload
+  const { totalMatches, stages, knockoutMatches = 0 } = workload
+  const [preparing, setPreparing] = useState(false)
   // Szkic przeżywa przejście do innej sekcji (np. "zmień" czas meczu w ustawieniach) i powrót.
   const [draft] = useState(() => readDraft(tournament.id))
   const [bounds] = useState((): TournamentBounds => {
@@ -912,7 +976,12 @@ function GenerateForm({
   // Generowanie jest jednorazowe, więc przed wysłaniem pytamy jeszcze raz.
   const [confirming, setConfirming] = useState<GenerateValues | null>(null)
 
-  function submit(values: GenerateValues) {
+  async function submit(values: GenerateValues) {
+    if (beforeGenerate) {
+      setPreparing(true)
+      const prepared = await beforeGenerate().finally(() => setPreparing(false))
+      if (!prepared) return
+    }
     const windows = [...values.days]
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((day) => ({
@@ -940,7 +1009,6 @@ function GenerateForm({
               ? `Rozstawiono ${plural(matchesCreated, ["mecz", "mecze", "meczów"])} 1. rundy`
               : `Wygenerowano ${plural(matchesCreated, ["mecz", "mecze", "meczów"])}`,
           )
-          await afterGenerate?.()
           router.push(`/tournaments/${tournament.id}/schedule`)
         },
         onError: (error) => applyFieldErrors(error, form),
@@ -957,7 +1025,7 @@ function GenerateForm({
             <AlertDialogDescription>
               {isKnockout(tournament)
                 ? `${plural(totalMatches, ["mecz 1. rundy dostanie", "mecze 1. rundy dostaną", "meczów 1. rundy dostanie"])} godziny i boiska.`
-                : `Powstanie ${plural(totalMatches, ["mecz", "mecze", "meczów"])} dla ${plural(acceptedTeams, ["zaakceptowanej drużyny", "zaakceptowanych drużyn", "zaakceptowanych drużyn"])}.`}{" "}
+                : `Powstanie ${plural(totalMatches - knockoutMatches, ["mecz", "mecze", "meczów"])} dla ${plural(acceptedTeams, ["zaakceptowanej drużyny", "zaakceptowanych drużyn", "zaakceptowanych drużyn"])}${knockoutMatches > 0 ? `, a ${plural(knockoutMatches, ["mecz pucharu dostanie", "mecze pucharu dostaną", "meczów pucharu dostanie"])} godziny` : ""}.`}{" "}
               Turniej przejdzie do etapu „Harmonogram gotowy”. Żeby ułożyć terminarz jeszcze raz,
               trzeba go najpierw wyczyścić.
             </AlertDialogDescription>
@@ -983,7 +1051,7 @@ function GenerateForm({
             )}
             <AlertDialogAction
               onClick={() => {
-                if (confirming) submit(confirming)
+                if (confirming) void submit(confirming)
                 setConfirming(null)
               }}
             >
@@ -1262,9 +1330,9 @@ function GenerateForm({
         )}
 
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={!ready || !planOk || generate.isPending}>
+          <Button type="submit" disabled={!ready || !planOk || generate.isPending || preparing}>
             <CalendarCheck />
-            {generate.isPending ? "Generowanie…" : "Generuj terminarz"}
+            {generate.isPending || preparing ? "Generowanie…" : "Generuj terminarz"}
           </Button>
           <Button asChild variant="ghost">
             <Link
@@ -1296,21 +1364,37 @@ export function GenerateScheduleView() {
     withBracket,
   )
   const { mutateAsync: createBracket, isPending: creatingBracket } = useGenerateBracket(id)
-  // Kategorie bez drabinki (GET zwraca 404) — drabinka powstaje sama z propozycji par.
-  const missingBrackets = (categories.data ?? []).filter((_, index) => {
-    const bracket = brackets[index]
-    return !!bracket?.isError && isApiError(bracket.error) && bracket.error.status === 404
-  })
   const acceptedIn = (categoryId: string) =>
     (teams.data ?? []).filter(
       (team) => team.categoryId === categoryId && team.registrationStatus === "Accepted",
     )
+  // Kategorie bez drabinki (GET zwraca 404), w których ktoś gra — drabinka powstaje sama z propozycji
+  // par. Każda z nich musi ją mieć, inaczej generator odmówi (dawniej ta kategoria zostawała bez meczów).
+  const missingBrackets = (categories.data ?? []).filter((category, index) => {
+    const bracket = brackets[index]
+    return (
+      acceptedIn(category.id).length >= 2 &&
+      !!bracket?.isError &&
+      isApiError(bracket.error) &&
+      bracket.error.status === 404
+    )
+  })
 
   // Puchar: terminarz rozstawia mecze 1. rundy, więc drabinka musi powstać przed generowaniem.
   // Tworzymy ją po wejściu tutaj (zapisy zamknięte, drużyny ustalone), każdą kategorię raz.
   const autoKnockout =
     isOrganizer && knockout && tournament.data?.status === "RegistrationClosed" && !!teams.data
   const missingKey = missingBrackets.map((c) => c.id).join(",")
+  const presentKey = (categories.data ?? [])
+    .filter((_, index) => !!brackets[index]?.data)
+    .map((c) => c.id)
+    .join(",")
+  // Kategoria, która ma drabinkę, może ją znów stracić (organizator ją usunie, żeby ułożyć pary od nowa).
+  // Wtedy drabinka ma powstać sama ponownie, więc zapominamy, że już próbowaliśmy.
+  useEffect(() => {
+    for (const categoryId of presentKey ? presentKey.split(",") : [])
+      autoBracketTried.delete(`${id}:${categoryId}`)
+  }, [presentKey, id])
   useEffect(() => {
     if (!autoKnockout || !missingKey) return
     const todo = missingKey
@@ -1330,7 +1414,8 @@ export function GenerateScheduleView() {
         try {
           await createBracket({ categoryId, pairs })
         } catch {
-          // Błąd pokazuje globalny handler; organizator ułoży tę drabinkę ręcznie.
+          // Błąd pokazuje globalny handler; po powrocie na ekran spróbujemy jeszcze raz.
+          autoBracketTried.delete(`${id}:${categoryId}`)
         }
       }
     })()
@@ -1363,9 +1448,12 @@ export function GenerateScheduleView() {
     teams.isPending ||
     schedule.isPending ||
     categories.isPending ||
-    // Kategoria bez drabinki kończy się błędem 404, nie wiecznym ładowaniem.
-    (withBracket && brackets.some((bracket) => bracket.isPending)) ||
-    creatingBracket
+    // Kategoria bez drabinki kończy się błędem 404, nie wiecznym ładowaniem. Tylko pierwsze ładowanie:
+    // po utworzeniu drabinki zapytanie wraca na chwilę do "pending", a szkielet w tym czasie
+    // przemontowywał formularz w trakcie generowania (ginęło przejście do terminarza).
+    (withBracket && brackets.some((bracket) => bracket.isPending && !bracket.isFetched)) ||
+    // Grupy + puchar tworzą drabinki w trakcie generowania - formularz musi wtedy zostać na ekranie.
+    (knockout && creatingBracket)
   if (loading) return <Skeleton className="h-96 w-full max-w-3xl rounded-xl" />
 
   const t = tournament.data!
@@ -1378,6 +1466,34 @@ export function GenerateScheduleView() {
     brackets.flatMap((bracket) => (bracket.data ? [bracket.data] : [])),
     pendingBracket,
   )
+  // Grupy + puchar: propozycja drabinki z miejsc w grupach dla kategorii, które jej jeszcze nie mają.
+  // Kategoria bez propozycji (np. pary trzeba poprawić) czeka na organizatora w zakładce Drabinka.
+  const groupBracketProposals =
+    t.format === "GroupAndKnockout"
+      ? missingBrackets.map((category) => {
+          const categoryGroups = plan
+            .filter((p) => p.group.categoryId === category.id && p.matches > 0)
+            .map((p) => p.group)
+            .sort((a, b) => a.order - b.order)
+          return {
+            category,
+            pairs:
+              categoryGroups.length > 0
+                ? autoBracketPairs(categoryGroups, acceptedIn(category.id))
+                : null,
+          }
+        })
+      : []
+  const groupMatches = plan.reduce((sum, p) => sum + p.matches, 0)
+  const knockoutMatches =
+    t.format === "GroupAndKnockout"
+      ? stages.length +
+        groupBracketProposals.reduce(
+          (sum, { pairs }) =>
+            sum + (pairs ? bracketMatchCount(pairs, !!settings.data?.isThirdPlaceMatchEnabled) : 0),
+          0,
+        )
+      : 0
   const workload: Workload = isKnockout(t)
     ? {
         totalMatches: bracketMatches > 0 ? Math.max(stages.length, bracketMatches) : 0,
@@ -1386,8 +1502,10 @@ export function GenerateScheduleView() {
         stages: stages.length >= bracketMatches ? stages : undefined,
       }
     : {
-        totalMatches: plan.reduce((sum, p) => sum + p.matches, 0),
+        // Grupy + puchar: generator od razu daje termin także meczom pucharu, więc liczą się do dni.
+        totalMatches: groupMatches + knockoutMatches,
         maxRounds: Math.max(0, ...plan.map((p) => p.rounds)),
+        knockoutMatches,
       }
   if (t.status === "Cancelled") {
     return <EmptyState icon={ShieldAlert} title="Turniej został anulowany" action={backLink} />
@@ -1407,34 +1525,32 @@ export function GenerateScheduleView() {
     )
   }
 
-  // Grupy + puchar: drabinka z miejsc w grupach (A1–B2, B1–A2). Kategorie, w których propozycji nie da
-  // się zapisać bez poprawek, zostają dla organizatora.
+  // Grupy + puchar: przed generowaniem drabinka z miejsc w grupach (A1–B2, B1–A2) w każdej kategorii,
+  // która jej nie ma. Generator od razu planuje jej mecze po fazie grupowej tej kategorii.
   async function createGroupBrackets() {
-    let skipped = 0
-    for (const category of missingBrackets) {
-      const categoryGroups = plan
-        .filter((p) => p.group.categoryId === category.id && p.matches > 0)
-        .map((p) => p.group)
-        .sort((a, b) => a.order - b.order)
-      const pairs =
-        categoryGroups.length > 0 ? autoBracketPairs(categoryGroups, acceptedIn(category.id)) : null
-      if (!pairs) {
-        skipped++
-        continue
-      }
+    let created = 0
+    for (const { category, pairs } of groupBracketProposals) {
+      if (!pairs) return false
       try {
         await createBracket({ categoryId: category.id, pairs })
+        created++
       } catch {
-        skipped++
+        // Błąd pokazuje globalny handler; terminarza bez drabinki tej kategorii nie generujemy.
+        return false
       }
     }
-    if (missingBrackets.length > skipped)
+    if (created > 0)
       toast.success("Drabinka utworzona z miejsc w grupach. Pary zmienisz w zakładce Drabinka.")
-    if (skipped > 0)
-      toast.message(
-        "Nie każdą drabinkę dało się ułożyć automatycznie. Ułóż pary w zakładce Drabinka.",
-      )
+    return true
   }
+
+  // Kategorie, w których drabinkę musi ułożyć organizator: puchar, gdy nie powstała sama, i grupy +
+  // puchar, gdy propozycji z miejsc w grupach nie da się zapisać bez poprawek.
+  const manualBrackets = isKnockout(t)
+    ? missingBrackets
+    : groupBracketProposals.filter((p) => !p.pairs).map((p) => p.category)
+  // Kategoria z jedną drużyną nie ma z kim grać, a terminarz powstaje dla całego turnieju.
+  const lonelyCategories = (categories.data ?? []).filter((c) => acceptedIn(c.id).length === 1)
 
   // Zaakceptowana drużyna bez grupy zostałaby po cichu pominięta — a generowanie jest jednorazowe.
   const teamsWithoutGroup = (teams.data ?? []).some(
@@ -1445,7 +1561,12 @@ export function GenerateScheduleView() {
     registrationClosed &&
     (isKnockout(t)
       ? bracketMatches > 0
-      : hasGroupStage(t) && plan.some((p) => p.matches > 0) && !teamsWithoutGroup) &&
+      : hasGroupStage(t) &&
+        plan.some((p) => p.matches > 0) &&
+        !plan.some((p) => p.teams === 1) &&
+        !teamsWithoutGroup) &&
+    manualBrackets.length === 0 &&
+    lonelyCategories.length === 0 &&
     activePitches.length > 0
 
   return (
@@ -1456,8 +1577,10 @@ export function GenerateScheduleView() {
           <CardTitle className="text-base">Warunki</CardTitle>
           <CardDescription>
             {isKnockout(t)
-              ? "Puchar: pary 1. rundy układają się same według rozstawienia (zmienisz je w zakładce Drabinka). Tu dostaną godziny i boiska. Kolejne rundy zaplanują się same po rozstrzygnięciu meczów."
-              : "Mecze „każdy z każdym” w grupach, dla drużyn zaakceptowanych i przypisanych do grupy."}
+              ? "Puchar: pary 1. rundy układają się same według rozstawienia (zmienisz je w zakładce Drabinka). Tu wszystkie rundy dostaną godziny i boiska."
+              : t.format === "GroupAndKnockout"
+                ? "Mecze „każdy z każdym” w grupach, a po nich puchar z miejsc w grupach. Wszystkie mecze dostaną godziny od razu."
+                : "Mecze „każdy z każdym” w grupach, dla drużyn zaakceptowanych i przypisanych do grupy."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1469,6 +1592,8 @@ export function GenerateScheduleView() {
             teams={teams.data ?? []}
             groups={groups.data ?? []}
             categories={categories.data ?? []}
+            manualBrackets={manualBrackets}
+            lonelyCategories={lonelyCategories}
           />
         </CardContent>
       </Card>
@@ -1502,7 +1627,7 @@ export function GenerateScheduleView() {
                     ? "Zapisy jeszcze nie ruszyły. Otwórz je, a potem zamknij, żeby wygenerować terminarz."
                     : "Zapisy są wciąż otwarte. Zamknij je, żeby wygenerować terminarz."
               }
-              afterGenerate={t.format === "GroupAndKnockout" ? createGroupBrackets : undefined}
+              beforeGenerate={t.format === "GroupAndKnockout" ? createGroupBrackets : undefined}
             />
           )}
         </CardContent>
