@@ -409,6 +409,43 @@ test.describe("Zgłoszenia do turnieju", () => {
     await expect(page.getByRole("button", { name: "Akceptuj wszystkie" })).toHaveCount(0)
   })
 
+  test("[DRU-056] wycofanie przy gotowym terminarzu pyta i mówi o odwołanych meczach", async ({ page }) => {
+    await mock.tournament(TOURNAMENT_ID, { status: "ScheduleGenerated" })
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+    const withdraw = page.getByRole("button", { name: "Wycofaj", exact: true }).first()
+
+    await withdraw.click()
+    const dialog = page.getByRole("alertdialog", { name: /Wycofać drużynę/ })
+    await expect(dialog).toContainText("Jej nierozegrane mecze zostaną odwołane.")
+    await expect(dialog).not.toContainText("walkower")
+    await dialog.getByRole("button", { name: "Anuluj" }).click()
+    expect(await mock.calls("PATCH", "/registration-status")).toBe(0)
+
+    await withdraw.click()
+    await dialog.getByRole("button", { name: "Wycofaj" }).click()
+    await expect(page.getByText(/: Wycofana/)).toBeVisible()
+    expect(await mock.calls("PATCH", "/registration-status")).toBe(1)
+  })
+
+  test("[DRU-056] w trwającym pucharze ostrzeżenie mówi o walkowerze dla rywala", async ({ page }) => {
+    await mock.tournament(TOURNAMENT_ID, { format: "Knockout", status: "InProgress" })
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+
+    await page.getByRole("button", { name: "Wycofaj", exact: true }).first().click()
+    await expect(page.getByRole("alertdialog", { name: /Wycofać drużynę/ })).toContainText(
+      "a w pucharze rywal dostanie walkower",
+    )
+  })
+
+  test("[DRU-056] bez terminarza wycofanie działa od razu, bez pytania", async ({ page }) => {
+    await mock.tournament(TOURNAMENT_ID, { status: "RegistrationClosed" })
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/teams`)
+
+    await page.getByRole("button", { name: "Wycofaj", exact: true }).first().click()
+    await expect(page.getByRole("alertdialog")).toHaveCount(0)
+    await expect.poll(() => mock.calls("PATCH", "/registration-status")).toBe(1)
+  })
+
   test("[DRU-010] kategorii z meczami nie da się usunąć, z wyjaśnieniem", async ({ page }) => {
     await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
     await page.getByRole("button", { name: "Usuń kategorię U12" }).click()
