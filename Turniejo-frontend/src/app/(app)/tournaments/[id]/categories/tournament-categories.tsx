@@ -12,6 +12,7 @@ import { CategoryCard } from "@/features/tournaments/components/category-card"
 import { CategoryFormDialog } from "@/features/tournaments/components/category-form-dialog"
 import { TieBreakerEditor } from "@/features/tournaments/components/tie-breaker-editor"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
+import { statusAtLeast } from "@/types/tournaments"
 
 export function TournamentCategoriesView({
   embedded = false,
@@ -32,6 +33,12 @@ export function TournamentCategoriesView({
     <CategoryFormDialog
       tournamentId={id}
       nextOrder={nextOrder}
+      // Jak DefaultGroupProvisioner: grupy powstają tylko w formacie z grupami, przed terminarzem.
+      withGroups={
+        (format === "Group" || format === "GroupAndKnockout") &&
+        !!tournament.data &&
+        !statusAtLeast(tournament.data.status, "ScheduleGenerated")
+      }
       trigger={
         <Button>
           <Plus />

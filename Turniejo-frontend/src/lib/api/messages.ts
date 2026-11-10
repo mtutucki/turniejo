@@ -39,6 +39,7 @@ const EXACT: Record<string, string> = {
   "Cannot delete a group that still has matches scheduled in it":
     "Nie można usunąć grupy, w której są zaplanowane mecze",
   "Group does not belong to the team's category": "Grupa należy do innej kategorii niż drużyna",
+  "GroupCount must be between 1 and 8.": "Liczba grup musi być od 1 do 8",
   // Drużyny
   "Team is already registered for this tournament and category":
     "Ta drużyna jest już zgłoszona do tej kategorii",

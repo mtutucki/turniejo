@@ -136,7 +136,7 @@ namespace Turniejo.Api.Controllers
         [HttpPost("{tournamentId}/categories")]
         public async Task<IActionResult> AddTournamentCategory([FromRoute] Guid tournamentId, [FromBody] AddTournamentCategoryRequest request, CancellationToken cancellationToken)
         {
-            var command = new AddTournamentCategoryCommand(tournamentId, request.Name, request.MinBirthDate, request.MaxBirthDate, request.Order);
+            var command = new AddTournamentCategoryCommand(tournamentId, request.Name, request.MinBirthDate, request.MaxBirthDate, request.Order, request.GroupCount);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -431,7 +431,7 @@ namespace Turniejo.Api.Controllers
         public sealed record ChangeTournamentStatusRequest(TournamentStatus TournamentStatus);
         public sealed record UpdateTournamentFormatRequest(TournamentFormat TournamentFormat);
         public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description, DateTimeOffset? ExpectedUpdatedAt = null);
-        public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
+        public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order, int GroupCount = 1);
         public sealed record UpdateTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
         public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
         public sealed record UpdateTournamentGroupRequest(string Name, int Order);

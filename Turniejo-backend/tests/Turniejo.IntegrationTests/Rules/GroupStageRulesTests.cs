@@ -72,6 +72,23 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
     }
 
     [Fact]
+    public async Task GRP_002_NewCategory_GetsTheRequestedNumberOfGroups()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+
+        var response = await s.Organizer.PostAsJsonAsync($"{T(s)}/categories",
+            new { name = "U12", minBirthDate = (DateTime?)null, maxBirthDate = (DateTime?)null, order = 2, groupCount = 3 });
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var categoryId = (await response.ReadJsonAsync()).GetGuid("tournamentCategoryId");
+
+        var groups = (await (await s.Organizer.GetAsync($"{T(s)}/groups")).ReadJsonAsync()).EnumerateArray()
+            .Where(g => g.GetGuid("categoryId") == categoryId)
+            .OrderBy(g => g.GetInt("order"))
+            .Select(g => g.GetString("name"));
+        groups.Should().Equal("Grupa A", "Grupa B", "Grupa C");
+    }
+
+    [Fact]
     public async Task GRP_005_TieBreakerOrder_IsSaved_AndDuplicateOrderIsRejected()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);

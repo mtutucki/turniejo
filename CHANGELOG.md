@@ -9,6 +9,15 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 ### Nowe
 
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
+- Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.
+
+### Zmienione
+
+- Grupy w karcie kategorii są czytelną listą z liczbą drużyn i przyciskami edycji i usuwania przy każdej grupie.
+
+### Poprawione
+
+- Grupę, z której wycofano wszystkie drużyny, da się już usunąć.
 
 ## [1.0.0] - 2026-11-09
 

@@ -194,4 +194,6 @@ export type CategoryInput = {
   minBirthDate: string | null
   maxBirthDate: string | null
   order: number
+  /** Tylko przy dodawaniu, w formacie z grupami: ile grup założyć od razu (1-8). */
+  groupCount?: number
 }

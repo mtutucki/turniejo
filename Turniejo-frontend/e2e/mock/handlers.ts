@@ -1454,7 +1454,7 @@ const config = [
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const c = configOf(params.id)
-      const body = (await request.json()) as { name: string; minBirthDate: string | null; maxBirthDate: string | null; order: number }
+      const body = (await request.json()) as { name: string; minBirthDate: string | null; maxBirthDate: string | null; order: number; groupCount?: number }
       if (c.categories.some((x) => x.name.toLowerCase() === body.name.trim().toLowerCase()))
         return validation("Name", `Tournament category with name '${body.name}' already exists`)
       const category = { id: newId(), tournamentId: params.id, name: body.name.trim(), minBirthDate: body.minBirthDate, maxBirthDate: body.maxBirthDate, order: body.order }
@@ -1462,7 +1462,8 @@ const config = [
       // Jak backend: przy formacie z grupami nowa kategoria dostaje od razu "Grupę A".
       const format = findTournament(params.id)?.format
       if (format === "Group" || format === "GroupAndKnockout")
-        c.groups.push({ id: newId(), tournamentId: params.id, categoryId: category.id, name: "Grupa A", order: 1 })
+        for (let i = 0; i < (body.groupCount ?? 1); i++)
+          c.groups.push({ id: newId(), tournamentId: params.id, categoryId: category.id, name: `Grupa ${String.fromCharCode(65 + i)}`, order: i + 1 })
       return HttpResponse.json({ tournamentCategoryId: category.id }, { status: 201 })
     }),
   ),
@@ -1491,6 +1492,31 @@ const config = [
       const group = { id: newId(), tournamentId: params.id, categoryId: body.categoryId, name: body.name.trim(), order: body.order }
       c.groups.push(group)
       return HttpResponse.json({ tournamentGroupId: group.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:id/groups/:groupId",
+    authed<{ id: string; groupId: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const group = configOf(params.id).groups.find((g) => g.id === params.groupId)
+      if (!group) return problem(404, "Not found")
+      const body = (await request.json()) as { name: string; order: number }
+      Object.assign(group, { name: body.name.trim(), order: body.order })
+      return HttpResponse.json({ tournamentGroupId: group.id })
+    }),
+  ),
+  http.delete(
+    "*/api/tournaments/:id/groups/:groupId",
+    authed<{ id: string; groupId: string }>(({ params, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      // Jak backend: blokują tylko oczekujące i przyjęte drużyny oraz mecze grupy.
+      if (tournamentTeams(params.id).some((t) => t.groupId === params.groupId && (t.registrationStatus === "Pending" || t.registrationStatus === "Accepted")))
+        return problem(409, "Cannot delete a group that still has teams assigned to it")
+      if (db.matches.some((m) => m.groupId === params.groupId))
+        return problem(409, "Cannot delete a group that still has matches scheduled in it")
+      const c = configOf(params.id)
+      c.groups = c.groups.filter((g) => g.id !== params.groupId)
+      return new HttpResponse(null, { status: 204 })
     }),
   ),
   http.get(
