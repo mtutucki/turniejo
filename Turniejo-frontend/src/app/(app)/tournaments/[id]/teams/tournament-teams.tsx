@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useTournamentTeams } from "@/features/teams/api"
+import { AcceptPendingTeams } from "@/features/teams/components/accept-pending-teams"
 import { AddTeamDialog } from "@/features/teams/components/add-team-dialog"
 import { TournamentTeamRow } from "@/features/teams/components/tournament-team-row"
 import { useCategories, useGroups, useMyOrganization } from "@/features/tournaments/api"
@@ -31,6 +32,12 @@ export function TournamentTeamsView() {
   // Backend liczy limit po zaakceptowanych: przy komplecie odrzuca akceptację i nowe zgłoszenia.
   const freeSlots = Math.max(teamLimit - accepted, 0)
   const limitReached = !!tournament.data && freeSlots === 0
+  // W kolejności kategorii, tak jak na liście: akceptacja przy małym limicie bierze te z góry.
+  const pendingTeams = (categories.data ?? []).flatMap((category) =>
+    (active ?? []).filter(
+      (t) => t.categoryId === category.id && t.registrationStatus === "Pending",
+    ),
+  )
 
   const addButton = isOrganizer &&
     organization.data &&
@@ -120,6 +127,11 @@ export function TournamentTeamsView() {
             <Link href={`/tournaments/${id}/settings#details`}>Zmień limit</Link>
           </Button>
         </div>
+      )}
+
+      {/* Przy wyczerpanym limicie zostaje sam baner o limicie powyżej. */}
+      {isOrganizer && pendingTeams.length > 0 && freeSlots > 0 && (
+        <AcceptPendingTeams tournamentId={id} teams={pendingTeams} freeSlots={freeSlots} />
       )}
 
       {!active?.length ? (
