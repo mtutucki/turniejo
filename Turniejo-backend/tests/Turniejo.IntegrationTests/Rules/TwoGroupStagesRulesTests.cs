@@ -354,4 +354,26 @@ public sealed class TwoGroupStagesRulesTests(IntegrationTestWebApplicationFactor
         entry.GetProperty("groupPosition").GetInt32().Should().Be(1);
         entry.GetString("groupName").Should().Be("Grupa I");
     }
+
+    [Fact]
+    public async Task FAZ_015_PublicPage_ShowsTheSecondStage_OnlyWithScheduleOrStandings()
+    {
+        var (s, first, _) = await TwoStagesAsync(Factory, start: false);
+        var slug = (await s.TournamentAsync()).GetString("slug");
+        var anonymous = CreateClient();
+        Task<HttpResponseMessage> Publish(bool schedule, bool standings) => s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
+            new { isPublic = true, showTeams = true, showPlayers = true, showSchedule = schedule, showStandings = standings, showBracket = true, showLiveMatches = true, showStats = true, abbreviatePlayerNames = true, showInDirectory = true });
+
+        (await Publish(schedule: true, standings: false)).IsSuccessStatusCode.Should().BeTrue();
+        var page = await (await anonymous.GetAsync($"/public/tournaments/{slug}")).ReadJsonAsync();
+        page.GetProperty("groups").EnumerateArray().Single(g => g.GetGuid("id") == first).GetInt("stage").Should().Be(2);
+        var visible = await (await anonymous.GetAsync($"/public/tournaments/{slug}/second-stage")).ReadJsonAsync();
+        visible.GetProperty("seats").GetArrayLength().Should().Be(6);
+        visible.GetProperty("fixtures").GetArrayLength().Should().Be(7);
+
+        (await Publish(schedule: false, standings: false)).IsSuccessStatusCode.Should().BeTrue();
+        var hidden = await (await anonymous.GetAsync($"/public/tournaments/{slug}/second-stage")).ReadJsonAsync();
+        hidden.GetProperty("seats").GetArrayLength().Should().Be(0);
+        hidden.GetProperty("fixtures").GetArrayLength().Should().Be(0);
+    }
 }

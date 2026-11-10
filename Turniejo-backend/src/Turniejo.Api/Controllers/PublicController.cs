@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Brackets.Application.Brackets.GetPublicBracket;
@@ -15,6 +15,8 @@ using Turniejo.Teams.Application.TournamentTeams.GetPublicTeamProfile;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeams;
 using Turniejo.Tournaments.Application.Tournaments.GetPublicTournamentPage;
 using Turniejo.Tournaments.Application.Tournaments.GetPublicTournaments;
+
+using Turniejo.Brackets.Application.SecondStage.GetPublicSecondStage;
 
 namespace Turniejo.Api.Controllers
 {
@@ -82,6 +84,13 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> GetBracket([FromRoute] string slug, [FromQuery] Guid categoryId, CancellationToken cancellationToken)
         {
             var result = await sender.Send(new GetPublicBracketQuery(slug, categoryId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("tournaments/{slug}/second-stage")]
+        public async Task<IActionResult> GetSecondStage([FromRoute] string slug, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPublicSecondStageQuery(slug), cancellationToken);
             return result.ToActionResult();
         }
 
