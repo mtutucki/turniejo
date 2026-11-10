@@ -63,6 +63,25 @@ namespace Turniejo.Tournaments.UnitTests.Entities
             result.Value.Status.Should().Be(TournamentStatus.Draft);
         }
 
+        [Theory]
+        [InlineData("Strefa Talentów - 2020 - 8:00 - 10:00", "strefa-talentow-2020-8-00-10-00")]
+        [InlineData("Puchar Łodzi/Żagań?", "puchar-lodzi-zagan")]
+        [InlineData("  Turniej  #1 & spółka  ", "turniej-1-spolka")]
+        public void Slug_HasOnlyLettersDigitsAndSingleHyphens(string name, string expectedPrefix)
+        {
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, name, ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+
+            tournament.Slug.Should().MatchRegex($"^{expectedPrefix}-[0-9a-f]{{6}}$");
+        }
+
+        [Fact]
+        public void Slug_OfANameWithoutLettersOrDigits_IsTheRandomSuffix()
+        {
+            var tournament = Tournament.Create(ValidId, ValidOrganizationId, ValidUserId, "!!!", ValidStartAt, ValidEndAt, ValidTeamLimit, ValidDescription).Value;
+
+            tournament.Slug.Should().MatchRegex("^[0-9a-f]{6}$");
+        }
+
         [Fact]
         public void GeneratedCodes_ShouldBeUnique()
         {

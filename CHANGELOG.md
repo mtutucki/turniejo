@@ -6,6 +6,13 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+## [1.1.1] - 2026-11-11
+
+### Poprawione
+
+- Turniej nie trafia już sam na listę turniejów na stronie głównej. Pokazuje się tam dopiero, gdy organizator włączy „Pokazuj na liście turniejów” w ustawieniach portalu. Turnieje, które trafiły na listę bez tej zgody, zniknęły z niej, a ich portale dalej działają przez link.
+- Portal turnieju z godziną albo innym znakiem specjalnym w nazwie (np. „8:00 - 10:00”) otwiera się, zamiast pokazywać „Nie ma takiej strony”.
+
 ## [1.1.0] - 2026-11-10
 
 ### Zmienione

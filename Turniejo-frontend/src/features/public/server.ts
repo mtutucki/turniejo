@@ -18,14 +18,30 @@ import type {
 import { tournamentDescription } from "./seo"
 
 /**
- * Publiczny turniej po slugu — jedno zapytanie na render (cache), wspólne dla layoutu, metadanych
- * i stron. Niepubliczny albo nieistniejący turniej to 404 (backend nie odróżnia tych przypadków).
+ * Slug z `params` strony. Next oddaje parametr trasy z zakodowanymi znakami takimi jak `:`
+ * (`8%3A00`), a encodeURIComponent zakodowałby je drugi raz i backend zwróciłby 404.
+ * Stare slugi mają takie znaki (godzina w nazwie turnieju).
+ */
+export function routeSlug(slug: string) {
+  try {
+    return decodeURIComponent(slug)
+  } catch {
+    return slug
+  }
+}
+
+/**
+ * Publiczny turniej po slugu z adresu strony: jedno zapytanie na render (cache), wspólne dla layoutu,
+ * metadanych i stron. Niepubliczny albo nieistniejący turniej to 404 (backend nie odróżnia tych przypadków).
  */
 export const getPublicTournament = cache(async (slug: string) => {
   try {
-    return await apiFetch<PublicTournament>(`/public/tournaments/${encodeURIComponent(slug)}`, {
-      cache: "no-store",
-    })
+    return await apiFetch<PublicTournament>(
+      `/public/tournaments/${encodeURIComponent(routeSlug(slug))}`,
+      {
+        cache: "no-store",
+      },
+    )
   } catch (error) {
     if (isApiError(error) && error.status === 404) notFound()
     throw error
@@ -102,11 +118,11 @@ export async function portalPageMetadata(
   }
 }
 
-/** Drużyna turnieju do tytułu strony drużyny. Niewidoczna (ukryte drużyny, wycofana) → 404. */
+/** Drużyna turnieju do tytułu strony drużyny (slug z adresu strony). Niewidoczna (ukryte drużyny, wycofana) → 404. */
 export const getPublicTeam = cache(async (slug: string, teamId: string) => {
   try {
     return await apiFetch<PublicTeam>(
-      `/public/tournaments/${encodeURIComponent(slug)}/teams/${encodeURIComponent(teamId)}`,
+      `/public/tournaments/${encodeURIComponent(routeSlug(slug))}/teams/${encodeURIComponent(teamId)}`,
       { cache: "no-store" },
     )
   } catch (error) {
