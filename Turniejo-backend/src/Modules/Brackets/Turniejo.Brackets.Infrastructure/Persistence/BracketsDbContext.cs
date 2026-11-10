@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Domain.Entities;
 using Turniejo.SharedKernel.Outbox;
@@ -11,6 +11,7 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
     public DbSet<Bracket> Brackets => Set<Bracket>();
     public DbSet<BracketRound> BracketRounds => Set<BracketRound>();
     public DbSet<BracketNode> BracketNodes => Set<BracketNode>();
+    public DbSet<SecondStageSeat> SecondStageSeats => Set<SecondStageSeat>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
@@ -71,6 +72,29 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
 
     public async Task<BracketNode?> GetBracketNodeByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
         await BracketNodes.FirstOrDefaultAsync(n => n.MatchId == matchId, cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageSeat>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats
+            .AsNoTracking()
+            .Where(s => s.TournamentId == tournamentId)
+            .OrderBy(s => s.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageSeat>> GetTrackedSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats
+            .Where(s => s.TournamentId == tournamentId)
+            .OrderBy(s => s.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageSeat>> GetTrackedSecondStageSeatsByGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats
+            .Where(s => s.GroupId == groupId || s.SourceGroupId == groupId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddSecondStageSeatsAsync(IEnumerable<SecondStageSeat> seats, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats.AddRangeAsync(seats, cancellationToken);
+
+    public void RemoveSecondStageSeats(IEnumerable<SecondStageSeat> seats) => SecondStageSeats.RemoveRange(seats);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

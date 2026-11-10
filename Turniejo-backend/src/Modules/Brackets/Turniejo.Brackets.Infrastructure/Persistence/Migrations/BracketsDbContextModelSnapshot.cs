@@ -168,6 +168,48 @@ namespace Turniejo.Brackets.Infrastructure.Persistence.Migrations
                     b.ToTable("bracket_rounds", "brackets");
                 });
 
+            modelBuilder.Entity("Turniejo.Brackets.Domain.Entities.SecondStageSeat", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SourceGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SourcePosition")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TournamentTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceGroupId", "SourcePosition")
+                        .IsUnique();
+
+                    b.HasIndex("TournamentId", "CategoryId");
+
+                    b.ToTable("second_stage_seats", "brackets");
+                });
+
             modelBuilder.Entity("Turniejo.SharedKernel.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")

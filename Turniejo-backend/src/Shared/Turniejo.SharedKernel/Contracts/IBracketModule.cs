@@ -1,4 +1,4 @@
-namespace Turniejo.SharedKernel.Contracts;
+﻿namespace Turniejo.SharedKernel.Contracts;
 
 // Mecz kolejnej rundy drabinki powstaje dopiero, gdy znane są obie drużyny (Match wymaga obu), więc
 // półfinał czy finał nie miały terminu aż do rozstrzygnięcia poprzedniej rundy. Generator terminarza
@@ -10,7 +10,15 @@ public interface IBracketModule
     Task SetPlannedSlotsAsync(IReadOnlyCollection<BracketPlannedSlotDto> slots, CancellationToken cancellationToken = default);
     Task ClearPlannedSlotsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
     Task SetPlannedRefereeAsync(Guid nodeId, Guid? refereeId, CancellationToken cancellationToken = default);
+
+    // Format „Dwie fazy grupowe”: miejsca w grupach fazy 2, obsadzane z tabel fazy 1.
+    Task<IReadOnlyList<SecondStageSeatInfoDto>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+    /// <summary>Usunięta grupa (fazy 1 albo 2) nie może zostać w podziale drugiej fazy.</summary>
+    Task RemoveSecondStageSeatsForGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
 }
+
+public record SecondStageSeatInfoDto(
+    Guid Id, Guid CategoryId, Guid GroupId, int Order, Guid SourceGroupId, int SourcePosition, Guid? TournamentTeamId);
 
 // HasBye: węzeł z wolnym losem nigdy nie dostaje meczu, więc nie potrzebuje terminu.
 // CategoryId, grupy źródłowe i znane drużyny: generator terminarza planuje mecz pucharu po fazie grupowej

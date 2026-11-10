@@ -19,7 +19,7 @@ namespace Turniejo.Tournaments.UnitTests.TournamentGroups
             _dbContext = Substitute.For<ITournamentsDbContext>();
             _teamModule = Substitute.For<ITeamModule>();
             _matchModule = Substitute.For<IMatchModule>();
-            _handler = new DeleteTournamentGroupCommandHandler(_dbContext, _teamModule, _matchModule);
+            _handler = new DeleteTournamentGroupCommandHandler(_dbContext, _teamModule, _matchModule, Substitute.For<IBracketModule>());
         }
 
         private static TournamentGroup CreateFakeTournamentGroup()

@@ -1,4 +1,4 @@
-using Turniejo.Brackets.Application.Abstractions;
+﻿using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Domain.Entities;
 using Turniejo.Brackets.Domain.Enums;
 using Turniejo.SharedKernel.Contracts;
@@ -63,6 +63,21 @@ internal sealed class BracketModule(IBracketsDbContext dbContext) : IBracketModu
         foreach (var node in await dbContext.GetTrackedBracketNodesByIdsAsync([nodeId], cancellationToken))
             node.PlanReferee(refereeId);
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SecondStageSeatInfoDto>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        (await dbContext.GetSecondStageSeatsAsync(tournamentId, cancellationToken))
+            .Select(s => new SecondStageSeatInfoDto(s.Id, s.CategoryId, s.GroupId, s.Order, s.SourceGroupId, s.SourcePosition, s.TournamentTeamId))
+            .ToList();
+
+    public async Task RemoveSecondStageSeatsForGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
+    {
+        var seats = await dbContext.GetTrackedSecondStageSeatsByGroupAsync(groupId, cancellationToken);
+        if (seats.Count == 0)
+            return;
+
+        dbContext.RemoveSecondStageSeats(seats);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

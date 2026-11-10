@@ -1,4 +1,4 @@
-using Turniejo.Brackets.Domain.Entities;
+﻿using Turniejo.Brackets.Domain.Entities;
 using Turniejo.SharedKernel.Outbox;
 
 namespace Turniejo.Brackets.Application.Abstractions
@@ -27,5 +27,13 @@ namespace Turniejo.Brackets.Application.Abstractions
         Task<IReadOnlyList<BracketNode>> GetBracketNodesByRoundIdsAsync(IReadOnlyCollection<Guid> roundIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<BracketNode>> GetTrackedBracketNodesByIdsAsync(IReadOnlyCollection<Guid> nodeIds, CancellationToken cancellationToken = default);
         Task<BracketNode?> GetBracketNodeByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default);
+
+        // SecondStageSeat (format „Dwie fazy grupowe”)
+        Task<IReadOnlyList<SecondStageSeat>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<SecondStageSeat>> GetTrackedSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
+        /// <summary>Miejsca w grupie <paramref name="groupId"/> albo z niej (jako grupy fazy 1).</summary>
+        Task<IReadOnlyList<SecondStageSeat>> GetTrackedSecondStageSeatsByGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task AddSecondStageSeatsAsync(IEnumerable<SecondStageSeat> seats, CancellationToken cancellationToken = default);
+        void RemoveSecondStageSeats(IEnumerable<SecondStageSeat> seats);
     }
 }

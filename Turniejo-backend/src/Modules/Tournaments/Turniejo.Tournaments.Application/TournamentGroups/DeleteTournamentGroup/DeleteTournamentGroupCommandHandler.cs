@@ -10,7 +10,8 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.DeleteTournamentGrou
     internal sealed class DeleteTournamentGroupCommandHandler(
         ITournamentsDbContext tournamentsDbContext,
         ITeamModule teamModule,
-        IMatchModule matchModule) : ICommandHandler<DeleteTournamentGroupCommand>
+        IMatchModule matchModule,
+        IBracketModule bracketModule) : ICommandHandler<DeleteTournamentGroupCommand>
     {
         public async Task<Result> Handle(DeleteTournamentGroupCommand request, CancellationToken cancellationToken)
         {
@@ -26,6 +27,8 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.DeleteTournamentGrou
 
             // Wycofane i odrzucone zgłoszenia nie blokują usunięcia, ale nie mogą wskazywać na nieistniejącą grupę.
             await teamModule.UnassignTeamsFromGroupAsync(request.GroupId, cancellationToken);
+
+            await bracketModule.RemoveSecondStageSeatsForGroupAsync(request.GroupId, cancellationToken);
 
             await tournamentsDbContext.RemoveTournamentGroupAsync(group, cancellationToken);
             await tournamentsDbContext.SaveChangesAsync(cancellationToken);
