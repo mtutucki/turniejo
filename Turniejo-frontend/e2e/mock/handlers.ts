@@ -1393,10 +1393,16 @@ const api = [
   http.get(
     "*/api/teams/:teamId/history",
     authed(({ user, params }) => {
-      if (!rosterOf(user, params.teamId)) return problem(403, "Forbidden")
       const own = Object.entries(TEAM_NAMES)
         .filter(([, t]) => t.id === params.teamId)
         .map(([ttId]) => ttId)
+      // Jak TeamRosterAccessGuard: organizator organizacji albo sztab któregoś zgłoszenia drużyny.
+      const staff = own.some((tt) =>
+        ["Coach", "AssistantCoach", "Manager"].some((role) =>
+          hasRole(user, role, "TournamentTeam", tt),
+        ),
+      )
+      if (!rosterOf(user, params.teamId) && !staff) return problem(403, "Forbidden")
       const finished = db.matches
         .filter((m) => m.status === "Finished" && (own.includes(m.home) || own.includes(m.away)))
         .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
@@ -1421,7 +1427,9 @@ const api = [
       }
       const tt = own[0]
       const t = findTournament(IDS.tournament)!
-      const row = tt ? groupStandings(IDS.tournament, IDS.group).find((r) => r.tournamentTeamId === tt) : undefined
+      const row = tt
+        ? groupStandings(IDS.tournament, IDS.group).find((r) => r.tournamentTeamId === tt)
+        : undefined
       const opponentOf = (m: (typeof finished)[number]) => (own.includes(m.home) ? m.away : m.home)
       const opponents = [...new Set(finished.map(opponentOf))].map((o) => ({
         teamId: TEAM_NAMES[o]!.id,

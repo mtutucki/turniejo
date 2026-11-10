@@ -20,6 +20,7 @@ const TABS = [
   { segment: "roster", label: "Kadra" },
   { segment: "schedule", label: "Terminarz" },
   { segment: "stats", label: "Statystyki" },
+  { segment: "history", label: "Wszystkie turnieje" },
 ]
 
 const CoachTeamContext = createContext<MyTeam | null>(null)

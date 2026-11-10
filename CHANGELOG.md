@@ -15,7 +15,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Nowe
 
-- Drużyna w bazie drużyn ma statystyki ze wszystkich turniejów: bilans, bramki, procent zwycięstw i formę, listę turniejów z wynikiem (np. „Zwycięzca”, „Odpadła w półfinale”, „2. miejsce w Grupie A”), najlepszych zawodników (gole, asysty, MVP, kartki) i bilans z każdym rywalem.
+- Drużyna w bazie drużyn ma statystyki ze wszystkich turniejów: bilans, bramki, procent zwycięstw i formę, listę turniejów z wynikiem (np. „Zwycięzca”, „Odpadła w półfinale”, „2. miejsce w Grupie A”), najlepszych zawodników (gole, asysty, MVP, kartki) i bilans z każdym rywalem. Trener ma te statystyki w zakładce „Wszystkie turnieje” swojej drużyny.
 - Każda drużyna ma swoją stronę: miejsce w grupie, bilans, forma z ostatnich meczów, wszystkie mecze z wynikami, droga w pucharze i skład z golami i asystami. Wchodzisz na nią, klikając drużynę w tabeli, drabince, na liście drużyn albo na stronie meczu, w portalu kibica i w panelu.
 - Turnieje łatwiej znaleźć w Google: strona główna i portale kibica mają opisy, sitemapę i dane o meczach. Link do turnieju albo meczu wysłany na Messengerze, WhatsAppie czy Facebooku pokazuje obrazek z nazwą turnieju, a przy meczu z drużynami i aktualnym wynikiem. Turniej ukryty z listy turniejów nie trafia do Google.
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.

@@ -36,9 +36,11 @@ export function TeamHistorySection({ teamId }: { teamId: string }) {
         <CardDescription>
           {history.isPending
             ? "Wczytywanie…"
-            : !data?.tournamentCount
-              ? "Drużyna nie grała jeszcze w żadnym turnieju."
-              : `${plural(data.tournamentCount, ["turniej", "turnieje", "turniejów"])}, liczą się zakończone mecze.`}
+            : history.isError
+              ? "Nie udało się wczytać statystyk."
+              : !data?.tournamentCount
+                ? "Drużyna nie grała jeszcze w żadnym turnieju."
+                : `${plural(data.tournamentCount, ["turniej", "turnieje", "turniejów"])}, liczą się zakończone mecze.`}
         </CardDescription>
       </CardHeader>
       {history.isPending ? (

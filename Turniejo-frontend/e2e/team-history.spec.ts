@@ -52,3 +52,26 @@ test("[DRU-047] drużyna bez turniejów mówi to wprost, kadra zostaje", async (
   await expect(page.getByTestId("history-tournament")).toHaveCount(0)
   await noHorizontalScroll(page)
 })
+
+test("[DRU-048] trener widzi statystyki drużyny ze wszystkich turniejów w swoim panelu", async ({
+  page,
+}) => {
+  await mock.matchStatus(MATCH_ID, "Finished")
+  await loginAs(page, "trener@e2e.pl")
+  await page.goto("/coach/teams/0f000000-0000-4000-8000-000000000050/players")
+  await page.getByRole("link", { name: "Wszystkie turnieje" }).click()
+
+  await expect(page).toHaveURL(/\/coach\/teams\/.+\/history$/)
+  await expect(page.getByText("Statystyki we wszystkich turniejach")).toBeVisible()
+  await expect(page.getByTestId("history-tournament")).toContainText("1. miejsce w Grupie A")
+  await noHorizontalScroll(page)
+})
+
+test("[DRU-049] błąd wczytywania statystyk nie udaje drużyny bez turniejów", async ({ page }) => {
+  await mock.override({ method: "GET", path: "/api/teams/:teamId/history", status: 500 })
+  await loginAs(page, ORGANIZER)
+  await page.goto(`/organizations/${ORGANIZATION_ID}/teams/team-orly`)
+
+  await expect(page.getByText("Nie udało się wczytać statystyk.")).toBeVisible()
+  await expect(page.getByText("Drużyna nie grała jeszcze w żadnym turnieju.")).toHaveCount(0)
+})
