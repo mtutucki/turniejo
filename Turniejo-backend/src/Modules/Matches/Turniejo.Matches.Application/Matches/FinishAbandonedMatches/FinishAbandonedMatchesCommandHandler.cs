@@ -11,21 +11,29 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
 {
     /// <summary>
     /// Mecz, którego nikt nie zakończył, trwał w nieskończoność (zegar pokazywał tysiące minut),
-    /// a tabela i drabinka czekały na wynik. Po 3× czasie meczu od startu (min. 2 h, zapas na
-    /// pauzy, dogrywkę i karne) kończymy go z bieżącym wynikiem. Remis w pucharze zostaje
-    /// dla organizatora, bo bez karnych nie ma zwycięzcy.
+    /// a tabela i drabinka czekały na wynik. Mecz uznajemy za porzucony, gdy od startu minęło 3× czasu
+    /// meczu i od 4 h nikt nic przy nim nie zrobił (gol, kartka, pauza, wznowienie, zmiana wyniku).
+    /// Dogrywka, karne czy długa przerwa nie szkodzą, dopóki ktoś mecz prowadzi. Taki mecz kończymy
+    /// z bieżącym wynikiem. Remisu w pucharze nie da się
+    /// zakończyć bez karnych, więc system raz go wstrzymuje i powiadamia organizatora; od tej
+    /// chwili mecz należy do organizatora i system go nie rusza.
     /// </summary>
     internal sealed class FinishAbandonedMatchesCommandHandler(
         IMatchesDbContext dbContext,
         ITournamentModule tournamentModule) : ICommandHandler<FinishAbandonedMatchesCommand, FinishAbandonedMatchesResponse>
     {
-        public static readonly TimeSpan MinimumThreshold = TimeSpan.FromHours(2);
+        public static readonly TimeSpan InactivityThreshold = TimeSpan.FromHours(4);
         private const int DurationMultiplier = 3;
 
         public async Task<Result<FinishAbandonedMatchesResponse>> Handle(FinishAbandonedMatchesCommand request, CancellationToken cancellationToken)
         {
-            var candidates = await dbContext.GetTrackedUnfinishedMatchesStartedBeforeAsync(request.Now - MinimumThreshold, cancellationToken);
+            // Start też jest czynnością, więc mecz młodszy niż 4 h nie może być porzucony.
+            var candidates = await dbContext.GetTrackedUnfinishedMatchesStartedBeforeAsync(request.Now - InactivityThreshold, cancellationToken);
+            var lastEventChanges = candidates.Count == 0
+                ? new Dictionary<Guid, DateTimeOffset>()
+                : await dbContext.GetLastEventChangeByMatchIdsAsync(candidates.Select(m => m.Id).ToList(), cancellationToken);
             var finished = 0;
+            var awaitingDecision = 0;
 
             foreach (var tournamentMatches in candidates.GroupBy(m => m.TournamentId))
             {
@@ -33,14 +41,29 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
                 if (settings == null)
                     continue;
 
-                var threshold = TimeSpan.FromMinutes(Math.Max(DurationMultiplier * settings.MatchDurationMinutes, MinimumThreshold.TotalMinutes));
+                var minimumDuration = TimeSpan.FromMinutes(DurationMultiplier * settings.MatchDurationMinutes);
 
                 foreach (var match in tournamentMatches)
                 {
-                    if (match.StartedAt!.Value + threshold > request.Now)
+                    if (match.StartedAt!.Value + minimumDuration > request.Now)
                         continue;
-                    if (match.StageType != StageType.Group && match.HomeScore == match.AwayScore)
+                    // Zmiany samego meczu (pauza, wynik) i jego zdarzeń (gole, kartki, cofnięcia).
+                    var lastActivity = lastEventChanges.TryGetValue(match.Id, out var lastEventChange) && lastEventChange > match.UpdatedAt
+                        ? lastEventChange
+                        : match.UpdatedAt;
+                    if (lastActivity + InactivityThreshold > request.Now)
                         continue;
+                    if (match.AwaitingDecisionSince.HasValue)
+                        continue;
+
+                    if (match.NeedsDecisionToFinish)
+                    {
+                        if (match.MarkAwaitingDecision(request.Now).IsFailure)
+                            continue;
+                        await AddOutboxMessagesAsync(match, cancellationToken);
+                        awaitingDecision++;
+                        continue;
+                    }
 
                     // Guid.Empty = system: nikt z ludzi nie kliknął "Zakończ".
                     var result = match.Finish(MatchResultType.Regular, null, settings.RefereeEditWindowMinutes, Guid.Empty);
@@ -55,21 +78,24 @@ namespace Turniejo.Matches.Application.Matches.FinishAbandonedMatches
                         continue;
 
                     await dbContext.AddMatchEventAsync(matchEvent.Value, cancellationToken);
-
-                    foreach (var domainEvent in match.DomainEvents)
-                        await dbContext.AddOutboxMessageAsync(
-                            OutboxMessage.Create(domainEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(domainEvent, domainEvent.GetType())),
-                            cancellationToken);
-                    match.ClearDomainEvents();
-
+                    await AddOutboxMessagesAsync(match, cancellationToken);
                     finished++;
                 }
             }
 
-            if (finished > 0)
+            if (finished + awaitingDecision > 0)
                 await dbContext.SaveChangesAsync(cancellationToken);
 
-            return Result.Success(new FinishAbandonedMatchesResponse(finished));
+            return Result.Success(new FinishAbandonedMatchesResponse(finished, awaitingDecision));
+        }
+
+        private async Task AddOutboxMessagesAsync(Match match, CancellationToken cancellationToken)
+        {
+            foreach (var domainEvent in match.DomainEvents)
+                await dbContext.AddOutboxMessageAsync(
+                    OutboxMessage.Create(domainEvent.GetType().AssemblyQualifiedName!, JsonSerializer.Serialize(domainEvent, domainEvent.GetType())),
+                    cancellationToken);
+            match.ClearDomainEvents();
         }
     }
 }

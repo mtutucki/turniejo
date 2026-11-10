@@ -9,6 +9,7 @@ import { formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { resultNote } from "@/features/matches/result-note"
 import type { PublicMatch } from "@/types/public"
+import { AWAITING_DECISION_LABEL } from "@/types/matches"
 
 import { type PublicLiveMatch, usePublicLiveMatch } from "../api"
 import { usePublicContext } from "../public-context"
@@ -60,6 +61,7 @@ function TeamLine({
 export function PublicMatchCard({ match }: { match: PublicMatch }) {
   const { slug, tournament, lookups } = usePublicContext()
   const isLive = match.status === "Live" || match.status === "Paused"
+  const waiting = match.status === "Paused" && !!match.awaitingDecision
   const live = usePublicLiveMatch(slug, match.id, isLive && tournament.settings.showLiveMatches)
   const minute = useLiveMinute(live.data)
   // Bez „Meczów na żywo” trwający mecz nie pokazuje wyniku ani szczegółów (QA v3: PUB-003f).
@@ -103,8 +105,12 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
                 )}
                 <span className="bg-live relative inline-flex size-2 rounded-full" />
               </span>
-              {match.status === "Paused" ? "PRZERWA" : "LIVE"}
-              {minute != null && (
+              {waiting
+                ? AWAITING_DECISION_LABEL.toUpperCase()
+                : match.status === "Paused"
+                  ? "PRZERWA"
+                  : "LIVE"}
+              {!waiting && minute != null && (
                 <span className="font-mono tabular-nums" data-testid="live-minute">
                   {minute}&apos;
                 </span>

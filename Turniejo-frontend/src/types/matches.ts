@@ -21,6 +21,9 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   Cancelled: "Odwołany",
 }
 
+/** Zamiast „Przerwa” i zegara przy meczu wstrzymanym przez system (Match.IsAwaitingDecision). */
+export const AWAITING_DECISION_LABEL = "Czeka na rozstrzygnięcie"
+
 /** Termin, boisko i sędziego da się zmienić tylko przed rozpoczęciem (Match.IsSchedulable w domenie). */
 export const SCHEDULABLE_STATUSES: MatchStatus[] = ["Scheduled", "Ready", "Postponed"]
 
@@ -59,6 +62,8 @@ export type Match = {
   resultType: string
   homePenaltyScore: number | null
   awayPenaltyScore: number | null
+  /** Porzucony remis w pucharze wstrzymany przez system, czeka na organizatora. */
+  awaitingDecision?: boolean
 }
 
 export type GenerateScheduleInput = {
@@ -186,6 +191,8 @@ export type MatchLivePanel = {
   elapsedSeconds: number | null
   homePenaltyScore: number | null
   awayPenaltyScore: number | null
+  /** Porzucony remis w pucharze wstrzymany przez system, czeka na organizatora. */
+  awaitingDecision?: boolean
 }
 
 /** MatchClockDto */

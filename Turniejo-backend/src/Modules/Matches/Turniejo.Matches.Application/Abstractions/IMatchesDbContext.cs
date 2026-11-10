@@ -28,7 +28,7 @@ namespace Turniejo.Matches.Application.Abstractions
         Task<IReadOnlyList<Match>> GetMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
         /// <summary>Śledzone przez EF — do modyfikacji; pozostałe zapytania o listy meczów są tylko do odczytu.</summary>
         Task<IReadOnlyList<Match>> GetTrackedMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
-        /// <summary>Śledzone przez EF: trwające (Live/Paused) mecze rozpoczęte przed podaną chwilą.</summary>
+        /// <summary>Śledzone przez EF: trwające (Live/Paused) mecze rozpoczęte przed podaną chwilą, których system jeszcze nie oddał organizatorowi.</summary>
         Task<IReadOnlyList<Match>> GetTrackedUnfinishedMatchesStartedBeforeAsync(DateTimeOffset startedBefore, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Match>> GetFinishedMatchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<bool> MatchExistsAtPitchAndTimeAsync(Guid pitchId, DateTimeOffset scheduledAt, Guid? excludeMatchId, CancellationToken cancellationToken = default);
@@ -43,6 +43,8 @@ namespace Turniejo.Matches.Application.Abstractions
 
         // MatchEvent
         Task AddMatchEventAsync(MatchEvent matchEvent, CancellationToken cancellationToken = default);
+        /// <summary>Ostatnia zmiana zdarzeń (dodanie, edycja, cofnięcie) każdego z meczów; mecze bez zdarzeń pomija.</summary>
+        Task<IReadOnlyDictionary<Guid, DateTimeOffset>> GetLastEventChangeByMatchIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<MatchEvent>> GetMatchEventsByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<MatchEvent>> GetActiveMatchEventsByTypeAsync(Guid matchId, MatchEventType type, CancellationToken cancellationToken = default);
         Task<MatchEvent?> GetMatchEventByIdAsync(Guid matchEventId, CancellationToken cancellationToken = default);

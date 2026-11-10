@@ -37,8 +37,9 @@ public sealed class AbandonedMatchBackgroundService(
             var result = await sender.Send(new FinishAbandonedMatchesCommand(DateTimeOffset.UtcNow), cancellationToken);
             if (result.IsFailure)
                 logger.LogError("Failed to finish abandoned matches: {Error}", result.Error.Message);
-            else if (result.Value.FinishedCount > 0)
-                logger.LogInformation("Finished {Count} abandoned matches", result.Value.FinishedCount);
+            else if (result.Value.FinishedCount + result.Value.AwaitingDecisionCount > 0)
+                logger.LogInformation("Abandoned matches: {Finished} finished, {AwaitingDecision} paused for the organizer",
+                    result.Value.FinishedCount, result.Value.AwaitingDecisionCount);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

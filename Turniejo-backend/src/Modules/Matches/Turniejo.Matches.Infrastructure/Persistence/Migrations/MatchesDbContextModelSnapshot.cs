@@ -68,6 +68,9 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("AwaitingDecisionSince")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int?>("AwayPenaltyScore")
                         .HasColumnType("integer");
 

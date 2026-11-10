@@ -36,7 +36,7 @@ namespace Turniejo.Matches.Application.Matches.GetOpenMatches
                         m.Id, m.TournamentId, m.CategoryId, m.GroupId, m.PitchId,
                         m.HomeTournamentTeamId, m.AwayTournamentTeamId, m.RefereeId, m.ScheduledAt,
                         m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString(),
-                        m.HomePenaltyScore, m.AwayPenaltyScore)));
+                        m.HomePenaltyScore, m.AwayPenaltyScore, AwaitingDecision: m.IsAwaitingDecision)));
             }
 
             return Result.Success<IReadOnlyList<MatchDto>>(dtos.OrderBy(m => m.ScheduledAt).ToList());
