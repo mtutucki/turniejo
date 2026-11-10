@@ -1,6 +1,14 @@
 "use client"
 
-import { CalendarDays, LayoutDashboard, LogIn, Trophy, Wifi, WifiOff } from "lucide-react"
+import {
+  CalendarDays,
+  ChevronLeft,
+  LayoutDashboard,
+  LogIn,
+  Trophy,
+  Wifi,
+  WifiOff,
+} from "lucide-react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -75,9 +83,9 @@ export function PublicHeader() {
     <header className="bg-brand text-brand-foreground">
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="flex items-center justify-between gap-3">
-          {/* Nie <Logo /> — to link do panelu aplikacji, a kibic zostaje na portalu. */}
+          {/* Nie <Logo /> — to link do panelu aplikacji, a kibic zostaje w części publicznej. */}
           <Link
-            href={root}
+            href="/t"
             className="flex items-center gap-2 text-sm font-semibold tracking-tight opacity-90 hover:opacity-100"
           >
             <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
@@ -111,6 +119,13 @@ export function PublicHeader() {
         </div>
 
         <div className="py-5">
+          <Link
+            href="/t"
+            className="mb-2 -ml-1 inline-flex items-center gap-0.5 text-xs font-medium opacity-75 hover:opacity-100"
+          >
+            <ChevronLeft className="size-4" />
+            Wszystkie turnieje
+          </Link>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
             {badge && (
