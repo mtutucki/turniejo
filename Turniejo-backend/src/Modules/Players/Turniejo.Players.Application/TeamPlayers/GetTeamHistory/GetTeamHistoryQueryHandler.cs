@@ -1,4 +1,4 @@
-using Turniejo.Players.Application.Abstractions;
+﻿using Turniejo.Players.Application.Abstractions;
 using Turniejo.Players.Application.DTOs;
 using Turniejo.Players.Application.Services;
 using Turniejo.SharedKernel.Contracts;
@@ -70,6 +70,10 @@ namespace Turniejo.Players.Application.TeamPlayers.GetTeamHistory
                 var nodes = tournament.Format is "Knockout" or "GroupAndKnockout"
                     ? await bracketModule.GetNodesByTournamentIdAsync(tournament.Id, cancellationToken)
                     : [];
+                // Dwie fazy grupowe: wynik turnieju to miejsce w grupie drugiej fazy, o ile drużyna do niej trafiła.
+                var secondStageSeats = tournament.Format == "TwoGroupStages"
+                    ? await bracketModule.GetSecondStageSeatsAsync(tournament.Id, cancellationToken)
+                    : [];
                 foreach (var registration in group)
                 {
                     var category = await tournamentModule.GetTournamentCategoryAsync(registration.CategoryId, cancellationToken);
@@ -78,7 +82,9 @@ namespace Turniejo.Players.Application.TeamPlayers.GetTeamHistory
 
                     int? position = null;
                     string? groupName = null;
-                    if (cup == null && registration.GroupId is { } groupId)
+                    // Najpierw grupa drugiej fazy; dopóki drużyna nie zagrała w niej meczu, liczy się grupa fazy 1.
+                    var groupIds = new[] { secondStageSeats.FirstOrDefault(x => x.TournamentTeamId == registration.Id)?.GroupId, registration.GroupId };
+                    foreach (var groupId in cup == null ? groupIds.OfType<Guid>() : [])
                     {
                         var row = (await standingModule.GetGroupStandingsAsync(groupId, cancellationToken))
                             .FirstOrDefault(s => s.TournamentTeamId == registration.Id);
@@ -86,6 +92,7 @@ namespace Turniejo.Players.Application.TeamPlayers.GetTeamHistory
                         {
                             position = row.Position;
                             groupName = groups.FirstOrDefault(g => g.Id == groupId)?.Name;
+                            break;
                         }
                     }
 

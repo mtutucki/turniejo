@@ -337,4 +337,21 @@ public sealed class TwoGroupStagesRulesTests(IntegrationTestWebApplicationFactor
         (await MatchInGroupAsync(s, first, "T1", "T4")).GetGuid("id").Should().Be(started, "rozpoczęty mecz zostaje");
         (await s.NotificationsAsync(s.Organizer)).Should().Contain(n => n.GetString("type") == "BracketChangeBlocked");
     }
+
+    [Fact]
+    public async Task FAZ_014_TeamHistory_ShowsThePlaceInTheSecondStageGroup()
+    {
+        var (s, first, _) = await TwoStagesAsync(Factory);
+        await PlayFirstStageAsync(s);
+        await FlushOutboxAsync();
+        await WinAsync(s, first, "T2", "T1");
+        await FlushOutboxAsync();
+
+        var history = await (await s.Organizer.GetAsync($"/api/teams/{s.ClubTeam("T2")}/history")).ReadJsonAsync();
+
+        var entry = history.GetProperty("tournaments").EnumerateArray().Single();
+        entry.GetString("resultKind").Should().Be("Group");
+        entry.GetProperty("groupPosition").GetInt32().Should().Be(1);
+        entry.GetString("groupName").Should().Be("Grupa I");
+    }
 }
