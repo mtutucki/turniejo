@@ -15,8 +15,11 @@ public sealed class TournamentPublicSettings
     public bool ShowStats { get; private set; } = true;
     // RODO: zawodnicy to zwykle dzieci — portal domyślnie pokazuje "Jan K." zamiast pełnego nazwiska.
     public bool AbbreviatePlayerNames { get; private set; } = true;
-    /// <summary>Publiczny turniej widać na liście turniejów (strona główna). Wyłączony: portal tylko przez link.</summary>
-    public bool ShowInDirectory { get; private set; } = true;
+    /// <summary>
+    /// Publiczny turniej widać na liście turniejów (strona główna). Wyłączony: portal tylko przez link.
+    /// Domyślnie wyłączony: na liście jest tylko turniej, który organizator sam tam dodał.
+    /// </summary>
+    public bool ShowInDirectory { get; private set; } = false;
 
     private TournamentPublicSettings() { }
 
@@ -32,7 +35,7 @@ public sealed class TournamentPublicSettings
     public Result Update(
         bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
         bool showStandings, bool showBracket, bool showLiveMatches, bool showStats,
-        bool abbreviatePlayerNames = true, bool showInDirectory = true)
+        bool abbreviatePlayerNames = true, bool showInDirectory = false)
     {
         IsPublic = isPublic;
         ShowTeams = showTeams;

@@ -17,7 +17,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSet
         bool AbbreviatePlayerNames = true,
         // Wartości, które formularz wczytał. Inne w bazie = ktoś zapisał portal w międzyczasie (QA v3: UST-015).
         ExpectedPublicSettings? Expected = null,
-        bool ShowInDirectory = true) : ICommand<UpdateTournamentPublicSettingsResponse>, IAuthorizedRequest
+        bool ShowInDirectory = false) : ICommand<UpdateTournamentPublicSettingsResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;
@@ -34,5 +34,5 @@ namespace Turniejo.Tournaments.Application.Tournaments.UpdateTournamentPublicSet
         bool ShowLiveMatches,
         bool ShowStats,
         bool AbbreviatePlayerNames,
-        bool ShowInDirectory = true);
+        bool ShowInDirectory = false);
 }

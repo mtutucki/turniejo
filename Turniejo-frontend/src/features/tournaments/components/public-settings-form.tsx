@@ -154,7 +154,7 @@ export function PublicSettingsForm({
         {toggle(
           "showInDirectory",
           "Pokazuj na liście turniejów",
-          "Turniej widać na stronie głównej Turniejo. Wyłącz, jeśli portal ma być dostępny tylko przez link.",
+          "Turniej widać na stronie głównej Turniejo. Bez tego portal działa tylko przez link.",
           !isPublic,
         )}
         <FieldSeparator>Co pokazać</FieldSeparator>

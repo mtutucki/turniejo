@@ -39,7 +39,7 @@ public record TieBreakerRuleDto(int Order, string Type);
 public record TournamentPublicSettingsDto(
     Guid TournamentId, bool IsPublic, bool ShowTeams, bool ShowPlayers,
     bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats,
-    bool AbbreviatePlayerNames = true, bool ShowInDirectory = true);
+    bool AbbreviatePlayerNames = true, bool ShowInDirectory = false);
 public record PublicTournamentDto(
     Guid Id, string Name, string Slug, string Status, string? Format,
     DateTimeOffset StartAt, DateTimeOffset EndAt, string? Description,

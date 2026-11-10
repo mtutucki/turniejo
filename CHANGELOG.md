@@ -6,6 +6,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+### Poprawione
+
+- Turniej nie trafia już sam na listę turniejów na stronie głównej. Pokazuje się tam dopiero, gdy organizator włączy „Pokazuj na liście turniejów” w ustawieniach portalu. Turnieje, które trafiły na listę bez tej zgody, zniknęły z niej, a ich portale dalej działają przez link.
+
 ## [1.1.0] - 2026-11-10
 
 ### Zmienione

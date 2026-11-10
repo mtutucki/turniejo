@@ -200,7 +200,7 @@ public sealed class Tournament : BaseEntity
     public Result UpdatePublicSettings(
         bool isPublic, bool showTeams, bool showPlayers, bool showSchedule,
         bool showStandings, bool showBracket, bool showLiveMatches, bool showStats,
-        bool abbreviatePlayerNames = true, bool showInDirectory = true)
+        bool abbreviatePlayerNames = true, bool showInDirectory = false)
     {
         var result = PublicSettings.Update(isPublic, showTeams, showPlayers, showSchedule, showStandings, showBracket, showLiveMatches, showStats, abbreviatePlayerNames, showInDirectory);
         if (result.IsFailure)
