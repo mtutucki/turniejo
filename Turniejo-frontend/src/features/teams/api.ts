@@ -105,12 +105,16 @@ export function useTournamentTeams(tournamentId: string) {
   })
 }
 
-/** Zgłoszenia zmieniają też statystyki dashboardu turnieju. */
+/**
+ * Zgłoszenia zmieniają też statystyki dashboardu i tabele grup (backend układa tabelę z drużyn
+ * przypisanych do grupy, więc nowa, przeniesiona albo wycofana drużyna zmienia jej wiersze).
+ */
 function useInvalidateTournamentTeams(tournamentId: string) {
   const queryClient = useQueryClient()
   return () => {
     void queryClient.invalidateQueries({ queryKey: teamKeys.tournamentTeams(tournamentId) })
     void queryClient.invalidateQueries({ queryKey: tournamentKeys.dashboard(tournamentId) })
+    void queryClient.invalidateQueries({ queryKey: matchKeys.allStandings(tournamentId) })
   }
 }
 

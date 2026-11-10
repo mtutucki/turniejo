@@ -267,6 +267,7 @@ const tournamentTeams = (tournamentId: string) =>
         teamName: team.name,
         teamShortName: team.shortName,
         teamLogoUrl: null,
+        ...db.teamChanges[id],
       }))
 
 /**
@@ -1662,6 +1663,25 @@ const shirtTaken = (squad: SquadEntry[], shirt: number | null, exceptId?: string
 const squadBase = "*/api/tournaments/:tid/tournament-teams/:ttid"
 
 const squad = [
+  http.patch(
+    `${squadBase}/group`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.tid)) return problem(403, "Forbidden")
+      const body = (await request.json()) as { groupId: string | null }
+      db.teamChanges[params.ttid] = { ...db.teamChanges[params.ttid], groupId: body.groupId }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.patch(
+    `${squadBase}/registration-status`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.tid)) return problem(403, "Forbidden")
+      const body = (await request.json()) as { registrationStatus: number }
+      const status = ["", "Pending", "Accepted", "Rejected", "Withdrawn"][body.registrationStatus]
+      db.teamChanges[params.ttid] = { ...db.teamChanges[params.ttid], registrationStatus: status }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
   http.get(
     `${squadBase}/players`,
     authed<{ tid: string; ttid: string }>(({ params }) => HttpResponse.json(squadEntries(params.ttid))),
