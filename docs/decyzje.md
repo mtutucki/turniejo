@@ -58,6 +58,7 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 - Karne w meczu grupowym nie zmieniają tabeli, są tylko informacją (GRP-026).
 - Usunięcie grupy blokują tylko oczekujące i przyjęte drużyny oraz mecze grupy (także odwołane). Wycofane i odrzucone zgłoszenia tracą wtedy grupę (GRP-004, 2026-11-10).
 - Nowa kategoria w formacie z grupami dostaje od razu wybraną liczbę grup (1-8, domyślnie 1); drużyny bez grupy trafiają do Grupy A (GRP-002, 2026-11-10).
+- Bez zapisanych reguł remisu punktowego obowiązuje domyślna kolejność: punkty i bilans w meczach bezpośrednich, bilans bramek, gole zdobyte, zwycięstwa. Nie jest zapisywana w bazie, więc działa też dla starych turniejów; zapis własnej kolejności ją zastępuje (GRP-005, 2026-11-10).
 
 **Drabinka i mistrz**
 - Korekta wyniku zmieniająca awans: nierozpoczęty mecz kolejnej rundy dostaje nową drużynę sam; rozpoczęty zostaje bez zmian, a organizator dostaje powiadomienie (PUC-048, GPK-008).

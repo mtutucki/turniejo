@@ -16,6 +16,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 - Grupy w karcie kategorii są czytelną listą z liczbą drużyn i przyciskami edycji i usuwania przy każdej grupie.
 - Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
+- Turniej ma od razu domyślną kolejność reguł przy równej liczbie punktów (mecze bezpośrednie, bilans, gole, zwycięstwa). Organizator może ją zmienić.
 
 ### Poprawione
 

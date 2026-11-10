@@ -104,6 +104,31 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
     }
 
     [Fact]
+    public async Task GRP_005_NewTournament_HasDefaultTieBreakerOrder()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+
+        var rules = (await (await s.Organizer.GetAsync($"{T(s)}/tiebreaker-rules")).ReadJsonAsync()).EnumerateArray()
+            .OrderBy(r => r.GetInt("order")).Select(r => r.GetString("type"));
+
+        rules.Should().Equal("HeadToHeadPoints", "HeadToHeadGoalDiff", "GoalDifference", "GoalsFor", "Wins");
+    }
+
+    [Fact]
+    public async Task GRP_005_WithoutSavedRules_EqualPointsAreResolvedByGoalDifference()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3);
+
+        // T1 i T2 po 4 punkty, remis między sobą, T1 ma lepszy bilans.
+        await PlayAsync(s, "T1", "T2", 0, 0);
+        await PlayAsync(s, "T1", "T3", 5, 0);
+        await PlayAsync(s, "T2", "T3", 1, 0);
+
+        var order = (await TableAsync(s)).OrderBy(r => r.GetInt("position")).Select(r => r.GetGuid("tournamentTeamId"));
+        order.Should().Equal(s.Team("T1"), s.Team("T2"), s.Team("T3"));
+    }
+
+    [Fact]
     public async Task GRP_007_GroupWithOneTeam_CannotGetASchedule()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 1, schedule: false);
