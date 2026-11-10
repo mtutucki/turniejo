@@ -5,6 +5,7 @@ using Turniejo.Api.Extensions;
 using Turniejo.Teams.Application.Teams.CreateTeam;
 using Turniejo.Teams.Application.Teams.GetTeamById;
 using Turniejo.Teams.Application.Teams.GetTeams;
+using Turniejo.Teams.Application.Teams.SetTeamLabels;
 using Turniejo.Teams.Application.Teams.UpdateTeam;
 using Turniejo.Teams.Application.Teams.UpdateTeamLogo;
 using Turniejo.Teams.Application.Teams.UploadTeamLogo;
@@ -31,6 +32,15 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> UpdateTeam([FromRoute] Guid organizationId, [FromRoute] Guid teamId, [FromBody] UpdateTeamRequest request, CancellationToken cancellationToken)
         {
             var command = new UpdateTeamCommand(organizationId, teamId, request.Name, request.ShortName);
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        // Etykiety drużyny z bazy organizacji (pusta lista zdejmuje wszystkie).
+        [HttpPut("{teamId}/labels")]
+        public async Task<IActionResult> SetTeamLabels([FromRoute] Guid organizationId, [FromRoute] Guid teamId, [FromBody] SetTeamLabelsRequest request, CancellationToken cancellationToken)
+        {
+            var command = new SetTeamLabelsCommand(organizationId, teamId, request.LabelIds ?? []);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -86,5 +96,6 @@ namespace Turniejo.Api.Controllers
         public sealed record CreateTeamRequest(string Name, string? ShortName, string? LogoUrl);
         public sealed record UpdateTeamRequest(string Name, string? ShortName);
         public sealed record UpdateTeamLogoRequest(string? LogoUrl);
+        public sealed record SetTeamLabelsRequest(IReadOnlyCollection<Guid>? LabelIds);
     }
 }

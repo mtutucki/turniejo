@@ -427,4 +427,93 @@ public sealed class TeamsAndSquadsRulesTests(IntegrationTestWebApplicationFactor
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    // Etykiety drużyn w bazie organizacji (DRU-048…051).
+
+    private static string Labels(TournamentScenario s) => $"/api/organizations/{s.OrganizationId}/team-labels";
+
+    private static async Task<Guid> CreateLabelAsync(TournamentScenario s, string name)
+    {
+        var response = await s.Organizer.PostAsJsonAsync(Labels(s), new { name });
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        return (await response.ReadJsonAsync()).GetGuid("labelId");
+    }
+
+    private static async Task<List<JsonElement>> LabelsAsync(TournamentScenario s) =>
+        (await (await s.Organizer.GetAsync(Labels(s))).ReadJsonAsync()).EnumerateArray().ToList();
+
+    private static async Task<List<Guid>> LabelIdsOfAsync(TournamentScenario s, string team)
+    {
+        var teams = (await (await s.Organizer.GetAsync($"/api/organizations/{s.OrganizationId}/teams")).ReadJsonAsync()).EnumerateArray();
+        return teams.Single(t => t.GetGuid("id") == s.ClubTeam(team))
+            .GetProperty("labelIds").EnumerateArray().Select(e => e.GetGuid()).ToList();
+    }
+
+    [Fact]
+    public async Task DRU_048_Labels_AreCreatedAndRenamed_AndNamesAreUniqueIgnoringCase()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var year = await CreateLabelAsync(s, "Rocznik 2015");
+        await CreateLabelAsync(s, "Klub Orlik");
+
+        (await s.Organizer.PostAsJsonAsync(Labels(s), new { name = " rocznik 2015 " })).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await s.Organizer.PostAsJsonAsync(Labels(s), new { name = "  " })).IsSuccessStatusCode.Should().BeFalse();
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}", new { name = "KLUB ORLIK" })).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}", new { name = "Rocznik 2016" })).IsSuccessStatusCode.Should().BeTrue();
+
+        (await LabelsAsync(s)).Select(l => l.GetString("name")).Should().Equal("Klub Orlik", "Rocznik 2016");
+    }
+
+    [Fact]
+    public async Task DRU_049_TeamHasManyLabels_SetFromTheLabelOrFromTheTeam()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3, schedule: false);
+        var year = await CreateLabelAsync(s, "Rocznik 2015");
+        var club = await CreateLabelAsync(s, "Klub Orlik");
+
+        // Etykieta dla kilku drużyn naraz: z listy dostają ją, pozostałe tracą.
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}/teams", new { teamIds = new[] { s.ClubTeam("T1"), s.ClubTeam("T2") } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}/teams", new { teamIds = new[] { s.ClubTeam("T2"), s.ClubTeam("T3") } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        // Etykiety jednej drużyny (okno edycji).
+        (await s.Organizer.PutAsJsonAsync($"/api/organizations/{s.OrganizationId}/teams/{s.ClubTeam("T2")}/labels", new { labelIds = new[] { year, club } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        (await LabelIdsOfAsync(s, "T1")).Should().BeEmpty();
+        (await LabelIdsOfAsync(s, "T2")).Should().BeEquivalentTo([year, club]);
+        (await LabelIdsOfAsync(s, "T3")).Should().Equal(year);
+        var counts = (await LabelsAsync(s)).ToDictionary(l => l.GetGuid("id"), l => l.GetProperty("teamCount").GetInt32());
+        counts[year].Should().Be(2);
+        counts[club].Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DRU_050_DeletingALabel_RemovesItFromTeams_AndKeepsTheTeams()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var year = await CreateLabelAsync(s, "Rocznik 2015");
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}/teams", new { teamIds = new[] { s.ClubTeam("T1") } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        (await s.Organizer.DeleteAsync($"{Labels(s)}/{year}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await LabelsAsync(s)).Should().BeEmpty();
+        (await LabelIdsOfAsync(s, "T1")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DRU_051_LabelsOfAnotherOrganization_CannotBeUsedOrSeen()
+    {
+        var a = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var b = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var labelOfB = await CreateLabelAsync(b, "Rocznik 2015");
+
+        (await a.Organizer.GetAsync(Labels(b))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await a.Organizer.PutAsJsonAsync($"/api/organizations/{a.OrganizationId}/teams/{a.ClubTeam("T1")}/labels", new { labelIds = new[] { labelOfB } }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await b.Organizer.PutAsJsonAsync($"{Labels(b)}/{labelOfB}/teams", new { teamIds = new[] { a.ClubTeam("T1") } }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await LabelIdsOfAsync(a, "T1")).Should().BeEmpty();
+    }
 }

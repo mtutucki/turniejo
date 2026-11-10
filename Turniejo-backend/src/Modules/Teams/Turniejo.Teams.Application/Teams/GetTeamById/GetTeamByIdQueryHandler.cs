@@ -13,7 +13,7 @@ namespace Turniejo.Teams.Application.Teams.GetTeamById
             if (team == null || team.OrganizationId != request.OrganizationId)
                 return Result.Failure<TeamDto>(Error.NotFound("Team", request.TeamId));
 
-            var dto = new TeamDto(team.Id, team.OrganizationId, team.Name, team.ShortName, team.LogoUrl);
+            var dto = new TeamDto(team.Id, team.OrganizationId, team.Name, team.ShortName, team.LogoUrl, team.LabelIds);
 
             return Result.Success(dto);
         }
