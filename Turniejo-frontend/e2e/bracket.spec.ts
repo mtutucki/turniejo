@@ -75,11 +75,22 @@ test.describe("Drabinka pucharu", () => {
     await expect(page.getByRole("button", { name: "Utwórz drabinkę" })).toBeDisabled()
   })
 
-  test("[PUC-020] ponad 16 drużyn: informacja, ile się zmieści", async ({ page }) => {
+  test("[PUC-020] ponad 16 drużyn: drabinka 1/16 finału mieści wszystkie", async ({ page }) => {
     await knockoutWith(17)
     await page.goto(`/tournaments/${TOURNAMENT_ID}/bracket`)
 
-    await expect(page.getByText("Do drabinki zmieści się 16 z 17 drużyn.", { exact: false })).toBeVisible()
+    await expect(page.getByText("Drabinka utworzy się sama")).toBeVisible()
+    await expect(page.getByRole("button", { name: "1/16 finału (17–32 drużyny)" })).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByRole("combobox", { name: "Para 16: gospodarz" })).toHaveText(/Drużyna 16/)
+    await expect(page.getByRole("combobox", { name: "Para 16: gość" })).toHaveText(/Drużyna 17/)
+
+    await page.getByRole("button", { name: "Utwórz drabinkę" }).click()
+    await expect(page.getByText("Drabinka utworzona")).toBeVisible()
+    await expect(page.getByText("1/16 finału").first()).toBeVisible()
+    await expect(page.getByText("Finał", { exact: true }).first()).toBeVisible()
+    // Pięć rund przewija się w ramce drabinki, nie cała strona.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(0)
   })
 })
 

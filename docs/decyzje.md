@@ -63,7 +63,7 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 **Drabinka i mistrz**
 - Korekta wyniku zmieniająca awans: nierozpoczęty mecz kolejnej rundy dostaje nową drużynę sam; rozpoczęty zostaje bez zmian, a organizator dostaje powiadomienie (PUC-048, GPK-008).
 - Przy 3 drużynach (półfinał z wolnym losem) nie ma meczu o 3. miejsce; trzecie miejsce zajmuje przegrany rozegranego półfinału (PUC-019).
-- Ponad 16 drużyn: ostrzeżenie „zmieści się 16 z N” i ręczny wybór drużyn (PUC-020).
+- Drabinka nie ma górnego limitu drużyn: pierwsza runda to najmniejsza potęga dwójki, w której mieszczą się wszyscy, a wolne losy dostają najwyżej rozstawieni. Do wyboru są wielkości do 1/8 finału i dalej, aż do tej mieszczącej wszystkie drużyny. Zastępuje dawne ostrzeżenie „zmieści się 16 z N” (PUC-020, 2026-11-10).
 - Formularz drabinki pozwala wybrać tylko istniejące miejsca w grupie (GPK-007).
 - Baner mistrza pojawia się zaraz po finale, nie czeka na „Zakończ turniej” (PUC-045, PUB-011).
 

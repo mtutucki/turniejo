@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
 import type { TournamentGroup } from "@/types/tournaments"
 
@@ -5,8 +6,7 @@ import type { BracketSlotInput } from "./api"
 
 export type BracketPair = { home: BracketSlotInput | null; away: BracketSlotInput | null }
 
-/** Backend przyjmuje tylko 1, 2, 4 albo 8 par w 1. rundzie (potęga dwójki). */
-const MAX_PAIRS = 8
+// Backend przyjmuje dowolną potęgę dwójki par w 1. rundzie, bez górnego limitu (PUC-020).
 const nextPowerOfTwo = (value: number) => 2 ** Math.ceil(Math.log2(Math.max(1, value)))
 
 /**
@@ -15,7 +15,26 @@ const nextPowerOfTwo = (value: number) => 2 ** Math.ceil(Math.log2(Math.max(1, v
  */
 export function defaultPairCount(groups: TournamentGroup[], teams: TournamentTeam[]) {
   const wanted = groups.length > 0 ? groups.length : Math.max(2, teams.length) / 2
-  return Math.min(MAX_PAIRS, nextPowerOfTwo(wanted))
+  return nextPowerOfTwo(wanted)
+}
+
+const ROUND_NAMES: Record<number, string> = { 1: "Finał", 2: "Półfinały", 4: "Ćwierćfinały" }
+
+/**
+ * Wielkości pierwszej rundy do wyboru: zawsze do 1/8 finału, a dalej do drabinki, w której zmieszczą
+ * się wszystkie drużyny (40 drużyn → do 1/32 finału).
+ */
+export function bracketSizes(groups: TournamentGroup[], teams: TournamentTeam[]) {
+  const largest = Math.max(8, defaultPairCount(groups, teams), nextPowerOfTwo(teams.length / 2))
+  const sizes: { pairs: number; label: string }[] = []
+  for (let pairs = 1; pairs <= largest; pairs *= 2) {
+    const name = ROUND_NAMES[pairs] ?? `1/${pairs} finału`
+    // "Ćwierćfinały (5–8 drużyn)": odmiana według górnej granicy.
+    const teamCount = plural(pairs * 2, ["drużyna", "drużyny", "drużyn"])
+    const range = pairs === 1 ? teamCount : `${pairs + 1}–${teamCount}`
+    sizes.push({ pairs, label: `${name} (${range})` })
+  }
+  return sizes
 }
 
 /**
