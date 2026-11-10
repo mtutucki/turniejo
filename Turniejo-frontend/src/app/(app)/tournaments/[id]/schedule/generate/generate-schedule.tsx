@@ -848,7 +848,11 @@ function GenerateForm({
   // Klucz zamiast tablicy: `pitches` to nowa tablica przy każdym renderze, a zapis po "Anuluj"
   // przywróciłby właśnie usunięty szkic.
   const pitchKey = pitches.map((p) => p.id).join(",")
+  // Po wygenerowaniu szkic jest już usunięty. Odświeżenie danych po sukcesie nie może go zapisać
+  // z powrotem, bo terminarz odsyłałby wtedy z powrotem do generatora.
+  const generated = useRef(false)
   useEffect(() => {
+    if (generated.current) return
     try {
       sessionStorage.setItem(
         draftKey(tournament.id),
@@ -1003,6 +1007,7 @@ function GenerateForm({
       },
       {
         onSuccess: async ({ matchesCreated }) => {
+          generated.current = true
           clearScheduleDraft(tournament.id)
           toast.success(
             isKnockout(tournament)
