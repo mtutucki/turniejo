@@ -100,3 +100,48 @@ test.describe("Unikalne nazwy", () => {
     await expect(dialog.getByText("Ta nazwa jest już zajęta")).toBeVisible()
   })
 })
+
+test.describe("Grupy w kategorii", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, ORGANIZER)
+  })
+
+  async function groupTournament(page: Page) {
+    const id = await createTournament(page)
+    await page.getByText("Grupowy", { exact: true }).click()
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+    await expect(page.getByRole("spinbutton", { name: "Wygrana" })).toBeVisible()
+    await page.goto(`/tournaments/${id}/categories`)
+    return id
+  }
+
+  test("[GRP-002] nowa kategoria od razu z wybraną liczbą grup", async ({ page }) => {
+    await groupTournament(page)
+    await page.getByRole("button", { name: "Dodaj kategorię" }).first().click()
+    const dialog = page.getByRole("dialog", { name: "Nowa kategoria" })
+    await dialog.getByLabel("Nazwa").fill("U12")
+    await dialog.getByLabel("Liczba grup").fill("3")
+    await expect(dialog.getByText("Powstanie: Grupa A, Grupa B i Grupa C.", { exact: false })).toBeVisible()
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(dialog).toBeHidden()
+
+    const groups = page.getByRole("region", { name: "Grupy w kategorii U12" })
+    await expect(groups.getByRole("listitem")).toHaveText([/Grupa A/, /Grupa B/, /Grupa C/])
+  })
+
+  test("[GRP-004] pustą grupę usuwa się przyciskiem przy grupie", async ({ page }) => {
+    await groupTournament(page)
+    await page.getByRole("button", { name: "Dodaj kategorię" }).first().click()
+    const dialog = page.getByRole("dialog", { name: "Nowa kategoria" })
+    await dialog.getByLabel("Nazwa").fill("U12")
+    await dialog.getByLabel("Liczba grup").fill("2")
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(dialog).toBeHidden()
+
+    await page.getByRole("button", { name: "Usuń Grupa B" }).click()
+    const confirm = page.getByRole("alertdialog", { name: "Usunąć grupę „Grupa B”?" })
+    await confirm.getByRole("button", { name: "Usuń" }).click()
+    await expect(page.getByRole("button", { name: "Edytuj Grupa B" })).toBeHidden()
+    await expect(page.getByRole("button", { name: "Edytuj Grupa A" })).toBeVisible()
+  })
+})

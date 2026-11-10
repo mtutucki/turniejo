@@ -98,4 +98,22 @@ test.describe("Zgłoszenia do turnieju", () => {
     await dialog.getByRole("button", { name: "Zamknij" }).click()
     await expect(page.getByText("U12").first()).toBeVisible()
   })
+
+  test("[GRP-004] grupy z drużynami nie da się usunąć, z wyjaśnieniem", async ({ page }) => {
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+    await page.getByRole("button", { name: "Usuń Grupa A" }).click()
+
+    const dialog = page.getByRole("alertdialog", { name: "Grupy „Grupa A” nie da się jeszcze usunąć" })
+    await expect(dialog.getByRole("link", { name: "Przejdź do Drużyn" })).toBeVisible()
+    await expect(dialog.getByRole("link", { name: "Przejdź do Terminarza" })).toBeVisible()
+    await expect(dialog.getByRole("button", { name: "Usuń" })).toHaveCount(0)
+  })
+
+  test("[GRP-002] po wygenerowaniu terminarza nowa kategoria nie pyta o liczbę grup", async ({ page }) => {
+    await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
+    await page.getByRole("button", { name: "Dodaj kategorię" }).first().click()
+    const dialog = page.getByRole("dialog", { name: "Nowa kategoria" })
+    await expect(dialog.getByLabel("Nazwa")).toBeVisible()
+    await expect(dialog.getByLabel("Liczba grup")).toHaveCount(0)
+  })
 })

@@ -55,6 +55,8 @@ Ustalenia z przeglądu QA (2026-11-06 i 2026-11-08), wszystkie wdrożone i pokry
 - Organizator zmienia wynik bez limitu czasu do zakończenia turnieju; potem blokada (PUC-076).
 - Drużyny nie można wycofać w trakcie jej meczu (PUC-054). Wycofanie z grupy: rozegrane wyniki zostają, nierozegrane mecze odwołane (GRP-020).
 - Karne w meczu grupowym nie zmieniają tabeli, są tylko informacją (GRP-026).
+- Usunięcie grupy blokują tylko oczekujące i przyjęte drużyny oraz mecze grupy (także odwołane). Wycofane i odrzucone zgłoszenia tracą wtedy grupę (GRP-004, 2026-11-10).
+- Nowa kategoria w formacie z grupami dostaje od razu wybraną liczbę grup (1-8, domyślnie 1); drużyny bez grupy trafiają do Grupy A (GRP-002, 2026-11-10).
 
 **Drabinka i mistrz**
 - Korekta wyniku zmieniająca awans: nierozpoczęty mecz kolejnej rundy dostaje nową drużynę sam; rozpoczęty zostaje bez zmian, a organizator dostaje powiadomienie (PUC-048, GPK-008).

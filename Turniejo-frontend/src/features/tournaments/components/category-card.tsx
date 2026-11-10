@@ -31,6 +31,7 @@ import type { TournamentCategory, TournamentFormat, TournamentGroup } from "@/ty
 
 import { useDeleteCategory } from "../api"
 import { CategoryFormDialog } from "./category-form-dialog"
+import { DeleteGroupDialog } from "./delete-group-dialog"
 import { GroupFormDialog } from "./group-form-dialog"
 
 function birthRange(category: TournamentCategory) {
@@ -211,42 +212,65 @@ export function CategoryCard({
           <p className="text-muted-foreground text-sm">
             Wybierz format turnieju - przy formacie z grupami kategoria dostanie od razu „Grupa A”.
           </p>
-        ) : groups.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Brak grup w tej kategorii.</p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
-            {groups.map((group) => (
-              <li key={group.id}>
-                {canManage ? (
-                  <GroupFormDialog
-                    tournamentId={tournamentId}
-                    categoryId={category.id}
-                    categoryName={category.name}
-                    group={group}
-                    nextOrder={group.order}
-                    trigger={
-                      <button
-                        type="button"
-                        className="bg-secondary hover:bg-accent focus-visible:ring-ring flex items-center gap-2 rounded-md px-3 py-1.5 text-sm outline-none focus-visible:ring-2"
-                        aria-label={`Edytuj ${group.name}`}
-                      >
-                        {group.name}
-                        <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                          {teamCount(group.id)}
-                        </span>
-                        <Pencil className="text-muted-foreground size-3" />
-                      </button>
-                    }
-                  />
-                ) : (
-                  <span className="bg-secondary rounded-md px-3 py-1.5 text-sm">
-                    {group.name} ·{" "}
-                    <span className="font-mono tabular-nums">{teamCount(group.id)}</span>
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <section aria-label={`Grupy w kategorii ${category.name}`} className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">Grupy</h3>
+              {canManage && (
+                <GroupFormDialog
+                  tournamentId={tournamentId}
+                  categoryId={category.id}
+                  categoryName={category.name}
+                  nextOrder={nextGroupOrder}
+                  suggestedName={suggestGroupName(groups)}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <Plus />
+                      Dodaj grupę
+                    </Button>
+                  }
+                />
+              )}
+            </div>
+            {groups.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Brak grup w tej kategorii.</p>
+            ) : (
+              <ul className="divide-y rounded-md border">
+                {groups.map((group) => (
+                  <li key={group.id} className="flex items-center gap-2 py-1 pr-1 pl-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {group.name}
+                    </span>
+                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                      {plural(teamCount(group.id), ["drużyna", "drużyny", "drużyn"])}
+                    </span>
+                    {canManage && (
+                      <div className="flex shrink-0">
+                        <GroupFormDialog
+                          tournamentId={tournamentId}
+                          categoryId={category.id}
+                          categoryName={category.name}
+                          group={group}
+                          nextOrder={group.order}
+                          trigger={
+                            <Button variant="ghost" size="icon" aria-label={`Edytuj ${group.name}`}>
+                              <Pencil />
+                            </Button>
+                          }
+                        />
+                        <DeleteGroupDialog
+                          tournamentId={tournamentId}
+                          group={group}
+                          activeTeams={teamCount(group.id)}
+                          matches={categoryMatches.filter((m) => m.groupId === group.id).length}
+                        />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         )}
         {format && format !== "Knockout" && groups.length === 1 && (
           <p className="text-muted-foreground text-xs">
@@ -263,21 +287,6 @@ export function CategoryCard({
             </Link>
             .
           </p>
-        )}
-        {canManage && format && format !== "Knockout" && (
-          <GroupFormDialog
-            tournamentId={tournamentId}
-            categoryId={category.id}
-            categoryName={category.name}
-            nextOrder={nextGroupOrder}
-            suggestedName={suggestGroupName(groups)}
-            trigger={
-              <Button variant="outline" size="sm">
-                <Plus />
-                Dodaj grupę
-              </Button>
-            }
-          />
         )}
       </CardContent>
     </Card>

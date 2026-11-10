@@ -20,8 +20,10 @@ public interface ITeamModule
     Task<IReadOnlyList<Guid>> GetInactiveTournamentTeamIdsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
     /// <summary>Usuwa zgłoszenia od razu w bazie (sztab znika kaskadą FK).</summary>
     Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
-    // Jak wyżej, dla TournamentTeam.GroupId — blokada kasowania grupy turnieju.
-    Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    /// <summary>Czy w grupie są oczekujące albo przyjęte zgłoszenia (blokada kasowania grupy).</summary>
+    Task<bool> AnyActiveTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    /// <summary>Zdejmuje grupę z pozostałych (odrzuconych/wycofanych) zgłoszeń przed usunięciem grupy.</summary>
+    Task UnassignTeamsFromGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
     /// <summary>Drużyny kategorii bez grupy (poza odrzuconymi/wycofanymi) trafiają do wskazanej grupy.</summary>
     Task<int> AssignUngroupedTeamsToGroupAsync(Guid tournamentId, Guid categoryId, Guid groupId, CancellationToken cancellationToken = default);
 

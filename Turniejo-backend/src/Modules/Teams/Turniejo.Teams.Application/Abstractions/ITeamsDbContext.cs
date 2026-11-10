@@ -31,7 +31,8 @@ namespace Turniejo.Teams.Application.Abstractions
         Task<bool> AnyActiveTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Guid>> GetInactiveTournamentTeamIdsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
         Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
-        Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task<bool> AnyActiveTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByGroupIdForUpdateAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
 
         // TeamStaff

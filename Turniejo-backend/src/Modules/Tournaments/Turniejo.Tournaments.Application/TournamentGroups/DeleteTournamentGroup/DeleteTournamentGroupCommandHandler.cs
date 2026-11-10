@@ -6,7 +6,7 @@ using Turniejo.Tournaments.Application.Abstractions;
 namespace Turniejo.Tournaments.Application.TournamentGroups.DeleteTournamentGroup
 {
     // GroupId w Teams/Matches nie ma FK (osobne moduły) — bez tych kontroli skasowanie grupy cicho
-    // osierocałoby przypisane drużyny i mecze, psując tabele grupowe.
+    // osierocałoby aktywne drużyny i mecze, psując tabele grupowe.
     internal sealed class DeleteTournamentGroupCommandHandler(
         ITournamentsDbContext tournamentsDbContext,
         ITeamModule teamModule,
@@ -18,11 +18,14 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.DeleteTournamentGrou
             if (group == null || group.TournamentId != request.TournamentId)
                 return Result.Failure(Error.NotFound("TournamentGroup", request.GroupId));
 
-            if (await teamModule.AnyTeamsInGroupAsync(request.GroupId, cancellationToken))
+            if (await teamModule.AnyActiveTeamsInGroupAsync(request.GroupId, cancellationToken))
                 return Result.Failure(Error.Conflict("GroupId", "Cannot delete a group that still has teams assigned to it"));
 
             if (await matchModule.AnyMatchesForGroupAsync(request.GroupId, cancellationToken))
                 return Result.Failure(Error.Conflict("GroupId", "Cannot delete a group that still has matches scheduled in it"));
+
+            // Wycofane i odrzucone zgłoszenia nie blokują usunięcia, ale nie mogą wskazywać na nieistniejącą grupę.
+            await teamModule.UnassignTeamsFromGroupAsync(request.GroupId, cancellationToken);
 
             await tournamentsDbContext.RemoveTournamentGroupAsync(group, cancellationToken);
             await tournamentsDbContext.SaveChangesAsync(cancellationToken);

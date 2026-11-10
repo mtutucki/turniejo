@@ -6,20 +6,7 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { Trash2 } from "lucide-react"
-
 import { TextField } from "@/components/forms/text-field"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -34,7 +21,7 @@ import { FieldError, FieldGroup } from "@/components/ui/field"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import type { TournamentGroup } from "@/types/tournaments"
 
-import { useDeleteGroup, useSaveGroup } from "../api"
+import { useSaveGroup } from "../api"
 
 const schema = z.object({
   name: z.string().trim().min(1, "Podaj nazwę grupy").max(100, "Maksymalnie 100 znaków"),
@@ -65,7 +52,6 @@ export function GroupFormDialog({
 }: GroupFormDialogProps) {
   const [open, setOpen] = useState(false)
   const saveGroup = useSaveGroup(tournamentId)
-  const deleteGroup = useDeleteGroup(tournamentId)
   const defaults: GroupValues = {
     name: group?.name ?? suggestedName,
     order: group?.order ?? nextOrder,
@@ -84,16 +70,6 @@ export function GroupFormDialog({
         onError: (error) => applyFieldErrors(error, form),
       },
     )
-  }
-
-  function remove() {
-    if (!group) return
-    deleteGroup.mutate(group.id, {
-      onSuccess: () => {
-        toast.success(`Usunięto: ${group.name}`)
-        setOpen(false)
-      },
-    })
   }
 
   return (
@@ -137,33 +113,6 @@ export function GroupFormDialog({
           </FieldGroup>
         </form>
         <DialogFooter>
-          {group && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive sm:mr-auto"
-                >
-                  <Trash2 />
-                  Usuń grupę
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Usunąć grupę „{group.name}”?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Nie da się usunąć grupy, do której są przypisane drużyny lub zaplanowane mecze.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Anuluj</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={remove}>
-                    Usuń
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Anuluj
           </Button>
