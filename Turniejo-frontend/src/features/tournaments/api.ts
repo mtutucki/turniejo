@@ -342,15 +342,18 @@ export function useSaveGroup(id: string) {
       categoryId,
       name,
       order,
+      stage = 1,
     }: {
       groupId?: string
       categoryId: string
       name: string
       order: number
+      /** 2: grupa drugiej fazy (format „Dwie fazy grupowe”). */
+      stage?: 1 | 2
     }) =>
       groupId
         ? request(`${base(id)}/groups/${groupId}`, { method: "PUT", body: { name, order } })
-        : request(`${base(id)}/groups`, { method: "POST", body: { categoryId, name, order } }),
+        : request(`${base(id)}/groups`, { method: "POST", body: { categoryId, name, order, stage } }),
     meta: { handlesValidation: true },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tournamentKeys.groups(id) }),
   })
@@ -361,7 +364,11 @@ export function useDeleteGroup(id: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (groupId: string) => request(`${base(id)}/groups/${groupId}`, { method: "DELETE" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: tournamentKeys.groups(id) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: tournamentKeys.groups(id) })
+      // Usunięta grupa znika też z podziału na fazę 2.
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "second-stage"] })
+    },
   })
 }
 

@@ -40,10 +40,6 @@ public sealed class GroupToBracketTests(IntegrationTestWebApplicationFactory fac
         await TournamentFlow.ChangeStatusAsync(organizer, tournamentId, TournamentStatus.RegistrationOpen);
         await TournamentFlow.ChangeStatusAsync(organizer, tournamentId, TournamentStatus.RegistrationClosed);
         var pitchId = await TournamentFlow.AddPitchAsync(organizer, tournamentId, "Pitch 1");
-        (await organizer.PostAsJsonAsync($"/api/tournaments/{tournamentId}/schedule/generate",
-                new MatchesController.GenerateScheduleRequest(now, now.AddHours(6), [pitchId])))
-            .IsSuccessStatusCode.Should().BeTrue();
-
         // Półfinały: 1. miejsce A - wolny los, 1. miejsce B - 2. miejsce A.
         (await organizer.PostAsJsonAsync($"/api/tournaments/{tournamentId}/bracket/generate",
                 new BracketsController.GenerateBracketRequest(categoryId,
@@ -51,6 +47,9 @@ public sealed class GroupToBracketTests(IntegrationTestWebApplicationFactory fac
                     new BracketsController.BracketPairingRequest(BracketSourceType.GroupPosition, groupA, 1, null, BracketSourceType.Bye, null, null, null),
                     new BracketsController.BracketPairingRequest(BracketSourceType.GroupPosition, groupB, 1, null, BracketSourceType.GroupPosition, groupA, 2, null),
                 ])))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await organizer.PostAsJsonAsync($"/api/tournaments/{tournamentId}/schedule/generate",
+                new MatchesController.GenerateScheduleRequest(now, now.AddHours(6), [pitchId])))
             .IsSuccessStatusCode.Should().BeTrue();
 
         // Gra tylko grupa A: A1 wygrywa 2:0. Grupa B ma dalej mecz niezakończony.

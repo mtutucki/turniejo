@@ -20,7 +20,10 @@ import type { PublicSettings } from "@/types/public"
 
 import { useUpdatePublicSettings } from "../api"
 
-type ToggleName = Exclude<keyof PublicSettings, "isPublic" | "abbreviatePlayerNames">
+type ToggleName = Exclude<
+  keyof PublicSettings,
+  "isPublic" | "abbreviatePlayerNames" | "showInDirectory"
+>
 
 const SECTIONS: { name: ToggleName; label: string; description: string }[] = [
   {
@@ -147,6 +150,12 @@ export function PublicSettingsForm({
               </Button>
             </span>
           </div>
+        )}
+        {toggle(
+          "showInDirectory",
+          "Pokazuj na liście turniejów",
+          "Turniej widać na stronie głównej Turniejo. Wyłącz, jeśli portal ma być dostępny tylko przez link.",
+          !isPublic,
         )}
         <FieldSeparator>Co pokazać</FieldSeparator>
         {SECTIONS.map(({ name, label, description }) =>

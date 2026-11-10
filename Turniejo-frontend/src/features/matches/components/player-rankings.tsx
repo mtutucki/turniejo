@@ -15,9 +15,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import type { RankingEntry } from "@/types/public"
 
-// Jedna seria (liczba na zawodnika) → jeden odcień. #0FA676 zamiast marki #10B981: przechodzi pasmo
-// jasności i kontrast na ciemnej powierzchni #1C2026 (validate_palette.js, tryb dark).
-const BAR_COLOR = "#0FA676"
+// Jedna seria (liczba na zawodnika) → jeden odcień z tokenu --chart-bar (globals.css), dobranego
+// pod kontrast kart w każdym motywie.
+const BAR_COLOR = "var(--chart-bar)"
 const ROW_HEIGHT = 44
 
 export type PlayerRankingKind = "scorers" | "assists" | "mvp"

@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Turniejo.Matches.Application.Matches.FinishAbandonedMatches;
 using Turniejo.Notifications.Application.Notifications.CreateMatchReminderNotifications;
 
 namespace Turniejo.Architecture.UnitTests
@@ -28,6 +29,24 @@ namespace Turniejo.Architecture.UnitTests
             offendingActions.Should().BeEmpty(
                 "CreateMatchReminderNotificationsCommand is IPublicRequest (no auth check at all) and must " +
                 "stay reachable only from MatchReminderBackgroundService, never from an HTTP controller action");
+        }
+
+        // To samo dla FinishAbandonedMatchesCommand: z HTTP każdy mógłby zakończyć cudze mecze.
+        [Fact]
+        public void FinishAbandonedMatchesCommand_ShouldNeverBeAcceptedByAControllerAction()
+        {
+            var commandType = typeof(FinishAbandonedMatchesCommand);
+
+            var offendingActions = typeof(Turniejo.Api.Controllers.PublicController).Assembly
+                .GetTypes()
+                .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
+                .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                .Where(m => m.GetParameters().Any(p => p.ParameterType == commandType))
+                .Select(m => $"{m.DeclaringType!.Name}.{m.Name}")
+                .ToList();
+
+            offendingActions.Should().BeEmpty(
+                "FinishAbandonedMatchesCommand is IPublicRequest and must stay reachable only from AbandonedMatchBackgroundService");
         }
     }
 }

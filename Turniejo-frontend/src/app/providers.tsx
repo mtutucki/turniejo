@@ -3,15 +3,17 @@
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { MotionConfig } from "motion/react"
 import { getSession, SessionProvider, signOut, useSession } from "next-auth/react"
+import { ThemeProvider } from "next-themes"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { AuthSync } from "@/components/auth/auth-sync"
 import { NotificationSync } from "@/features/notifications/notification-sync"
+import { ThemeSync } from "@/features/theme/theme-sync"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { handleApiError } from "@/lib/api/error-handler"
 import { isApiError } from "@/lib/api/errors"
-import { isStartPath } from "@/lib/auth/public-paths"
+import { isPublicPath, isStartPath } from "@/lib/auth/public-paths"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 
 declare module "@tanstack/react-query" {
@@ -28,6 +30,8 @@ declare module "@tanstack/react-query" {
 /** Strony logowania/rejestracji — z nich nigdy nie przekierowujemy na logowanie (inaczej pętla). */
 const AUTH_PAGES = ["/login", "/register", "/password-reset", "/password-reset/confirm"]
 const onAuthPage = () => AUTH_PAGES.includes(window.location.pathname)
+/** Strony bez logowania (portal kibica, lista turniejów, pomoc): koniec sesji nie wyrzuca z nich na logowanie. */
+const onPublicPage = () => isPublicPath(window.location.pathname)
 
 function loginUrl() {
   const { pathname, search } = window.location
@@ -38,8 +42,9 @@ function loginUrl() {
 }
 
 function redirectToLogin() {
-  // 401 z zapytania w tle na stronie logowania to po prostu brak sesji — nic nie robimy.
-  if (onAuthPage()) return
+  // 401 z zapytania w tle na stronie logowania albo w portalu kibica to po prostu brak sesji —
+  // strona działa bez logowania, więc zostajemy na niej.
+  if (onAuthPage() || onPublicPage()) return
   window.location.assign(loginUrl())
 }
 
@@ -84,7 +89,8 @@ function SessionExpiryWatcher() {
   useEffect(() => {
     if (session?.error !== "RefreshTokenError") return
     // Na stronie logowania tylko czyścimy sesję — przekierowanie przeładowałoby ją w kółko.
-    if (onAuthPage()) void signOut({ redirect: false })
+    // Na stronach publicznych (portal kibica) też: kibic ogląda dalej, już jako niezalogowany.
+    if (onAuthPage() || onPublicPage()) void signOut({ redirect: false })
     else void signOut({ redirectTo: loginUrl() })
   }, [session?.error])
   return null
@@ -112,19 +118,23 @@ export function Providers({ children }: { children: ReactNode }) {
     // Sprawdzanie sesji co 30 s: bez tego na bezczynnej stronie wygasła sesja wychodziła na jaw dopiero
     // przy pierwszym kliknięciu (SessionExpiryWatcher reaguje na odświeżoną sesję), a token odświeżał się
     // dopiero przy zapytaniu do API.
-    <SessionProvider refetchInterval={30}>
-      <QueryProvider>
-        {/* Animacje respektują systemowe "ogranicz ruch". */}
-        <MotionConfig reducedMotion="user">
-          <TooltipProvider>{children}</TooltipProvider>
-        </MotionConfig>
-        <AuthSync />
-        <NotificationSync />
-        <PersistedStoresHydration />
-        <SessionExpiryWatcher />
-        {/* Aplikacja jest tylko ciemna (klasa "dark" na <html>) — bez ThemeProvidera. */}
-        <Toaster theme="dark" position="top-center" richColors closeButton />
-      </QueryProvider>
-    </SessionProvider>
+    // Motyw: klasa "dark" na <html> (next-themes, przed pierwszym malowaniem, bez mignięcia).
+    // Domyślnie jak w systemie, wybór w przeglądarce, a po zalogowaniu z konta (ThemeSync).
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <SessionProvider refetchInterval={30}>
+        <QueryProvider>
+          {/* Animacje respektują systemowe "ogranicz ruch". */}
+          <MotionConfig reducedMotion="user">
+            <TooltipProvider>{children}</TooltipProvider>
+          </MotionConfig>
+          <AuthSync />
+          <NotificationSync />
+          <ThemeSync />
+          <PersistedStoresHydration />
+          <SessionExpiryWatcher />
+          <Toaster position="top-center" richColors closeButton />
+        </QueryProvider>
+      </SessionProvider>
+    </ThemeProvider>
   )
 }

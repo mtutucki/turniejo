@@ -50,6 +50,25 @@ test.describe("Kreator konfiguracji", () => {
     // Ustawienie meczu o 3. miejsce zostało zapisane.
     await steps(page).getByRole("button", { name: /Zasady gry/ }).click()
     await expect(page.getByRole("switch", { name: "Mecz o 3. miejsce" })).toBeChecked()
+    // W pucharze nie ma tabeli, więc nie ma kroku z kolejnością przy remisie.
+    await expect(steps(page).getByRole("button", { name: /Tabela/ })).toHaveCount(0)
+  })
+
+  test("[GRP-005] format grupowy: krok Tabela z domyślną kolejnością przy remisie", async ({ page }) => {
+    await createTournament(page)
+    await page.getByText("Grupowy", { exact: true }).click()
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+
+    await expect(page).toHaveURL(/\?step=tiebreakers$/)
+    const rules = page.getByRole("list", { name: "Kolejność reguł" })
+    await expect(rules.getByRole("listitem")).toHaveCount(5)
+    await expect(rules.getByRole("listitem").first()).toContainText("1.")
+
+    // Bez zmian „Zapisz i dalej” przechodzi do kolejnego kroku.
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+    await expect(page.getByRole("switch", { name: "Turniej publiczny" })).toBeVisible()
+    await expect(steps(page).getByRole("button", { name: /Tabela/ }).getByLabel("Zrobione")).toBeVisible()
   })
 })
 
@@ -98,5 +117,50 @@ test.describe("Unikalne nazwy", () => {
     await dialog.getByLabel("Nazwa").fill("Grupa A")
     await dialog.getByRole("button", { name: "Zapisz" }).click()
     await expect(dialog.getByText("Ta nazwa jest już zajęta")).toBeVisible()
+  })
+})
+
+test.describe("Grupy w kategorii", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, ORGANIZER)
+  })
+
+  async function groupTournament(page: Page) {
+    const id = await createTournament(page)
+    await page.getByText("Grupowy", { exact: true }).click()
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+    await expect(page.getByRole("spinbutton", { name: "Wygrana" })).toBeVisible()
+    await page.goto(`/tournaments/${id}/categories`)
+    return id
+  }
+
+  test("[GRP-002] nowa kategoria od razu z wybraną liczbą grup", async ({ page }) => {
+    await groupTournament(page)
+    await page.getByRole("button", { name: "Dodaj kategorię" }).first().click()
+    const dialog = page.getByRole("dialog", { name: "Nowa kategoria" })
+    await dialog.getByLabel("Nazwa").fill("U12")
+    await dialog.getByLabel("Liczba grup").fill("3")
+    await expect(dialog.getByText("Powstanie: Grupa A, Grupa B i Grupa C.", { exact: false })).toBeVisible()
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(dialog).toBeHidden()
+
+    const groups = page.getByRole("region", { name: "Grupy w kategorii U12" })
+    await expect(groups.getByRole("listitem")).toHaveText([/Grupa A/, /Grupa B/, /Grupa C/])
+  })
+
+  test("[GRP-004] pustą grupę usuwa się przyciskiem przy grupie", async ({ page }) => {
+    await groupTournament(page)
+    await page.getByRole("button", { name: "Dodaj kategorię" }).first().click()
+    const dialog = page.getByRole("dialog", { name: "Nowa kategoria" })
+    await dialog.getByLabel("Nazwa").fill("U12")
+    await dialog.getByLabel("Liczba grup").fill("2")
+    await dialog.getByRole("button", { name: "Zapisz" }).click()
+    await expect(dialog).toBeHidden()
+
+    await page.getByRole("button", { name: "Usuń Grupa B" }).click()
+    const confirm = page.getByRole("alertdialog", { name: "Usunąć grupę „Grupa B”?" })
+    await confirm.getByRole("button", { name: "Usuń" }).click()
+    await expect(page.getByRole("button", { name: "Edytuj Grupa B" })).toBeHidden()
+    await expect(page.getByRole("button", { name: "Edytuj Grupa A" })).toBeVisible()
   })
 })

@@ -4,6 +4,17 @@ import { ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -46,6 +57,12 @@ type TournamentTeamRowProps = {
   canManage: boolean
   /** Komplet zaakceptowanych drużyn: backend i tak odrzuci akceptację. */
   limitReached?: boolean
+  /** Lista jest już podzielona na grupy: nazwa grupy przy drużynie byłaby powtórzeniem. */
+  inGroupSection?: boolean
+  /** Terminarz już jest: mecze powstały z tych grup, backend odrzuci zmianę grupy i akceptację. */
+  scheduleLocked?: boolean
+  /** Terminarz już jest: wycofanie odwoła mecze drużyny, więc „Wycofaj” najpierw pyta z tym tekstem. */
+  withdrawWarning?: string
 }
 
 export function TournamentTeamRow({
@@ -54,6 +71,9 @@ export function TournamentTeamRow({
   groups,
   canManage,
   limitReached = false,
+  inGroupSection = false,
+  scheduleLocked = false,
+  withdrawWarning,
 }: TournamentTeamRowProps) {
   const changeStatus = useChangeRegistrationStatus(tournamentId)
   const changePayment = useChangePaymentStatus(tournamentId)
@@ -79,7 +99,7 @@ export function TournamentTeamRow({
           <span className="block truncate font-medium">{team.teamName}</span>
           <span className="text-muted-foreground flex items-center gap-2 text-xs">
             <RegistrationStatusBadge status={team.registrationStatus} />
-            {!canManage && groupName && <span>{groupName}</span>}
+            {!canManage && !inGroupSection && groupName && <span>{groupName}</span>}
           </span>
         </span>
         <ChevronRight className="text-muted-foreground ml-auto size-4 lg:hidden" />
@@ -100,9 +120,14 @@ export function TournamentTeamRow({
                     { onSuccess: () => toast.success(`${team.teamName}: grupa zapisana`) },
                   )
                 }
-                disabled={assignGroup.isPending}
+                disabled={assignGroup.isPending || scheduleLocked}
               >
-                <SelectTrigger size="sm" className="w-36" aria-label={`Grupa: ${team.teamName}`}>
+                <SelectTrigger
+                  size="sm"
+                  className="w-36"
+                  aria-label={`Grupa: ${team.teamName}`}
+                  title={scheduleLocked ? "Grupę zmienisz po wyczyszczeniu terminarza" : undefined}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,14 +162,46 @@ export function TournamentTeamRow({
             </SelectContent>
           </Select>
           {transitions.map((status) => {
-            const blocked = status === "Accepted" && limitReached
+            const blocked = status === "Accepted" && (limitReached || scheduleLocked)
+            if (status === "Withdrawn" && withdrawWarning)
+              return (
+                <AlertDialog key={status}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant={TRANSITION_ACTIONS[status].variant}
+                      disabled={changeStatus.isPending}
+                    >
+                      {TRANSITION_ACTIONS[status].label}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Wycofać drużynę {team.teamName}?</AlertDialogTitle>
+                      <AlertDialogDescription>{withdrawWarning}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                      <AlertDialogAction variant="destructive" onClick={() => setStatus(status)}>
+                        Wycofaj
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )
             return (
               <Button
                 key={status}
                 size="sm"
                 variant={TRANSITION_ACTIONS[status].variant}
                 disabled={changeStatus.isPending || blocked}
-                title={blocked ? "Limit drużyn jest wyczerpany" : undefined}
+                title={
+                  !blocked
+                    ? undefined
+                    : scheduleLocked
+                      ? "Drużynę przyjmiesz po wyczyszczeniu terminarza"
+                      : "Limit drużyn jest wyczerpany"
+                }
                 onClick={() => setStatus(status)}
               >
                 {TRANSITION_ACTIONS[status].label}

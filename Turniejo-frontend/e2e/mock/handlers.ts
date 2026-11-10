@@ -25,7 +25,13 @@ import { closeAll, connectionCount, negotiateResponse, publish } from "./signalr
  * zamiast odtwarzać w mocku logikę backendu. Ścieżka jak w Express: /api/tournaments/:id/settings.
  * Override bez "times" działa do resetu mocka, z "times" - tyle razy.
  */
-type Override = { method: string; pattern: RegExp; status: number; body: unknown; times: number | null }
+type Override = {
+  method: string
+  pattern: RegExp
+  status: number
+  body: unknown
+  times: number | null
+}
 let overrides: Override[] = []
 /** Wywołania API od resetu ("POST /api/..."): test sprawdza np., że podwójny klik wysłał jedno żądanie. */
 let requests: string[] = []
@@ -184,6 +190,7 @@ const matchDto = (m: Match) => ({
   resultType: m.resultType ?? (m.status === "Finished" ? "Regular" : "NotPlayed"),
   homePenaltyScore: null,
   awayPenaltyScore: null,
+  awaitingDecision: m.awaitingDecision ?? false,
 })
 
 const elapsed = (m: Match) => {
@@ -232,6 +239,7 @@ const livePanel = (m: Match) => ({
   elapsedSeconds: elapsed(m),
   homePenaltyScore: null,
   awayPenaltyScore: null,
+  awaitingDecision: m.awaitingDecision ?? false,
 })
 
 const rosterPlayer = (playerId: string) =>
@@ -267,7 +275,54 @@ const tournamentTeams = (tournamentId: string) =>
         teamName: team.name,
         teamShortName: team.shortName,
         teamLogoUrl: null,
+        ...db.teamChanges[id],
       }))
+
+/**
+ * Tabela grupy jak GroupTable w backendzie: wszystkie zaakceptowane drużyny grupy, także przed
+ * pierwszym meczem (z zerami). Kolejność: punkty, różnica bramek, bramki zdobyte.
+ */
+function groupStandings(tournamentId: string, groupId: string) {
+  const finished = db.matches.filter((m) => m.groupId === groupId && m.status === "Finished")
+  const rows = tournamentTeams(tournamentId)
+    .filter((t) => t.groupId === groupId && t.registrationStatus === "Accepted")
+    .map((t) => {
+      const row = { matchesPlayed: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }
+      for (const m of finished.filter((x) => x.home === t.id || x.away === t.id)) {
+        const [own, other] =
+          m.home === t.id ? [m.homeScore, m.awayScore] : [m.awayScore, m.homeScore]
+        row.matchesPlayed++
+        row.goalsFor += own
+        row.goalsAgainst += other
+        if (own > other) row.wins++
+        else if (own === other) row.draws++
+        else row.losses++
+      }
+      return {
+        id: `${groupId}-${t.id}`,
+        tournamentId,
+        categoryId: t.categoryId,
+        groupId,
+        tournamentTeamId: t.id,
+        ...row,
+        goalDifference: row.goalsFor - row.goalsAgainst,
+        points: row.wins * 3 + row.draws,
+      }
+    })
+    .sort(
+      (a, b) =>
+        b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor,
+    )
+  return rows.map((r, i) => ({ ...r, position: i + 1 }))
+}
+
+/** Po zakończonym meczu backend przelicza tabelę i wysyła StandingUpdated do grupy turnieju. */
+function standingChanged(m: Match) {
+  publish("tournaments", m.tournamentId, "StandingUpdated", {
+    tournamentId: m.tournamentId,
+    groupId: m.groupId,
+  })
+}
 
 function createOrganization(user: User, name: string) {
   const organization = { id: newId(), name, slug: slugify(name), ownerUserId: user.id }
@@ -435,6 +490,7 @@ const api = [
         lastName: user.lastName,
         phoneNumber: user.phoneNumber ?? null,
         seenReleaseVersion: user.seenReleaseVersion ?? null,
+        theme: user.theme ?? "system",
       }),
     ),
   ),
@@ -457,13 +513,26 @@ const api = [
     "*/api/me/seen-release",
     authed(async ({ user, request }) => {
       const { version } = (await request.json()) as { version: string }
-      if (!/^\d+\.\d+\.\d+$/.test(version)) return problem(422, "Release version must look like 1.2.0.")
+      if (!/^\d+\.\d+\.\d+$/.test(version))
+        return problem(422, "Release version must look like 1.2.0.")
       const newer = (a: string, b: string) => {
         const [x, y] = [a, b].map((v) => v.split(".").map(Number))
         const i = x!.findIndex((n, k) => n !== y![k])
         return i >= 0 && x![i]! > y![i]!
       }
-      if (!user.seenReleaseVersion || newer(version, user.seenReleaseVersion)) user.seenReleaseVersion = version
+      if (!user.seenReleaseVersion || newer(version, user.seenReleaseVersion))
+        user.seenReleaseVersion = version
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  // Jak SetMyThemeCommand: tylko system, light albo dark.
+  http.put(
+    "*/api/me/theme",
+    authed(async ({ user, request }) => {
+      const { theme } = (await request.json()) as { theme: string }
+      if (theme !== "system" && theme !== "light" && theme !== "dark")
+        return problem(422, "Theme must be system, light or dark.")
+      user.theme = theme
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -854,7 +923,14 @@ const api = [
             resultType?: string | number
             winnerTournamentTeamId?: string | null
           }
-          const RESULT_TYPES = ["NotPlayed", "Regular", "ExtraTime", "Penalties", "Walkover", "ManualDecision"]
+          const RESULT_TYPES = [
+            "NotPlayed",
+            "Regular",
+            "ExtraTime",
+            "Penalties",
+            "Walkover",
+            "ManualDecision",
+          ]
           m.resultType =
             typeof body.resultType === "string"
               ? body.resultType
@@ -864,7 +940,11 @@ const api = [
         }
         m.status = to
         publish("matches", m.id, "MatchStatusChanged", { matchId: m.id, status: to })
-        publish("tournaments", m.tournamentId, "MatchChanged", { tournamentId: m.tournamentId, matchId: m.id })
+        publish("tournaments", m.tournamentId, "MatchChanged", {
+          tournamentId: m.tournamentId,
+          matchId: m.id,
+        })
+        if (to === "Finished") standingChanged(m)
         return HttpResponse.json({ matchId: m.id, status: to })
       }),
     ),
@@ -875,9 +955,20 @@ const api = [
     authed<{ tid: string; mid: string }>(async ({ params, request, user }) => {
       const m = findMatch(params.mid)
       if (!m) return problem(404, "Match not found")
-      if (m.status !== "Live" && m.status !== "Paused") return problem(400, "Match is not in progress.")
-      const body = (await request.json()) as { tournamentTeamId: string; playerId: string; cardType: number | string; minute: number }
-      const type = typeof body.cardType === "number" ? (body.cardType === 9 ? "RedCard" : "YellowCard") : body.cardType
+      if (m.status !== "Live" && m.status !== "Paused")
+        return problem(400, "Match is not in progress.")
+      const body = (await request.json()) as {
+        tournamentTeamId: string
+        playerId: string
+        cardType: number | string
+        minute: number
+      }
+      const type =
+        typeof body.cardType === "number"
+          ? body.cardType === 9
+            ? "RedCard"
+            : "YellowCard"
+          : body.cardType
       const sentOff = m.events.some((e) => e.playerId === body.playerId && e.type === "RedCard")
       if (sentOff) return validation("PlayerId", "Player has been sent off")
       const event = (eventType: string) => {
@@ -897,7 +988,10 @@ const api = [
         return e
       }
       const card = event(type)
-      if (type === "YellowCard" && m.events.filter((e) => e.playerId === body.playerId && e.type === "YellowCard").length === 2)
+      if (
+        type === "YellowCard" &&
+        m.events.filter((e) => e.playerId === body.playerId && e.type === "YellowCard").length === 2
+      )
         event("RedCard")
       publish("matches", m.id, "MatchEventAdded", { matchId: m.id, matchEventId: card.id })
       return HttpResponse.json({ matchEventId: card.id })
@@ -909,9 +1003,18 @@ const api = [
       const m = findMatch(params.mid)
       const e = m?.events.find((x) => x.id === params.eid)
       if (!m || !e) return problem(404, "Event not found")
-      const body = (await request.json()) as { minute: number; second: number | null; playerId: string | null }
-      if (body.minute < 0 || body.minute > 300) return validation("Minute", "Minute must be between 0 and 300.")
-      Object.assign(e, { minute: body.minute, second: body.second ?? null, playerId: body.playerId ?? e.playerId })
+      const body = (await request.json()) as {
+        minute: number
+        second: number | null
+        playerId: string | null
+      }
+      if (body.minute < 0 || body.minute > 300)
+        return validation("Minute", "Minute must be between 0 and 300.")
+      Object.assign(e, {
+        minute: body.minute,
+        second: body.second ?? null,
+        playerId: body.playerId ?? e.playerId,
+      })
       publish("matches", m.id, "MatchEventAdded", { matchId: m.id, matchEventId: e.id })
       return HttpResponse.json({ matchEventId: e.id })
     }),
@@ -1109,6 +1212,34 @@ const api = [
   ),
 
   // --- Portal publiczny (bez logowania) ---
+  http.get("*/public/tournaments", () =>
+    HttpResponse.json(
+      db.tournaments
+        .filter(
+          (t) =>
+            t.isPublic &&
+            configOf(t.id).publicSettings.showInDirectory !== false &&
+            t.status !== "Draft" &&
+            t.status !== "Cancelled",
+        )
+        .map((t) => ({
+          name: t.name,
+          slug: t.slug,
+          status: t.status,
+          startAt: t.startAt,
+          endAt: t.endAt,
+          organizer: {
+            id: t.organizationId,
+            name: db.organizations.find((o) => o.id === t.organizationId)?.name ?? "",
+          },
+          categories: t.id === IDS.tournament ? ["U12"] : [],
+          teamCount: tournamentTeams(t.id).length,
+          liveMatchCount: db.matches.filter(
+            (m) => m.tournamentId === t.id && (m.status === "Live" || m.status === "Paused"),
+          ).length,
+        })),
+    ),
+  ),
   http.get("*/public/tournaments/:slug", ({ params }) => {
     const t = db.tournaments.find((x) => x.slug === params.slug && x.isPublic)
     if (!t) return problem(404, "Tournament not found")
@@ -1129,11 +1260,16 @@ const api = [
         showBracket: false,
         showLiveMatches: true,
         showStats: true,
+        showInDirectory: configOf(t.id).publicSettings.showInDirectory !== false,
       },
       categories: [{ id: IDS.category, name: "U12", order: 1 }],
       groups: [{ id: IDS.group, categoryId: IDS.category, name: "Grupa A", order: 1 }],
       pitches: [{ id: IDS.pitch, name: "Boisko Główne" }],
     })
+  }),
+  http.get("*/public/tournaments/:slug/second-stage", ({ params }) => {
+    const t = db.tournaments.find((x) => x.slug === params.slug && x.isPublic)
+    return t ? HttpResponse.json(configOf(t.id).secondStage) : problem(404, "Not found")
   }),
   http.get("*/public/tournaments/:slug/schedule", ({ params }) => {
     const t = db.tournaments.find((x) => x.slug === params.slug && x.isPublic)
@@ -1154,7 +1290,43 @@ const api = [
       })),
     ),
   ),
-  http.get("*/public/tournaments/:slug/standings", () => HttpResponse.json([])),
+  // Profil drużyny i skład (jak backend: zaakceptowana drużyna, skład bez usuniętych, nazwisko skrócone).
+  http.get("*/public/tournaments/:slug/teams/:teamId", ({ params }) => {
+    const t = tournamentTeams(IDS.tournament).find((x) => x.id === params.teamId)
+    return t && t.registrationStatus === "Accepted"
+      ? HttpResponse.json({
+          tournamentTeamId: t.id,
+          teamId: t.teamId,
+          name: t.teamName,
+          shortName: t.teamShortName,
+          categoryId: t.categoryId,
+          groupId: t.groupId,
+        })
+      : problem(404, "Not found")
+  }),
+  http.get("*/public/tournaments/:slug/teams/:teamId/players", ({ params }) => {
+    const settings = configOf(IDS.tournament).publicSettings
+    if (settings.showPlayers === false) return problem(404, "Not found")
+    const abbreviate = settings.abbreviatePlayerNames !== false
+    return HttpResponse.json(
+      squadEntries(String(params.teamId))
+        .filter((p) => p.status !== "Removed")
+        .map((p) => ({
+          tournamentPlayerId: p.id,
+          playerId: p.playerId,
+          firstName: p.firstName,
+          lastName: abbreviate ? `${p.lastName.charAt(0)}.` : p.lastName,
+          shirtNumber: p.shirtNumber,
+          position: p.position,
+        })),
+    )
+  }),
+  // Ta sama tabela co w panelu (z zakończonych meczów grupy).
+  http.get("*/public/tournaments/:slug/standings", ({ request }) =>
+    HttpResponse.json(
+      groupStandings(IDS.tournament, new URL(request.url).searchParams.get("groupId") ?? ""),
+    ),
+  ),
   http.get("*/public/tournaments/:slug/stats/:kind", () => HttpResponse.json([])),
   http.get("*/public/matches/:id/live", ({ params }) => {
     const m = findMatch(String(params.id))
@@ -1172,10 +1344,13 @@ const api = [
     authed(({ user, params }) => {
       if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
       return HttpResponse.json(
-        [...Object.values(TEAM_NAMES).map((t) => ({ ...t, logoUrl: null })), ...db.orgTeams].map((t) => ({
-          ...t,
-          organizationId: params.id,
-        })),
+        [...Object.values(TEAM_NAMES).map((t) => ({ ...t, logoUrl: null })), ...db.orgTeams].map(
+          (t) => ({
+            ...t,
+            organizationId: params.id,
+            labelIds: db.teamLabelIds[t.id] ?? [],
+          }),
+        ),
       )
     }),
   ),
@@ -1183,10 +1358,99 @@ const api = [
     "*/api/organizations/:id/teams",
     authed<{ id: string }>(async ({ user, params, request }) => {
       if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
-      const body = (await request.json()) as { name: string; shortName: string | null; logoUrl: string | null }
-      const team = { id: newId(), name: body.name, shortName: body.shortName, logoUrl: body.logoUrl }
+      const body = (await request.json()) as {
+        name: string
+        shortName: string | null
+        logoUrl: string | null
+      }
+      const team = {
+        id: newId(),
+        name: body.name,
+        shortName: body.shortName,
+        logoUrl: body.logoUrl,
+      }
       db.orgTeams.push(team)
       return HttpResponse.json({ teamId: team.id }, { status: 201 })
+    }),
+  ),
+  // Etykiety drużyn (TeamLabelsController): jak backend, nazwa unikalna bez wielkości liter.
+  http.get(
+    "*/api/organizations/:id/team-labels",
+    authed(({ user, params }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const counts = Object.values(db.teamLabelIds).flat()
+      return HttpResponse.json(
+        [...db.teamLabels]
+          .sort((a, b) => a.name.localeCompare(b.name, "pl"))
+          .map((l) => ({ ...l, teamCount: counts.filter((id) => id === l.id).length })),
+      )
+    }),
+  ),
+  http.post(
+    "*/api/organizations/:id/team-labels",
+    authed<{ id: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const name = ((await request.json()) as { name: string }).name.trim()
+      if (db.teamLabels.some((l) => l.name.toLowerCase() === name.toLowerCase()))
+        return HttpResponse.json(
+          { code: "Conflict.Name", message: "A label with this name already exists", type: 3 },
+          { status: 409 },
+        )
+      const label = { id: newId(), name }
+      db.teamLabels.push(label)
+      return HttpResponse.json({ labelId: label.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/team-labels/:labelId/teams",
+    authed<{ id: string; labelId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      if (!db.teamLabels.some((l) => l.id === params.labelId))
+        return problem(404, "Label not found")
+      const { teamIds } = (await request.json()) as { teamIds: string[] }
+      const all = [...Object.values(TEAM_NAMES), ...db.orgTeams].map((t) => t.id)
+      for (const teamId of all) {
+        const current = (db.teamLabelIds[teamId] ?? []).filter((id) => id !== params.labelId)
+        db.teamLabelIds[teamId] = teamIds.includes(teamId) ? [...current, params.labelId] : current
+      }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/team-labels/:labelId",
+    authed<{ id: string; labelId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const label = db.teamLabels.find((l) => l.id === params.labelId)
+      if (!label) return problem(404, "Label not found")
+      const name = ((await request.json()) as { name: string }).name.trim()
+      if (
+        db.teamLabels.some((l) => l.id !== label.id && l.name.toLowerCase() === name.toLowerCase())
+      )
+        return HttpResponse.json(
+          { code: "Conflict.Name", message: "A label with this name already exists", type: 3 },
+          { status: 409 },
+        )
+      label.name = name
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.delete(
+    "*/api/organizations/:id/team-labels/:labelId",
+    authed<{ id: string; labelId: string }>(({ user, params }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      db.teamLabels = db.teamLabels.filter((l) => l.id !== params.labelId)
+      for (const teamId of Object.keys(db.teamLabelIds))
+        db.teamLabelIds[teamId] = db.teamLabelIds[teamId]!.filter((id) => id !== params.labelId)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.put(
+    "*/api/organizations/:id/teams/:teamId/labels",
+    authed<{ id: string; teamId: string }>(async ({ user, params, request }) => {
+      if (!hasRole(user, "Organizer", "Organization", params.id)) return problem(403, "Forbidden")
+      const { labelIds } = (await request.json()) as { labelIds: string[] }
+      db.teamLabelIds[params.teamId] = [...new Set(labelIds)]
+      return new HttpResponse(null, { status: 204 })
     }),
   ),
   http.put(
@@ -1208,6 +1472,80 @@ const api = [
       const body = (await request.json()) as { name: string; shortName: string | null }
       Object.assign(team, { name: body.name, shortName: body.shortName })
       return HttpResponse.json({ teamId: team.id })
+    }),
+  ),
+  // Historia drużyny z bazy: jak backend liczy z zakończonych meczów jej zgłoszeń (tu jeden turniej).
+  http.get(
+    "*/api/teams/:teamId/history",
+    authed(({ user, params }) => {
+      const own = Object.entries(TEAM_NAMES)
+        .filter(([, t]) => t.id === params.teamId)
+        .map(([ttId]) => ttId)
+      // Jak TeamRosterAccessGuard: organizator organizacji albo sztab któregoś zgłoszenia drużyny.
+      const staff = own.some((tt) =>
+        ["Coach", "AssistantCoach", "Manager"].some((role) =>
+          hasRole(user, role, "TournamentTeam", tt),
+        ),
+      )
+      if (!rosterOf(user, params.teamId) && !staff) return problem(403, "Forbidden")
+      const finished = db.matches
+        .filter((m) => m.status === "Finished" && (own.includes(m.home) || own.includes(m.away)))
+        .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+      const record = (ms: typeof finished) => {
+        const r = { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }
+        for (const m of ms) {
+          const home = own.includes(m.home)
+          const [f, a] = home ? [m.homeScore, m.awayScore] : [m.awayScore, m.homeScore]
+          r.played++
+          r.goalsFor += f
+          r.goalsAgainst += a
+          if (f > a) r.wins++
+          else if (f === a) r.draws++
+          else r.losses++
+        }
+        return r
+      }
+      const outcome = (m: (typeof finished)[number]) => {
+        const home = own.includes(m.home)
+        const [f, a] = home ? [m.homeScore, m.awayScore] : [m.awayScore, m.homeScore]
+        return f > a ? "W" : f === a ? "D" : "L"
+      }
+      const tt = own[0]
+      const t = findTournament(IDS.tournament)!
+      const row = tt
+        ? groupStandings(IDS.tournament, IDS.group).find((r) => r.tournamentTeamId === tt)
+        : undefined
+      const opponentOf = (m: (typeof finished)[number]) => (own.includes(m.home) ? m.away : m.home)
+      const opponents = [...new Set(finished.map(opponentOf))].map((o) => ({
+        teamId: TEAM_NAMES[o]!.id,
+        name: TEAM_NAMES[o]!.name,
+        record: record(finished.filter((m) => opponentOf(m) === o)),
+      }))
+      return HttpResponse.json({
+        summary: record(finished),
+        tournamentCount: tt ? 1 : 0,
+        form: finished.map(outcome).slice(-5),
+        tournaments: tt
+          ? [
+              {
+                tournamentId: t.id,
+                tournamentName: t.name,
+                tournamentStatus: t.status,
+                startAt: t.startAt,
+                endAt: t.endAt,
+                tournamentTeamId: tt,
+                categoryName: "U12",
+                resultKind: row && row.matchesPlayed > 0 ? "Group" : "None",
+                eliminatedRoundFromEnd: null,
+                groupPosition: row && row.matchesPlayed > 0 ? row.position : null,
+                groupName: row && row.matchesPlayed > 0 ? "Grupa A" : null,
+                record: record(finished),
+              },
+            ]
+          : [],
+        players: [],
+        opponents,
+      })
     }),
   ),
   http.get(
@@ -1310,13 +1648,63 @@ const api = [
 type Config = {
   settings: Record<string, unknown>
   publicSettings: Record<string, boolean>
-  categories: { id: string; tournamentId: string; name: string; minBirthDate: string | null; maxBirthDate: string | null; order: number }[]
-  groups: { id: string; tournamentId: string; categoryId: string; name: string; order: number }[]
-  pitches: { id: string; tournamentId: string; name: string; description: string | null; isActive: boolean }[]
+  categories: {
+    id: string
+    tournamentId: string
+    name: string
+    minBirthDate: string | null
+    maxBirthDate: string | null
+    order: number
+  }[]
+  groups: {
+    id: string
+    tournamentId: string
+    categoryId: string
+    name: string
+    order: number
+    stage?: 1 | 2
+  }[]
+  /** Dwie fazy grupowe: podział na grupy fazy 2 i zaplanowane mecze (SecondStageDto). */
+  secondStage: {
+    seats: SecondStageSeatMock[]
+    fixtures: Record<string, unknown>[]
+    ranges: {
+      id: string
+      categoryId: string
+      groupId: string
+      fromPosition: number
+      toPosition: number
+    }[]
+  }
+  pitches: {
+    id: string
+    tournamentId: string
+    name: string
+    description: string | null
+    isActive: boolean
+  }[]
   tieBreakers: { order: number; type: string }[]
 }
 
-const TIEBREAKERS = ["HeadToHeadPoints", "HeadToHeadGoalDiff", "GoalDifference", "GoalsFor", "Wins", "ManualDecision", "RandomDraw"]
+const TIEBREAKERS = [
+  "HeadToHeadPoints",
+  "HeadToHeadGoalDiff",
+  "GoalDifference",
+  "GoalsFor",
+  "Wins",
+  "ManualDecision",
+  "RandomDraw",
+]
+
+type SecondStageSeatMock = {
+  id: string
+  categoryId: string
+  groupId: string
+  order: number
+  sourceGroupId: string
+  sourcePosition: number
+  tournamentTeamId: string | null
+}
 
 let configs = new Map<string, Config>()
 
@@ -1347,15 +1735,28 @@ function configOf(tournamentId: string): Config {
       showLiveMatches: true,
       showStats: true,
       abbreviatePlayerNames: true,
+      showInDirectory: true,
     },
     categories: seeded
-      ? [{ id: IDS.category, tournamentId, name: "U12", minBirthDate: null, maxBirthDate: null, order: 1 }]
+      ? [
+          {
+            id: IDS.category,
+            tournamentId,
+            name: "U12",
+            minBirthDate: null,
+            maxBirthDate: null,
+            order: 1,
+          },
+        ]
       : [],
-    groups: seeded ? [{ id: IDS.group, tournamentId, categoryId: IDS.category, name: "Grupa A", order: 1 }] : [],
+    groups: seeded
+      ? [{ id: IDS.group, tournamentId, categoryId: IDS.category, name: "Grupa A", order: 1 }]
+      : [],
     pitches: seeded
       ? [{ id: IDS.pitch, tournamentId, name: "Boisko Główne", description: null, isActive: true }]
       : [],
     tieBreakers: TIEBREAKERS.slice(0, 5).map((type, i) => ({ order: i + 1, type })),
+    secondStage: { seats: [], fixtures: [], ranges: [] },
   }
   configs.set(tournamentId, c)
   return c
@@ -1365,7 +1766,8 @@ const validation = (field: string, message: string) =>
   HttpResponse.json({ code: `Validation.${field}`, message, type: 2 }, { status: 400 })
 
 /** Tylko organizator turnieju zmienia jego konfigurację; tylko przed startem (jak backend dla zasad). */
-const organizerOf = (user: User, tournamentId: string) => hasRole(user, "Organizer", "Tournament", tournamentId)
+const organizerOf = (user: User, tournamentId: string) =>
+  hasRole(user, "Organizer", "Tournament", tournamentId)
 
 const config = [
   http.get(
@@ -1378,7 +1780,10 @@ const config = [
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const t = findTournament(params.id)
       if (t && ["InProgress", "Finished", "Cancelled"].includes(t.status))
-        return validation("Settings", "Tournament settings cannot be changed after the tournament has started")
+        return validation(
+          "Settings",
+          "Tournament settings cannot be changed after the tournament has started",
+        )
       configOf(params.id).settings = (await request.json()) as Record<string, unknown>
       return new HttpResponse(null, { status: 204 })
     }),
@@ -1389,7 +1794,10 @@ const config = [
       const t = findTournament(params.id)
       if (!t) return problem(404, "Tournament not found")
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
-      const body = (await request.json()) as Pick<Tournament, "name" | "startAt" | "endAt" | "teamLimit" | "description">
+      const body = (await request.json()) as Pick<
+        Tournament,
+        "name" | "startAt" | "endAt" | "teamLimit" | "description"
+      >
       Object.assign(t, {
         name: body.name,
         startAt: body.startAt,
@@ -1400,7 +1808,10 @@ const config = [
       return new HttpResponse(null, { status: 204 })
     }),
   ),
-  http.get("*/api/tournaments/:id/members", authed(() => HttpResponse.json([]))),
+  http.get(
+    "*/api/tournaments/:id/members",
+    authed(() => HttpResponse.json([])),
+  ),
   http.get(
     "*/api/tournaments/:id/public-settings",
     authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).publicSettings)),
@@ -1410,7 +1821,10 @@ const config = [
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const c = configOf(params.id)
-      c.publicSettings = { ...c.publicSettings, ...((await request.json()) as Record<string, boolean>) }
+      c.publicSettings = {
+        ...c.publicSettings,
+        ...((await request.json()) as Record<string, boolean>),
+      }
       const t = findTournament(params.id)
       if (t) t.isPublic = !!c.publicSettings.isPublic
       return new HttpResponse(null, { status: 204 })
@@ -1423,9 +1837,15 @@ const config = [
       if (!t) return problem(404, "Tournament not found")
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       if (!["Draft", "RegistrationOpen", "RegistrationClosed"].includes(t.status))
-        return validation("TournamentFormat", "Tournament format cannot be changed after the schedule is generated")
+        return validation(
+          "TournamentFormat",
+          "Tournament format cannot be changed after the schedule is generated",
+        )
       const { tournamentFormat } = (await request.json()) as { tournamentFormat: number | string }
-      t.format = typeof tournamentFormat === "string" ? tournamentFormat : ["Group", "Knockout", "GroupAndKnockout"][tournamentFormat - 1]!
+      t.format =
+        typeof tournamentFormat === "string"
+          ? tournamentFormat
+          : ["Group", "Knockout", "GroupAndKnockout", "TwoGroupStages"][tournamentFormat - 1]!
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -1437,7 +1857,9 @@ const config = [
     "*/api/tournaments/:id/tiebreaker-rules",
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
-      const { rules } = (await request.json()) as { rules: { order: number; type: number | string }[] }
+      const { rules } = (await request.json()) as {
+        rules: { order: number; type: number | string }[]
+      }
       configOf(params.id).tieBreakers = rules.map((r) => ({
         order: r.order,
         type: typeof r.type === "string" ? r.type : TIEBREAKERS[r.type - 1]!,
@@ -1454,15 +1876,35 @@ const config = [
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const c = configOf(params.id)
-      const body = (await request.json()) as { name: string; minBirthDate: string | null; maxBirthDate: string | null; order: number }
+      const body = (await request.json()) as {
+        name: string
+        minBirthDate: string | null
+        maxBirthDate: string | null
+        order: number
+        groupCount?: number
+      }
       if (c.categories.some((x) => x.name.toLowerCase() === body.name.trim().toLowerCase()))
         return validation("Name", `Tournament category with name '${body.name}' already exists`)
-      const category = { id: newId(), tournamentId: params.id, name: body.name.trim(), minBirthDate: body.minBirthDate, maxBirthDate: body.maxBirthDate, order: body.order }
+      const category = {
+        id: newId(),
+        tournamentId: params.id,
+        name: body.name.trim(),
+        minBirthDate: body.minBirthDate,
+        maxBirthDate: body.maxBirthDate,
+        order: body.order,
+      }
       c.categories.push(category)
       // Jak backend: przy formacie z grupami nowa kategoria dostaje od razu "Grupę A".
       const format = findTournament(params.id)?.format
-      if (format === "Group" || format === "GroupAndKnockout")
-        c.groups.push({ id: newId(), tournamentId: params.id, categoryId: category.id, name: "Grupa A", order: 1 })
+      if (format === "Group" || format === "GroupAndKnockout" || format === "TwoGroupStages")
+        for (let i = 0; i < (body.groupCount ?? 1); i++)
+          c.groups.push({
+            id: newId(),
+            tournamentId: params.id,
+            categoryId: category.id,
+            name: `Grupa ${String.fromCharCode(65 + i)}`,
+            order: i + 1,
+          })
       return HttpResponse.json({ tournamentCategoryId: category.id }, { status: 201 })
     }),
   ),
@@ -1477,6 +1919,14 @@ const config = [
     }),
   ),
   http.get(
+    "*/api/tournaments/:id/standings",
+    authed<{ id: string }>(({ params, request }) =>
+      HttpResponse.json(
+        groupStandings(params.id, new URL(request.url).searchParams.get("groupId") ?? ""),
+      ),
+    ),
+  ),
+  http.get(
     "*/api/tournaments/:id/groups",
     authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).groups)),
   ),
@@ -1485,12 +1935,121 @@ const config = [
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const c = configOf(params.id)
-      const body = (await request.json()) as { categoryId: string; name: string; order: number }
-      if (c.groups.some((g) => g.categoryId === body.categoryId && g.name.toLowerCase() === body.name.trim().toLowerCase()))
+      const body = (await request.json()) as {
+        categoryId: string
+        name: string
+        order: number
+        stage?: 1 | 2
+      }
+      if (body.stage === 2 && findTournament(params.id)?.format !== "TwoGroupStages")
+        return validation("Stage", "Second-stage groups need the two group stages format")
+      if (
+        c.groups.some(
+          (g) =>
+            g.categoryId === body.categoryId &&
+            g.name.toLowerCase() === body.name.trim().toLowerCase(),
+        )
+      )
         return validation("Name", "Name already exists")
-      const group = { id: newId(), tournamentId: params.id, categoryId: body.categoryId, name: body.name.trim(), order: body.order }
+      const group = {
+        id: newId(),
+        tournamentId: params.id,
+        categoryId: body.categoryId,
+        name: body.name.trim(),
+        order: body.order,
+        stage: body.stage ?? 1,
+      }
       c.groups.push(group)
       return HttpResponse.json({ tournamentGroupId: group.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:id/groups/:groupId",
+    authed<{ id: string; groupId: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const group = configOf(params.id).groups.find((g) => g.id === params.groupId)
+      if (!group) return problem(404, "Not found")
+      const body = (await request.json()) as { name: string; order: number }
+      Object.assign(group, { name: body.name.trim(), order: body.order })
+      return HttpResponse.json({ tournamentGroupId: group.id })
+    }),
+  ),
+  http.delete(
+    "*/api/tournaments/:id/groups/:groupId",
+    authed<{ id: string; groupId: string }>(({ params, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      // Jak backend: blokują tylko oczekujące i przyjęte drużyny oraz mecze grupy.
+      if (
+        tournamentTeams(params.id).some(
+          (t) =>
+            t.groupId === params.groupId &&
+            (t.registrationStatus === "Pending" || t.registrationStatus === "Accepted"),
+        )
+      )
+        return problem(409, "Cannot delete a group that still has teams assigned to it")
+      if (db.matches.some((m) => m.groupId === params.groupId))
+        return problem(409, "Cannot delete a group that still has matches scheduled in it")
+      const c = configOf(params.id)
+      c.groups = c.groups.filter((g) => g.id !== params.groupId)
+      // Jak backend: usunięta grupa znika też z podziału na drugą fazę.
+      c.secondStage.seats = c.secondStage.seats.filter(
+        (s) => s.groupId !== params.groupId && s.sourceGroupId !== params.groupId,
+      )
+      c.secondStage.ranges = c.secondStage.ranges.filter((x) => x.groupId !== params.groupId)
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.get(
+    "*/api/tournaments/:id/second-stage",
+    authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).secondStage)),
+  ),
+  http.put(
+    "*/api/tournaments/:id/second-stage/seats",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const t = findTournament(params.id)
+      if (t?.format !== "TwoGroupStages")
+        return validation("Format", "Second-stage groups need the two group stages format")
+      if (!["Draft", "RegistrationOpen", "RegistrationClosed"].includes(t.status))
+        return problem(409, "Clear the schedule before changing the second stage")
+      const body = (await request.json()) as {
+        categoryId: string
+        seats: { groupId: string; sourceGroupId: string; sourcePosition: number }[]
+      }
+      const keys = body.seats.map((x) => `${x.sourceGroupId}:${x.sourcePosition}`)
+      if (new Set(keys).size !== keys.length)
+        return validation("Seats", "Each place can go to only one second-stage group")
+      const c = configOf(params.id)
+      // Jak backend: pojedyncze miejsca zastępują zakresy.
+      c.secondStage.ranges = c.secondStage.ranges.filter((x) => x.categoryId !== body.categoryId)
+      c.secondStage.seats = [
+        ...c.secondStage.seats.filter((x) => x.categoryId !== body.categoryId),
+        ...body.seats.map((x, i) => ({
+          id: newId(),
+          categoryId: body.categoryId,
+          order: i + 1,
+          tournamentTeamId: null,
+          ...x,
+        })),
+      ]
+      return HttpResponse.json(body.seats.length)
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:id/second-stage/ranges",
+    authed<{ id: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const body = (await request.json()) as {
+        categoryId: string
+        ranges: { groupId: string; fromPosition: number; toPosition: number }[]
+      }
+      const c = configOf(params.id)
+      c.secondStage.seats = c.secondStage.seats.filter((x) => x.categoryId !== body.categoryId)
+      c.secondStage.ranges = [
+        ...c.secondStage.ranges.filter((x) => x.categoryId !== body.categoryId),
+        ...body.ranges.map((x) => ({ id: newId(), categoryId: body.categoryId, ...x })),
+      ]
+      return HttpResponse.json(body.ranges.length)
     }),
   ),
   http.get(
@@ -1504,8 +2063,17 @@ const config = [
       const c = configOf(params.id)
       const body = (await request.json()) as { name: string; description: string | null }
       if (c.pitches.some((p) => p.name.toLowerCase() === body.name.trim().toLowerCase()))
-        return validation("Name", `Pitch with name '${body.name}' already exists in this tournament`)
-      const pitch = { id: newId(), tournamentId: params.id, name: body.name.trim(), description: body.description, isActive: true }
+        return validation(
+          "Name",
+          `Pitch with name '${body.name}' already exists in this tournament`,
+        )
+      const pitch = {
+        id: newId(),
+        tournamentId: params.id,
+        name: body.name.trim(),
+        description: body.description,
+        isActive: true,
+      }
       c.pitches.push(pitch)
       return HttpResponse.json({ pitchId: pitch.id }, { status: 201 })
     }),
@@ -1573,16 +2141,48 @@ function ageError(tournamentId: string, birthDate: string | null) {
 }
 
 const shirtTaken = (squad: SquadEntry[], shirt: number | null, exceptId?: string) =>
-  shirt != null && squad.some((p) => p.id !== exceptId && p.status !== "Removed" && p.shirtNumber === shirt)
+  shirt != null &&
+  squad.some((p) => p.id !== exceptId && p.status !== "Removed" && p.shirtNumber === shirt)
 
 const squadBase = "*/api/tournaments/:tid/tournament-teams/:ttid"
 
 const squad = [
+  http.patch(
+    `${squadBase}/group`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.tid)) return problem(403, "Forbidden")
+      const body = (await request.json()) as { groupId: string | null }
+      db.teamChanges[params.ttid] = { ...db.teamChanges[params.ttid], groupId: body.groupId }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+  http.patch(
+    `${squadBase}/registration-status`,
+    authed<{ tid: string; ttid: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.tid)) return problem(403, "Forbidden")
+      const body = (await request.json()) as { registrationStatus: number }
+      const status = ["", "Pending", "Accepted", "Rejected", "Withdrawn"][body.registrationStatus]
+      // Jak backend (ScheduleLock): po wygenerowaniu terminarza nowa drużyna nie miałaby meczów.
+      const tournamentStatus = findTournament(params.tid)?.status
+      if (
+        status === "Accepted" &&
+        ["ScheduleGenerated", "InProgress", "Finished"].includes(tournamentStatus ?? "")
+      )
+        return problem(409, "Clear the schedule before changing teams or groups")
+      db.teamChanges[params.ttid] = { ...db.teamChanges[params.ttid], registrationStatus: status }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ),
   http.get(
     `${squadBase}/players`,
-    authed<{ tid: string; ttid: string }>(({ params }) => HttpResponse.json(squadEntries(params.ttid))),
+    authed<{ tid: string; ttid: string }>(({ params }) =>
+      HttpResponse.json(squadEntries(params.ttid)),
+    ),
   ),
-  http.get(`${squadBase}/staff`, authed(() => HttpResponse.json([]))),
+  http.get(
+    `${squadBase}/staff`,
+    authed(() => HttpResponse.json([])),
+  ),
   http.get(
     `${squadBase}/roster-sources`,
     authed<{ tid: string; ttid: string }>(({ params }) => {
@@ -1636,7 +2236,10 @@ const squad = [
           p.birthDate?.slice(0, 10) === body.birthDate.slice(0, 10),
       )
       if (duplicate && !body.allowDuplicate)
-        return validation("LastName", "A player with the same name and birth date is already in this team")
+        return validation(
+          "LastName",
+          "A player with the same name and birth date is already in this team",
+        )
       if (shirtTaken(entries, body.shirtNumber))
         return validation("ShirtNumber", "Shirt number is already taken in this team")
       const entry: SquadEntry = {
@@ -1652,7 +2255,10 @@ const squad = [
         photoUrl: null,
       }
       entries.push(entry)
-      return HttpResponse.json({ playerId: entry.playerId, tournamentPlayerId: entry.id }, { status: 201 })
+      return HttpResponse.json(
+        { playerId: entry.playerId, tournamentPlayerId: entry.id },
+        { status: 201 },
+      )
     }),
   ),
   http.put(
@@ -1687,7 +2293,10 @@ const squad = [
   http.delete(
     `${squadBase}/players/:tpid`,
     authed<{ tid: string; ttid: string; tpid: string }>(({ params }) => {
-      squads.set(params.ttid, squadEntries(params.ttid).filter((p) => p.id !== params.tpid))
+      squads.set(
+        params.ttid,
+        squadEntries(params.ttid).filter((p) => p.id !== params.tpid),
+      )
       return HttpResponse.json({ tournamentPlayerId: params.tpid, deleted: true })
     }),
   ),
@@ -1696,7 +2305,11 @@ const squad = [
     authed<{ tid: string; ttid: string }>(async ({ params, request }) => {
       const entries = squadEntries(params.ttid)
       const body = (await request.json()) as {
-        players: { playerId: string; shirtNumber: number | null; position: number | string | null }[]
+        players: {
+          playerId: string
+          shirtNumber: number | null
+          position: number | string | null
+        }[]
       }
       const roster = db.rosters[TEAM_NAMES[params.ttid]?.id ?? ""] ?? []
       const added: SquadEntry[] = []
@@ -1749,7 +2362,12 @@ type Node = {
 type Round = { id: string; roundNumber: number; roundType: string; name: string; nodes: Node[] }
 
 const SOURCE_TYPES = ["Fixed", "GroupPosition", "MatchWinner", "MatchLoser", "Bye"]
-const ROUND_NAMES: Record<number, string> = { 1: "Finał", 2: "Półfinały", 4: "Ćwierćfinały", 8: "1/8 finału" }
+const ROUND_NAMES: Record<number, string> = {
+  1: "Finał",
+  2: "Półfinały",
+  4: "Ćwierćfinały",
+  8: "1/8 finału",
+}
 
 let brackets = new Map<string, { id: string; tournamentId: string; rounds: Round[] }>()
 
@@ -1796,13 +2414,24 @@ const bracket = [
         return validation("CategoryId", "A bracket already exists for this tournament")
       const pairs = body.roundOnePairings
       const source = (v: unknown) => (typeof v === "number" ? SOURCE_TYPES[v - 1]! : String(v))
-      if (pairs.some((p) => source(p.homeSourceType) === "Bye" && source(p.awaySourceType) === "Bye"))
-        return validation("RoundOnePairings", "A pairing cannot have Bye on both sides — there would be no team to advance.")
+      if (
+        pairs.some((p) => source(p.homeSourceType) === "Bye" && source(p.awaySourceType) === "Bye")
+      )
+        return validation(
+          "RoundOnePairings",
+          "A pairing cannot have Bye on both sides — there would be no team to advance.",
+        )
 
       const rounds: Round[] = []
       for (let size = pairs.length, number = 1; size >= 1; size /= 2, number++) {
         const id = newId()
-        rounds.push({ id, roundNumber: number, roundType: "Standard", name: ROUND_NAMES[size] ?? `Runda ${number}`, nodes: Array.from({ length: size }, () => emptyNode(id)) })
+        rounds.push({
+          id,
+          roundNumber: number,
+          roundType: "Standard",
+          name: ROUND_NAMES[size] ?? `Runda ${number}`,
+          nodes: Array.from({ length: size }, () => emptyNode(id)),
+        })
       }
       rounds[0]!.nodes.forEach((node, i) => {
         const p = pairs[i]!
@@ -1824,8 +2453,10 @@ const bracket = [
           node.winnerGoesToSlot = i % 2 === 0 ? "Home" : "Away"
           // Wolny los: drużyna od razu w kolejnej rundzie.
           if (r === 0 && (node.homeSourceType === "Bye" || node.awaySourceType === "Bye")) {
-            const team = node.homeSourceType === "Bye" ? node.awayTournamentTeamId : node.homeTournamentTeamId
-            if (i % 2 === 0) Object.assign(next, { homeSourceType: "Fixed", homeTournamentTeamId: team })
+            const team =
+              node.homeSourceType === "Bye" ? node.awayTournamentTeamId : node.homeTournamentTeamId
+            if (i % 2 === 0)
+              Object.assign(next, { homeSourceType: "Fixed", homeTournamentTeamId: team })
             else Object.assign(next, { awaySourceType: "Fixed", awayTournamentTeamId: team })
           }
         })
@@ -1836,11 +2467,20 @@ const bracket = [
         third.homeSourceType = "MatchLoser"
         third.awaySourceType = "MatchLoser"
         rounds[rounds.length - 2]!.nodes.forEach((n) => (n.loserGoesToNodeId = third.id))
-        rounds.push({ id, roundNumber: rounds.length, roundType: "ThirdPlace", name: "Mecz o 3. miejsce", nodes: [third] })
+        rounds.push({
+          id,
+          roundNumber: rounds.length,
+          roundType: "ThirdPlace",
+          name: "Mecz o 3. miejsce",
+          nodes: [third],
+        })
       }
       const created = { id: newId(), tournamentId: params.id, rounds }
       brackets.set(bracketKey(params.id, body.categoryId), created)
-      return HttpResponse.json({ bracketId: created.id, roundCount: rounds.length }, { status: 201 })
+      return HttpResponse.json(
+        { bracketId: created.id, roundCount: rounds.length },
+        { status: 201 },
+      )
     }),
   ),
   http.delete(
@@ -1856,7 +2496,13 @@ const bracket = [
 
 const control = [
   http.post("*/__control/override", async ({ request }) => {
-    const o = (await request.json()) as { method: string; path: string; status?: number; body?: unknown; times?: number }
+    const o = (await request.json()) as {
+      method: string
+      path: string
+      status?: number
+      body?: unknown
+      times?: number
+    }
     overrides.push({
       method: o.method.toUpperCase(),
       pattern: toPattern(o.path),
@@ -1870,11 +2516,34 @@ const control = [
   http.post("*/__control/matches/:id/status", async ({ params, request }) => {
     const m = findMatch(String(params.id))
     if (!m) return problem(404, "Match not found")
-    const { status, editLockedAt } = (await request.json()) as { status: string; editLockedAt?: string | null }
+    const { status, editLockedAt, awaitingDecision } = (await request.json()) as {
+      status: string
+      editLockedAt?: string | null
+      awaitingDecision?: boolean
+    }
     m.status = status
     if (editLockedAt !== undefined) m.editLockedAt = editLockedAt
+    // Porzucony remis wstrzymany przez system: zegar stanął po ponad 2 dniach (jak 3864' z QA).
+    m.awaitingDecision = !!awaitingDecision && status === "Paused"
+    if (m.awaitingDecision) {
+      const pausedAt = Date.now()
+      Object.assign(m, {
+        startedAt: new Date(pausedAt - 3864 * 60_000).toISOString(),
+        pausedAt: new Date(pausedAt).toISOString(),
+        totalPausedSeconds: 0,
+      })
+    }
+    // Mecz zakończony "na innym urządzeniu": tabela przeliczona jak w backendzie.
+    if (status === "Finished") standingChanged(m)
     if (status === "Scheduled") {
-      Object.assign(m, { startedAt: null, pausedAt: null, totalPausedSeconds: 0, homeScore: 0, awayScore: 0, events: [] })
+      Object.assign(m, {
+        startedAt: null,
+        pausedAt: null,
+        totalPausedSeconds: 0,
+        homeScore: 0,
+        awayScore: 0,
+        events: [],
+      })
     }
     return new HttpResponse(null, { status: 204 })
   }),
@@ -1890,6 +2559,13 @@ const control = [
     const user = db.users.find((u) => u.email === String(params.email))
     if (!user) return problem(404, "User not found")
     user.seenReleaseVersion = ((await request.json()) as { version: string | null }).version
+    return new HttpResponse(null, { status: 204 })
+  }),
+  // Motyw na koncie ustawiony przez test (np. wybrany wcześniej na innym urządzeniu).
+  http.post("*/__control/users/:email/theme", async ({ params, request }) => {
+    const user = db.users.find((u) => u.email === String(params.email))
+    if (!user) return problem(404, "User not found")
+    user.theme = ((await request.json()) as { theme: User["theme"] }).theme
     return new HttpResponse(null, { status: 204 })
   }),
   http.post("*/__control/reset", () => {
@@ -1930,6 +2606,7 @@ const control = [
         email: u.email,
         roles: u.roles.map((r) => `${r.role}@${r.scopeType}`),
         seenReleaseVersion: u.seenReleaseVersion ?? null,
+        theme: u.theme ?? "system",
       })),
       organizations: db.organizations.map((o) => o.name),
       requests,
@@ -1941,4 +2618,12 @@ const control = [
   ),
 ]
 
-export const handlers = [...control, overrideHandler, ...keycloak, ...config, ...squad, ...bracket, ...api]
+export const handlers = [
+  ...control,
+  overrideHandler,
+  ...keycloak,
+  ...config,
+  ...squad,
+  ...bracket,
+  ...api,
+]

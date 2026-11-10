@@ -37,6 +37,13 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
         }
     }
 
+    public async Task ExecuteInTransactionAsync(Func<Task> work, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        await work();
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task AddPitchAsync(Pitch pitch, CancellationToken cancellationToken = default) =>
         await Pitches.AddAsync(pitch, cancellationToken);
 
@@ -79,6 +86,14 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
     public async Task<Match?> GetMatchByIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
         await Matches.FirstOrDefaultAsync(m => m.Id == matchId, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, int>> CountLiveMatchesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default) =>
+        await Matches
+            .AsNoTracking()
+            .Where(m => tournamentIds.Contains(m.TournamentId) && (m.Status == MatchStatus.Live || m.Status == MatchStatus.Paused))
+            .GroupBy(m => m.TournamentId)
+            .Select(g => new { TournamentId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TournamentId, x => x.Count, cancellationToken);
+
     public async Task<IReadOnlyList<Match>> GetMatchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await Matches
             .AsNoTracking()
@@ -105,6 +120,11 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
     public async Task<IReadOnlyList<Match>> GetTrackedMatchesByIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default) =>
         await Matches
             .Where(m => matchIds.Contains(m.Id))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Match>> GetTrackedUnfinishedMatchesStartedBeforeAsync(DateTimeOffset startedBefore, CancellationToken cancellationToken = default) =>
+        await Matches
+            .Where(m => (m.Status == MatchStatus.Live || m.Status == MatchStatus.Paused) && m.StartedAt < startedBefore && m.AwaitingDecisionSince == null)
             .ToListAsync(cancellationToken);
 
     public async Task<bool> AnyMatchesByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
@@ -145,6 +165,14 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
             .AsNoTracking()
             .Where(m => m.Status == MatchStatus.Scheduled && m.ScheduledAt >= from && m.ScheduledAt <= to)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, DateTimeOffset>> GetLastEventChangeByMatchIdsAsync(IReadOnlyCollection<Guid> matchIds, CancellationToken cancellationToken = default) =>
+        await MatchEvents
+            .AsNoTracking()
+            .Where(e => matchIds.Contains(e.MatchId))
+            .GroupBy(e => e.MatchId)
+            .Select(g => new { MatchId = g.Key, LastChange = g.Max(e => e.UpdatedAt) })
+            .ToDictionaryAsync(x => x.MatchId, x => x.LastChange, cancellationToken);
 
     public async Task AddMatchEventAsync(MatchEvent matchEvent, CancellationToken cancellationToken = default) =>
         await MatchEvents.AddAsync(matchEvent, cancellationToken);

@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Turniejo.Api.Controllers;
 using Turniejo.IntegrationTests.Infrastructure;
+using Turniejo.Matches.Domain.Enums;
 
 namespace Turniejo.IntegrationTests.Rules;
 
@@ -53,6 +55,22 @@ public sealed class TeamsAndSquadsRulesTests(IntegrationTestWebApplicationFactor
         var (_, tt) = await RegisterTeamAsync(s, "Nowi");
 
         (await EntryAsync(s, tt)).GetString("registrationStatus").Should().Be("Pending");
+    }
+
+    [Fact]
+    public async Task TeamList_KeepsItsOrder_AfterAcceptingATeam()
+    {
+        // Dwie drużyny o tej samej nazwie: po akceptacji pierwszej lista nie może zamienić ich miejscami,
+        // bo organizator widzi wtedy zaakceptowaną „inną” drużynę.
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var (_, first) = await RegisterTeamAsync(s, "Orły");
+        var (_, second) = await RegisterTeamAsync(s, "Orły");
+        var before = (await TeamsAsync(s)).Select(t => t.GetGuid("id")).ToList();
+        before.IndexOf(first).Should().BeLessThan(before.IndexOf(second));
+
+        (await SetStatusAsync(s, first, Accepted)).IsSuccessStatusCode.Should().BeTrue();
+
+        (await TeamsAsync(s)).Select(t => t.GetGuid("id")).Should().Equal(before);
     }
 
     [Fact]
@@ -356,5 +374,146 @@ public sealed class TeamsAndSquadsRulesTests(IntegrationTestWebApplicationFactor
         var (_, playerId) = await s.CreatePlayerAsync("T1", "Jan", "Kadrowy");
 
         (await RosterAsync(coach, s.ClubTeam("T1"))).Should().Contain(p => p.GetGuid("playerId") == playerId);
+    }
+
+    // Statystyki drużyny z bazy we wszystkich turniejach: bilans, miejsce w grupie, zawodnicy, rywale.
+    [Fact]
+    public async Task DRU_044_TeamHistory_SumsFinishedMatches_PlayersAndOpponents()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3);
+        var (_, adam) = await s.CreatePlayerAsync("T1", "Adam", "Strzelec");
+        var (_, bartek) = await s.CreatePlayerAsync("T1", "Bartek", "Podający");
+
+        var first = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        (await s.Organizer.PostAsync($"{T(s)}/matches/{first}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{T(s)}/matches/{first}/goals",
+                new { tournamentTeamId = s.Team("T1"), playerId = adam, assistPlayerId = bartek, goalType = 5, minute = 10, second = (int?)null }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PostAsJsonAsync($"{T(s)}/matches/{first}/finish",
+                new MatchesController.FinishMatchRequest(MatchResultType.Regular, s.Team("T1"))))
+            .IsSuccessStatusCode.Should().BeTrue();
+        await FlushOutboxAsync();
+        await s.PlayAsync((await s.MatchBetweenAsync("T1", "T3")).GetGuid("id"), 1, 1);
+
+        var history = await (await s.Organizer.GetAsync($"/api/teams/{s.ClubTeam("T1")}/history")).ReadJsonAsync();
+
+        var summary = history.GetProperty("summary");
+        (summary.GetProperty("played").GetInt32(), summary.GetProperty("wins").GetInt32(), summary.GetProperty("draws").GetInt32()).Should().Be((2, 1, 1));
+        (summary.GetProperty("goalsFor").GetInt32(), summary.GetProperty("goalsAgainst").GetInt32()).Should().Be((2, 1));
+        history.GetProperty("tournamentCount").GetInt32().Should().Be(1);
+        // Forma idzie w kolejności terminarza, a test gra mecze w innej, więc sprawdza same wyniki.
+        history.GetProperty("form").EnumerateArray().Select(f => f.GetString()).Should().BeEquivalentTo(["W", "D"]);
+
+        var entry = history.GetProperty("tournaments").EnumerateArray().Single();
+        entry.GetString("resultKind").Should().Be("Group");
+        entry.GetProperty("groupPosition").GetInt32().Should().Be(1);
+        entry.GetGuid("tournamentTeamId").Should().Be(s.Team("T1"));
+
+        var players = history.GetProperty("players").EnumerateArray().ToList();
+        players.Single(p => p.GetGuid("playerId") == adam).GetProperty("goals").GetInt32().Should().Be(1);
+        players.Single(p => p.GetGuid("playerId") == bartek).GetProperty("assists").GetInt32().Should().Be(1);
+
+        var opponents = history.GetProperty("opponents").EnumerateArray().ToList();
+        opponents.Select(o => o.GetGuid("teamId")).Should().BeEquivalentTo([s.ClubTeam("T2"), s.ClubTeam("T3")]);
+    }
+
+    [Fact]
+    public async Task DRU_045_TeamHistory_IsOnlyForTheOrganizationAndTeamStaff()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        var (outsider, _) = await s.NewUserAsync("outsider");
+
+        var response = await outsider.GetAsync($"/api/teams/{s.ClubTeam("T1")}/history");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    // Etykiety drużyn w bazie organizacji (DRU-048…051).
+
+    private static string Labels(TournamentScenario s) => $"/api/organizations/{s.OrganizationId}/team-labels";
+
+    private static async Task<Guid> CreateLabelAsync(TournamentScenario s, string name)
+    {
+        var response = await s.Organizer.PostAsJsonAsync(Labels(s), new { name });
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        return (await response.ReadJsonAsync()).GetGuid("labelId");
+    }
+
+    private static async Task<List<JsonElement>> LabelsAsync(TournamentScenario s) =>
+        (await (await s.Organizer.GetAsync(Labels(s))).ReadJsonAsync()).EnumerateArray().ToList();
+
+    private static async Task<List<Guid>> LabelIdsOfAsync(TournamentScenario s, string team)
+    {
+        var teams = (await (await s.Organizer.GetAsync($"/api/organizations/{s.OrganizationId}/teams")).ReadJsonAsync()).EnumerateArray();
+        return teams.Single(t => t.GetGuid("id") == s.ClubTeam(team))
+            .GetProperty("labelIds").EnumerateArray().Select(e => e.GetGuid()).ToList();
+    }
+
+    [Fact]
+    public async Task DRU_048_Labels_AreCreatedAndRenamed_AndNamesAreUniqueIgnoringCase()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var year = await CreateLabelAsync(s, "Rocznik 2015");
+        await CreateLabelAsync(s, "Klub Orlik");
+
+        (await s.Organizer.PostAsJsonAsync(Labels(s), new { name = " rocznik 2015 " })).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await s.Organizer.PostAsJsonAsync(Labels(s), new { name = "  " })).IsSuccessStatusCode.Should().BeFalse();
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}", new { name = "KLUB ORLIK" })).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}", new { name = "Rocznik 2016" })).IsSuccessStatusCode.Should().BeTrue();
+
+        (await LabelsAsync(s)).Select(l => l.GetString("name")).Should().Equal("Klub Orlik", "Rocznik 2016");
+    }
+
+    [Fact]
+    public async Task DRU_049_TeamHasManyLabels_SetFromTheLabelOrFromTheTeam()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3, schedule: false);
+        var year = await CreateLabelAsync(s, "Rocznik 2015");
+        var club = await CreateLabelAsync(s, "Klub Orlik");
+
+        // Etykieta dla kilku drużyn naraz: z listy dostają ją, pozostałe tracą.
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}/teams", new { teamIds = new[] { s.ClubTeam("T1"), s.ClubTeam("T2") } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}/teams", new { teamIds = new[] { s.ClubTeam("T2"), s.ClubTeam("T3") } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        // Etykiety jednej drużyny (okno edycji).
+        (await s.Organizer.PutAsJsonAsync($"/api/organizations/{s.OrganizationId}/teams/{s.ClubTeam("T2")}/labels", new { labelIds = new[] { year, club } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        (await LabelIdsOfAsync(s, "T1")).Should().BeEmpty();
+        (await LabelIdsOfAsync(s, "T2")).Should().BeEquivalentTo([year, club]);
+        (await LabelIdsOfAsync(s, "T3")).Should().Equal(year);
+        var counts = (await LabelsAsync(s)).ToDictionary(l => l.GetGuid("id"), l => l.GetProperty("teamCount").GetInt32());
+        counts[year].Should().Be(2);
+        counts[club].Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DRU_050_DeletingALabel_RemovesItFromTeams_AndKeepsTheTeams()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var year = await CreateLabelAsync(s, "Rocznik 2015");
+        (await s.Organizer.PutAsJsonAsync($"{Labels(s)}/{year}/teams", new { teamIds = new[] { s.ClubTeam("T1") } }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        (await s.Organizer.DeleteAsync($"{Labels(s)}/{year}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await LabelsAsync(s)).Should().BeEmpty();
+        (await LabelIdsOfAsync(s, "T1")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DRU_051_LabelsOfAnotherOrganization_CannotBeUsedOrSeen()
+    {
+        var a = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var b = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var labelOfB = await CreateLabelAsync(b, "Rocznik 2015");
+
+        (await a.Organizer.GetAsync(Labels(b))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await a.Organizer.PutAsJsonAsync($"/api/organizations/{a.OrganizationId}/teams/{a.ClubTeam("T1")}/labels", new { labelIds = new[] { labelOfB } }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await b.Organizer.PutAsJsonAsync($"{Labels(b)}/{labelOfB}/teams", new { teamIds = new[] { a.ClubTeam("T1") } }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await LabelIdsOfAsync(a, "T1")).Should().BeEmpty();
     }
 }

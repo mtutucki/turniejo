@@ -21,7 +21,7 @@ namespace Turniejo.Standings.UnitTests.Standings
             _tournamentModule = Substitute.For<ITournamentModule>();
             _teamModule = Substitute.For<ITeamModule>();
             _matchModule = Substitute.For<IMatchModule>();
-            _handler = new RecalculateStandingsCommandHandler(_dbContext, _tournamentModule, _teamModule, _matchModule);
+            _handler = new RecalculateStandingsCommandHandler(_dbContext, _tournamentModule, _teamModule, _matchModule, Substitute.For<IBracketModule>());
 
             _dbContext.GetStandingAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Standing?)null);
             _tournamentModule.GetTieBreakerRulesAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())

@@ -19,7 +19,7 @@ namespace Turniejo.Matches.Application.Matches.GetMatchById
                 match.Id, match.TournamentId, match.CategoryId, match.GroupId, match.PitchId,
                 match.HomeTournamentTeamId, match.AwayTournamentTeamId, visibleRefereeId(match.RefereeId), match.ScheduledAt,
                 match.Status.ToString(), match.StageType.ToString(), match.HomeScore, match.AwayScore, match.ResultType.ToString(),
-                match.HomePenaltyScore, match.AwayPenaltyScore);
+                match.HomePenaltyScore, match.AwayPenaltyScore, AwaitingDecision: match.IsAwaitingDecision);
 
             return Result.Success(dto);
         }

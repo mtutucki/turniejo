@@ -30,7 +30,9 @@ import { plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
 import type { TournamentCategory } from "@/types/tournaments"
 
-import { useAddTeamToTournament, useOrganizationTeams } from "../api"
+import { useAddTeamToTournament, useOrganizationTeams, useTeamLabels } from "../api"
+import { ALL_TEAMS, filterTeams, groupByLabel, type LabelFilter, MANY_TEAMS } from "../team-labels"
+import { TeamLabelFilter, TeamLabelsHint } from "./team-label-filter"
 
 type AddTeamDialogProps = {
   tournamentId: string
@@ -62,6 +64,8 @@ export function AddTeamDialog({
   const [error, setError] = useState<string>()
   const [pending, setPending] = useState(false)
   const teams = useOrganizationTeams(organizationId)
+  const labels = useTeamLabels(organizationId)
+  const labelList = labels.data ?? []
   const addTeam = useAddTeamToTournament(tournamentId)
 
   // Aktywne zgłoszenie (oczekuje/zaakceptowana) blokuje ponowne — odrzucone i wycofane nie.
@@ -72,21 +76,43 @@ export function AddTeamDialog({
     return !status || status === "Rejected" || status === "Withdrawn"
   })
   const [query, setQuery] = useState("")
-  // Przy dużej bazie — filtr po nazwie (zaznaczenia spoza filtra zostają).
-  const visible = query.trim()
-    ? available.filter((t) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
-    : available
+  const [labelFilter, setLabelFilter] = useState<LabelFilter>(ALL_TEAMS)
+  // Przy dużej bazie: filtr po etykiecie i nazwie (zaznaczenia spoza filtra zostają), więc
+  // „Zaznacz wszystkie” przy wybranej etykiecie zgłasza całą etykietę.
+  const visible = filterTeams(available, labelFilter, query)
   const allSelected = visible.length > 0 && visible.every((t) => selected.has(t.id))
   const limitReached = freeSlots === 0
   // Nie da się zaznaczyć więcej drużyn, niż jest wolnych miejsc.
   const canSelectMore = selected.size < freeSlots
   const fitsAll = selected.size + visible.filter((t) => !selected.has(t.id)).length <= freeSlots
+  // Z etykietami lista dzieli się na sekcje (drużyna z kilkoma etykietami jest w każdej).
+  const sections =
+    labelList.length > 0
+      ? groupByLabel(filterTeams(available, ALL_TEAMS, query), labelList, labelFilter)
+      : null
+
+  /** Cała etykieta naraz: odznacza, gdy wszystkie są zaznaczone, inaczej dobiera do limitu. */
+  function toggleSection(sectionTeams: { id: string }[]) {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (sectionTeams.every((t) => next.has(t.id))) {
+        for (const t of sectionTeams) next.delete(t.id)
+        return next
+      }
+      for (const t of sectionTeams) {
+        if (next.size >= freeSlots) break
+        next.add(t.id)
+      }
+      return next
+    })
+  }
 
   function reset() {
     setSelected(new Set())
     setCategoryId(categories.length === 1 ? categories[0]!.id : undefined)
     setError(undefined)
     setQuery("")
+    setLabelFilter(ALL_TEAMS)
   }
 
   function toggle(teamId: string, checked: boolean) {
@@ -130,6 +156,38 @@ export function AddTeamDialog({
     // Zostają zaznaczone tylko te, których nie udało się zgłosić.
     setSelected(failedIds)
     setError(`Nie udało się zgłosić: ${failed.join("; ")}`)
+  }
+
+  function teamItem(team: { id: string; name: string }, sectionKey?: string) {
+    const previous = registrationOf(team.id)?.registrationStatus
+    // Ta sama drużyna może być w kilku sekcjach: id pola musi być unikalne.
+    const inputId = sectionKey ? `add-team-${sectionKey}-${team.id}` : `add-team-${team.id}`
+    const locked = !selected.has(team.id) && !canSelectMore
+    return (
+      <li key={team.id} className="flex items-center gap-3 px-3 py-2">
+        <Checkbox
+          id={inputId}
+          checked={selected.has(team.id)}
+          disabled={locked}
+          onCheckedChange={(checked) => toggle(team.id, checked === true)}
+        />
+        <label
+          htmlFor={inputId}
+          className={
+            locked
+              ? "text-muted-foreground min-w-0 flex-1 cursor-not-allowed text-sm opacity-60"
+              : "min-w-0 flex-1 cursor-pointer text-sm"
+          }
+        >
+          <span className="block truncate">{team.name}</span>
+          {previous && (
+            <span className="text-muted-foreground text-xs">
+              {previous === "Rejected" ? "Odrzucona" : "Wycofana"} - zgłoś ponownie
+            </span>
+          )}
+        </label>
+      </li>
+    )
   }
 
   return (
@@ -210,7 +268,20 @@ export function AddTeamDialog({
                   </Button>
                 )}
               </div>
-              {available.length > 8 && (
+              {(teams.data?.length ?? 0) > 0 && (
+                <TeamLabelsHint
+                  organizationId={organizationId}
+                  teamCount={teams.data?.length ?? 0}
+                  labelCount={labelList.length}
+                />
+              )}
+              <TeamLabelFilter
+                labels={labelList}
+                teams={available}
+                value={labelFilter}
+                onChange={setLabelFilter}
+              />
+              {(available.length > MANY_TEAMS || labelList.length > 0) && (
                 <Input
                   type="search"
                   placeholder="Szukaj drużyny…"
@@ -233,41 +304,47 @@ export function AddTeamDialog({
               )}
               {available.length > 0 ? (
                 <ul className="max-h-72 divide-y overflow-y-auto rounded-md border">
-                  {visible.length === 0 && (
+                  {(sections ? sections.length === 0 : visible.length === 0) && (
                     <li className="text-muted-foreground px-3 py-2 text-sm">
-                      Brak drużyn pasujących do „{query}”.
+                      {query.trim()
+                        ? `Brak drużyn pasujących do „${query.trim()}”.`
+                        : "Brak drużyn z tą etykietą do zgłoszenia."}
                     </li>
                   )}
-                  {visible.map((team) => {
-                    const previous = registrationOf(team.id)?.registrationStatus
-                    const inputId = `add-team-${team.id}`
-                    const locked = !selected.has(team.id) && !canSelectMore
-                    return (
-                      <li key={team.id} className="flex items-center gap-3 px-3 py-2">
-                        <Checkbox
-                          id={inputId}
-                          checked={selected.has(team.id)}
-                          disabled={locked}
-                          onCheckedChange={(checked) => toggle(team.id, checked === true)}
-                        />
-                        <label
-                          htmlFor={inputId}
-                          className={
-                            locked
-                              ? "text-muted-foreground min-w-0 flex-1 cursor-not-allowed text-sm opacity-60"
-                              : "min-w-0 flex-1 cursor-pointer text-sm"
-                          }
-                        >
-                          <span className="block truncate">{team.name}</span>
-                          {previous && (
-                            <span className="text-muted-foreground text-xs">
-                              {previous === "Rejected" ? "Odrzucona" : "Wycofana"} - zgłoś ponownie
-                            </span>
-                          )}
-                        </label>
-                      </li>
-                    )
-                  })}
+                  {sections
+                    ? sections.map((section) => {
+                        const count = section.teams.filter((t) => selected.has(t.id)).length
+                        const all = count === section.teams.length
+                        const headerId = `add-team-section-${section.key}`
+                        return (
+                          <li key={section.key}>
+                            <div className="bg-muted sticky top-0 z-10 flex items-center gap-3 px-3 py-2">
+                              <Checkbox
+                                id={headerId}
+                                aria-label={`Zaznacz etykietę ${section.title}`}
+                                checked={all}
+                                disabled={!all && !canSelectMore}
+                                onCheckedChange={() => toggleSection(section.teams)}
+                              />
+                              <label
+                                htmlFor={headerId}
+                                className="min-w-0 flex-1 cursor-pointer truncate text-sm font-medium"
+                              >
+                                {section.title}
+                              </label>
+                              <span className="text-muted-foreground text-xs tabular-nums">
+                                {count > 0
+                                  ? `${count}/${section.teams.length}`
+                                  : section.teams.length}
+                              </span>
+                            </div>
+                            <ul aria-label={section.title} className="divide-y border-t">
+                              {section.teams.map((team) => teamItem(team, section.key))}
+                            </ul>
+                          </li>
+                        )
+                      })
+                    : visible.map((team) => teamItem(team))}
                 </ul>
               ) : (
                 teams.data && (

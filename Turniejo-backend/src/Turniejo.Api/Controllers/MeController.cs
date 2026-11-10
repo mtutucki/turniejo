@@ -7,6 +7,7 @@ using Turniejo.Users.Application.Users.DeleteMyAccount;
 using Turniejo.Users.Application.Users.ExportMyData;
 using Turniejo.Users.Application.Users.GetMyProfile;
 using Turniejo.Users.Application.Users.MarkReleaseSeen;
+using Turniejo.Users.Application.Users.SetMyTheme;
 using Turniejo.Users.Application.Users.UpdateMyProfile;
 
 namespace Turniejo.Api.Controllers
@@ -34,6 +35,14 @@ namespace Turniejo.Api.Controllers
         // Zamknięcie okna "Co nowego" (wersja X.Y.Z). Starsza niż zapisana nic nie zmienia.
         [HttpPut("seen-release")]
         public async Task<IActionResult> MarkReleaseSeen([FromBody] MarkReleaseSeenCommand command, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(command, cancellationToken);
+            return result.ToActionResult();
+        }
+
+        // Motyw aplikacji na koncie: "system", "light" albo "dark".
+        [HttpPut("theme")]
+        public async Task<IActionResult> SetMyTheme([FromBody] SetMyThemeCommand command, CancellationToken cancellationToken)
         {
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();

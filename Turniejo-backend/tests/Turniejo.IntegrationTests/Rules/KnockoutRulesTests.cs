@@ -83,6 +83,19 @@ public sealed class KnockoutRulesTests(IntegrationTestWebApplicationFactory fact
         counts.GetInt("accepted").Should().Be(8);
     }
 
+    // PUC-020: drabinka nie ma górnego limitu, 32 drużyny to pięć rund od 1/16 finału do finału.
+    [Fact]
+    public async Task PUC_020_BracketAbove16Teams_HasAllRounds()
+    {
+        // Bez terminarza: 31 meczów nie mieści się w jednym dniu na jednym boisku scenariusza.
+        var s = await TournamentScenario.KnockoutAsync(Factory, teams: 32, schedule: false);
+
+        var rounds = await RoundsAsync(s);
+        rounds.Select(r => r.GetProperty("nodes").GetArrayLength()).Should().Equal(16, 8, 4, 2, 1);
+        rounds[0].GetProperty("nodes").EnumerateArray().Should()
+            .Contain(n => TeamsOf(n).Contains(s.Team("T31")) && TeamsOf(n).Contains(s.Team("T32")));
+    }
+
     [Fact]
     public async Task PUC_010_SwappingRoundOneSlots_ChangesTheMatchesWithoutDuplicates()
     {

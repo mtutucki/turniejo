@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
@@ -10,11 +10,12 @@ using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
 {
-    // Dwa tryby wg formatu turnieju:
-    // - Group / GroupAndKnockout: tworzy mecze fazy grupowej (każdy z każdym) i rozkłada je w oknie czasu,
-    // - Knockout: mecze 1. rundy tworzy drabinka (GenerateBracket) — tu tylko dostają termin i boisko
-    //   w oknie czasu. Kolejne rundy powstają po rozstrzygnięciu meczów (CreateBracketMatch).
-    // W obu przypadkach na końcu etap turnieju zmienia się na ScheduleGenerated.
+    // Jeden terminarz dla całego turnieju, wszystkie kategorie razem (ScheduleBuilder):
+    // - grupy: tworzy mecze fazy grupowej (każdy z każdym),
+    // - puchar: mecze 1. rundy tworzy drabinka (GenerateBracket), tu dostają termin i boisko,
+    // - kolejne rundy (także po fazie grupowej) dostają zaplanowany termin na węźle drabinki; mecz
+    //   powstaje w nim po rozstrzygnięciu (CreateBracketMatch).
+    // Drabinka musi istnieć w każdej kategorii. Na końcu etap turnieju zmienia się na ScheduleGenerated.
     internal sealed class GenerateScheduleCommandHandler(
         IMatchesDbContext dbContext,
         ITournamentModule tournamentModule,
@@ -24,7 +25,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
     {
         private sealed record MatchPair(Guid CategoryId, Guid GroupId, Guid HomeTournamentTeamId, Guid AwayTournamentTeamId);
 
-        private sealed record Placement<T>(T Item, Guid PitchId, DateTimeOffset ScheduledAt);
+        // Mecz grupy fazy 2 przed rozstrzygnięciem: para miejsc (Id miejsc w polach drużyn), czeka na grupy źródłowe obu miejsc.
+        private sealed record SecondStagePlan(Guid Key, MatchPair Seats, int Round, IReadOnlySet<Guid> SourceGroupIds);
 
         private static readonly StageType[] BracketStages = [StageType.Knockout, StageType.ThirdPlace, StageType.Final];
 
@@ -44,7 +46,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 windows.Any(w => w.StartAt < tournamentStart || w.EndAt > tournamentEnd))
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("StartAt", "Schedule must fit within the tournament dates"));
 
-            if (tournament.Format is not ("Group" or "GroupAndKnockout" or "Knockout"))
+            if (tournament.Format is not ("Group" or "GroupAndKnockout" or "Knockout" or "TwoGroupStages"))
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("Format", "Set the tournament format before generating the schedule"));
 
             var settings = await tournamentModule.GetTournamentSettingsAsync(request.TournamentId, cancellationToken);
@@ -57,168 +59,398 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                 return Result.Failure<GenerateScheduleResponse>(Error.Validation("PitchIds", "No valid active pitches belonging to this tournament were provided"));
 
             var existingMatches = await dbContext.GetMatchesByTournamentIdAsync(request.TournamentId, cancellationToken);
+            var tournamentTeams = await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken);
+            var accepted = tournamentTeams.Where(t => t.RegistrationStatus == "Accepted").ToList();
+            var clubOf = ClubLookup(tournamentTeams);
 
-            return tournament.Format == "Knockout"
-                ? await ScheduleKnockoutAsync(request, windows, settings, pitches, existingMatches, cancellationToken)
-                : await ScheduleGroupStageAsync(request, windows, settings, pitches, existingMatches, cancellationToken);
+            var withGroups = tournament.Format is "Group" or "GroupAndKnockout" or "TwoGroupStages";
+            var withBracket = tournament.Format is "Knockout" or "GroupAndKnockout";
+
+            var pairs = new List<(Guid Key, MatchPair Pair, int Round)>();
+            if (withGroups)
+            {
+                var groupResult = await BuildGroupPairsAsync(request.TournamentId, accepted, existingMatches, cancellationToken);
+                if (groupResult.IsFailure)
+                    return Result.Failure<GenerateScheduleResponse>(groupResult.Error);
+                pairs = groupResult.Value;
+            }
+
+            var secondStage = new List<SecondStagePlan>();
+            if (tournament.Format == "TwoGroupStages")
+            {
+                var secondStageResult = await BuildSecondStageAsync(request.TournamentId, accepted, cancellationToken);
+                if (secondStageResult.IsFailure)
+                    return Result.Failure<GenerateScheduleResponse>(secondStageResult.Error);
+                secondStage = secondStageResult.Value;
+            }
+
+            IReadOnlyList<BracketNodeInfoDto> nodes = withBracket
+                ? await bracketModule.GetNodesByTournamentIdAsync(request.TournamentId, cancellationToken)
+                : [];
+
+            // Mecze pucharu, które już istnieją i się nie zaczęły (1. runda, a w grupach + pucharze pary
+            // ustawione ręcznie). Dostają nowy termin; reszta istniejących meczów zostaje tam, gdzie jest.
+            var bracketMatchIds = withBracket
+                ? existingMatches
+                    .Where(m => BracketStages.Contains(m.StageType) &&
+                                m.Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed)
+                    .Select(m => m.Id)
+                    .ToHashSet()
+                : [];
+            if (tournament.Format == "Knockout" && bracketMatchIds.Count == 0)
+                return Result.Failure<GenerateScheduleResponse>(Error.Validation(
+                    "Bracket", "Generate the knockout bracket first — the schedule places its first-round matches"));
+
+            // Kategoria z jedną drużyną nie ma meczów, a terminarz generuje się raz dla całego turnieju.
+            if (accepted.GroupBy(t => t.CategoryId).Any(g => g.Count() == 1))
+                return Result.Failure<GenerateScheduleResponse>(Error.Validation(
+                    "TournamentId", "Each category needs at least 2 accepted teams"));
+
+            // Każda kategoria potrzebuje drabinki. Bez tego generator rozstawiał tylko gotowe drabinki,
+            // etap zmieniał się na "harmonogram gotowy", a pozostała kategoria zostawała bez meczów.
+            if (withBracket)
+            {
+                var categoriesWithBracket = nodes.Select(n => n.CategoryId).ToHashSet();
+                if (accepted.Select(t => t.CategoryId).Distinct().Any(c => !categoriesWithBracket.Contains(c)))
+                    return Result.Failure<GenerateScheduleResponse>(Error.Validation(
+                        "Bracket", "Every category needs a knockout bracket before generating the schedule"));
+            }
+
+            // existingMatches jest tylko do odczytu (AsNoTracking) — zmiany na nich nie trafiały do bazy.
+            var bracketMatches = bracketMatchIds.Count > 0
+                ? await dbContext.GetTrackedMatchesByIdsAsync(bracketMatchIds, cancellationToken)
+                : [];
+
+            var items = BuildItems(pairs, bracketMatches, nodes, accepted, clubOf);
+            items.AddRange(SecondStageItems(secondStage, pairs, accepted, clubOf));
+
+            var fixedMatches = existingMatches
+                .Where(m => m.Status != MatchStatus.Cancelled && m.PitchId.HasValue && !bracketMatchIds.Contains(m.Id))
+                .Select(m => new FixedMatch(m.PitchId, m.ScheduledAt,
+                    new HashSet<Guid> { clubOf(m.HomeTournamentTeamId), clubOf(m.AwayTournamentTeamId) }))
+                .ToList();
+
+            var result = ScheduleBuilder.Build(items, pitches.Select(p => p.Id).ToList(), fixedMatches, windows, settings);
+            if (result.Unplaced > 0)
+                return NotEnoughTime(result.Unplaced);
+
+            var newMatches = new List<Match>();
+            foreach (var (key, pair, _) in pairs)
+            {
+                var slot = result.Slots[key];
+                var matchResult = Match.Create(
+                    Guid.NewGuid(), request.TournamentId, pair.CategoryId, pair.GroupId,
+                    pair.HomeTournamentTeamId, pair.AwayTournamentTeamId, slot.PitchId, slot.StartAt, StageType.Group);
+                if (matchResult.IsFailure)
+                    return Result.Failure<GenerateScheduleResponse>(matchResult.Error);
+                newMatches.Add(matchResult.Value);
+            }
+
+            var plannedSlots = nodes
+                .Where(n => !n.MatchId.HasValue && result.Slots.ContainsKey(n.Id))
+                .Select(n => new BracketPlannedSlotDto(n.Id, result.Slots[n.Id].PitchId, result.Slots[n.Id].StartAt))
+                .ToList();
+
+            // Mecze i etap turnieju żyją w dwóch bazach modułów, więc nie ma jednej transakcji. Kolejność:
+            // najpierw mecze, potem etap — a gdy zmiana etapu się nie uda, cofamy właśnie zapisane mecze.
+            // Odwrotnie (etap pierwszy) błąd zapisu meczów zostawiał "harmonogram gotowy" z zerem meczów.
+            if (newMatches.Count > 0)
+            {
+                await dbContext.AddMatchesAsync(newMatches, cancellationToken);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            var previous = bracketMatches.ToDictionary(m => m.Id, m => (m.PitchId, m.ScheduledAt));
+            // Bez MatchScheduleChanged w outboxie: terminarz dopiero powstaje, to nie "zmiana terminu"
+            // do rozesłania rodzicom (tak samo nowe mecze fazy grupowej nie wysyłają powiadomień).
+            if (bracketMatches.Count > 0)
+                await ApplySlotsAsync(
+                    bracketMatches.Select(m => (m, (Guid?)result.Slots[m.Id].PitchId, result.Slots[m.Id].StartAt)).ToList(),
+                    cancellationToken);
+
+            if (!await tournamentModule.ChangeTournamentStatusAsync(request.TournamentId, "ScheduleGenerated", cancellationToken))
+            {
+                if (bracketMatches.Count > 0)
+                    await ApplySlotsAsync(
+                        bracketMatches.Select(m => (m, previous[m.Id].PitchId, previous[m.Id].ScheduledAt)).ToList(),
+                        cancellationToken);
+                if (newMatches.Count > 0)
+                {
+                    await dbContext.RemoveMatchesAsync(newMatches, cancellationToken);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
+
+                return StatusConflict();
+            }
+
+            if (plannedSlots.Count > 0)
+                await bracketModule.SetPlannedSlotsAsync(plannedSlots, cancellationToken);
+
+            if (secondStage.Count > 0)
+                await bracketModule.CreateSecondStageFixturesAsync(request.TournamentId, secondStage
+                    .Select(f => new SecondStageFixturePlanDto(
+                        f.Key, f.Seats.CategoryId, f.Seats.GroupId, f.Seats.HomeTournamentTeamId, f.Seats.AwayTournamentTeamId,
+                        f.Round + 1, result.Slots[f.Key].PitchId, result.Slots[f.Key].StartAt))
+                    .ToList(), cancellationToken);
+
+            return await CompleteAsync(
+                request.TournamentId, tournament.Format == "Knockout" ? bracketMatches.Count : newMatches.Count, cancellationToken);
         }
 
-        private async Task<Result<GenerateScheduleResponse>> ScheduleGroupStageAsync(
-            GenerateScheduleCommand request,
-            IReadOnlyList<ScheduleWindow> windows,
-            TournamentSettingsSummaryDto settings,
-            List<Pitch> pitches,
+        private async Task<Result<List<(Guid Key, MatchPair Pair, int Round)>>> BuildGroupPairsAsync(
+            Guid tournamentId,
+            List<TournamentTeamDto> accepted,
             IReadOnlyList<Match> existingMatches,
             CancellationToken cancellationToken)
         {
-            var groups = await tournamentModule.GetTournamentGroupsAsync(request.TournamentId, cancellationToken);
+            var groups = await tournamentModule.GetTournamentGroupsAsync(tournamentId, cancellationToken);
             if (groups.Count == 0)
-                return Result.Failure<GenerateScheduleResponse>(Error.Validation("TournamentId", "Tournament has no groups defined"));
+                return Result.Failure<List<(Guid, MatchPair, int)>>(Error.Validation("TournamentId", "Tournament has no groups defined"));
 
-            var allTournamentTeams = await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken);
             // Mecze grają tylko drużyny przypisane do grupy. Zaakceptowana drużyna bez grupy zostałaby po
             // cichu pominięta, a terminarz generuje się raz — organizator zauważał to dopiero po fakcie.
-            if (allTournamentTeams.Any(t => t.RegistrationStatus == "Accepted" && !t.GroupId.HasValue))
-                return Result.Failure<GenerateScheduleResponse>(Error.Validation("TournamentId", "Some accepted teams are not assigned to a group"));
+            if (accepted.Any(t => !t.GroupId.HasValue))
+                return Result.Failure<List<(Guid, MatchPair, int)>>(Error.Validation("TournamentId", "Some accepted teams are not assigned to a group"));
 
-            var acceptedTeamsByGroup = allTournamentTeams
-                .Where(t => t.RegistrationStatus == "Accepted" && t.GroupId.HasValue)
+            var teamsByGroup = accepted
                 .GroupBy(t => t.GroupId!.Value)
                 .ToDictionary(g => g.Key, g => g.Select(t => t.Id).ToList());
 
-            var pairs = new List<MatchPair>();
-            var roundsByGroup = new List<List<List<MatchPair>>>();
-            foreach (var group in groups)
+            var pairs = new List<(Guid Key, MatchPair Pair, int Round)>();
+            // Grupy drugiej fazy nie mają przydzielonych drużyn, ich mecze planuje BuildSecondStageAsync.
+            foreach (var group in groups.Where(g => g.Stage == 1))
             {
-                if (!acceptedTeamsByGroup.TryGetValue(group.Id, out var teamIds) || teamIds.Count < 2)
+                if (!teamsByGroup.TryGetValue(group.Id, out var teamIds) || teamIds.Count < 2)
                     continue;
 
-                roundsByGroup.Add(BuildRoundRobinRounds(group, teamIds));
+                var rounds = BuildRoundRobinRounds(group, teamIds);
+                for (var round = 0; round < rounds.Count; round++)
+                    pairs.AddRange(rounds[round].Select(pair => (Guid.NewGuid(), pair, round)));
             }
 
-            // Kolejka 1 wszystkich grup, potem kolejka 2 itd. — grupy grają równolegle, a drużyny dostają przerwy.
-            var maxRounds = roundsByGroup.Count == 0 ? 0 : roundsByGroup.Max(r => r.Count);
-            for (var round = 0; round < maxRounds; round++)
-                foreach (var groupRounds in roundsByGroup)
-                    if (round < groupRounds.Count)
-                        pairs.AddRange(groupRounds[round]);
-
             if (pairs.Count == 0)
-                return Result.Failure<GenerateScheduleResponse>(Error.Validation("TournamentId", "No matches to schedule — each group needs at least 2 accepted teams"));
+                return Result.Failure<List<(Guid, MatchPair, int)>>(Error.Validation(
+                    "TournamentId", "No matches to schedule — each group needs at least 2 accepted teams"));
+
+            // Grupa z jedną drużyną była pomijana po cichu, a ta drużyna nie grała ani razu.
+            if (teamsByGroup.Values.Any(teams => teams.Count == 1))
+                return Result.Failure<List<(Guid, MatchPair, int)>>(Error.Validation("TournamentId", "Each group needs at least 2 accepted teams"));
 
             // Pozostałość po nieudanym generowaniu (mecze zapisane, etap nie zmieniony) — ponowne generowanie
             // zdublowałoby pary. Organizator czyści terminarz (ClearSchedule) i generuje od nowa.
             if (existingMatches.Any(m => m.StageType == StageType.Group && m.Status != MatchStatus.Cancelled))
-                return Result.Failure<GenerateScheduleResponse>(Error.Validation("TournamentId", "Tournament already has group matches — clear the schedule first"));
+                return Result.Failure<List<(Guid, MatchPair, int)>>(Error.Validation(
+                    "TournamentId", "Tournament already has group matches — clear the schedule first"));
 
-            var occupiedSlots = existingMatches
-                .Where(m => m.PitchId.HasValue && m.Status != MatchStatus.Cancelled)
-                .Select(m => (m.PitchId!.Value, m.ScheduledAt))
-                .ToHashSet();
-
-            var clubOf = ClubLookup(allTournamentTeams);
-            var (placements, unplaced, _) = PlaceInSlots(
-                pairs, p => (clubOf(p.HomeTournamentTeamId), clubOf(p.AwayTournamentTeamId)), pitches, occupiedSlots, windows, settings);
-            if (unplaced > 0)
-                return NotEnoughTime(unplaced);
-
-            var scheduledMatches = new List<Match>();
-            foreach (var placement in placements)
-            {
-                var pair = placement.Item;
-                var matchResult = Match.Create(
-                    Guid.NewGuid(), request.TournamentId, pair.CategoryId, pair.GroupId,
-                    pair.HomeTournamentTeamId, pair.AwayTournamentTeamId, placement.PitchId,
-                    placement.ScheduledAt, StageType.Group);
-
-                if (matchResult.IsFailure)
-                    return Result.Failure<GenerateScheduleResponse>(matchResult.Error);
-
-                scheduledMatches.Add(matchResult.Value);
-            }
-
-            // Mecze i etap turnieju żyją w dwóch bazach modułów, więc nie ma jednej transakcji. Kolejność:
-            // najpierw mecze, potem etap — a gdy zmiana etapu się nie uda, usuwamy właśnie zapisane mecze.
-            // Odwrotnie (etap pierwszy) błąd zapisu meczów zostawiał "harmonogram gotowy" z zerem meczów.
-            await dbContext.AddMatchesAsync(scheduledMatches, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            if (!await tournamentModule.ChangeTournamentStatusAsync(request.TournamentId, "ScheduleGenerated", cancellationToken))
-            {
-                await dbContext.RemoveMatchesAsync(scheduledMatches, cancellationToken);
-                await dbContext.SaveChangesAsync(cancellationToken);
-                return StatusConflict();
-            }
-
-            return await CompleteAsync(request.TournamentId, scheduledMatches.Count, cancellationToken);
+            // Kolejka 1 wszystkich grup, potem kolejka 2 itd. — kolejność bazowa dla układacza.
+            return Result.Success(pairs.OrderBy(p => p.Round).ToList());
         }
 
-        private async Task<Result<GenerateScheduleResponse>> ScheduleKnockoutAsync(
-            GenerateScheduleCommand request,
-            IReadOnlyList<ScheduleWindow> windows,
-            TournamentSettingsSummaryDto settings,
-            List<Pitch> pitches,
-            IReadOnlyList<Match> existingMatches,
-            CancellationToken cancellationToken)
+        /// <summary>
+        /// Format „Dwie fazy grupowe”: każdy z każdym w grupach fazy 2, ale między miejscami („1. miejsce Gr. A”),
+        /// bo drużyny będą znane dopiero po fazie 1. Każda kategoria potrzebuje grup fazy 2 z co najmniej
+        /// dwoma miejscami, a miejsce musi istnieć w tabeli grupy źródłowej.
+        /// </summary>
+        private async Task<Result<List<SecondStagePlan>>> BuildSecondStageAsync(
+            Guid tournamentId, List<TournamentTeamDto> accepted, CancellationToken cancellationToken)
         {
-            // Mecze drabinki, które jeszcze się nie zaczęły — w praktyce 1. runda (kolejne rundy powstają
-            // dopiero po rozstrzygnięciu meczów). Kolejność z drabinki (termin utworzenia) zostaje.
-            var toScheduleIds = existingMatches
-                .Where(m => BracketStages.Contains(m.StageType) &&
-                            m.Status is MatchStatus.Scheduled or MatchStatus.Ready or MatchStatus.Postponed)
-                .Select(m => m.Id)
-                .ToHashSet();
-            if (toScheduleIds.Count == 0)
-                return Result.Failure<GenerateScheduleResponse>(Error.Validation(
-                    "Bracket", "Generate the knockout bracket first — the schedule places its first-round matches"));
+            var groups = await tournamentModule.GetTournamentGroupsAsync(tournamentId, cancellationToken);
+            var teamCount = accepted.Where(t => t.GroupId.HasValue).GroupBy(t => t.GroupId!.Value).ToDictionary(g => g.Key, g => g.Count());
+            // Zakresy miejsc (albo gotowy podział) zamieniają się teraz w miejsca z prawdziwej liczby drużyn.
+            await bracketModule.PrepareSecondStageSeatsAsync(tournamentId, groups, teamCount, cancellationToken);
+            var seats = await bracketModule.GetSecondStageSeatsAsync(tournamentId, cancellationToken);
+            var seatsByGroup = seats.GroupBy(s => s.GroupId).ToDictionary(g => g.Key, g => g.OrderBy(s => s.Order).ToList());
+            var secondStageGroups = groups.Where(g => g.Stage == 2).ToList();
 
-            // existingMatches jest tylko do odczytu (AsNoTracking) — zmiany na nich nie trafiały do bazy:
-            // etap zmieniał się na "harmonogram gotowy", a mecze zostawały bez boiska, wszystkie o tej samej godzinie.
-            // Najpierw wcześniejsze rundy: przy wolnych losach mecz 2. rundy powstaje od razu (przed
-            // meczami 1. rundy) i bez tego dostawałby wcześniejszą godzinę niż one.
-            var nodes = await bracketModule.GetNodesByTournamentIdAsync(request.TournamentId, cancellationToken);
-            var roundByMatchId = nodes
-                .Where(n => n.MatchId.HasValue)
-                .ToDictionary(n => n.MatchId!.Value, n => n.RoundNumber);
-            var toSchedule = (await dbContext.GetTrackedMatchesByIdsAsync(toScheduleIds, cancellationToken))
-                .OrderBy(m => roundByMatchId.GetValueOrDefault(m.Id, int.MaxValue))
-                .ThenBy(m => m.ScheduledAt)
-                .ThenBy(m => m.CreatedAt)
-                .ToList();
+            if (accepted.Select(t => t.CategoryId).Distinct()
+                .Any(c => !secondStageGroups.Any(g => g.CategoryId == c && seatsByGroup.ContainsKey(g.Id))))
+                return Result.Failure<List<SecondStagePlan>>(Error.Validation(
+                    "SecondStage", "Every category needs second-stage groups with places before generating the schedule"));
 
-            var occupiedSlots = existingMatches
-                .Where(m => m.PitchId.HasValue && m.Status != MatchStatus.Cancelled && !toScheduleIds.Contains(m.Id))
-                .Select(m => (m.PitchId!.Value, m.ScheduledAt))
-                .ToHashSet();
+            if (secondStageGroups.Any(g => seatsByGroup.TryGetValue(g.Id, out var groupSeats) && groupSeats.Count < 2))
+                return Result.Failure<List<SecondStagePlan>>(Error.Validation(
+                    "SecondStage", "Each second-stage group needs at least 2 places"));
 
-            var clubOf = ClubLookup(await teamModule.GetTournamentTeamsByTournamentIdAsync(request.TournamentId, cancellationToken));
-            var (placements, unplaced, placedInWindow) = PlaceInSlots(
-                toSchedule, m => (clubOf(m.HomeTournamentTeamId), clubOf(m.AwayTournamentTeamId)), pitches, occupiedSlots, windows, settings);
-            if (unplaced > 0)
-                return NotEnoughTime(unplaced);
+            if (seats.Any(s => s.SourcePosition > teamCount.GetValueOrDefault(s.SourceGroupId)))
+                return Result.Failure<List<SecondStagePlan>>(Error.Validation(
+                    "SecondStage", "A second-stage place points to a position its group does not have"));
 
-            var (plannedSlots, unplanned) = PlanLaterRounds(
-                windows, settings, pitches, nodes, existingMatches, placements, occupiedSlots, placedInWindow);
-            if (unplanned > 0)
-                return NotEnoughTime(unplanned);
-
-            // Zapamiętane na wypadek wycofania, gdy etap turnieju nie da się zmienić.
-            var previous = toSchedule.ToDictionary(m => m.Id, m => (m.PitchId, m.ScheduledAt));
-            // Bez MatchScheduleChanged w outboxie: terminarz dopiero powstaje, to nie "zmiana terminu"
-            // do rozesłania rodzicom (tak samo nowe mecze fazy grupowej nie wysyłają powiadomień).
-            await ApplySlotsAsync(
-                placements.Select(p => (p.Item, (Guid?)p.PitchId, p.ScheduledAt)).ToList(), cancellationToken);
-
-            if (!await tournamentModule.ChangeTournamentStatusAsync(request.TournamentId, "ScheduleGenerated", cancellationToken))
+            var sourceBySeat = seats.ToDictionary(s => s.Id, s => s.SourceGroupId);
+            var plans = new List<SecondStagePlan>();
+            foreach (var group in secondStageGroups)
             {
-                await ApplySlotsAsync(
-                    toSchedule.Select(m => (m, previous[m.Id].PitchId, previous[m.Id].ScheduledAt)).ToList(), cancellationToken);
-                return StatusConflict();
+                if (!seatsByGroup.TryGetValue(group.Id, out var groupSeats))
+                    continue;
+
+                var rounds = BuildRoundRobinRounds(group, groupSeats.Select(x => x.Id).ToList());
+                for (var round = 0; round < rounds.Count; round++)
+                    plans.AddRange(rounds[round].Select(pair => new SecondStagePlan(
+                        Guid.NewGuid(), pair, round,
+                        new HashSet<Guid> { sourceBySeat[pair.HomeTournamentTeamId], sourceBySeat[pair.AwayTournamentTeamId] })));
             }
 
-            await bracketModule.SetPlannedSlotsAsync(plannedSlots, cancellationToken);
+            return Result.Success(plans.OrderBy(p => p.Round).ToList());
+        }
 
-            return await CompleteAsync(request.TournamentId, toSchedule.Count, cancellationToken);
+        /// <summary>
+        /// Mecz fazy 2 czeka na wszystkie mecze grup źródłowych obu miejsc i może w nim zagrać każda drużyna
+        /// z tych grup (ta sama drużyna z bazy w innej kategorii nie gra wtedy innego meczu, jak w pucharze).
+        /// </summary>
+        private static IEnumerable<ScheduleItem> SecondStageItems(
+            List<SecondStagePlan> plans,
+            List<(Guid Key, MatchPair Pair, int Round)> pairs,
+            List<TournamentTeamDto> accepted,
+            Func<Guid, Guid> clubOf)
+        {
+            var groupRounds = pairs.Count == 0 ? 0 : pairs.Max(p => p.Round) + 1;
+            var pairKeysByGroup = pairs.GroupBy(p => p.Pair.GroupId).ToDictionary(g => g.Key, g => g.Select(p => p.Key).ToList());
+            var clubsByGroup = accepted.Where(t => t.GroupId.HasValue)
+                .GroupBy(t => t.GroupId!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(t => clubOf(t.Id)).ToHashSet());
+
+            foreach (var plan in plans)
+            {
+                var possible = plan.SourceGroupIds.SelectMany(g => clubsByGroup.GetValueOrDefault(g) ?? []).ToHashSet();
+                var after = plan.SourceGroupIds.SelectMany(g => pairKeysByGroup.GetValueOrDefault(g) ?? []).ToList();
+                yield return new ScheduleItem(plan.Key, plan.Seats.CategoryId, new HashSet<Guid>(), possible, after, groupRounds + plan.Round);
+            }
+        }
+
+        /// <summary>
+        /// Mecze grupowe, istniejące mecze pucharu i węzły drabinki bez meczu w jednej liście dla układacza.
+        /// Węzeł bez meczu czeka na mecze, z których przyjdą drużyny (albo na fazę grupową swoich grup);
+        /// finał czeka też na mecz o 3. miejsce z tych samych półfinałów (na dwóch boiskach grały równolegle).
+        /// Przy wolnych losach mecz 2. rundy powstaje od razu, więc też czeka na mecze 1. rundy.
+        /// </summary>
+        private static List<ScheduleItem> BuildItems(
+            List<(Guid Key, MatchPair Pair, int Round)> pairs,
+            IReadOnlyList<Match> bracketMatches,
+            IReadOnlyList<BracketNodeInfoDto> nodes,
+            List<TournamentTeamDto> accepted,
+            Func<Guid, Guid> clubOf)
+        {
+            var items = new List<ScheduleItem>();
+            foreach (var (key, pair, round) in pairs)
+            {
+                var clubs = new HashSet<Guid> { clubOf(pair.HomeTournamentTeamId), clubOf(pair.AwayTournamentTeamId) };
+                items.Add(new ScheduleItem(key, pair.CategoryId, clubs, clubs, [], round));
+            }
+
+            var groupRounds = pairs.Count == 0 ? 0 : pairs.Max(p => p.Round) + 1;
+            var pairKeysByGroup = pairs.GroupBy(p => p.Pair.GroupId).ToDictionary(g => g.Key, g => g.Select(p => p.Key).ToList());
+            var clubsByGroup = accepted.Where(t => t.GroupId.HasValue)
+                .GroupBy(t => t.GroupId!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(t => clubOf(t.Id)).ToHashSet());
+            var nodeById = nodes.ToDictionary(n => n.Id);
+            var bracketMatchById = bracketMatches.ToDictionary(m => m.Id);
+
+            // Klucz węzła u układacza: mecz, który dostaje termin, albo sam węzeł (termin planowany).
+            // Węzeł z wolnym losem i mecz, który już się odbył, nie mają czego układać.
+            Guid? KeyOf(BracketNodeInfoDto node) =>
+                node.MatchId is { } matchId
+                    ? bracketMatchById.ContainsKey(matchId) ? matchId : (Guid?)null
+                    : node.HasBye ? null : node.Id;
+
+            HashSet<Guid> KnownClubs(BracketNodeInfoDto node)
+            {
+                var known = new HashSet<Guid>();
+                if (node.MatchId is { } matchId && bracketMatchById.TryGetValue(matchId, out var match))
+                {
+                    known.Add(clubOf(match.HomeTournamentTeamId));
+                    known.Add(clubOf(match.AwayTournamentTeamId));
+                    return known;
+                }
+
+                if (node.HomeTournamentTeamId is { } home)
+                    known.Add(clubOf(home));
+                if (node.AwayTournamentTeamId is { } away)
+                    known.Add(clubOf(away));
+                return known;
+            }
+
+            var possibleMemo = new Dictionary<Guid, HashSet<Guid>>();
+            HashSet<Guid> PossibleClubs(BracketNodeInfoDto node)
+            {
+                if (possibleMemo.TryGetValue(node.Id, out var memo))
+                    return memo;
+
+                var result = KnownClubs(node);
+                if (!(node.MatchId is { } matchId && bracketMatchById.ContainsKey(matchId)))
+                {
+                    foreach (var (team, group, source) in new[]
+                             {
+                                 (node.HomeTournamentTeamId, node.HomeSourceGroupId, node.HomeSourceNodeId),
+                                 (node.AwayTournamentTeamId, node.AwaySourceGroupId, node.AwaySourceNodeId),
+                             })
+                    {
+                        if (team.HasValue)
+                            continue;
+                        if (group is { } groupId && clubsByGroup.TryGetValue(groupId, out var groupClubs))
+                            result.UnionWith(groupClubs);
+                        else if (source is { } sourceId && nodeById.TryGetValue(sourceId, out var sourceNode))
+                            result.UnionWith(PossibleClubs(sourceNode));
+                    }
+                }
+
+                possibleMemo[node.Id] = result;
+                return result;
+            }
+
+            // Na co czeka węzeł: mecze, z których przyjdą drużyny, i fazę grupową grup źródłowych. Węzeł
+            // z wolnym losem nie ma meczu — wtedy czekamy na to, na co czekałby on sam (np. jego grupę).
+            List<Guid> SourcesOf(BracketNodeInfoDto node)
+            {
+                var keys = new List<Guid>();
+                foreach (var groupId in new[] { node.HomeSourceGroupId, node.AwaySourceGroupId })
+                {
+                    if (groupId is { } id && pairKeysByGroup.TryGetValue(id, out var groupKeys))
+                        keys.AddRange(groupKeys);
+                }
+
+                foreach (var sourceId in new[] { node.HomeSourceNodeId, node.AwaySourceNodeId })
+                {
+                    if (sourceId is not { } id || !nodeById.TryGetValue(id, out var source))
+                        continue;
+                    if (KeyOf(source) is { } sourceKey)
+                        keys.Add(sourceKey);
+                    else if (source.HasBye)
+                        keys.AddRange(SourcesOf(source));
+                }
+
+                return keys;
+            }
+
+            // Mecz o 3. miejsce ma numer rundy finału — idzie przed finałem.
+            foreach (var node in nodes.OrderBy(n => n.RoundNumber).ThenByDescending(n => n.IsThirdPlace))
+            {
+                if (KeyOf(node) is not { } key)
+                    continue;
+
+                var after = SourcesOf(node);
+
+                if (!node.IsThirdPlace)
+                {
+                    var thirdPlace = nodes.FirstOrDefault(n => n.IsThirdPlace &&
+                        n.HomeSourceNodeId == node.HomeSourceNodeId && n.AwaySourceNodeId == node.AwaySourceNodeId);
+                    if (thirdPlace != null && KeyOf(thirdPlace) is { } thirdKey)
+                        after.Add(thirdKey);
+                }
+
+                var categoryId = node.MatchId is { } matchId && bracketMatchById.TryGetValue(matchId, out var match)
+                    ? match.CategoryId ?? node.CategoryId
+                    : node.CategoryId;
+                items.Add(new ScheduleItem(key, categoryId, KnownClubs(node), PossibleClubs(node), after, groupRounds + node.RoundNumber));
+            }
+
+            // Mecz pucharu bez węzła drabinki też musi dostać termin; kolejność jak przy tworzeniu.
+            var withNode = nodes.Where(n => n.MatchId.HasValue).Select(n => n.MatchId!.Value).ToHashSet();
+            foreach (var match in bracketMatches.Where(m => !withNode.Contains(m.Id)).OrderBy(m => m.ScheduledAt).ThenBy(m => m.CreatedAt))
+            {
+                var clubs = new HashSet<Guid> { clubOf(match.HomeTournamentTeamId), clubOf(match.AwayTournamentTeamId) };
+                items.Add(new ScheduleItem(match.Id, match.CategoryId ?? Guid.Empty, clubs, clubs, [], groupRounds + 1));
+            }
+
+            return items;
         }
 
         // Dwa zapisy: najpierw mecze schodzą z boisk, dopiero potem dostają nowe terminy. Po wyczyszczeniu
@@ -235,186 +467,6 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             foreach (var (match, pitchId, scheduledAt) in slots)
                 match.UpdateSchedule(pitchId, scheduledAt, currentUserContext.UserId);
             await dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        /// <summary>
-        /// Terminy dla meczów kolejnych rund, które jeszcze nie istnieją (czekają na zwycięzców): runda po
-        /// rundzie, każdy najwcześniej po meczach, z których przyjdą drużyny, na pierwszym wolnym boisku.
-        /// Limit meczów dnia (MaxMatches) liczy się razem z meczami już rozstawionymi — dzięki temu
-        /// organizator decyduje, którego dnia wypada np. finał: zostawia na ten dzień tylko tyle meczów.
-        /// </summary>
-        private static (List<BracketPlannedSlotDto> Planned, int Unplanned) PlanLaterRounds(
-            IReadOnlyList<ScheduleWindow> windows,
-            TournamentSettingsSummaryDto settings,
-            List<Pitch> pitches,
-            IReadOnlyList<BracketNodeInfoDto> nodes,
-            IReadOnlyList<Match> existingMatches,
-            List<Placement<Match>> placements,
-            HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots,
-            int[] placedInWindow)
-        {
-            var slot = TimeSpan.FromMinutes(settings.MatchDurationMinutes + settings.BreakDurationMinutes);
-            var slotStarts = SlotStarts(windows, settings).ToList();
-
-            // Koniec meczu (z przerwą) każdego węzła, który ma już mecz: nowy termin z tego generowania
-            // albo dotychczasowy (mecz, którego generator nie rusza).
-            var matchStart = existingMatches
-                .Where(m => m.Status != MatchStatus.Cancelled)
-                .ToDictionary(m => m.Id, m => m.ScheduledAt);
-            foreach (var placement in placements)
-                matchStart[placement.Item.Id] = placement.ScheduledAt;
-
-            var readyAt = new Dictionary<Guid, DateTimeOffset>();
-            foreach (var node in nodes)
-            {
-                if (node.MatchId.HasValue && matchStart.TryGetValue(node.MatchId.Value, out var start))
-                    readyAt[node.Id] = start + slot;
-            }
-
-            var planned = new List<BracketPlannedSlotDto>();
-            var unplanned = 0;
-
-            // Mecz o 3. miejsce ma numer rundy finału — idzie przed finałem.
-            foreach (var node in nodes
-                         .Where(n => !n.MatchId.HasValue && !n.HasBye)
-                         .OrderBy(n => n.RoundNumber)
-                         .ThenByDescending(n => n.IsThirdPlace))
-            {
-                var notBefore = new[] { node.HomeSourceNodeId, node.AwaySourceNodeId }
-                    .Where(id => id.HasValue && readyAt.ContainsKey(id.Value))
-                    .Select(id => readyAt[id!.Value])
-                    .DefaultIfEmpty(windows[0].StartAt)
-                    .Max();
-
-                // Finał po meczu o 3. miejsce z tej samej drabinki (te same półfinały). Na dwóch boiskach
-                // oba dostawały ten sam slot i grały równolegle.
-                if (!node.IsThirdPlace)
-                {
-                    var thirdPlace = nodes.FirstOrDefault(n => n.IsThirdPlace &&
-                        n.HomeSourceNodeId == node.HomeSourceNodeId && n.AwaySourceNodeId == node.AwaySourceNodeId);
-                    if (thirdPlace != null && readyAt.TryGetValue(thirdPlace.Id, out var thirdPlaceEnd) && thirdPlaceEnd > notBefore)
-                        notBefore = thirdPlaceEnd;
-                }
-
-                BracketPlannedSlotDto? found = null;
-                foreach (var (slotStart, windowIndex) in slotStarts)
-                {
-                    if (slotStart < notBefore)
-                        continue;
-
-                    if (placedInWindow[windowIndex] >= (windows[windowIndex].MaxMatches ?? int.MaxValue))
-                        continue;
-
-                    var pitch = pitches.FirstOrDefault(p => !occupiedSlots.Contains((p.Id, slotStart)));
-                    if (pitch == null)
-                        continue;
-
-                    found = new BracketPlannedSlotDto(node.Id, pitch.Id, slotStart);
-                    placedInWindow[windowIndex]++;
-                    break;
-                }
-
-                if (found == null)
-                {
-                    unplanned++;
-                    continue;
-                }
-
-                planned.Add(found);
-                occupiedSlots.Add((found.PitchId, found.ScheduledAt));
-                readyAt[node.Id] = found.ScheduledAt + slot;
-            }
-
-            return (planned, unplanned);
-        }
-
-        /// <summary>
-        /// Początki slotów (mecz + przerwa) we wszystkich oknach po kolei. Mecz musi się zmieścić w oknie
-        /// w całości, nie tylko zacząć przed jego końcem.
-        /// </summary>
-        private static IEnumerable<(DateTimeOffset SlotStart, int WindowIndex)> SlotStarts(
-            IReadOnlyList<ScheduleWindow> windows, TournamentSettingsSummaryDto settings)
-        {
-            var matchDuration = TimeSpan.FromMinutes(settings.MatchDurationMinutes);
-            var slotMinutes = settings.MatchDurationMinutes + settings.BreakDurationMinutes;
-
-            for (var i = 0; i < windows.Count; i++)
-                for (var slotStart = windows[i].StartAt;
-                     slotStart + matchDuration <= windows[i].EndAt;
-                     slotStart = slotStart.AddMinutes(slotMinutes))
-                    yield return (slotStart, i);
-        }
-
-        /// <summary>
-        /// Rozkłada mecze w slotach kolejnych okien (dni gry) na wolnych boiskach. Drużyna nigdy
-        /// nie gra dwóch meczów w jednym slocie, a pierwszeństwo mają pary, których drużyny odpoczywały.
-        /// Okno z limitem (MaxMatches) dostaje najwyżej tyle meczów — reszta przechodzi na kolejne dni.
-        /// </summary>
-        private static (List<Placement<T>> Placements, int Unplaced, int[] PlacedInWindow) PlaceInSlots<T>(
-            List<T> items,
-            Func<T, (Guid Home, Guid Away)> teamsOf,
-            List<Pitch> pitches,
-            HashSet<(Guid PitchId, DateTimeOffset ScheduledAt)> occupiedSlots,
-            IReadOnlyList<ScheduleWindow> windows,
-            TournamentSettingsSummaryDto settings)
-        {
-            var placements = new List<Placement<T>>();
-            var remaining = new List<T>(items);
-            var playedPreviousSlot = new HashSet<Guid>();
-            var previousWindow = 0;
-            var placedInWindow = new int[windows.Count];
-
-            foreach (var (slotStart, windowIndex) in SlotStarts(windows, settings))
-            {
-                if (remaining.Count == 0)
-                    break;
-
-                // Nowy dzień — wszyscy są wypoczęci.
-                if (windowIndex != previousWindow)
-                    playedPreviousSlot = [];
-                previousWindow = windowIndex;
-
-                var windowLimit = (windows[windowIndex].MaxMatches ?? int.MaxValue) - placedInWindow[windowIndex];
-                if (windowLimit <= 0)
-                    continue;
-
-                var freePitches = pitches.Where(p => !occupiedSlots.Contains((p.Id, slotStart))).ToList();
-                var slotCapacity = Math.Min(freePitches.Count, windowLimit);
-                var playingThisSlot = new HashSet<Guid>();
-                var slotItems = new List<T>();
-
-                foreach (var requireRest in new[] { true, false })
-                {
-                    foreach (var item in remaining.ToList())
-                    {
-                        if (slotItems.Count >= slotCapacity)
-                            break;
-
-                        var (home, away) = teamsOf(item);
-                        if (playingThisSlot.Contains(home) || playingThisSlot.Contains(away))
-                            continue;
-
-                        if (requireRest && (playedPreviousSlot.Contains(home) || playedPreviousSlot.Contains(away)))
-                            continue;
-
-                        slotItems.Add(item);
-                        remaining.Remove(item);
-                        playingThisSlot.Add(home);
-                        playingThisSlot.Add(away);
-                    }
-                }
-
-                for (var i = 0; i < slotItems.Count; i++)
-                {
-                    placements.Add(new Placement<T>(slotItems[i], freePitches[i].Id, slotStart));
-                    occupiedSlots.Add((freePitches[i].Id, slotStart));
-                }
-
-                placedInWindow[windowIndex] += slotItems.Count;
-                playedPreviousSlot = playingThisSlot;
-            }
-
-            return (placements, remaining.Count, placedInWindow);
         }
 
         // Ta sama drużyna z bazy może grać w kilku kategoriach (osobne zgłoszenia). Dla generatora to

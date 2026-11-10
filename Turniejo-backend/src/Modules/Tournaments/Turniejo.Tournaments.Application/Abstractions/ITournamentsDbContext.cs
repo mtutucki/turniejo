@@ -12,6 +12,8 @@ namespace Turniejo.Tournaments.Application.Abstractions
         Task<Tournament?> GetTournamentByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentByIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<Tournament?> GetTournamentBySlugAsync(string slug, CancellationToken cancellationToken = default);
+        /// <summary>Turnieje z włączonym portalem, bez szkiców i odwołanych (lista publiczna).</summary>
+        Task<IReadOnlyList<Tournament>> GetListedPublicTournamentsAsync(CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Tournament>> GetTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
         /// <summary>Miękko usuwa wszystkie turnieje organizacji; zwraca Id wszystkich, także usuniętych wcześniej.</summary>
         Task<IReadOnlyList<Guid>> SoftDeleteTournamentsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
@@ -19,6 +21,7 @@ namespace Turniejo.Tournaments.Application.Abstractions
         // TournamentCategory
         Task AddTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToken = default);
         Task<bool> CategoryNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentCategory>> GetTournamentCategoriesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<TournamentCategory?> GetTournamentCategoryByIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
         public Task RemoveTournamentCategoryAsync(TournamentCategory category, CancellationToken cancellationToke = default);

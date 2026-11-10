@@ -11,7 +11,7 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.GetTournamentGroups
         {
             var groups = await dbContext.GetTournamentGroupsByTournamentIdAsync(request.TournamentId, cancellationToken);
             var dtos = groups.Select(c => new TournamentGroupDto(
-                c.Id, c.TournamentId, c.CategoryId, c.Name, c.Order)).ToList();
+                c.Id, c.TournamentId, c.CategoryId, c.Name, c.Order, c.Stage)).ToList();
 
             return Result.Success<IReadOnlyList<TournamentGroupDto>>(dtos);
         }

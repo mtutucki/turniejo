@@ -1,5 +1,6 @@
 "use client"
 
+import { ThemeToggle } from "@/features/theme/theme-toggle"
 import { useActiveTournamentStore } from "@/stores/active-tournament-store"
 
 import { Logo } from "./logo"
@@ -26,6 +27,7 @@ export function TournamentHeader() {
           </>
         )}
       </p>
+      <ThemeToggle />
       <NotificationBell />
       <div className="lg:hidden">
         <UserMenu />

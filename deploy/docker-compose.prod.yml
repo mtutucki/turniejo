@@ -50,6 +50,8 @@ services:
       args:
         # Wpiekane w `next build` (rewrite /backend/*) — patrz Turniejo-frontend/Dockerfile.
         API_URL: http://api:8080
+        # Adres kanoniczny, sitemapa i podgląd linków (src/lib/site.ts) w stronach budowanych z góry.
+        SITE_URL: https://${DOMAIN}
         NEXT_PUBLIC_UMAMI_SCRIPT_URL: ${NEXT_PUBLIC_UMAMI_SCRIPT_URL:-}
         NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${NEXT_PUBLIC_UMAMI_WEBSITE_ID:-}
         NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-}
@@ -66,6 +68,7 @@ services:
       KEYCLOAK_CLIENT_ID: turniejo-frontend
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?}
       NEXTAUTH_URL: https://${DOMAIN}
+      SITE_URL: https://${DOMAIN}
       # Auth.js za reverse proxy — bez tego odrzuca żądania z Host innym niż localhost (UntrustedHost).
       AUTH_TRUST_HOST: "true"
     depends_on:

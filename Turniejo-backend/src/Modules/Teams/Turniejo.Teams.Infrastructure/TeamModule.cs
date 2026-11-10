@@ -41,6 +41,15 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         return ToDto(tournamentTeam);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, int>> CountAcceptedTeamsByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default)
+    {
+        if (tournamentIds.Count == 0)
+            return new Dictionary<Guid, int>();
+
+        var counts = await dbContext.CountAcceptedTeamsByTournamentIdsAsync(tournamentIds, cancellationToken);
+        return tournamentIds.Distinct().ToDictionary(id => id, id => counts.GetValueOrDefault(id));
+    }
+
     public async Task<IReadOnlyList<TournamentTeamDto>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default)
     {
         var tournamentTeams = await dbContext.GetTournamentTeamsByTournamentIdAsync(tournamentId, cancellationToken);
@@ -71,8 +80,18 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
     public Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default) =>
         dbContext.RemoveTournamentTeamsAsync(tournamentTeamIds, cancellationToken);
 
-    public async Task<bool> AnyTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
-        await dbContext.AnyTournamentTeamsByGroupIdAsync(groupId, cancellationToken);
+    public async Task<bool> AnyActiveTeamsInGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await dbContext.AnyActiveTournamentTeamsByGroupIdAsync(groupId, cancellationToken);
+
+    public async Task UnassignTeamsFromGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
+    {
+        var teams = await dbContext.GetTournamentTeamsByGroupIdForUpdateAsync(groupId, cancellationToken);
+        foreach (var team in teams)
+            team.AssignToGroup(null);
+
+        if (teams.Count > 0)
+            await dbContext.SaveChangesAsync(cancellationToken);
+    }
 
     public async Task<int> AssignUngroupedTeamsToGroupAsync(Guid tournamentId, Guid categoryId, Guid groupId, CancellationToken cancellationToken = default)
     {

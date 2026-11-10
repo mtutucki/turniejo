@@ -19,7 +19,7 @@ namespace Turniejo.Matches.Application.Schedule.GetSchedule
                     m.Id, m.TournamentId, m.CategoryId, m.GroupId, m.PitchId,
                     m.HomeTournamentTeamId, m.AwayTournamentTeamId, visibleRefereeId(m.RefereeId), m.ScheduledAt,
                     m.Status.ToString(), m.StageType.ToString(), m.HomeScore, m.AwayScore, m.ResultType.ToString(),
-                    m.HomePenaltyScore, m.AwayPenaltyScore))
+                    m.HomePenaltyScore, m.AwayPenaltyScore, AwaitingDecision: m.IsAwaitingDecision))
                 .ToList();
 
             return Result.Success<IReadOnlyList<MatchDto>>(dtos);

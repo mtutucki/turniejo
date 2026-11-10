@@ -12,6 +12,7 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TournamentTeam> TournamentTeams => Set<TournamentTeam>();
     public DbSet<TeamStaff> TeamStaffs => Set<TeamStaff>();
+    public DbSet<TeamLabel> TeamLabels => Set<TeamLabel>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default)
@@ -65,7 +66,44 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
         await Teams
             .Where(t => t.OrganizationId == organizationId)
             .ExecuteDeleteAsync(cancellationToken);
+        await TeamLabels
+            .Where(l => l.OrganizationId == organizationId)
+            .ExecuteDeleteAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Team>> GetTeamsByOrganizationIdForUpdateAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        await Teams
+            .Where(t => t.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddTeamLabelAsync(TeamLabel label, CancellationToken cancellationToken = default) =>
+        await TeamLabels.AddAsync(label, cancellationToken);
+
+    public async Task<TeamLabel?> GetTeamLabelByIdAsync(Guid labelId, CancellationToken cancellationToken = default) =>
+        await TeamLabels.FirstOrDefaultAsync(l => l.Id == labelId, cancellationToken);
+
+    public async Task<IReadOnlyList<TeamLabel>> GetTeamLabelsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default) =>
+        await TeamLabels
+            .AsNoTracking()
+            .Where(l => l.OrganizationId == organizationId)
+            .OrderBy(l => l.Name).ThenBy(l => l.Id)
+            .ToListAsync(cancellationToken);
+
+    public async Task<bool> TeamLabelNameExistsAsync(Guid organizationId, string name, Guid? exceptLabelId, CancellationToken cancellationToken = default)
+    {
+        var lower = name.ToLower();
+        return await TeamLabels.AnyAsync(l =>
+            l.OrganizationId == organizationId &&
+            l.Name.ToLower() == lower &&
+            (exceptLabelId == null || l.Id != exceptLabelId),
+            cancellationToken);
+    }
+
+    public Task RemoveTeamLabelAsync(TeamLabel label, CancellationToken cancellationToken = default)
+    {
+        TeamLabels.Remove(label);
+        return Task.CompletedTask;
     }
 
     public async Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default) =>
@@ -78,7 +116,18 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
         await TournamentTeams
             .AsNoTracking()
             .Where(t => t.TournamentId == tournamentId)
+            // Bez sortowania Postgres przestawia wiersz po każdej zmianie (np. akceptacji),
+            // a drużyny o tej samej nazwie zamieniały się miejscami na liście.
+            .OrderBy(t => t.CreatedAt).ThenBy(t => t.Id)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountAcceptedTeamsByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default) =>
+        await TournamentTeams
+            .AsNoTracking()
+            .Where(t => tournamentIds.Contains(t.TournamentId) && t.RegistrationStatus == RegistrationStatus.Accepted)
+            .GroupBy(t => t.TournamentId)
+            .Select(g => new { TournamentId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.TournamentId, x => x.Count, cancellationToken);
 
     public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
         await TournamentTeams
@@ -125,8 +174,14 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public async Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
-        await TournamentTeams.AnyAsync(t => t.GroupId == groupId, cancellationToken);
+    public async Task<bool> AnyActiveTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.AnyAsync(t =>
+            t.GroupId == groupId &&
+            (t.RegistrationStatus == RegistrationStatus.Pending || t.RegistrationStatus == RegistrationStatus.Accepted),
+            cancellationToken);
+
+    public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByGroupIdForUpdateAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await TournamentTeams.Where(t => t.GroupId == groupId).ToListAsync(cancellationToken);
 
     public async Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
         await TournamentTeams.CountAsync(t =>

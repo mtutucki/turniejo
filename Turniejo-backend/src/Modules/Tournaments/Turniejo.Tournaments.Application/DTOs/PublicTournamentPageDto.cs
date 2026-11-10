@@ -1,4 +1,4 @@
-namespace Turniejo.Tournaments.Application.DTOs
+﻿namespace Turniejo.Tournaments.Application.DTOs
 {
     public sealed record PublicTournamentSettingsDto(
         bool ShowTeams,
@@ -10,7 +10,7 @@ namespace Turniejo.Tournaments.Application.DTOs
         bool ShowStats);
 
     public sealed record PublicCategoryDto(Guid Id, string Name, int Order);
-    public sealed record PublicGroupDto(Guid Id, Guid CategoryId, string Name, int Order);
+    public sealed record PublicGroupDto(Guid Id, Guid CategoryId, string Name, int Order, int Stage = 1);
     public sealed record PublicPitchDto(Guid Id, string Name);
 
     public sealed record PublicTournamentPageDto(

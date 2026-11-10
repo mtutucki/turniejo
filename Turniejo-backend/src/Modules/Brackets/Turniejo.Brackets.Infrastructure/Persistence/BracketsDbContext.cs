@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Turniejo.Brackets.Application.Abstractions;
 using Turniejo.Brackets.Domain.Entities;
 using Turniejo.SharedKernel.Outbox;
@@ -11,6 +11,9 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
     public DbSet<Bracket> Brackets => Set<Bracket>();
     public DbSet<BracketRound> BracketRounds => Set<BracketRound>();
     public DbSet<BracketNode> BracketNodes => Set<BracketNode>();
+    public DbSet<SecondStageSeat> SecondStageSeats => Set<SecondStageSeat>();
+    public DbSet<SecondStageFixture> SecondStageFixtures => Set<SecondStageFixture>();
+    public DbSet<SecondStageRange> SecondStageRanges => Set<SecondStageRange>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public async Task AddOutboxMessageAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
@@ -71,6 +74,76 @@ public sealed class BracketsDbContext(DbContextOptions<BracketsDbContext> option
 
     public async Task<BracketNode?> GetBracketNodeByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
         await BracketNodes.FirstOrDefaultAsync(n => n.MatchId == matchId, cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageSeat>> GetSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats
+            .AsNoTracking()
+            .Where(s => s.TournamentId == tournamentId)
+            .OrderBy(s => s.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageSeat>> GetTrackedSecondStageSeatsAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats
+            .Where(s => s.TournamentId == tournamentId)
+            .OrderBy(s => s.Order)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageSeat>> GetTrackedSecondStageSeatsByGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats
+            .Where(s => s.GroupId == groupId || s.SourceGroupId == groupId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddSecondStageSeatsAsync(IEnumerable<SecondStageSeat> seats, CancellationToken cancellationToken = default) =>
+        await SecondStageSeats.AddRangeAsync(seats, cancellationToken);
+
+    public void RemoveSecondStageSeats(IEnumerable<SecondStageSeat> seats) => SecondStageSeats.RemoveRange(seats);
+
+    public async Task<IReadOnlyList<SecondStageRange>> GetSecondStageRangesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges
+            .AsNoTracking()
+            .Where(r => r.TournamentId == tournamentId)
+            .OrderBy(r => r.FromPosition)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageRange>> GetTrackedSecondStageRangesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges
+            .Where(r => r.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageRange>> GetTrackedSecondStageRangesByGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges
+            .Where(r => r.GroupId == groupId)
+            .ToListAsync(cancellationToken);
+
+    public async Task AddSecondStageRangesAsync(IEnumerable<SecondStageRange> ranges, CancellationToken cancellationToken = default) =>
+        await SecondStageRanges.AddRangeAsync(ranges, cancellationToken);
+
+    public void RemoveSecondStageRanges(IEnumerable<SecondStageRange> ranges) => SecondStageRanges.RemoveRange(ranges);
+
+    public async Task<IReadOnlyList<SecondStageFixture>> GetSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures
+            .AsNoTracking()
+            .Where(f => f.TournamentId == tournamentId)
+            .OrderBy(f => f.PlannedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesAsync(Guid tournamentId, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures
+            .Where(f => f.TournamentId == tournamentId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecondStageFixture>> GetTrackedSecondStageFixturesByGroupIdsAsync(IReadOnlyCollection<Guid> groupIds, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures
+            .Where(f => groupIds.Contains(f.GroupId))
+            .ToListAsync(cancellationToken);
+
+    public async Task<SecondStageFixture?> GetSecondStageFixtureByMatchIdAsync(Guid matchId, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures.FirstOrDefaultAsync(f => f.MatchId == matchId, cancellationToken);
+
+    public async Task AddSecondStageFixturesAsync(IEnumerable<SecondStageFixture> fixtures, CancellationToken cancellationToken = default) =>
+        await SecondStageFixtures.AddRangeAsync(fixtures, cancellationToken);
+
+    public void RemoveSecondStageFixtures(IEnumerable<SecondStageFixture> fixtures) => SecondStageFixtures.RemoveRange(fixtures);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

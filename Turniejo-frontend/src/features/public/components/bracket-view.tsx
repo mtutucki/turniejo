@@ -33,6 +33,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
       matches={schedule.data ?? []}
       lookups={{
         teamName: (id) => lookups.teamName(id),
+        teamHref: tournament.settings.showTeams ? (id) => `/t/${slug}/teams/${id}` : undefined,
         groupName: lookups.groupName,
         pitchName: lookups.pitchName,
       }}

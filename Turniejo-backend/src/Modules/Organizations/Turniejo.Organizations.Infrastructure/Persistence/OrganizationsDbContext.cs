@@ -23,6 +23,11 @@ public sealed class OrganizationsDbContext(DbContextOptions<OrganizationsDbConte
         CancellationToken cancellationToken = default) =>
         await OutboxMessages.AddAsync(message, cancellationToken);
 
+    public async Task<IReadOnlyList<Organization>> GetOrganizationsByIdsAsync(
+        IReadOnlyCollection<Guid> organizationIds,
+        CancellationToken cancellationToken = default) =>
+        await Organizations.AsNoTracking().Where(x => organizationIds.Contains(x.Id)).ToListAsync(cancellationToken);
+
     public async Task<bool> OrganizationExistsForOwnerAsync(
         Guid ownerUserId,
         CancellationToken cancellationToken = default) =>

@@ -85,6 +85,15 @@ export type Team = {
   name: string
   shortName: string | null
   logoUrl: string | null
+  /** Identyfikatory etykiet z bazy organizacji (TeamLabel). */
+  labelIds: string[]
+}
+
+/** TeamLabelDto — etykieta drużyn w bazie organizacji (np. rocznik, klub). */
+export type TeamLabel = {
+  id: string
+  name: string
+  teamCount: number
 }
 
 /** TournamentTeamDto — zgłoszenie drużyny do turnieju. */
@@ -149,6 +158,8 @@ export type TeamInput = {
   name: string
   shortName: string | null
   logoUrl: string | null
+  /** Etykiety drużyny. Pominięte: bez zmian. */
+  labelIds?: string[]
 }
 
 export type NewPlayerInput = {
@@ -251,4 +262,55 @@ export type RemoveRosterPlayerResult = {
   deleted: boolean
   removedFromSquads: number
   keptInSquads: string[]
+}
+
+/** TeamRecordDto — bilans z zakończonych meczów. */
+export type TeamRecordSummary = {
+  played: number
+  wins: number
+  draws: number
+  losses: number
+  goalsFor: number
+  goalsAgainst: number
+}
+
+/** Wynik drużyny w turnieju (TeamHistoryTournamentDto.ResultKind). */
+export type TeamHistoryResultKind =
+  "Champion" | "RunnerUp" | "Third" | "Fourth" | "Eliminated" | "InCup" | "Group" | "None"
+
+/** TeamHistoryTournamentDto — jedno zgłoszenie (turniej + kategoria). */
+export type TeamHistoryTournament = {
+  tournamentId: string
+  tournamentName: string
+  tournamentStatus: string
+  startAt: string | null
+  endAt: string | null
+  tournamentTeamId: string
+  categoryName: string | null
+  resultKind: TeamHistoryResultKind
+  /** 2 = półfinał, 3 = ćwierćfinał… (przy Eliminated). */
+  eliminatedRoundFromEnd: number | null
+  groupPosition: number | null
+  groupName: string | null
+  record: TeamRecordSummary
+}
+
+/** TeamHistoryDto — GET /api/teams/{teamId}/history: drużyna z bazy we wszystkich turniejach. */
+export type TeamHistory = {
+  summary: TeamRecordSummary
+  tournamentCount: number
+  /** Ostatnie wyniki, najstarszy pierwszy. */
+  form: ("W" | "D" | "L")[]
+  tournaments: TeamHistoryTournament[]
+  players: {
+    playerId: string
+    firstName: string
+    lastName: string
+    goals: number
+    assists: number
+    mvp: number
+    yellowCards: number
+    redCards: number
+  }[]
+  opponents: { teamId: string; name: string; record: TeamRecordSummary }[]
 }

@@ -50,8 +50,8 @@ namespace Turniejo.Tournaments.Application.TournamentsCategories.AddTournamentCa
 
             await tournamentsDbContext.SaveChangesAsync(cancellationToken);
 
-            // Format z grupami: kategoria od razu dostaje "Grupa A" (jedna pula to najczęstszy przypadek).
-            await defaultGroupProvisioner.EnsureDefaultGroupsAsync(tournament, [result.Value.Id], cancellationToken);
+            // Format z grupami: kategoria od razu dostaje "Grupa A" (albo tyle grup, ile wybrał organizator).
+            await defaultGroupProvisioner.EnsureDefaultGroupsAsync(tournament, [result.Value.Id], request.GroupCount, cancellationToken);
 
             return Result.Success(new AddTournamentCategoryResponse(result.Value.Id));
         }

@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Match } from "@/types/matches"
@@ -23,6 +25,8 @@ export type BracketLookups = {
   teamName: (tournamentTeamId: string) => string
   groupName: (groupId: string | null) => string | null
   pitchName?: (pitchId: string | null) => string | null
+  /** Strona drużyny. Bez niej nazwa jest zwykłym tekstem (np. w trybie zamiany par). */
+  teamHref?: (tournamentTeamId: string) => string | undefined
 }
 
 /** Nazwy rund od końca: finał, półfinały, ćwierćfinały, 1/8 finału… (backend zwraca "Round N"). */
@@ -75,6 +79,7 @@ function placeholder(
 function Slot({
   label,
   known,
+  href,
   score,
   penalties,
   winner,
@@ -83,6 +88,7 @@ function Slot({
 }: {
   label: string
   known: boolean
+  href?: string
   score: number | null
   penalties: number | null
   winner: boolean
@@ -95,11 +101,16 @@ function Slot({
     winner && "bg-primary/10 font-semibold",
     decided && !winner && "text-muted-foreground",
   )
-  const name = (
-    <span className={cn("min-w-0 truncate", !known && "text-muted-foreground italic")}>
-      {label}
-    </span>
-  )
+  const name =
+    href && !swap ? (
+      <Link href={href} className="min-w-0 truncate hover:underline">
+        {label}
+      </Link>
+    ) : (
+      <span className={cn("min-w-0 truncate", !known && "text-muted-foreground italic")}>
+        {label}
+      </span>
+    )
   if (swap) {
     return (
       <button
@@ -183,6 +194,7 @@ function NodeCard({
               )
         }
         known={!!node.homeTournamentTeamId}
+        href={node.homeTournamentTeamId ? lookups.teamHref?.(node.homeTournamentTeamId) : undefined}
         score={showScore ? match!.homeScore : null}
         penalties={showScore ? match!.homePenaltyScore : null}
         winner={played && homeAhead(match!)}
@@ -202,6 +214,7 @@ function NodeCard({
               )
         }
         known={!!node.awayTournamentTeamId}
+        href={node.awayTournamentTeamId ? lookups.teamHref?.(node.awayTournamentTeamId) : undefined}
         score={showScore ? match!.awayScore : null}
         penalties={showScore ? match!.awayPenaltyScore : null}
         winner={played && awayAhead(match!)}
@@ -210,7 +223,10 @@ function NodeCard({
       />
       {/* Karne są przy wynikach drużyn - tu dogrywka i walkower, żeby nie wyglądały jak zwykły wynik. */}
       {played && match && (match.resultType === "ExtraTime" || match.resultType === "Walkover") && (
-        <p className="text-muted-foreground border-t px-3 py-1 text-xs" data-testid="bracket-node-note">
+        <p
+          className="text-muted-foreground border-t px-3 py-1 text-xs"
+          data-testid="bracket-node-note"
+        >
           {resultNote({ ...match, homePenaltyScore: null, awayPenaltyScore: null })}
         </p>
       )}

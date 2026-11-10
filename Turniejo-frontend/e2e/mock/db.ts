@@ -12,6 +12,8 @@ export type User = {
   phoneNumber?: string | null
   /** Ostatnia wersja z okna „Co nowego” (null/brak = nowe konto, okno się nie pokaże). */
   seenReleaseVersion?: string | null
+  /** Motyw na koncie (brak = "system"). */
+  theme?: "system" | "light" | "dark"
   roles: Role[]
 }
 export type Team = { id: string; name: string; shortName: string | null }
@@ -74,6 +76,7 @@ export type Match = {
   resultType?: string
   winnerTournamentTeamId?: string | null
   editLockedAt?: string | null
+  awaitingDecision?: boolean
 }
 
 // Stałe id — testy odwołują się do nich w URL-ach.
@@ -247,7 +250,24 @@ function seed() {
   const guardians = [{ playerId: IDS.child, userId: IDS.parent, canEdit: true }]
   /** Drużyny dodane w teście (seedowane Orły i Lwy są w TEAM_NAMES). */
   const orgTeams: (Team & { logoUrl: string | null })[] = []
-  return { users, tournaments, matches, organizations, rosters, guardians, orgTeams, usedResetTokens: [] as string[] }
+  /** Etykiety drużyn w bazie organizacji i przypisania (klucz: id drużyny z bazy). */
+  const teamLabels: { id: string; name: string }[] = []
+  const teamLabelIds: Record<string, string[]> = {}
+  /** Zmiany zgłoszeń seedowanych drużyn w teście (grupa, status), klucz: tournamentTeamId. */
+  const teamChanges: Record<string, { groupId?: string | null; registrationStatus?: string }> = {}
+  return {
+    users,
+    tournaments,
+    matches,
+    organizations,
+    rosters,
+    guardians,
+    orgTeams,
+    teamLabels,
+    teamLabelIds,
+    teamChanges,
+    usedResetTokens: [] as string[],
+  }
 }
 
 export const db = seed()

@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+
 import { DemoBanner } from "@/components/demo-banner"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { BottomNav } from "@/components/layout/bottom-nav"
@@ -6,6 +8,9 @@ import { WhatsNewDialog } from "@/features/whats-new/whats-new-dialog"
 
 // < 1024px: jedna kolumna + dolna nawigacja.
 // ≥ 1024px: sidebar 240px + główny feed.
+// Panel po zalogowaniu: nic do znalezienia w Google, a linki z niego nie są dla kibiców.
+export const metadata: Metadata = { robots: { index: false, follow: false } }
+
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-full flex-1 flex-col">

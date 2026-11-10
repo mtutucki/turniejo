@@ -18,10 +18,15 @@ export type PlannedBracketMatch = {
   stage: string
   home: PlannedSide
   away: PlannedSide
+  /**
+   * Mecz grupy drugiej fazy (format „Dwie fazy grupowe”), a nie drabinki: grupa do filtra, a termin
+   * i sędziego zmienia się dopiero na meczu, gdy powstanie.
+   */
+  secondStageGroupId?: string
 }
 
 /** known = konkretna drużyna (już awansowała); inaczej opis typu "Zwycięzca meczu A – B". */
-export type PlannedSide = { label: string; known: boolean }
+export type PlannedSide = { label: string; known: boolean; tournamentTeamId?: string }
 
 const STAGES: Record<number, [name: string, genitive: string]> = {
   1: ["Finał", "finału"],
@@ -48,6 +53,16 @@ export type BracketStage = {
 const STAGE_TITLES: Record<string, string> = {
   Półfinał: "Półfinały",
   Ćwierćfinał: "Ćwierćfinały",
+}
+
+/** Nazwa rundy każdego meczu drabinki: matchId → „Półfinał”, „Finał”, „Mecz o 3. miejsce”… */
+export function bracketMatchStages(bracket: Bracket): Map<string, string> {
+  const standardRounds = bracket.rounds.filter((r) => r.roundType === "Standard").length
+  const stages = new Map<string, string>()
+  for (const round of bracket.rounds)
+    for (const node of round.nodes)
+      if (node.matchId) stages.set(node.matchId, stageOf(round, standardRounds)[0])
+  return stages
 }
 
 export function bracketStages(bracket: Bracket): BracketStage[] {
@@ -90,7 +105,7 @@ export function plannedBracketMatches(
 
   function side(target: BracketNode, slot: "Home" | "Away"): PlannedSide {
     const teamId = slot === "Home" ? target.homeTournamentTeamId : target.awayTournamentTeamId
-    if (teamId) return { label: teamName(teamId), known: true }
+    if (teamId) return { label: teamName(teamId), known: true, tournamentTeamId: teamId }
 
     const sourceType = slot === "Home" ? target.homeSourceType : target.awaySourceType
     if (sourceType !== "MatchWinner" && sourceType !== "MatchLoser") {

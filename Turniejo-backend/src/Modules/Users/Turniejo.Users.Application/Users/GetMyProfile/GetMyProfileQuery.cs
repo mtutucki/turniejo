@@ -7,4 +7,5 @@ namespace Turniejo.Users.Application.Users.GetMyProfile;
 public sealed record GetMyProfileQuery : IQuery<MyProfileDto>, IAuthenticatedOnlyRequest;
 
 // SeenReleaseVersion: ostatnia wersja z okna "Co nowego" (null = nowe konto, okna jeszcze nie było).
-public sealed record MyProfileDto(string Email, string FirstName, string LastName, string? PhoneNumber, string? SeenReleaseVersion);
+// Theme: motyw na koncie, "system", "light" albo "dark".
+public sealed record MyProfileDto(string Email, string FirstName, string LastName, string? PhoneNumber, string? SeenReleaseVersion, string Theme);

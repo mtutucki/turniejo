@@ -179,3 +179,70 @@ test("[PUC-068] puchar: drabinka powstaje sama z propozycji", async ({ page }) =
   await expect(page.getByText("Ćwierćfinały").first()).toBeVisible()
   await expect(page.getByRole("button", { name: "Utwórz drabinkę" })).toHaveCount(0)
 })
+
+test.describe("Generator terminarza: kilka kategorii", () => {
+  const SECOND = "0f000000-0000-4000-8000-000000000021"
+  const category = (id: string, name: string, order: number) => ({
+    id, tournamentId: TOURNAMENT_ID, name, minBirthDate: null, maxBirthDate: null, order,
+  })
+
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, ORGANIZER)
+  })
+
+  test("[wiele kategorii] puchar: kategoria bez drabinki blokuje generowanie", async ({ page }) => {
+    // Dawniej przycisk odblokowywał się przy pierwszej gotowej drabince, a druga kategoria zostawała bez meczów.
+    const u14 = [5, 6, 7, 8].map((i) => ({ ...team(i, { groupId: null }), categoryId: SECOND }))
+    await readyToGenerate([...[1, 2, 3, 4].map((i) => team(i, { groupId: null })), ...u14])
+    await mock.tournament(TOURNAMENT_ID, { format: "Knockout" })
+    await mock.override({
+      method: "GET",
+      path: "/api/tournaments/:id/categories",
+      body: [category(CATEGORY, "U12", 1), category(SECOND, "U14", 2)],
+    })
+    await page.route("**/bracket/generate", (route) =>
+      route.request().postData()?.includes(SECOND)
+        ? route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ title: "Conflict", status: 409 }) })
+        : route.continue(),
+    )
+    await page.goto(GENERATE_URL)
+
+    await expect(condition(page, "Brak drabinki: U14").getByLabel("Niespełnione")).toBeVisible()
+    await expect(generate(page)).toBeDisabled()
+  })
+
+  test("[wiele kategorii] grupy + puchar: drabinka powstaje przed terminarzem, a jej mecze liczą się do dnia", async ({ page }) => {
+    await readyToGenerate()
+    await mock.tournament(TOURNAMENT_ID, { format: "GroupAndKnockout" })
+    await mock.override({ method: "POST", path: "/api/tournaments/:id/schedule/generate", body: { matchesCreated: 6 } })
+    const order: string[] = []
+    page.on("request", (request) => {
+      if (request.method() === "POST" && /\/(bracket|schedule)\/generate$/.test(request.url()))
+        order.push(request.url().includes("bracket") ? "bracket" : "schedule")
+    })
+    await page.goto(GENERATE_URL)
+
+    await generate(page).click()
+    const dialog = page.getByRole("alertdialog")
+    await expect(dialog).toContainText(/Powstanie 6 meczów .*pucharu (dostanie|dostaną) godziny/)
+    await dialog.getByRole("button", { name: "Generuj terminarz" }).click()
+
+    await expect(page).toHaveURL(new RegExp(`/tournaments/${TOURNAMENT_ID}/schedule$`))
+    expect(order).toEqual(["bracket", "schedule"])
+  })
+
+  test("[wiele kategorii] grupy + puchar: bez drabinki terminarz nie powstaje", async ({ page }) => {
+    await readyToGenerate()
+    await mock.tournament(TOURNAMENT_ID, { format: "GroupAndKnockout" })
+    await page.route("**/bracket/generate", (route) =>
+      route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ title: "Conflict", status: 409 }) }),
+    )
+    await page.goto(GENERATE_URL)
+
+    await generate(page).click()
+    await page.getByRole("alertdialog").getByRole("button", { name: "Generuj terminarz" }).click()
+
+    await expect(page).toHaveURL(new RegExp(`${GENERATE_URL}$`))
+    expect(await mock.calls("POST", "/schedule/generate")).toBe(0)
+  })
+})

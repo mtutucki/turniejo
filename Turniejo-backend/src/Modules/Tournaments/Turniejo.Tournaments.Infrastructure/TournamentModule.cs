@@ -1,10 +1,11 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using MediatR;
 using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.Outbox;
 using Turniejo.Tournaments.Application.Abstractions;
 using Turniejo.Tournaments.Application.Tournaments.ChangeTournamentStatus;
 using Turniejo.Tournaments.Application.Tournaments.RevertScheduleGeneration;
+using Turniejo.Tournaments.Domain.Entities;
 using Turniejo.Tournaments.Domain.Enums;
 
 namespace Turniejo.Tournaments.Infrastructure;
@@ -43,7 +44,7 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
     {
         var groups = await dbContext.GetTournamentGroupsByTournamentIdAsync(tournamentId, cancellationToken);
 
-        return groups.Select(g => new TournamentGroupDto(g.Id, g.TournamentId, g.CategoryId, g.Name)).ToList();
+        return groups.Select(g => new TournamentGroupDto(g.Id, g.TournamentId, g.CategoryId, g.Name, g.Stage, g.Order)).ToList();
     }
 
     public async Task<TournamentGroupDto?> GetTournamentGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
@@ -52,7 +53,7 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         if (group is null)
             return null;
 
-        return new TournamentGroupDto(group.Id, group.TournamentId, group.CategoryId, group.Name);
+        return new TournamentGroupDto(group.Id, group.TournamentId, group.CategoryId, group.Name, group.Stage, group.Order);
     }
 
     public async Task<TournamentSettingsSummaryDto?> GetTournamentSettingsAsync(Guid tournamentId, CancellationToken cancellationToken = default)
@@ -74,6 +75,10 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
     public async Task<IReadOnlyList<TieBreakerRuleDto>> GetTieBreakerRulesAsync(Guid tournamentId, CancellationToken cancellationToken = default)
     {
         var rules = await dbContext.GetTieBreakerRulesByTournamentIdAsync(tournamentId, cancellationToken);
+
+        // Ta sama domyślna kolejność co w GET /tiebreaker-rules, żeby tabela liczyła to, co widzi organizator.
+        if (rules.Count == 0)
+            return TieBreakerRule.DefaultOrder.Select((type, i) => new TieBreakerRuleDto(i + 1, type.ToString())).ToList();
 
         return rules
             .OrderBy(r => r.Order)
@@ -145,5 +150,5 @@ internal sealed class TournamentModule(ITournamentsDbContext dbContext, ISender 
         tournament.PublicSettings.ShowPlayers, tournament.PublicSettings.ShowSchedule,
         tournament.PublicSettings.ShowStandings, tournament.PublicSettings.ShowBracket,
         tournament.PublicSettings.ShowLiveMatches, tournament.PublicSettings.ShowStats,
-        tournament.PublicSettings.AbbreviatePlayerNames);
+        tournament.PublicSettings.AbbreviatePlayerNames, tournament.PublicSettings.ShowInDirectory);
 }

@@ -230,6 +230,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TournamentId")
                         .HasColumnType("uuid");
 
@@ -269,6 +272,9 @@ namespace Turniejo.Tournaments.Infrastructure.Persistence.Migrations
                                 .HasColumnType("boolean");
 
                             b1.Property<bool>("ShowBracket")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("ShowInDirectory")
                                 .HasColumnType("boolean");
 
                             b1.Property<bool>("ShowLiveMatches")

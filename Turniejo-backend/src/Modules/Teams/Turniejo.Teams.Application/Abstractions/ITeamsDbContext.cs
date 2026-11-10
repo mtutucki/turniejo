@@ -18,9 +18,22 @@ namespace Turniejo.Teams.Application.Abstractions
         /// <summary>Usuwa drużyny organizacji razem ze zgłoszeniami do turniejów i sztabem.</summary>
         Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
+        /// <summary>Śledzone (do zmiany) drużyny organizacji, np. przy zmianie etykiet.</summary>
+        Task<IReadOnlyList<Team>> GetTeamsByOrganizationIdForUpdateAsync(Guid organizationId, CancellationToken cancellationToken = default);
+
+        // TeamLabel
+        Task AddTeamLabelAsync(TeamLabel label, CancellationToken cancellationToken = default);
+        Task<TeamLabel?> GetTeamLabelByIdAsync(Guid labelId, CancellationToken cancellationToken = default);
+        /// <summary>Etykiety organizacji posortowane po nazwie.</summary>
+        Task<IReadOnlyList<TeamLabel>> GetTeamLabelsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
+        /// <summary>Czy organizacja ma etykietę o tej nazwie (bez względu na wielkość liter), poza wskazaną.</summary>
+        Task<bool> TeamLabelNameExistsAsync(Guid organizationId, string name, Guid? exceptLabelId, CancellationToken cancellationToken = default);
+        Task RemoveTeamLabelAsync(TeamLabel label, CancellationToken cancellationToken = default);
+
         // TournamentTeam
         Task AddTournamentTeamAsync(TournamentTeam tournamentTeam, CancellationToken cancellationToken = default);
         Task<TournamentTeam?> GetTournamentTeamByIdAsync(Guid tournamentTeamId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyDictionary<Guid, int>> CountAcceptedTeamsByTournamentIdsAsync(IReadOnlyCollection<Guid> tournamentIds, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default);
         /// <summary>Śledzone (do zmiany) drużyny kategorii bez grupy — GetTournamentTeamsByTournamentIdAsync jest AsNoTracking.</summary>
@@ -31,7 +44,8 @@ namespace Turniejo.Teams.Application.Abstractions
         Task<bool> AnyActiveTournamentTeamsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Guid>> GetInactiveTournamentTeamIdsByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default);
         Task RemoveTournamentTeamsAsync(IReadOnlyCollection<Guid> tournamentTeamIds, CancellationToken cancellationToken = default);
-        Task<bool> AnyTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task<bool> AnyActiveTournamentTeamsByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByGroupIdForUpdateAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<int> CountAcceptedTournamentTeamsAsync(Guid tournamentId, CancellationToken cancellationToken = default);
 
         // TeamStaff

@@ -19,6 +19,8 @@ public sealed class User : BaseEntity
     // Ostatnia wersja z okna "Co nowego", którą user zamknął (X.Y.Z). Null = nowe konto, okna jeszcze
     // nie było: frontend zapisuje wtedy bieżącą wersję bez pokazywania (docs/decyzje.md).
     public string? SeenReleaseVersion { get; private set; }
+    // Motyw idzie za kontem między urządzeniami. Domyślnie jak w systemie (docs/decyzje.md).
+    public ThemePreference ThemePreference { get; private set; } = ThemePreference.System;
 
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -102,6 +104,19 @@ public sealed class User : BaseEntity
             return Result.Success();
 
         SeenReleaseVersion = version;
+        SetUpdatedAt();
+        return Result.Success();
+    }
+
+    public Result SetThemePreference(ThemePreference theme)
+    {
+        if (!Enum.IsDefined(theme))
+            return Result.Failure(Error.Validation("Theme", "Theme must be system, light or dark."));
+
+        if (ThemePreference == theme)
+            return Result.Success();
+
+        ThemePreference = theme;
         SetUpdatedAt();
         return Result.Success();
     }

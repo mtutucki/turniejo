@@ -95,6 +95,8 @@ export type LiveScoreBoardProps = {
   resultType?: string | null
   /** Sekundy gry (zegar meczu). */
   seconds: number
+  /** Mecz wstrzymany przez system: zegar (np. 3864 min) nic nie mówi, więc go nie pokazujemy. */
+  awaitingDecision?: boolean
   /** Sędzia/organizator: przyciski +/− przy wyniku. */
   canEdit: boolean
   onGoal: (team: MatchTeam) => void
@@ -114,6 +116,7 @@ export function LiveScoreBoard({
   awayPenaltyScore,
   resultType,
   seconds,
+  awaitingDecision = false,
   canEdit,
   onGoal,
   onUndo,
@@ -123,8 +126,10 @@ export function LiveScoreBoard({
     <>
       <section aria-label="Wynik" className="bg-card rounded-2xl border p-4">
         <div className="mb-4 flex flex-col items-center gap-2">
-          <MatchStatusBadge status={status} />
-          <MatchClock seconds={seconds} status={status} />
+          <MatchStatusBadge status={status} awaitingDecision={awaitingDecision} />
+          {!(awaitingDecision && status === "Paused") && (
+            <MatchClock seconds={seconds} status={status} />
+          )}
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
           <TeamScore

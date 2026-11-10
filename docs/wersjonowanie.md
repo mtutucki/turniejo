@@ -14,13 +14,13 @@ Po podniesieniu liczby te na prawo od niej wracają do zera. Wątpliwość „fu
 
 ## Wersja a wdrożenie
 
-- **Każdy merge do `master` trafia na serwer** - tak jak dotąd. Nie trzeba robić wydania, żeby poprawka zadziałała u ludzi.
-- **Wydanie** to decyzja, że zebrane zmiany dostają numer i opis (np. przed turniejem, po większej funkcji, raz na kilka tygodni).
-- Aplikacja pokazuje, co dokładnie działa na serwerze:
+- **Do `master` trafiają tylko wydania** (PR z `release/X.Y.Z`) i pilne poprawki. Każdy merge do `master` trafia na serwer.
+- **Wydanie** to zebrane na branchu `release/X.Y.Z` funkcje i poprawki z numerem i opisem (np. przed turniejem albo po kilku zmianach).
+- Stopka strony i portalu kibica pokazuje sam numer wydania (`wersja 1.4.0`). Co dokładnie działa na serwerze, widać w podpowiedzi po najechaniu na numer i pod `https://TWOJA-DOMENA/backend/version`:
   - `1.4.0` - dokładnie wydanie 1.4.0,
   - `1.4.0+3 (abc1234)` - wydanie 1.4.0 i 3 zmiany po nim (ostatnia to commit `abc1234`).
 
-  Numer jest w stopce strony i portalu kibica oraz pod `https://TWOJA-DOMENA/backend/version`. Przy zgłoszeniu błędu podaj go.
+  Przy zgłoszeniu błędu podaj pełny zapis.
 
 ## Lista zmian: CHANGELOG.md
 
@@ -40,13 +40,35 @@ Po podniesieniu liczby te na prawo od niej wracają do zera. Wątpliwość „fu
 ## Jak wydać wersję
 
 ```bash
-# 1. Przygotowanie: branch release/1.5.0, „Nieopublikowane” staje się [1.5.0] z datą
-bash scripts/release.sh prepare 1.5.0
-git push -u origin release/1.5.0          # PR do master, przejrzyj listę zmian, merge
+# 1. Początek cyklu: branch release/1.5.0 od master
+bash scripts/release.sh start 1.5.0
 
-# 2. Po merge: tag na master
+# 2. W trakcie: każda funkcja i poprawka na branchu od release/1.5.0, potem lokalny merge
+git switch -c feat/whats-new release/1.5.0
+#    ... kod, testy zmienianego miejsca, commity ...
+git switch release/1.5.0 && git merge --no-ff feat/whats-new
+
+# 3. Koniec cyklu: „Nieopublikowane” staje się [1.5.0] z datą, pełna kontrola raz, push i PR
+bash scripts/release.sh prepare 1.5.0
+bash scripts/check.sh --e2e
+git push -u origin release/1.5.0          # PR do master, przejrzyj listę zmian, merge (deploy)
+
+# 4. Po merge: tag na master
 bash scripts/release.sh tag 1.5.0
 ```
+
+### Pilna poprawka
+
+Błąd na serwerze, a `release/1.5.0` jeszcze niegotowy: osobne mini-wydanie od `master`.
+
+```bash
+bash scripts/release.sh start 1.4.1
+git switch -c fix/… release/1.4.1        # test + poprawka + linijka w CHANGELOG, merge do release/1.4.1
+bash scripts/release.sh prepare 1.4.1    # dalej jak wyżej: kontrola, push, PR, merge, tag
+git switch release/1.5.0 && git merge master   # poprawka trafia też do bieżącego wydania
+```
+
+Konflikt w CHANGELOG.md przy ostatnim kroku: zostaw sekcję [1.4.1] i nad nią bieżące „Nieopublikowane”.
 
 Po wypchnięciu tagu GitHub Actions:
 

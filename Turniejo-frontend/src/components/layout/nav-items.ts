@@ -4,6 +4,7 @@ import {
   Bell,
   CalendarDays,
   CircleHelp,
+  Globe,
   ClipboardList,
   type LucideIcon,
   ListOrdered,
@@ -102,6 +103,7 @@ export const GLOBAL_NAV_ITEMS: NavItem[] = [
     icon: UserPlus,
     requires: (assignments) => !hasOrganization(assignments),
   },
+  { href: "/t", label: "Turnieje publiczne", icon: Globe },
   { href: "/help", label: "Pomoc", icon: CircleHelp },
 ]
 

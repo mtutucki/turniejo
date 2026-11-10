@@ -53,6 +53,42 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
     }
 
     [Fact]
+    public async Task GRP_004_GroupWithOnlyWithdrawnTeams_CanBeDeleted()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, schedule: false);
+        (await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{s.Team("T3")}/registration-status", new { registrationStatus = 4 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{s.Team("T4")}/registration-status", new { registrationStatus = 4 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        (await s.Organizer.DeleteAsync($"{T(s)}/groups/{s.Group("B")}")).IsSuccessStatusCode.Should().BeTrue();
+
+        // Wycofane zgłoszenia nie wskazują już na usuniętą grupę.
+        var teams = (await (await s.Organizer.GetAsync($"{T(s)}/teams")).ReadJsonAsync()).EnumerateArray().ToList();
+        teams.Where(t => t.GetGuid("id") == s.Team("T3") || t.GetGuid("id") == s.Team("T4"))
+            .Should().HaveCount(2).And.OnlyContain(t => t.GetGuidOrNull("groupId") == null);
+        var groups = (await (await s.Organizer.GetAsync($"{T(s)}/groups")).ReadJsonAsync()).EnumerateArray();
+        groups.Select(g => g.GetGuid("id")).Should().NotContain(s.Group("B"));
+    }
+
+    [Fact]
+    public async Task GRP_002_NewCategory_GetsTheRequestedNumberOfGroups()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+
+        var response = await s.Organizer.PostAsJsonAsync($"{T(s)}/categories",
+            new { name = "U12", minBirthDate = (DateTime?)null, maxBirthDate = (DateTime?)null, order = 2, groupCount = 3 });
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var categoryId = (await response.ReadJsonAsync()).GetGuid("tournamentCategoryId");
+
+        var groups = (await (await s.Organizer.GetAsync($"{T(s)}/groups")).ReadJsonAsync()).EnumerateArray()
+            .Where(g => g.GetGuid("categoryId") == categoryId)
+            .OrderBy(g => g.GetInt("order"))
+            .Select(g => g.GetString("name"));
+        groups.Should().Equal("Grupa A", "Grupa B", "Grupa C");
+    }
+
+    [Fact]
     public async Task GRP_005_TieBreakerOrder_IsSaved_AndDuplicateOrderIsRejected()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
@@ -65,6 +101,31 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
 
         var saved = (await (await s.Organizer.GetAsync(path)).ReadJsonAsync()).EnumerateArray().OrderBy(r => r.GetInt("order")).ToList();
         saved.Select(r => r.GetString("type")).Should().Equal("GoalDifference", "HeadToHeadPoints");
+    }
+
+    [Fact]
+    public async Task GRP_005_NewTournament_HasDefaultTieBreakerOrder()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+
+        var rules = (await (await s.Organizer.GetAsync($"{T(s)}/tiebreaker-rules")).ReadJsonAsync()).EnumerateArray()
+            .OrderBy(r => r.GetInt("order")).Select(r => r.GetString("type"));
+
+        rules.Should().Equal("HeadToHeadPoints", "HeadToHeadGoalDiff", "GoalDifference", "GoalsFor", "Wins");
+    }
+
+    [Fact]
+    public async Task GRP_005_WithoutSavedRules_EqualPointsAreResolvedByGoalDifference()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3);
+
+        // T1 i T2 po 4 punkty, remis między sobą, T1 ma lepszy bilans.
+        await PlayAsync(s, "T1", "T2", 0, 0);
+        await PlayAsync(s, "T1", "T3", 5, 0);
+        await PlayAsync(s, "T2", "T3", 1, 0);
+
+        var order = (await TableAsync(s)).OrderBy(r => r.GetInt("position")).Select(r => r.GetGuid("tournamentTeamId"));
+        order.Should().Equal(s.Team("T1"), s.Team("T2"), s.Team("T3"));
     }
 
     [Fact]
@@ -275,5 +336,164 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
 
         response.IsSuccessStatusCode.Should().BeFalse();
         (await response.Content.ReadAsStringAsync()).Should().Contain("One of the teams already plays another match at this time");
+    }
+
+    // Opóźnienie na boisku: przesunięcie meczu o cały slot bez przesuwania kolejnych trafia na następny mecz.
+    [Fact]
+    public async Task GRP_Schedule_DelayingAMatchIntoTheNextOne_WithoutShiftingFollowing_IsRejected()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4, start: false);
+        var (first, gap) = await FirstMatchAndGapAsync(s);
+
+        var response = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule",
+            new { pitchId = s.PitchId, scheduledAt = DateTimeOffset.Parse(first.GetString("scheduledAt")) + gap });
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Another match is already scheduled on this pitch at this time");
+    }
+
+    // Każdy mecz ląduje dokładnie na starym terminie następnego - sprawdza też, że zapis nie potyka się
+    // o unikalny indeks (boisko, godzina) w trakcie przesuwania.
+    [Fact]
+    public async Task GRP_Schedule_ShiftingFollowing_MovesEveryLaterMatchOnThePitchByTheSameAmount()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4, start: false);
+        var before = (await s.ScheduleAsync()).ToDictionary(m => m.GetGuid("id"), m => DateTimeOffset.Parse(m.GetString("scheduledAt")));
+        var (first, gap) = await FirstMatchAndGapAsync(s);
+
+        var response = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule",
+            new { pitchId = s.PitchId, scheduledAt = before[first.GetGuid("id")] + gap, shiftFollowing = true });
+
+        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+        var after = (await s.ScheduleAsync()).ToDictionary(m => m.GetGuid("id"), m => DateTimeOffset.Parse(m.GetString("scheduledAt")));
+        after.Should().HaveCount(6);
+        foreach (var (id, at) in before)
+            after[id].Should().Be(at + gap);
+    }
+
+    // Grupa 3 drużyn: każde dwa mecze mają wspólną drużynę. Boisko A: pierwszy mecz. Boisko B: drugi zaraz
+    // po nim, trzeci jeszcze później. Opóźnienie pierwszego najeżdża na drugi na boisku B.
+    [Fact]
+    public async Task GRP_Schedule_ShiftThatHitsATeamOnAnotherPitch_AsksFirst_ThenMovesThatPitchToo()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3, start: false);
+        var pitchB = await TournamentFlow.AddPitchAsync(s.Organizer, s.TournamentId, "Boisko 2");
+        var (first, gap) = await FirstMatchAndGapAsync(s);
+        var ordered = (await s.ScheduleAsync()).OrderBy(m => DateTimeOffset.Parse(m.GetString("scheduledAt"))).ToList();
+        var t0 = DateTimeOffset.Parse(first.GetString("scheduledAt"));
+        var (second, third) = (ordered[1].GetGuid("id"), ordered[2].GetGuid("id"));
+        (await s.Organizer.PutAsJsonAsync($"{M(s, third)}/schedule", new { pitchId = pitchB, scheduledAt = t0 + gap * 3 }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        (await s.Organizer.PutAsJsonAsync($"{M(s, second)}/schedule", new { pitchId = pitchB, scheduledAt = t0 + gap }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        var body = new { pitchId = s.PitchId, scheduledAt = t0 + gap, shiftFollowing = true };
+
+        var asked = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule", body);
+
+        ((int)asked.StatusCode).Should().Be(409);
+        (await asked.Content.ReadAsStringAsync()).Should().Contain("Conflict.OtherPitches");
+        DateTimeOffset At(List<JsonElement> list, Guid id) => DateTimeOffset.Parse(list.Single(m => m.GetGuid("id") == id).GetString("scheduledAt"));
+        At(await s.ScheduleAsync(), first.GetGuid("id")).Should().Be(t0);
+
+        var confirmed = await s.Organizer.PutAsJsonAsync($"{M(s, first.GetGuid("id"))}/schedule",
+            new { body.pitchId, body.scheduledAt, shiftFollowing = true, shiftOtherPitches = true });
+
+        confirmed.IsSuccessStatusCode.Should().BeTrue(await confirmed.Content.ReadAsStringAsync());
+        var after = await s.ScheduleAsync();
+        At(after, first.GetGuid("id")).Should().Be(t0 + gap);
+        At(after, second).Should().Be(t0 + gap * 2);
+        At(after, third).Should().Be(t0 + gap * 4);
+    }
+
+    private static async Task<(JsonElement First, TimeSpan Gap)> FirstMatchAndGapAsync(TournamentScenario s)
+    {
+        var ordered = (await s.ScheduleAsync()).OrderBy(m => DateTimeOffset.Parse(m.GetString("scheduledAt"))).ToList();
+        var gap = DateTimeOffset.Parse(ordered[1].GetString("scheduledAt")) - DateTimeOffset.Parse(ordered[0].GetString("scheduledAt"));
+        return (ordered[0], gap);
+    }
+
+    // Tabela to projekcja liczona po zakończonym meczu. Zanim pierwszy mecz grupy się skończy, drużyny
+    // grupy mają być w tabeli z zerami, a nie "Brak drużyn w grupie".
+    [Fact]
+    public async Task GRP_Standings_ListAllGroupTeams_BeforeTheFirstMatchEnds()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4);
+
+        var table = await TableAsync(s);
+
+        table.Select(r => r.GetGuid("tournamentTeamId")).Should()
+            .BeEquivalentTo(new[] { s.Team("T1"), s.Team("T2"), s.Team("T3"), s.Team("T4") });
+        table.Should().OnlyContain(r => r.GetInt("matchesPlayed") == 0 && r.GetInt("points") == 0);
+        table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3, 4);
+    }
+
+    [Fact]
+    public async Task GRP_PublicStandings_ListAllGroupTeams_BeforeTheFirstMatchEnds()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3);
+        var slug = (await s.TournamentAsync()).GetString("slug");
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
+                new { isPublic = true, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        var table = (await (await CreateClient().GetAsync($"/public/tournaments/{slug}/standings?groupId={s.Group("A")}")).ReadJsonAsync())
+            .EnumerateArray().ToList();
+
+        table.Should().HaveCount(3);
+        table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3);
+    }
+
+    // Wynik pierwszego meczu nie może zgubić drużyn, które jeszcze nie grały.
+    [Fact]
+    public async Task GRP_Standings_AfterTheFirstMatch_KeepTeamsThatHaveNotPlayed()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4);
+        await PlayAsync(s, "T1", "T2", 2, 0);
+        await FlushOutboxAsync();
+
+        var table = await TableAsync(s);
+
+        table.Should().HaveCount(4);
+        table.First().GetGuid("tournamentTeamId").Should().Be(s.Team("T1"));
+        table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3, 4);
+    }
+
+    // Mecze grupowe powstają z podziału na grupy w chwili generowania. Zmiana grupy albo nowa drużyna
+    // po generowaniu rozjeżdżała mecze z grupami (mecze "Grupy A" z drużyną z Grupy B, błędne tabele).
+    [Fact]
+    public async Task GRP_031_TeamCannotChangeGroup_OnceScheduleIsGenerated()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, start: false);
+
+        var response = await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{s.Team("T1")}/group",
+            new Turniejo.Api.Controllers.TournamentsController.AssignTeamToGroupRequest(s.Group("B")));
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Clear the schedule");
+        var teams = (await (await s.Organizer.GetAsync($"{T(s)}/teams")).ReadJsonAsync()).EnumerateArray();
+        teams.Single(t => t.GetGuid("id") == s.Team("T1")).GetGuid("groupId").Should().Be(s.Group("A"));
+    }
+
+    [Fact]
+    public async Task GRP_032_NewTeamCannotBeAccepted_OnceScheduleIsGenerated()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, start: false);
+        var teamId = await TournamentFlow.CreateTeamAsync(s.Organizer, s.OrganizationId, "Spóźnieni");
+        var tt = await TournamentFlow.AddTeamToTournamentAsync(s.Organizer, s.TournamentId, teamId, s.CategoryId);
+
+        var response = await s.Organizer.PatchAsJsonAsync($"{T(s)}/tournament-teams/{tt}/registration-status",
+            new { registrationStatus = 2 });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Clear the schedule");
+    }
+
+    [Fact]
+    public async Task GRP_033_GroupsCanChangeAgain_AfterClearingTheSchedule()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, groups: 2, teamsPerGroup: 2, start: false);
+        (await s.Organizer.DeleteAsync($"{T(s)}/schedule")).IsSuccessStatusCode.Should().BeTrue();
+
+        await TournamentFlow.AssignTeamToGroupAsync(s.Organizer, s.TournamentId, s.Team("T1"), s.Group("B"));
     }
 }

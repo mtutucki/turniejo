@@ -1,10 +1,14 @@
 "use client"
 
 import { ListOrdered } from "lucide-react"
+import Link from "next/link"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useStandings } from "@/features/matches/api"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
+import { useSecondStage } from "@/features/second-stage/api"
+import { pendingPlaces } from "@/features/second-stage/split"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
@@ -13,10 +17,13 @@ function GroupTable({
   groupId,
   title,
   teamName,
+  pending = [],
 }: {
   groupId: string
   title: string
   teamName: (tournamentTeamId: string) => string
+  /** Grupa drugiej fazy: miejsca, które czekają na koniec pierwszej fazy. */
+  pending?: string[]
 }) {
   const { id } = useTournamentContext()
   const standings = useStandings(id, groupId)
@@ -28,7 +35,9 @@ function GroupTable({
       {standings.isPending ? (
         <Skeleton className="m-4 h-32" />
       ) : rows.length === 0 ? (
-        <p className="text-muted-foreground px-4 py-6 text-sm">Brak drużyn w grupie.</p>
+        pending.length === 0 && (
+          <p className="text-muted-foreground px-4 py-6 text-sm">Brak drużyn w grupie.</p>
+        )
       ) : (
         <table className="w-full text-sm">
           <thead className="text-muted-foreground text-xs">
@@ -52,7 +61,14 @@ function GroupTable({
                 <td className="text-muted-foreground px-3 py-2 font-mono tabular-nums">
                   {row.position}
                 </td>
-                <td className="truncate px-2 py-2 font-medium">{teamName(row.tournamentTeamId)}</td>
+                <td className="truncate px-2 py-2 font-medium">
+                  <Link
+                    href={`/tournaments/${id}/teams/${row.tournamentTeamId}`}
+                    className="hover:underline"
+                  >
+                    {teamName(row.tournamentTeamId)}
+                  </Link>
+                </td>
                 <td className="px-2 py-2 text-center font-mono tabular-nums">
                   {row.matchesPlayed}
                 </td>
@@ -79,6 +95,18 @@ function GroupTable({
           </tbody>
         </table>
       )}
+      {!standings.isPending && pending.length > 0 && (
+        <div className="border-t px-4 py-3 text-sm">
+          <p className="text-muted-foreground text-xs">Czekają na koniec pierwszej fazy:</p>
+          <ul className="mt-1 space-y-0.5">
+            {pending.map((label) => (
+              <li key={label} className="text-muted-foreground italic">
+                {label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
@@ -88,6 +116,10 @@ export function TournamentStandingsView() {
   const categories = useCategories(id)
   const groups = useGroups(id)
   const teams = useTournamentTeams(id)
+  // Wynik zakończonego meczu pojawia się w tabeli bez odświeżania strony.
+  useTournamentMatchesRealtime([id])
+  const twoStages = tournament.data?.format === "TwoGroupStages"
+  const secondStage = useSecondStage(id, twoStages)
 
   if (tournament.data?.format === "Knockout") {
     return (
@@ -129,16 +161,28 @@ export function TournamentStandingsView() {
                 {category.name}
               </h2>
             )}
-            <div className="grid gap-4 lg:grid-cols-2">
-              {categoryGroups.map((group) => (
-                <GroupTable
-                  key={group.id}
-                  groupId={group.id}
-                  title={group.name}
-                  teamName={teamName}
-                />
-              ))}
-            </div>
+            {[1, 2].map((stage) => {
+              const stageGroups = categoryGroups.filter((g) => (g.stage === 2 ? 2 : 1) === stage)
+              if (stageGroups.length === 0) return null
+              return (
+                <div key={stage} className="space-y-2">
+                  {twoStages && (
+                    <h3 className="text-sm font-medium">{stage === 1 ? "Faza 1" : "Faza 2"}</h3>
+                  )}
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {stageGroups.map((group) => (
+                      <GroupTable
+                        key={group.id}
+                        groupId={group.id}
+                        title={group.name}
+                        teamName={teamName}
+                        pending={pendingPlaces(secondStage.data?.seats ?? [], group.id, groupList)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </section>
         )
       })}

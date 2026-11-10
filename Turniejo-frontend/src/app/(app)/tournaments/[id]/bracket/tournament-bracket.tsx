@@ -284,7 +284,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
             className="flex items-center gap-3 rounded-xl border border-yellow-400/40 bg-yellow-400/10 p-4"
           >
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-yellow-400/20">
-              <Trophy className="size-5 text-yellow-500" aria-hidden />
+              <Trophy className="size-5 text-yellow-700 dark:text-yellow-500" aria-hidden />
             </span>
             <span className="min-w-0">
               <span className="text-muted-foreground block text-xs font-medium tracking-wide uppercase">
@@ -306,6 +306,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
           matches={schedule.data ?? []}
           lookups={{
             teamName: (teamId) => teamById.get(teamId) ?? "Drużyna",
+            teamHref: (teamId) => `/tournaments/${id}/teams/${teamId}`,
             groupName: (groupId) => (groupId ? (groupById.get(groupId) ?? null) : null),
             pitchName: (pitchId) => (pitchId ? (pitchById.get(pitchId) ?? null) : null),
           }}
@@ -366,16 +367,15 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
     )
   }
 
-  // Czy generator terminarza ułoży tę drabinkę sam. Puchar: wszystkie drużyny muszą się zmieścić
-  // (do 16). Grupy + puchar: propozycja "na krzyż" działa przy 1, 2, 4 albo 8 grupach (grup może
-  // jeszcze nie być, wtedy zakładamy, że się uda).
+  // Czy generator terminarza ułoży tę drabinkę sam. Puchar: zawsze, bo drabinka mieści każdą liczbę
+  // drużyn (PUC-020). Grupy + puchar: propozycja "na krzyż" działa przy 1, 2, 4 albo 8 grupach (grup
+  // może jeszcze nie być, wtedy zakładamy, że się uda).
   const groupCount = categoryGroups.length
   const autoReason =
     tournamentFormat === "Knockout"
       ? autoBracketPairs([], acceptedTeams)
         ? null
-        : // QA v3: PUC-020 - organizator ma wiedzieć, ile drużyn się nie zmieści.
-          `Do drabinki zmieści się 16 z ${acceptedTeams.length} drużyn. Wybierz, które zagrają, i ułóż pary samodzielnie.`
+        : "Pary trzeba ułożyć samodzielnie."
       : groupCount === 0 || [1, 2, 4, 8].includes(groupCount)
         ? null
         : `Przy ${groupCount} grupach pary trzeba ułożyć samodzielnie.`

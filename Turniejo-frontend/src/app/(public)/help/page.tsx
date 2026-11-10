@@ -75,7 +75,10 @@ const SECTIONS: FaqSection[] = [
             <li>Załóż konto i wybierz „Organizuję turnieje”.</li>
             <li>Utwórz turniej: nazwa, termin, miejsce.</li>
             <li>Dodaj kategorie (np. roczniki), boiska i drużyny.</li>
-            <li>Wybierz format - grupowy, pucharowy albo grupy + puchar - i zamknij zapisy.</li>
+            <li>
+              Wybierz format - grupowy, pucharowy, grupy + puchar albo dwie fazy grupowe - i zamknij
+              zapisy.
+            </li>
             <li>Wygeneruj terminarz i przydziel sędziów do meczów.</li>
             <li>
               Roześlij kody zaproszeń trenerom, sędziom i rodzicom, a kibicom - link do portalu

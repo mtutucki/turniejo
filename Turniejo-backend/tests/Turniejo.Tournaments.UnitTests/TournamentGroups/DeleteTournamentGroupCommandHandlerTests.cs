@@ -19,7 +19,7 @@ namespace Turniejo.Tournaments.UnitTests.TournamentGroups
             _dbContext = Substitute.For<ITournamentsDbContext>();
             _teamModule = Substitute.For<ITeamModule>();
             _matchModule = Substitute.For<IMatchModule>();
-            _handler = new DeleteTournamentGroupCommandHandler(_dbContext, _teamModule, _matchModule);
+            _handler = new DeleteTournamentGroupCommandHandler(_dbContext, _teamModule, _matchModule, Substitute.For<IBracketModule>());
         }
 
         private static TournamentGroup CreateFakeTournamentGroup()
@@ -87,7 +87,7 @@ namespace Turniejo.Tournaments.UnitTests.TournamentGroups
             // Arrange
             var group = CreateFakeTournamentGroup();
             _dbContext.GetTournamentGroupByIdAsync(group.Id, Arg.Any<CancellationToken>()).Returns(group);
-            _teamModule.AnyTeamsInGroupAsync(group.Id, Arg.Any<CancellationToken>()).Returns(true);
+            _teamModule.AnyActiveTeamsInGroupAsync(group.Id, Arg.Any<CancellationToken>()).Returns(true);
 
             // Act
             var result = await _handler.Handle(new DeleteTournamentGroupCommand(group.TournamentId, group.Id), CancellationToken.None);

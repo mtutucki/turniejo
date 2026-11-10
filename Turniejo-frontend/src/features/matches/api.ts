@@ -16,6 +16,8 @@ export const matchKeys = {
     ["tournaments", tournamentId, "bracket", categoryId] as const,
   standings: (tournamentId: string, groupId: string) =>
     ["tournaments", tournamentId, "standings", groupId] as const,
+  /** Tabele wszystkich grup turnieju (prefiks do unieważnienia). */
+  allStandings: (tournamentId: string) => ["tournaments", tournamentId, "standings"] as const,
   ranking: (tournamentId: string, kind: PlayerRankingKind) =>
     ["tournaments", tournamentId, "ranking", kind] as const,
 }
@@ -87,6 +89,8 @@ export function useGenerateSchedule(tournamentId: string) {
       void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
       // Backend przestawia status turnieju na ScheduleGenerated.
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) })
+      // Dwie fazy grupowe: generator planuje mecze fazy 2.
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "second-stage"] })
       void queryClient.invalidateQueries({ queryKey: ["tournaments", "list"] })
     },
   })
@@ -102,6 +106,8 @@ export function useClearSchedule(tournamentId: string) {
       void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
       // Backend cofa etap turnieju do "Zapisy zamknięte".
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.detail(tournamentId) })
+      // Znikają też zaplanowane mecze fazy 2.
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", tournamentId, "second-stage"] })
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.dashboard(tournamentId) })
       void queryClient.invalidateQueries({ queryKey: ["tournaments", "list"] })
     },
@@ -126,16 +132,23 @@ export function useUpdateMatchSchedule(tournamentId: string) {
       matchId,
       pitchId,
       scheduledAt,
+      shiftFollowing = false,
+      shiftOtherPitches = false,
     }: {
       matchId: string
       pitchId: string | null
       scheduledAt: string
+      /** Późniejsze, nierozpoczęte mecze na tym samym boisku przesuwają się o tyle samo. */
+      shiftFollowing?: boolean
+      /** Potwierdzenie, że przesunięcie rusza też mecze na innych boiskach (409 Conflict.OtherPitches). */
+      shiftOtherPitches?: boolean
     }) =>
       request(`${base(tournamentId)}/matches/${matchId}/schedule`, {
         method: "PUT",
-        body: { pitchId, scheduledAt },
+        body: { pitchId, scheduledAt, shiftFollowing, shiftOtherPitches },
       }),
-    meta: { handlesValidation: true },
+    // 409 pokazuje okno zmiany terminu: pytanie o inne boiska albo komunikat w formularzu.
+    meta: { handlesValidation: true, handlesConflict: true },
     onSuccess: invalidate,
   })
 }
@@ -330,7 +343,8 @@ export function useStandings(tournamentId: string, groupId: string) {
     queryKey: matchKeys.standings(tournamentId, groupId),
     queryFn: () =>
       request<Standing[]>(`${base(tournamentId)}/standings?groupId=${encodeURIComponent(groupId)}`),
-    enabled: isAuthenticated,
+    // Drużyna bez grupy (np. w pucharze) nie ma tabeli.
+    enabled: isAuthenticated && !!groupId,
   })
 }
 

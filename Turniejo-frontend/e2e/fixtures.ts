@@ -12,7 +12,12 @@ export const TOURNAMENT_ID = "0f000000-0000-4000-8000-000000000010"
 type MockState = {
   tournaments: { id: string; name: string; status: string }[]
   matches: { id: string; homeScore: number; awayScore: number }[]
-  users: { email: string; roles: string[]; seenReleaseVersion: string | null }[]
+  users: {
+    email: string
+    roles: string[]
+    seenReleaseVersion: string | null
+    theme: "system" | "light" | "dark"
+  }[]
   organizations: string[]
   requests: string[]
   connections: { tournaments: number; matches: number }
@@ -30,7 +35,13 @@ export const mock = {
    * Następne wywołania API (metoda + ścieżka, np. "/api/tournaments/:id/settings") dostają
    * podaną odpowiedź. Bez "times" działa do końca testu.
    */
-  override: (o: { method: string; path: string; status?: number; body?: unknown; times?: number }) =>
+  override: (o: {
+    method: string
+    path: string
+    status?: number
+    body?: unknown
+    times?: number
+  }) =>
     fetch(`${MOCK_URL}/__control/override`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -42,21 +53,36 @@ export const mock = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     }),
-  matchStatus: (matchId: string, status: string, editLockedAt?: string | null) =>
+  matchStatus: (
+    matchId: string,
+    status: string,
+    editLockedAt?: string | null,
+    awaitingDecision?: boolean,
+  ) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, editLockedAt }),
+      body: JSON.stringify({ status, editLockedAt, awaitingDecision }),
     }),
+  /** Porzucony remis wstrzymany przez system (Match.IsAwaitingDecision), zegar stanął na 3864'. */
+  awaitingDecision: (matchId: string) => mock.matchStatus(matchId, "Paused", undefined, true),
   /** Ile razy aplikacja wywołała dane API od początku testu, np. "POST", "/start". */
   calls: async (method: string, pathEnd: string) =>
-    (await mock.state()).requests.filter((r) => r.startsWith(`${method} `) && r.endsWith(pathEnd)).length,
+    (await mock.state()).requests.filter((r) => r.startsWith(`${method} `) && r.endsWith(pathEnd))
+      .length,
   /** Ostatnia wersja z okna „Co nowego” na koncie (null = nowe konto). */
   seenRelease: (email: string, version: string | null) =>
     fetch(`${MOCK_URL}/__control/users/${encodeURIComponent(email)}/seen-release`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version }),
+    }),
+  /** Motyw na koncie, jakby wybrany na innym urządzeniu. */
+  theme: (email: string, theme: "system" | "light" | "dark") =>
+    fetch(`${MOCK_URL}/__control/users/${encodeURIComponent(email)}/theme`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme }),
     }),
   release: (matchId: string) =>
     fetch(`${MOCK_URL}/__control/matches/${matchId}/release`, { method: "POST" }),

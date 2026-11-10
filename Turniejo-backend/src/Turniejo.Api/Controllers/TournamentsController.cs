@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Turniejo.Api.Extensions;
@@ -136,7 +136,7 @@ namespace Turniejo.Api.Controllers
         [HttpPost("{tournamentId}/categories")]
         public async Task<IActionResult> AddTournamentCategory([FromRoute] Guid tournamentId, [FromBody] AddTournamentCategoryRequest request, CancellationToken cancellationToken)
         {
-            var command = new AddTournamentCategoryCommand(tournamentId, request.Name, request.MinBirthDate, request.MaxBirthDate, request.Order);
+            var command = new AddTournamentCategoryCommand(tournamentId, request.Name, request.MinBirthDate, request.MaxBirthDate, request.Order, request.GroupCount);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -172,7 +172,7 @@ namespace Turniejo.Api.Controllers
         [HttpPost("{tournamentId}/groups")]
         public async Task<IActionResult> AddTournamentGroup([FromRoute] Guid tournamentId, [FromBody] AddTournamentGroupRequest request, CancellationToken cancellationToken)
         {
-            var command = new AddTournamentGroupCommand(tournamentId, request.CategoryId, request.Name, request.Order);
+            var command = new AddTournamentGroupCommand(tournamentId, request.CategoryId, request.Name, request.Order, request.Stage);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -263,7 +263,7 @@ namespace Turniejo.Api.Controllers
             var command = new UpdateTournamentPublicSettingsCommand(
                 tournamentId, request.IsPublic, request.ShowTeams, request.ShowPlayers,
                 request.ShowSchedule, request.ShowStandings, request.ShowBracket, request.ShowLiveMatches, request.ShowStats,
-                request.AbbreviatePlayerNames, request.Expected);
+                request.AbbreviatePlayerNames, request.Expected, request.ShowInDirectory);
 
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
@@ -431,13 +431,13 @@ namespace Turniejo.Api.Controllers
         public sealed record ChangeTournamentStatusRequest(TournamentStatus TournamentStatus);
         public sealed record UpdateTournamentFormatRequest(TournamentFormat TournamentFormat);
         public sealed record UpdateTournamentDetailsRequest(string Name, DateTimeOffset StartAt, DateTimeOffset EndAt, int TeamLimit, string? Description, DateTimeOffset? ExpectedUpdatedAt = null);
-        public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
+        public sealed record AddTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order, int GroupCount = 1);
         public sealed record UpdateTournamentCategoryRequest(string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate, int Order);
-        public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order);
+        public sealed record AddTournamentGroupRequest(Guid CategoryId, string Name, int Order, int Stage = 1);
         public sealed record UpdateTournamentGroupRequest(string Name, int Order);
         public sealed record SetTieBreakerRulesRequest(IReadOnlyList<TieBreakerRuleItem> Rules);
         public sealed record UpdateTournamentSettingsRequest(int PointsForWin, int PointsForDraw, int PointsForLoss, int MatchDurationMinutes, int BreakDurationMinutes, bool IsThirdPlaceMatchEnabled, int RefereeEditWindowMinutes, int WalkoverHomeScore, int WalkoverAwayScore, bool CanCoachEditSquadAfterStart, ExpectedTournamentSettings? Expected = null);
-        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats, bool AbbreviatePlayerNames = true, ExpectedPublicSettings? Expected = null);
+        public sealed record UpdateTournamentPublicSettingsRequest(bool IsPublic, bool ShowTeams, bool ShowPlayers, bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats, bool AbbreviatePlayerNames = true, ExpectedPublicSettings? Expected = null, bool ShowInDirectory = true);
         public sealed record AddTeamToTournamentRequest(Guid TeamId, Guid CategoryId);
         public sealed record ChangeTournamentTeamRegistrationStatusRequest(RegistrationStatus RegistrationStatus);
         public sealed record ChangeTournamentTeamPaymentStatusRequest(PaymentStatus PaymentStatus);

@@ -18,7 +18,7 @@ namespace Turniejo.Tournaments.Application.Tournaments.GetTournamentPublicSettin
             return Result.Success(new TournamentPublicSettingsDto(
                 tournament.Id, s.IsPublic, s.ShowTeams, s.ShowPlayers, s.ShowSchedule,
                 s.ShowStandings, s.ShowBracket, s.ShowLiveMatches, s.ShowStats,
-                s.AbbreviatePlayerNames));
+                s.AbbreviatePlayerNames, s.ShowInDirectory));
         }
     }
 }

@@ -17,6 +17,8 @@ export type PublicSettings = PublicVisibility & {
   isPublic: boolean
   /** RODO: portal pokazuje "Jan K." zamiast pełnego nazwiska (domyślnie włączone). */
   abbreviatePlayerNames: boolean
+  /** Turniej widać na liście turniejów publicznych; wyłączony: portal tylko przez link. */
+  showInDirectory: boolean
 }
 
 /** PublicTournamentPageDto */
@@ -29,9 +31,11 @@ export type PublicTournament = {
   startAt: string
   endAt: string
   description: string | null
-  settings: PublicVisibility
+  /** showInDirectory: turniej na liście publicznej. Wyłączony = portal tylko z linku, bez Google. */
+  settings: PublicVisibility & { showInDirectory?: boolean }
   categories: { id: string; name: string; order: number }[]
-  groups: { id: string; categoryId: string; name: string; order: number }[]
+  /** stage 2: grupa drugiej fazy (format „Dwie fazy grupowe”), brak = faza 1. */
+  groups: { id: string; categoryId: string; name: string; order: number; stage?: 1 | 2 }[]
   pitches: { id: string; name: string }[]
 }
 
@@ -103,6 +107,18 @@ export type Bracket = { id: string; tournamentId: string; rounds: BracketRound[]
 /** Jeden z dwóch slotów pary w drabince. */
 export type BracketSlotRef = { nodeId: string; slot: "Home" | "Away" }
 
+/** PublicSquadPlayerDto — skład na stronie drużyny (GET /public/tournaments/{slug}/teams/{id}/players). */
+export type PublicSquadPlayer = {
+  tournamentPlayerId: string
+  /** Łączy zawodnika z rankingami (RankingEntry.playerId). */
+  playerId: string
+  firstName: string
+  /** Skrócone do inicjału, gdy portal skraca nazwiska. */
+  lastName: string
+  shirtNumber: number | null
+  position: string | null
+}
+
 /** PlayerRankingEntryDto */
 export type RankingEntry = {
   playerId: string
@@ -113,3 +129,17 @@ export type RankingEntry = {
 }
 
 export type PublicMatch = Match
+
+/** PublicTournamentListItemDto — karta na liście turniejów publicznych (GET /public/tournaments). */
+export type PublicTournamentListItem = {
+  name: string
+  slug: string
+  status: TournamentStatus
+  startAt: string
+  endAt: string
+  organizer: { id: string; name: string }
+  categories: string[]
+  teamCount: number
+  /** Mecze na żywo albo w przerwie. */
+  liveMatchCount: number
+}

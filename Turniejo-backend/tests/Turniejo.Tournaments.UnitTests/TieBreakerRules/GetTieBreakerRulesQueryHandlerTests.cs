@@ -19,7 +19,7 @@ namespace Turniejo.Tournaments.UnitTests.TieBreakerRules
         }
 
         [Fact]
-        public async Task Handle_ShouldReturnEmptyList_WhenNoRulesExist()
+        public async Task Handle_ShouldReturnDefaultOrder_WhenNoRulesExist()
         {
             // Arrange
             var tournamentId = Guid.NewGuid();
@@ -31,7 +31,9 @@ namespace Turniejo.Tournaments.UnitTests.TieBreakerRules
 
             // Assert
             result.IsSuccess.Should().BeTrue();
-            result.Value.Should().BeEmpty();
+            result.Value.Select(r => r.Type).Should().Equal(
+                "HeadToHeadPoints", "HeadToHeadGoalDiff", "GoalDifference", "GoalsFor", "Wins");
+            result.Value.Select(r => r.Order).Should().Equal(1, 2, 3, 4, 5);
         }
 
         [Fact]

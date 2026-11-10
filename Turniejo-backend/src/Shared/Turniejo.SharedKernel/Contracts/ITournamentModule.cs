@@ -1,4 +1,4 @@
-namespace Turniejo.SharedKernel.Contracts;
+﻿namespace Turniejo.SharedKernel.Contracts;
 
 public interface ITournamentModule
 {
@@ -29,7 +29,8 @@ public interface ITournamentModule
 public record TournamentDto(Guid Id, string Name, string Status, string? Format, Guid OrganizationId, int TeamLimit,
     DateTimeOffset? StartAt = null, DateTimeOffset? EndAt = null);
 public record TournamentCategoryDto(Guid Id, Guid TournamentId, string Name, DateTime? MinBirthDate, DateTime? MaxBirthDate);
-public record TournamentGroupDto(Guid Id, Guid TournamentId, Guid CategoryId, string Name);
+// Stage 2: grupa drugiej fazy (format TwoGroupStages), drużyny przychodzą z miejsc w tabelach fazy 1.
+public record TournamentGroupDto(Guid Id, Guid TournamentId, Guid CategoryId, string Name, int Stage = 1, int Order = 0);
 public record TournamentSettingsSummaryDto(
     Guid TournamentId, int MatchDurationMinutes, int BreakDurationMinutes, int RefereeEditWindowMinutes,
     int PointsForWin, int PointsForDraw, int PointsForLoss, bool IsThirdPlaceMatchEnabled,
@@ -38,7 +39,7 @@ public record TieBreakerRuleDto(int Order, string Type);
 public record TournamentPublicSettingsDto(
     Guid TournamentId, bool IsPublic, bool ShowTeams, bool ShowPlayers,
     bool ShowSchedule, bool ShowStandings, bool ShowBracket, bool ShowLiveMatches, bool ShowStats,
-    bool AbbreviatePlayerNames = true);
+    bool AbbreviatePlayerNames = true, bool ShowInDirectory = true);
 public record PublicTournamentDto(
     Guid Id, string Name, string Slug, string Status, string? Format,
     DateTimeOffset StartAt, DateTimeOffset EndAt, string? Description,

@@ -18,16 +18,9 @@ import type { TournamentTeam } from "@/types/teams"
 import type { TournamentGroup } from "@/types/tournaments"
 
 import { type BracketSlotInput, useGenerateBracket } from "../api"
-import { type BracketPair, defaultPairCount, suggestPairs } from "../suggest-bracket"
+import { type BracketPair, bracketSizes, defaultPairCount, suggestPairs } from "../suggest-bracket"
 
 type Pair = BracketPair
-
-const SIZES = [
-  { pairs: 1, label: "Finał (2 drużyny)" },
-  { pairs: 2, label: "Półfinały (3–4 drużyny)" },
-  { pairs: 4, label: "Ćwierćfinały (5–8 drużyn)" },
-  { pairs: 8, label: "1/8 finału (9–16 drużyn)" },
-]
 
 const BYE = "bye"
 
@@ -141,7 +134,7 @@ export function GenerateBracketForm({
       <div className="space-y-2">
         <p className="text-sm font-medium">Pierwsza runda</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Wielkość drabinki">
-          {SIZES.map((size) => (
+          {bracketSizes(groups, teams).map((size) => (
             <Button
               key={size.pairs}
               type="button"

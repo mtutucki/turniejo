@@ -10,6 +10,7 @@ const EXACT: Record<string, string> = {
   "New password must be different from the current one.": "Nowe hasło musi się różnić od obecnego",
   "Release version is required.": "Brak numeru wersji",
   "Release version must look like 1.2.0.": "Nieprawidłowy numer wersji",
+  "Theme must be system, light or dark.": "Nieznany motyw",
   // Dołączanie kodem
   "Invalid tournament code.": "Nieprawidłowy kod turnieju",
   "This tournament has been cancelled": "Ten turniej został anulowany. Nie można już do niego dołączyć.",
@@ -39,10 +40,13 @@ const EXACT: Record<string, string> = {
   "Cannot delete a group that still has matches scheduled in it":
     "Nie można usunąć grupy, w której są zaplanowane mecze",
   "Group does not belong to the team's category": "Grupa należy do innej kategorii niż drużyna",
+  "GroupCount must be between 1 and 8.": "Liczba grup musi być od 1 do 8",
   // Drużyny
   "Team is already registered for this tournament and category":
     "Ta drużyna jest już zgłoszona do tej kategorii",
   "Tournament has reached its team limit": "Osiągnięto limit drużyn w turnieju",
+  "Clear the schedule before changing teams or groups":
+    "Najpierw wyczyść terminarz, potem zmień drużyny albo grupy",
   "Minute must be between 0 and 300.": "Minuta musi być od 0 do 300",
   "The team is playing a match right now": "Drużyna gra teraz mecz. Wycofasz ją po jego zakończeniu.",
   "The rules were changed by someone else. Refresh to see the latest data.":
@@ -82,6 +86,8 @@ const EXACT: Record<string, string> = {
     "Na tym boisku trwa wtedy inny mecz",
   "Another match is already scheduled on this pitch at this time.":
     "Na tym boisku trwa wtedy inny mecz",
+  "The shift also moves matches on other pitches":
+    "Przesunięcie zmieni też godziny meczów na innych boiskach",
   "One of the teams already plays another match at this time":
     "Jedna z drużyn gra w tym czasie inny mecz",
   "Schedule can only be generated when registration is closed":
@@ -100,6 +106,12 @@ const EXACT: Record<string, string> = {
     "Brak meczów do rozegrania - każda grupa potrzebuje co najmniej 2 zaakceptowanych drużyn",
   "Tournament cannot transition to ScheduleGenerated from its current status":
     "Terminarz został już wygenerowany albo turniej jest na innym etapie",
+  "Every category needs a knockout bracket before generating the schedule":
+    "Każda kategoria potrzebuje drabinki, ułóż brakujące w zakładce Drabinka",
+  "Each category needs at least 2 accepted teams":
+    "W kategorii jest tylko jedna drużyna, dodaj drugą albo usuń kategorię",
+  "Each group needs at least 2 accepted teams":
+    "W grupie jest tylko jedna drużyna, dodaj jej rywala albo przenieś ją do innej grupy",
   "Some accepted teams are not assigned to a group":
     "Część zaakceptowanych drużyn nie ma grupy - przypisz je, zanim wygenerujesz terminarz",
   "EndAt must be after StartAt.": "Koniec musi być po rozpoczęciu",
@@ -136,12 +148,40 @@ const EXACT: Record<string, string> = {
     "Drabinka została usunięta, ale etap turnieju się nie cofnął - wyczyść terminarz",
   "Bracket generation requires Knockout or GroupAndKnockout format":
     "Drabinka wymaga formatu z fazą pucharową",
+  // Dwie fazy grupowe
+  "Second-stage groups need the two group stages format":
+    "Grupy drugiej fazy są tylko w formacie „Dwie fazy grupowe”",
+  "Teams reach second-stage groups from the first-stage tables":
+    "Do grupy drugiej fazy drużyny trafiają same, z tabel pierwszej fazy",
+  "Remove the second-stage groups before changing the format":
+    "Najpierw usuń grupy drugiej fazy, potem zmień format",
+  "Clear the schedule before changing the second stage":
+    "Wyczyść terminarz, żeby zmienić podział na drugą fazę",
+  "Each place must go to a second-stage group of this category":
+    "Każde miejsce musi trafić do grupy drugiej fazy z tej kategorii",
+  "Each place must come from a first-stage group of this category":
+    "Każde miejsce musi pochodzić z grupy pierwszej fazy z tej kategorii",
+  "Each place can go to only one second-stage group":
+    "Jedno miejsce może trafić tylko do jednej grupy drugiej fazy",
+  "Place in the group must be at least 1": "Miejsce w grupie musi być co najmniej pierwsze",
+  "Every category needs second-stage groups with places before generating the schedule":
+    "Każda kategoria potrzebuje grup drugiej fazy z ustawionym podziałem",
+  "Each second-stage group needs at least 2 places":
+    "Każda grupa drugiej fazy potrzebuje co najmniej dwóch miejsc",
+  "A second-stage place points to a position its group does not have":
+    "W podziale na drugą fazę jest miejsce, którego nie ma w tabeli grupy",
   "Match events can only be recorded while the match is live, paused, or within the post-match edit window":
     "Czas na poprawki minął - wynik meczu jest zablokowany",
   "The post-match edit window has closed":
     "Czas na poprawki minął. Rozstrzygnięcie może teraz zmienić tylko organizator",
   "Match must be finished to change its result": "Ten mecz nie jest jeszcze zakończony",
   "Walkover requires a winner": "Wybierz drużynę, która wygrywa walkowerem",
+  // Etykiety drużyn
+  "A label with this name already exists": "Etykieta o tej nazwie już istnieje",
+  "Label name is required.": "Podaj nazwę etykiety",
+  "Label name must not exceed 60 characters.": "Nazwa etykiety może mieć najwyżej 60 znaków",
+  "Team does not belong to this organization": "Ta drużyna nie należy do Twojej organizacji",
+  "Label does not belong to this organization": "Ta etykieta nie należy do Twojej organizacji",
   "Logo must be a PNG, JPEG or WebP image": "Herb musi być obrazkiem PNG, JPG albo WebP",
   "Logo file is too large.": "Plik z herbem jest za duży",
   "Logo file is empty.": "Wybierz plik z herbem",

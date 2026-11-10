@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ThemeToggle } from "@/features/theme/theme-toggle"
 import { useTournamentSettings } from "@/features/tournaments/api"
 import { EventTimeline, playerLabel } from "@/features/matches/components/event-timeline"
 import { FinishMatchDialog } from "@/features/matches/components/finish-match-dialog"
@@ -251,6 +252,7 @@ function LivePanel({
         awayPenaltyScore={panel.awayPenaltyScore}
         resultType={panel.resultType}
         seconds={seconds}
+        awaitingDecision={panel.awaitingDecision}
         canEdit={canEdit}
         onGoal={quickGoal}
         onUndo={undoGoal}
@@ -449,6 +451,8 @@ export function LiveMatchView() {
             />
           )}
         {canOperate && <ConnectionBadge state={realtime} />}
+        {/* Na boisku w słońcu jasny motyw bywa czytelniejszy, więc przełącznik jest pod ręką. */}
+        <ThemeToggle className="hover:bg-accent" />
       </div>
     </header>
   )

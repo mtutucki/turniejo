@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { MATCH_STATUS_LABELS, type MatchStatus } from "@/types/matches"
+import { AWAITING_DECISION_LABEL, MATCH_STATUS_LABELS, type MatchStatus } from "@/types/matches"
 
 // Bursztyn (--live) tylko dla meczu, który właśnie trwa (Live/Paused) — reszta w neutralnych kolorach.
 const STATUS_STYLES: Record<MatchStatus, string> = {
@@ -15,17 +15,27 @@ const STATUS_STYLES: Record<MatchStatus, string> = {
 
 export function MatchStatusBadge({
   status,
+  awaitingDecision = false,
   className,
 }: {
   status: MatchStatus
+  /** Mecz wstrzymany przez system: zamiast „Przerwa” prośba o rozstrzygnięcie. */
+  awaitingDecision?: boolean
   className?: string
 }) {
+  const waiting = awaitingDecision && status === "Paused"
   return (
-    <Badge className={cn("border-transparent", STATUS_STYLES[status], className)}>
+    <Badge
+      className={cn(
+        "border-transparent",
+        waiting ? "bg-destructive/15 text-destructive" : STATUS_STYLES[status],
+        className,
+      )}
+    >
       {status === "Live" && (
         <span className="bg-live-foreground size-1.5 animate-pulse rounded-full" aria-hidden />
       )}
-      {MATCH_STATUS_LABELS[status]}
+      {waiting ? AWAITING_DECISION_LABEL : MATCH_STATUS_LABELS[status]}
     </Badge>
   )
 }

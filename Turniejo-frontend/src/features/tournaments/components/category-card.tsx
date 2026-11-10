@@ -25,12 +25,20 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { useSchedule } from "@/features/matches/api"
+import { SecondStageSection } from "@/features/second-stage/components/second-stage-section"
 import { formatBirthDate, plural } from "@/lib/format"
 import type { TournamentTeam } from "@/types/teams"
-import type { TournamentCategory, TournamentFormat, TournamentGroup } from "@/types/tournaments"
+import type {
+  SecondStageRange,
+  SecondStageSeat,
+  TournamentCategory,
+  TournamentFormat,
+  TournamentGroup,
+} from "@/types/tournaments"
 
 import { useDeleteCategory } from "../api"
 import { CategoryFormDialog } from "./category-form-dialog"
+import { DeleteGroupDialog } from "./delete-group-dialog"
 import { GroupFormDialog } from "./group-form-dialog"
 
 function birthRange(category: TournamentCategory) {
@@ -59,16 +67,31 @@ type CategoryCardProps = {
   teams: TournamentTeam[]
   format: TournamentFormat | null
   canManage: boolean
+  /** Dwie fazy grupowe: podział tej kategorii na grupy fazy 2. */
+  seats?: SecondStageSeat[]
+  /** Dwie fazy grupowe: zakresy miejsc tej kategorii. */
+  ranges?: SecondStageRange[]
+  /** Część limitu drużyn turnieju na tę kategorię - liczba drużyn, zanim się zgłoszą. */
+  teamLimitShare?: number
+  /** Terminarz istnieje - podział na fazę 2 jest zamrożony. */
+  scheduleLocked?: boolean
 }
 
 export function CategoryCard({
   tournamentId,
   category,
-  groups,
+  groups: allGroups,
   teams,
   format,
   canManage,
+  seats = [],
+  ranges = [],
+  teamLimitShare = 0,
+  scheduleLocked = false,
 }: CategoryCardProps) {
+  const twoStages = format === "TwoGroupStages"
+  // Grupy drugiej fazy nie mają przydzielonych drużyn - mają własną sekcję poniżej.
+  const groups = allGroups.filter((g) => g.stage !== 2)
   const teamCount = (groupId: string) => teams.filter((t) => t.groupId === groupId).length
   const ungrouped = teams.filter((t) => !t.groupId).length
   const deleteCategory = useDeleteCategory(tournamentId)
@@ -82,7 +105,7 @@ export function CategoryCard({
   const groupMatches = categoryMatches.filter((m) => m.stageType === "Group").length
   const bracketMatches = categoryMatches.length - groupMatches
   const blocked = played || teams.length > 0 || categoryMatches.length > 0
-  const nextGroupOrder = Math.max(0, ...groups.map((g) => g.order)) + 1
+  const nextGroupOrder = Math.max(0, ...allGroups.map((g) => g.order)) + 1
 
   return (
     <Card>
@@ -211,44 +234,88 @@ export function CategoryCard({
           <p className="text-muted-foreground text-sm">
             Wybierz format turnieju - przy formacie z grupami kategoria dostanie od razu „Grupa A”.
           </p>
-        ) : groups.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Brak grup w tej kategorii.</p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
-            {groups.map((group) => (
-              <li key={group.id}>
-                {canManage ? (
-                  <GroupFormDialog
-                    tournamentId={tournamentId}
-                    categoryId={category.id}
-                    categoryName={category.name}
-                    group={group}
-                    nextOrder={group.order}
-                    trigger={
-                      <button
-                        type="button"
-                        className="bg-secondary hover:bg-accent focus-visible:ring-ring flex items-center gap-2 rounded-md px-3 py-1.5 text-sm outline-none focus-visible:ring-2"
-                        aria-label={`Edytuj ${group.name}`}
-                      >
-                        {group.name}
-                        <span className="text-muted-foreground font-mono text-xs tabular-nums">
-                          {teamCount(group.id)}
-                        </span>
-                        <Pencil className="text-muted-foreground size-3" />
-                      </button>
-                    }
-                  />
-                ) : (
-                  <span className="bg-secondary rounded-md px-3 py-1.5 text-sm">
-                    {group.name} ·{" "}
-                    <span className="font-mono tabular-nums">{teamCount(group.id)}</span>
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <section aria-label={`Grupy w kategorii ${category.name}`} className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">{twoStages ? "Faza 1" : "Grupy"}</h3>
+              {canManage && (
+                <GroupFormDialog
+                  tournamentId={tournamentId}
+                  categoryId={category.id}
+                  categoryName={category.name}
+                  nextOrder={nextGroupOrder}
+                  suggestedName={suggestGroupName(groups)}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <Plus />
+                      Dodaj grupę
+                    </Button>
+                  }
+                />
+              )}
+            </div>
+            {groups.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Brak grup w tej kategorii.</p>
+            ) : (
+              <ul className="divide-y rounded-md border">
+                {groups.map((group) => (
+                  <li key={group.id} className="flex items-center gap-2 py-1 pr-1 pl-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {group.name}
+                    </span>
+                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                      {plural(teamCount(group.id), ["drużyna", "drużyny", "drużyn"])}
+                    </span>
+                    {canManage && (
+                      <div className="flex shrink-0">
+                        <GroupFormDialog
+                          tournamentId={tournamentId}
+                          categoryId={category.id}
+                          categoryName={category.name}
+                          group={group}
+                          nextOrder={group.order}
+                          trigger={
+                            <Button variant="ghost" size="icon" aria-label={`Edytuj ${group.name}`}>
+                              <Pencil />
+                            </Button>
+                          }
+                        />
+                        <DeleteGroupDialog
+                          tournamentId={tournamentId}
+                          group={group}
+                          activeTeams={teamCount(group.id)}
+                          matches={categoryMatches.filter((m) => m.groupId === group.id).length}
+                        />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         )}
-        {format && format !== "Knockout" && groups.length === 1 && (
+        {twoStages && (
+          <SecondStageSection
+            tournamentId={tournamentId}
+            categoryId={category.id}
+            categoryName={category.name}
+            groups={allGroups}
+            firstStage={groups.map((g) => ({
+              id: g.id,
+              name: g.name,
+              order: g.order,
+              teams: teamCount(g.id),
+            }))}
+            seats={seats}
+            ranges={ranges}
+            matches={categoryMatches}
+            canManage={canManage}
+            categoryTeams={teams.length || teamLimitShare}
+            teamsFromLimit={teams.length === 0 && teamLimitShare > 0}
+            locked={scheduleLocked}
+          />
+        )}
+        {format && format !== "Knockout" && !twoStages && groups.length === 1 && (
           <p className="text-muted-foreground text-xs">
             Jedna grupa - wszystkie drużyny kategorii grają każdy z każdym. Drugą grupę dodaj, gdy
             drużyn jest tyle, że wszystkie mecze by się nie zmieściły.
@@ -263,21 +330,6 @@ export function CategoryCard({
             </Link>
             .
           </p>
-        )}
-        {canManage && format && format !== "Knockout" && (
-          <GroupFormDialog
-            tournamentId={tournamentId}
-            categoryId={category.id}
-            categoryName={category.name}
-            nextOrder={nextGroupOrder}
-            suggestedName={suggestGroupName(groups)}
-            trigger={
-              <Button variant="outline" size="sm">
-                <Plus />
-                Dodaj grupę
-              </Button>
-            }
-          />
         )}
       </CardContent>
     </Card>

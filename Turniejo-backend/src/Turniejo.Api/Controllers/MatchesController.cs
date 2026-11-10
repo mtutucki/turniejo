@@ -121,7 +121,7 @@ namespace Turniejo.Api.Controllers
         [HttpPut("matches/{matchId}/schedule")]
         public async Task<IActionResult> UpdateMatchSchedule([FromRoute] Guid tournamentId, [FromRoute] Guid matchId, [FromBody] UpdateMatchScheduleRequest request, CancellationToken cancellationToken)
         {
-            var command = new UpdateMatchScheduleCommand(tournamentId, matchId, request.PitchId, request.ScheduledAt);
+            var command = new UpdateMatchScheduleCommand(tournamentId, matchId, request.PitchId, request.ScheduledAt, request.ShiftFollowing, request.ShiftOtherPitches);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -391,7 +391,7 @@ namespace Turniejo.Api.Controllers
             DateTimeOffset EndAt,
             IReadOnlyList<Guid> PitchIds,
             IReadOnlyList<ScheduleWindowRequest>? Windows = null);
-        public sealed record UpdateMatchScheduleRequest(Guid? PitchId, DateTimeOffset ScheduledAt);
+        public sealed record UpdateMatchScheduleRequest(Guid? PitchId, DateTimeOffset ScheduledAt, bool ShiftFollowing = false, bool ShiftOtherPitches = false);
 
         public sealed record UpdatePlannedMatchScheduleRequest(Guid PitchId, DateTimeOffset ScheduledAt);
         public sealed record AssignMatchPitchRequest(Guid? PitchId);

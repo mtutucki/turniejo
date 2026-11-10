@@ -2,6 +2,19 @@ import { expect, loginAs, MATCH_ID, mock, REFEREE, test } from "./fixtures"
 
 const timer = (page: import("@playwright/test").Page) => page.getByRole("timer")
 
+test("[MNZ-042] panel meczu wstrzymanego przez system: prośba o rozstrzygnięcie zamiast zegara", async ({
+  page,
+}) => {
+  await mock.awaitingDecision(MATCH_ID)
+  await loginAs(page, REFEREE)
+  await page.goto(`/matches/${MATCH_ID}/live`)
+
+  const board = page.getByRole("region", { name: "Wynik" })
+  await expect(board).toContainText("Czeka na rozstrzygnięcie")
+  await expect(timer(page)).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "WZNÓW" })).toBeVisible()
+})
+
 test.describe("Mecz na żywo: sterowanie", () => {
   test.beforeEach(async ({ page }) => {
     await mock.matchStatus(MATCH_ID, "Scheduled")
@@ -45,7 +58,8 @@ test.describe("Koniec meczu: walidacja rozstrzygnięcia", () => {
     await page.getByRole("button", { name: "KONIEC" }).click()
   })
 
-  const dialog = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Zakończyć mecz?" })
+  const dialog = (page: import("@playwright/test").Page) =>
+    page.getByRole("dialog", { name: "Zakończyć mecz?" })
 
   test("[PUC-040b] puste pola karnych", async ({ page }) => {
     await dialog(page).getByRole("button", { name: "Karne" }).click()
@@ -83,9 +97,14 @@ test.describe("Zdarzenia meczu", () => {
     await page.goto(`/matches/${MATCH_ID}/live`)
   })
 
-  const events = (page: import("@playwright/test").Page) => page.getByRole("list", { name: "Zdarzenia meczu" })
+  const events = (page: import("@playwright/test").Page) =>
+    page.getByRole("list", { name: "Zdarzenia meczu" })
 
-  async function choosePlayer(page: import("@playwright/test").Page, dialogName: string, player: RegExp) {
+  async function choosePlayer(
+    page: import("@playwright/test").Page,
+    dialogName: string,
+    player: RegExp,
+  ) {
     const dialog = page.getByRole("dialog", { name: dialogName })
     await dialog.getByRole("combobox", { name: "Zawodnik" }).click()
     await page.getByRole("option", { name: player }).click()
@@ -102,7 +121,11 @@ test.describe("Zdarzenia meczu", () => {
     }
 
     await expect(events(page).getByRole("listitem").filter({ hasText: /Żółta/ })).toHaveCount(2)
-    await expect(events(page).getByRole("listitem").filter({ hasText: /Czerwona/ })).toHaveCount(1)
+    await expect(
+      events(page)
+        .getByRole("listitem")
+        .filter({ hasText: /Czerwona/ }),
+    ).toHaveCount(1)
   })
 
   test("[MNZ-017a] edycja gola: strzelec i minuta", async ({ page }) => {
@@ -120,7 +143,10 @@ test.describe("Zdarzenia meczu", () => {
   })
 
   test("[MNZ-019] wybór MVP meczu", async ({ page }) => {
-    await page.getByRole("region", { name: "MVP meczu" }).getByRole("button", { name: "Wybierz" }).click()
+    await page
+      .getByRole("region", { name: "MVP meczu" })
+      .getByRole("button", { name: "Wybierz" })
+      .click()
     const dialog = await choosePlayer(page, "MVP meczu", /Adam Bramka/)
     await dialog.getByRole("button", { name: "Zapisz MVP" }).click()
 
@@ -138,14 +164,18 @@ test("[KON-036] sędzia po oknie poprawek nie zmienia rozstrzygnięcia", async (
   await expect(page.getByRole("button", { name: /Zmień rozstrzygnięcie/ })).toHaveCount(0)
 })
 
-test("[MNZ-026] panel sędziego na telefonie: wynik widoczny, duże przyciski, dialog w ekranie", async ({ page }, testInfo) => {
+test("[MNZ-026] panel sędziego na telefonie: wynik widoczny, duże przyciski, dialog w ekranie", async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "sprawdzenie układu na telefonie")
   await loginAs(page, REFEREE)
   await page.goto(`/matches/${MATCH_ID}/live`)
   const viewport = page.viewportSize()!
 
   // Brak przewijania w bok.
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    viewport.width,
+  )
   // Wynik widoczny bez przewijania.
   await expect(page.getByRole("region", { name: "Wynik" })).toBeInViewport()
   // Główne przyciski wygodne do kliknięcia palcem (co najmniej 44 px wysokości).
@@ -154,7 +184,10 @@ test("[MNZ-026] panel sędziego na telefonie: wynik widoczny, duże przyciski, d
     expect(box.height, name).toBeGreaterThanOrEqual(44)
   }
 
-  for (const [button, dialogName] of [["KONIEC", "Zakończyć mecz?"], ["KARTKA", "Kartka"]] as const) {
+  for (const [button, dialogName] of [
+    ["KONIEC", "Zakończyć mecz?"],
+    ["KARTKA", "Kartka"],
+  ] as const) {
     await page.getByRole("button", { name: button, exact: true }).click()
     const box = (await page.getByRole("dialog", { name: dialogName }).boundingBox())!
     expect(box.x).toBeGreaterThanOrEqual(0)

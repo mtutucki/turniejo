@@ -16,6 +16,7 @@ import { SimpleMatchList } from "@/features/panels/components/simple-match-list"
 import { AddPlayerDialog } from "@/features/teams/components/add-player-dialog"
 import { EditPlayerDialog } from "@/features/teams/components/edit-player-dialog"
 import { ImportSquadDialog } from "@/features/teams/components/import-squad-dialog"
+import { TeamHistorySection } from "@/features/teams/components/team-history-section"
 import { TeamRoster } from "@/features/teams/components/team-roster"
 import { plural } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -27,6 +28,12 @@ import { useCoachTeam } from "./team-shell"
 export function CoachRosterView() {
   const team = useCoachTeam()
   return <TeamRoster teamId={team.teamId} />
+}
+
+/** Drużyna z bazy we wszystkich turniejach (ta sama sekcja co w bazie drużyn organizatora). */
+export function CoachHistoryView() {
+  const team = useCoachTeam()
+  return <TeamHistorySection teamId={team.teamId} />
 }
 
 export function CoachPlayersView() {

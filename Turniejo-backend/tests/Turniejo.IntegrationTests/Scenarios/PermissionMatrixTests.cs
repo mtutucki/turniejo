@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -33,7 +33,7 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
         public required Dictionary<string, Guid> UserIds { get; init; }
         public required TournamentScenario A { get; init; }
         public required TournamentScenario B { get; init; }
-        public Guid M1, M2, MB, Goal1, Tp1, P1, Tp3, P3, StaffC2;
+        public Guid M1, M2, MB, Goal1, Tp1, P1, Tp3, P3, StaffC2, LabelA, LabelB;
         public Guid? NotificationOfC1;
     }
 
@@ -118,6 +118,12 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             .IsSuccessStatusCode.Should().BeTrue();
         var c1Notifications = await a.NotificationsAsync(c1);
 
+        // Etykiety drużyn w bazie obu organizacji.
+        var labelA = await org.PostAsJsonAsync($"/api/organizations/{a.OrganizationId}/team-labels", new { name = "Rocznik 2015" });
+        labelA.IsSuccessStatusCode.Should().BeTrue();
+        var labelB = await b.Organizer.PostAsJsonAsync($"/api/organizations/{b.OrganizationId}/team-labels", new { name = "Rocznik 2015" });
+        labelB.IsSuccessStatusCode.Should().BeTrue();
+
         return new World
         {
             A = a,
@@ -129,6 +135,7 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             },
             UserIds = new() { [R1] = r1Id, [R2] = r2Id, [C1] = c1Id, [C2] = c2Id, [Parent] = parentId, [Viewer] = viewerId },
             M1 = m1, M2 = m2, MB = mb, Goal1 = goalId, Tp1 = tp1, P1 = p1, Tp3 = tp3, P3 = p3, StaffC2 = staffC2,
+            LabelA = (await labelA.ReadJsonAsync()).GetGuid("labelId"), LabelB = (await labelB.ReadJsonAsync()).GetGuid("labelId"),
             NotificationOfC1 = c1Notifications.Select(n => (Guid?)n.GetGuid("notificationRecipientId")).FirstOrDefault(),
         };
     }
@@ -187,6 +194,8 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             C("generowanie drabinki", HttpMethod.Post, $"{t}/bracket/generate", new { categoryId = a.CategoryId, roundOnePairings = Array.Empty<object>() }, organizer),
             C("zamiana slotów", HttpMethod.Post, $"{t}/bracket/swap-slots", new { categoryId = a.CategoryId, firstNodeId = Guid.NewGuid(), firstSlot = 1, secondNodeId = Guid.NewGuid(), secondSlot = 2 }, organizer),
             C("przeliczenie drabinki", HttpMethod.Post, $"{t}/bracket/recalculate?categoryId={a.CategoryId}", null, organizer),
+            C("podział drugiej fazy", HttpMethod.Put, $"{t}/second-stage/seats", new { categoryId = a.CategoryId, seats = Array.Empty<object>() }, organizer),
+            C("zakresy drugiej fazy", HttpMethod.Put, $"{t}/second-stage/ranges", new { categoryId = a.CategoryId, ranges = Array.Empty<object>() }, organizer),
 
             // Mecz na żywo (KON-020, KON-027, KON-028, KON-029)
             C("pauza", HttpMethod.Post, $"{m}/pause", null, matchStaff),
@@ -227,6 +236,10 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             C("edycja drużyny", HttpMethod.Put, $"/api/organizations/{a.OrganizationId}/teams/{a.ClubTeam("T1")}", new { name = "T1", shortName = (string?)null }, organizer),
             C("herb drużyny", HttpMethod.Put, $"/api/organizations/{a.OrganizationId}/teams/{a.ClubTeam("T1")}/logo", new { logoUrl = (string?)null }, organizer),
             new("wgranie herbu", HttpMethod.Post, $"/api/organizations/{a.OrganizationId}/teams/logos", LogoUpload, organizer),
+            C("nowa etykieta", HttpMethod.Post, $"/api/organizations/{a.OrganizationId}/team-labels", new { name = "Klub" }, organizer),
+            C("nazwa etykiety", HttpMethod.Put, $"/api/organizations/{a.OrganizationId}/team-labels/{w.LabelA}", new { name = "Rocznik 2015" }, organizer),
+            C("drużyny z etykietą", HttpMethod.Put, $"/api/organizations/{a.OrganizationId}/team-labels/{w.LabelA}/teams", new { teamIds = new[] { a.ClubTeam("T1") } }, organizer),
+            C("etykiety drużyny", HttpMethod.Put, $"/api/organizations/{a.OrganizationId}/teams/{a.ClubTeam("T1")}/labels", new { labelIds = new[] { w.LabelA } }, organizer),
             C("zawodnik w kadrze klubu", HttpMethod.Post, club1, new { firstName = "Klub", lastName = "Owy", birthDate = new DateTime(2012, 2, 2), defaultPosition = 3, shirtNumber = (int?)null }, squad),
             C("edycja w kadrze klubu", HttpMethod.Put, $"{club1}/{w.P1}", new { firstName = "Adam", lastName = "Pierwszy", birthDate = new DateTime(2012, 1, 1), defaultPosition = 3, shirtNumber = 7 }, squad),
 
@@ -236,6 +249,7 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             C("usunięcie z kadry klubu", HttpMethod.Delete, $"{club1}/{w.P1}?removeFromCurrentSquads=false", null, squad),
             C("przywrócenie do kadry klubu", HttpMethod.Post, $"{club1}/{w.P1}/restore", null, squad),
             C("usunięcie z kadry turnieju", HttpMethod.Delete, $"{tt1}/players/{w.Tp1}", null, squad),
+            C("usunięcie etykiety", HttpMethod.Delete, $"/api/organizations/{a.OrganizationId}/team-labels/{w.LabelA}", null, organizer),
             C("usunięcie sztabu", HttpMethod.Delete, $"{t}/tournament-teams/{a.Team("T3")}/staff/{w.StaffC2}", null, organizer),
             C("usunięcie boiska", HttpMethod.Delete, $"{t}/pitches/{Guid.NewGuid()}", null, organizer),
             C("usunięcie grupy", HttpMethod.Delete, $"{t}/groups/{Guid.NewGuid()}", null, organizer),
@@ -280,6 +294,13 @@ public sealed class PermissionMatrixTests(IntegrationTestWebApplicationFactory f
             I("cudza drużyna klubu zgłoszona do swojego turnieju", OrgB, HttpMethod.Post, $"{tb}/teams", new { teamId = a.ClubTeam("T1"), categoryId = b.CategoryId }),
             I("cudzy zawodnik do swojej kadry", OrgB, HttpMethod.Post, $"{tb}/tournament-teams/{b.Team("T1")}/players", new { playerId = w.P1, shirtNumber = (int?)null, position = (int?)null }),
             I("opiekun cudzego zawodnika przez swoją drużynę", OrgB, HttpMethod.Post, $"/api/players/{w.P1}/guardians", new { tournamentId = b.TournamentId, tournamentTeamId = b.Team("T1"), userId = w.UserIds[Viewer], relationshipType = 1, canEdit = true, canReceiveNotifications = true }),
+
+            // Organizator B: swoja organizacja w adresie, a etykieta albo drużyna z organizacji A.
+            I("zmiana cudzej etykiety przez swoją organizację", OrgB, HttpMethod.Put, $"/api/organizations/{b.OrganizationId}/team-labels/{w.LabelA}", new { name = "X" }),
+            I("usunięcie cudzej etykiety przez swoją organizację", OrgB, HttpMethod.Delete, $"/api/organizations/{b.OrganizationId}/team-labels/{w.LabelA}", null),
+            I("cudza drużyna pod swoją etykietą", OrgB, HttpMethod.Put, $"/api/organizations/{b.OrganizationId}/team-labels/{w.LabelB}/teams", new { teamIds = new[] { a.ClubTeam("T1") } }),
+            I("swoja etykieta na cudzej drużynie", OrgB, HttpMethod.Put, $"/api/organizations/{b.OrganizationId}/teams/{a.ClubTeam("T1")}/labels", new { labelIds = new[] { w.LabelB } }),
+            I("cudza etykieta na swojej drużynie", OrgB, HttpMethod.Put, $"/api/organizations/{b.OrganizationId}/teams/{b.ClubTeam("T1")}/labels", new { labelIds = new[] { w.LabelA } }),
 
             // Sędzia M2 próbuje zmieniać zdarzenie z M1 przez swój mecz.
             I("cofnięcie gola z innego meczu przez swój mecz", R2, HttpMethod.Delete, $"{ta}/matches/{w.M2}/events/{w.Goal1}", null),

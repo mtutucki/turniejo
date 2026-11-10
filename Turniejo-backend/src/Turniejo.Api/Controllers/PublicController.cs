@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Turniejo.Api.Extensions;
 using Turniejo.Brackets.Application.Brackets.GetPublicBracket;
@@ -9,10 +9,14 @@ using Turniejo.Matches.Application.Stats.GetPublicMvpRanking;
 using Turniejo.Matches.Application.Stats.GetPublicTopAssists;
 using Turniejo.Matches.Application.Stats.GetPublicTopScorers;
 using Turniejo.Players.Application.TournamentPlayers.GetPublicPlayerProfile;
+using Turniejo.Players.Application.TournamentPlayers.GetPublicTeamSquad;
 using Turniejo.Standings.Application.Standings.GetPublicStandings;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeamProfile;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeams;
 using Turniejo.Tournaments.Application.Tournaments.GetPublicTournamentPage;
+using Turniejo.Tournaments.Application.Tournaments.GetPublicTournaments;
+
+using Turniejo.Brackets.Application.SecondStage.GetPublicSecondStage;
 
 namespace Turniejo.Api.Controllers
 {
@@ -20,6 +24,13 @@ namespace Turniejo.Api.Controllers
     [ApiController]
     public sealed class PublicController(ISender sender) : ControllerBase
     {
+        [HttpGet("tournaments")]
+        public async Task<IActionResult> GetTournaments(CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPublicTournamentsQuery(), cancellationToken);
+            return result.ToActionResult();
+        }
+
         [HttpGet("tournaments/{slug}")]
         public async Task<IActionResult> GetTournamentPage([FromRoute] string slug, CancellationToken cancellationToken)
         {
@@ -38,6 +49,13 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> GetTeamProfile([FromRoute] string slug, [FromRoute] Guid teamId, CancellationToken cancellationToken)
         {
             var result = await sender.Send(new GetPublicTeamProfileQuery(slug, teamId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("tournaments/{slug}/teams/{teamId}/players")]
+        public async Task<IActionResult> GetTeamSquad([FromRoute] string slug, [FromRoute] Guid teamId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPublicTeamSquadQuery(slug, teamId), cancellationToken);
             return result.ToActionResult();
         }
 
@@ -66,6 +84,13 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> GetBracket([FromRoute] string slug, [FromQuery] Guid categoryId, CancellationToken cancellationToken)
         {
             var result = await sender.Send(new GetPublicBracketQuery(slug, categoryId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("tournaments/{slug}/second-stage")]
+        public async Task<IActionResult> GetSecondStage([FromRoute] string slug, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPublicSecondStageQuery(slug), cancellationToken);
             return result.ToActionResult();
         }
 

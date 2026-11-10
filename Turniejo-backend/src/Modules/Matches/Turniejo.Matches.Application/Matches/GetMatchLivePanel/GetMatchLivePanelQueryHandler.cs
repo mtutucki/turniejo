@@ -33,7 +33,7 @@ namespace Turniejo.Matches.Application.Matches.GetMatchLivePanel
                 match.HomeScore, match.AwayScore, match.ResultType.ToString(), match.WinnerTournamentTeamId,
                 homeTeam, awayTeam, eventDtos, match.EditLockedAt,
                 match.GetElapsedSeconds(match.FinishedAt ?? match.PausedAt ?? DateTimeOffset.UtcNow),
-                match.HomePenaltyScore, match.AwayPenaltyScore);
+                match.HomePenaltyScore, match.AwayPenaltyScore, AwaitingDecision: match.IsAwaitingDecision);
 
             return Result.Success(dto);
         }

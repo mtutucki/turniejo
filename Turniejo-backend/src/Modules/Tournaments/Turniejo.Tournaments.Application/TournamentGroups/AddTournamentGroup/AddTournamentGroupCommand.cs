@@ -8,7 +8,8 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.AddTournamentGroup
         Guid TournamentId,
         Guid CategoryId,
         string Name,
-        int Order) : ICommand<AddTournamentGroupResponse>, IAuthorizedRequest
+        int Order,
+        int Stage = 1) : ICommand<AddTournamentGroupResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;
