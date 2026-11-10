@@ -13,7 +13,7 @@ export async function PublicTournamentsPage({
   return (
     <PublicSite
       title="Turnieje piłkarskie na żywo"
-      subtitle="Wyniki, terminarze i tabele turniejów, bez logowania."
+      subtitle="Wyniki, terminarze i tabele turniejów."
     >
       <TournamentDirectory initialData={tournaments} initialFilters={parseFilters(searchParams)} />
     </PublicSite>
