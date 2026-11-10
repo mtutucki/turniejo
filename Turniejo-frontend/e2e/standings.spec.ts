@@ -31,6 +31,8 @@ test("[TAB-02] wynik zakończonego meczu pojawia się w tabeli bez odświeżania
 })
 
 test("[TAB-03] drużyna przeniesiona do innej grupy od razu zmienia tabele, bez odświeżania", async ({ page }) => {
+  // Przed terminarzem: po jego wygenerowaniu grup nie da się już zmieniać (GRP-031).
+  await mock.tournament(TOURNAMENT_ID, { status: "RegistrationClosed" })
   await loginAs(page, ORGANIZER)
   await page.goto(`/tournaments/${TOURNAMENT_ID}/standings`)
   await expect(table(page).getByRole("row", { name: /Lwy E2E/ })).toBeVisible()
