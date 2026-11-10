@@ -276,4 +276,50 @@ public sealed class GroupStageRulesTests(IntegrationTestWebApplicationFactory fa
         response.IsSuccessStatusCode.Should().BeFalse();
         (await response.Content.ReadAsStringAsync()).Should().Contain("One of the teams already plays another match at this time");
     }
+
+    // Tabela to projekcja liczona po zakończonym meczu. Zanim pierwszy mecz grupy się skończy, drużyny
+    // grupy mają być w tabeli z zerami, a nie "Brak drużyn w grupie".
+    [Fact]
+    public async Task GRP_Standings_ListAllGroupTeams_BeforeTheFirstMatchEnds()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4);
+
+        var table = await TableAsync(s);
+
+        table.Select(r => r.GetGuid("tournamentTeamId")).Should()
+            .BeEquivalentTo(new[] { s.Team("T1"), s.Team("T2"), s.Team("T3"), s.Team("T4") });
+        table.Should().OnlyContain(r => r.GetInt("matchesPlayed") == 0 && r.GetInt("points") == 0);
+        table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3, 4);
+    }
+
+    [Fact]
+    public async Task GRP_PublicStandings_ListAllGroupTeams_BeforeTheFirstMatchEnds()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 3);
+        var slug = (await s.TournamentAsync()).GetString("slug");
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
+                new { isPublic = true, showTeams = true, showPlayers = true, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true }))
+            .IsSuccessStatusCode.Should().BeTrue();
+
+        var table = (await (await CreateClient().GetAsync($"/public/tournaments/{slug}/standings?groupId={s.Group("A")}")).ReadJsonAsync())
+            .EnumerateArray().ToList();
+
+        table.Should().HaveCount(3);
+        table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3);
+    }
+
+    // Wynik pierwszego meczu nie może zgubić drużyn, które jeszcze nie grały.
+    [Fact]
+    public async Task GRP_Standings_AfterTheFirstMatch_KeepTeamsThatHaveNotPlayed()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 4);
+        await PlayAsync(s, "T1", "T2", 2, 0);
+        await FlushOutboxAsync();
+
+        var table = await TableAsync(s);
+
+        table.Should().HaveCount(4);
+        table.First().GetGuid("tournamentTeamId").Should().Be(s.Team("T1"));
+        table.Select(r => r.GetInt("position")).Should().Equal(1, 2, 3, 4);
+    }
 }

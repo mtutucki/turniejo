@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.Standings.Application.Abstractions;
 using Turniejo.Standings.Application.Standings.GetStandings;
 using Turniejo.Standings.Domain.Entities;
@@ -14,7 +15,17 @@ namespace Turniejo.Standings.UnitTests.Standings
         public GetStandingsQueryHandlerTests()
         {
             _dbContext = Substitute.For<IStandingsDbContext>();
-            _handler = new GetStandingsQueryHandler(_dbContext);
+            _handler = new GetStandingsQueryHandler(
+                _dbContext, Substitute.For<ITournamentModule>(), NoGroupTeams(), Substitute.For<IMatchModule>());
+        }
+
+        // Drużyny grupy z modułu Teams: pusto = zapisane wiersze tabeli wystarczą (GroupTable.ReadAsync).
+        private static ITeamModule NoGroupTeams()
+        {
+            var teamModule = Substitute.For<ITeamModule>();
+            teamModule.GetTournamentTeamsByTournamentIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new List<TournamentTeamDto>());
+            return teamModule;
         }
 
         [Fact]

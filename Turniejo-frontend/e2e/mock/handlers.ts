@@ -269,6 +269,45 @@ const tournamentTeams = (tournamentId: string) =>
         teamLogoUrl: null,
       }))
 
+/**
+ * Tabela grupy jak GroupTable w backendzie: wszystkie zaakceptowane drużyny grupy, także przed
+ * pierwszym meczem (z zerami). Kolejność: punkty, różnica bramek, bramki zdobyte.
+ */
+function groupStandings(tournamentId: string, groupId: string) {
+  const finished = db.matches.filter((m) => m.groupId === groupId && m.status === "Finished")
+  const rows = tournamentTeams(tournamentId)
+    .filter((t) => t.groupId === groupId && t.registrationStatus === "Accepted")
+    .map((t) => {
+      const row = { matchesPlayed: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 }
+      for (const m of finished.filter((x) => x.home === t.id || x.away === t.id)) {
+        const [own, other] = m.home === t.id ? [m.homeScore, m.awayScore] : [m.awayScore, m.homeScore]
+        row.matchesPlayed++
+        row.goalsFor += own
+        row.goalsAgainst += other
+        if (own > other) row.wins++
+        else if (own === other) row.draws++
+        else row.losses++
+      }
+      return {
+        id: `${groupId}-${t.id}`,
+        tournamentId,
+        categoryId: t.categoryId,
+        groupId,
+        tournamentTeamId: t.id,
+        ...row,
+        goalDifference: row.goalsFor - row.goalsAgainst,
+        points: row.wins * 3 + row.draws,
+      }
+    })
+    .sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor)
+  return rows.map((r, i) => ({ ...r, position: i + 1 }))
+}
+
+/** Po zakończonym meczu backend przelicza tabelę i wysyła StandingUpdated do grupy turnieju. */
+function standingChanged(m: Match) {
+  publish("tournaments", m.tournamentId, "StandingUpdated", { tournamentId: m.tournamentId, groupId: m.groupId })
+}
+
 function createOrganization(user: User, name: string) {
   const organization = { id: newId(), name, slug: slugify(name), ownerUserId: user.id }
   db.organizations.push(organization)
@@ -865,6 +904,7 @@ const api = [
         m.status = to
         publish("matches", m.id, "MatchStatusChanged", { matchId: m.id, status: to })
         publish("tournaments", m.tournamentId, "MatchChanged", { tournamentId: m.tournamentId, matchId: m.id })
+        if (to === "Finished") standingChanged(m)
         return HttpResponse.json({ matchId: m.id, status: to })
       }),
     ),
@@ -1477,6 +1517,12 @@ const config = [
     }),
   ),
   http.get(
+    "*/api/tournaments/:id/standings",
+    authed<{ id: string }>(({ params, request }) =>
+      HttpResponse.json(groupStandings(params.id, new URL(request.url).searchParams.get("groupId") ?? "")),
+    ),
+  ),
+  http.get(
     "*/api/tournaments/:id/groups",
     authed<{ id: string }>(({ params }) => HttpResponse.json(configOf(params.id).groups)),
   ),
@@ -1873,6 +1919,8 @@ const control = [
     const { status, editLockedAt } = (await request.json()) as { status: string; editLockedAt?: string | null }
     m.status = status
     if (editLockedAt !== undefined) m.editLockedAt = editLockedAt
+    // Mecz zakończony "na innym urządzeniu": tabela przeliczona jak w backendzie.
+    if (status === "Finished") standingChanged(m)
     if (status === "Scheduled") {
       Object.assign(m, { startedAt: null, pausedAt: null, totalPausedSeconds: 0, homeScore: 0, awayScore: 0, events: [] })
     }

@@ -5,6 +5,7 @@ import { ListOrdered } from "lucide-react"
 import { EmptyState } from "@/components/layout/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useStandings } from "@/features/matches/api"
+import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-matches-realtime"
 import { useTournamentTeams } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
@@ -88,6 +89,8 @@ export function TournamentStandingsView() {
   const categories = useCategories(id)
   const groups = useGroups(id)
   const teams = useTournamentTeams(id)
+  // Wynik zakończonego meczu pojawia się w tabeli bez odświeżania strony.
+  useTournamentMatchesRealtime([id])
 
   if (tournament.data?.format === "Knockout") {
     return (
