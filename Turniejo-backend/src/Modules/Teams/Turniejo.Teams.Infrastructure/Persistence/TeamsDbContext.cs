@@ -78,6 +78,9 @@ public sealed class TeamsDbContext(DbContextOptions<TeamsDbContext> options)
         await TournamentTeams
             .AsNoTracking()
             .Where(t => t.TournamentId == tournamentId)
+            // Bez sortowania Postgres przestawia wiersz po każdej zmianie (np. akceptacji),
+            // a drużyny o tej samej nazwie zamieniały się miejscami na liście.
+            .OrderBy(t => t.CreatedAt).ThenBy(t => t.Id)
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<TournamentTeam>> GetTournamentTeamsByTeamIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>

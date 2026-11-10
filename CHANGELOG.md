@@ -25,6 +25,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
 - Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
 - Po przypisaniu drużyny do grupy, dodaniu albo wycofaniu drużyny tabela zmienia się od razu, bez odświeżania strony.
+- Lista drużyn turnieju nie zmienia kolejności po akceptacji, więc przy drużynach o tej samej nazwie widać, którą faktycznie zaakceptowano.
 
 ## [1.0.0] - 2026-11-09
 
