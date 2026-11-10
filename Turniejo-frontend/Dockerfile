@@ -30,6 +30,12 @@ RUN npm run build
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
+# Serwer to tylko `node server.js`. npm, yarn i corepack z obrazu bazowego nie są potrzebne, a to w ich
+# zależnościach skanery znajdują podatności. Usuwamy je i dociągamy poprawki pakietów Alpine.
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules /opt/yarn-* \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /usr/local/bin/yarn /usr/local/bin/yarnpkg
 # API_URL potrzebny też w działającym serwerze: komponenty serwerowe (np. /t/[slug]) pobierają dane
 # prosto z API (lib/api/client.ts). Bez niego fetch idzie na "undefined/..." i strona kończy się 500.
 ARG API_URL
