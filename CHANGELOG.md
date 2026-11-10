@@ -24,6 +24,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Tabela grupy pokazuje drużyny od razu, jeszcze przed pierwszym rozegranym meczem.
 - Tabela w panelu organizatora sama pokazuje wynik zakończonego meczu, bez odświeżania strony.
 
+### Zmienione
+
+- Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
+
 ## [1.0.0] - 2026-11-09
 
 Pierwsza wersja z numerem. Ten wpis streszcza, co aplikacja umie w tym momencie.

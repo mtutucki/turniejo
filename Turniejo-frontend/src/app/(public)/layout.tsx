@@ -12,6 +12,7 @@ import { formatVersion } from "@/lib/version"
 export default async function PublicPagesLayout({ children }: LayoutProps<"/">) {
   const session = await auth()
   const signedIn = !!session && !session.error
+  const version = formatVersion()
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
@@ -38,8 +39,10 @@ export default async function PublicPagesLayout({ children }: LayoutProps<"/">) 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">{children}</main>
       <footer className="border-t py-6">
         <LegalLinks className="justify-center" />
-        {formatVersion() && (
-          <p className="text-muted-foreground mt-2 text-center text-xs">Wersja {formatVersion()}</p>
+        {version && (
+          <p className="text-muted-foreground mt-2 text-center text-xs" title={version.details}>
+            Wersja {version.label}
+          </p>
         )}
       </footer>
     </div>
