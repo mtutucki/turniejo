@@ -50,6 +50,25 @@ test.describe("Kreator konfiguracji", () => {
     // Ustawienie meczu o 3. miejsce zostało zapisane.
     await steps(page).getByRole("button", { name: /Zasady gry/ }).click()
     await expect(page.getByRole("switch", { name: "Mecz o 3. miejsce" })).toBeChecked()
+    // W pucharze nie ma tabeli, więc nie ma kroku z kolejnością przy remisie.
+    await expect(steps(page).getByRole("button", { name: /Tabela/ })).toHaveCount(0)
+  })
+
+  test("[GRP-005] format grupowy: krok Tabela z domyślną kolejnością przy remisie", async ({ page }) => {
+    await createTournament(page)
+    await page.getByText("Grupowy", { exact: true }).click()
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+
+    await expect(page).toHaveURL(/\?step=tiebreakers$/)
+    const rules = page.getByRole("list", { name: "Kolejność reguł" })
+    await expect(rules.getByRole("listitem")).toHaveCount(5)
+    await expect(rules.getByRole("listitem").first()).toContainText("1.")
+
+    // Bez zmian „Zapisz i dalej” przechodzi do kolejnego kroku.
+    await page.getByRole("button", { name: "Zapisz i dalej" }).click()
+    await expect(page.getByRole("switch", { name: "Turniej publiczny" })).toBeVisible()
+    await expect(steps(page).getByRole("button", { name: /Tabela/ }).getByLabel("Zrobione")).toBeVisible()
   })
 })
 

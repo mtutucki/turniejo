@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -115,13 +115,22 @@ type TieBreakerEditorProps = {
   tournamentId: string
   savedRules: TieBreakerRule[]
   canManage: boolean
+  /** W kreatorze: po zapisie (albo bez zmian) przejdź do następnego kroku. */
+  onSaved?: () => void
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 /**
  * Kolejność kryteriów rozstrzygania remisów punktowych w tabeli. Zapis podmienia cały zestaw
  * (PUT), kolejność = pozycja na liście.
  */
-export function TieBreakerEditor({ tournamentId, savedRules, canManage }: TieBreakerEditorProps) {
+export function TieBreakerEditor({
+  tournamentId,
+  savedRules,
+  canManage,
+  onSaved,
+  onDirtyChange,
+}: TieBreakerEditorProps) {
   const saved = savedRules.map((r) => r.type)
   const [rules, setRules] = useState<TieBreakerType[]>(saved)
   const setTieBreakerRules = useSetTieBreakerRules(tournamentId)
@@ -133,6 +142,10 @@ export function TieBreakerEditor({ tournamentId, savedRules, canManage }: TieBre
   const available = ALL_TYPES.filter((type) => !rules.includes(type))
   const isDirty = rules.join() !== saved.join()
   const disabled = !canManage || setTieBreakerRules.isPending
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
 
   function move(from: number, to: number) {
     setRules((current) => arrayMove(current, from, to))
@@ -150,8 +163,12 @@ export function TieBreakerEditor({ tournamentId, savedRules, canManage }: TieBre
   }
 
   function save() {
+    if (!isDirty) return onSaved?.()
     setTieBreakerRules.mutate(rules, {
-      onSuccess: () => toast.success("Kolejność reguł zapisana"),
+      onSuccess: () => {
+        toast.success("Kolejność reguł zapisana")
+        onSaved?.()
+      },
     })
   }
 
@@ -205,8 +222,15 @@ export function TieBreakerEditor({ tournamentId, savedRules, canManage }: TieBre
 
       {canManage && (
         <div className="flex flex-wrap gap-2">
-          <Button onClick={save} disabled={disabled || !isDirty || rules.length === 0}>
-            {setTieBreakerRules.isPending ? "Zapisywanie…" : "Zapisz kolejność"}
+          <Button
+            onClick={save}
+            disabled={disabled || (!isDirty && !onSaved) || rules.length === 0}
+          >
+            {setTieBreakerRules.isPending
+              ? "Zapisywanie…"
+              : onSaved
+                ? "Zapisz i dalej"
+                : "Zapisz kolejność"}
           </Button>
           {isDirty && (
             <Button variant="ghost" onClick={() => setRules(saved)} disabled={disabled}>

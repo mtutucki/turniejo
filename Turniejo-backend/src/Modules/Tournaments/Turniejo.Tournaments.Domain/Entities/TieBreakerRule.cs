@@ -6,6 +6,18 @@ namespace Turniejo.Tournaments.Domain.Entities
 {
     public sealed class TieBreakerRule : BaseEntity
     {
+        /// <summary>
+        /// Kolejność używana, dopóki organizator nie zapisze własnej. Bez niej remis punktowy
+        /// nie byłby rozstrzygany niczym sensownym.
+        /// </summary>
+        public static readonly IReadOnlyList<TieBreakerType> DefaultOrder =
+        [
+            TieBreakerType.HeadToHeadPoints,
+            TieBreakerType.HeadToHeadGoalDiff,
+            TieBreakerType.GoalDifference,
+            TieBreakerType.GoalsFor,
+            TieBreakerType.Wins,
+        ];
 
         public Guid TournamentId { get; private set; }
         public int Order { get; private set; }

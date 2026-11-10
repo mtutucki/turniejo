@@ -17,7 +17,7 @@ import { statusAtLeast } from "@/types/tournaments"
 export function TournamentCategoriesView({
   embedded = false,
 }: {
-  /** W kreatorze turnieju: same kategorie, bez reguł tabeli (to ustawienie na później). */
+  /** W kreatorze turnieju: same kategorie, kolejność w tabeli ma tam własny krok. */
   embedded?: boolean
 }) {
   const { id, isOrganizer, tournament } = useTournamentContext()

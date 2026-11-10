@@ -11,11 +11,13 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 - Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.
 - Jasny motyw: domyślnie jak w telefonie lub komputerze, a ikonka w nagłówku przełącza między jasnym i ciemnym. Wybór zapisuje się na koncie.
+- Kreator turnieju z grupami ma krok „Tabela”, w którym ustawisz kolejność przy równej liczbie punktów.
 
 ### Zmienione
 
 - Grupy w karcie kategorii są czytelną listą z liczbą drużyn i przyciskami edycji i usuwania przy każdej grupie.
 - Stopka pokazuje sam numer wersji, np. „wersja 1.0.0”. Szczegóły widać po najechaniu na numer.
+- Turniej ma od razu domyślną kolejność reguł przy równej liczbie punktów (mecze bezpośrednie, bilans, gole, zwycięstwa). Organizator może ją zmienić.
 
 ### Poprawione
 
