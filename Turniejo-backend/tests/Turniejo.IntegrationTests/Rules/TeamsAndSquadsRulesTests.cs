@@ -56,6 +56,22 @@ public sealed class TeamsAndSquadsRulesTests(IntegrationTestWebApplicationFactor
     }
 
     [Fact]
+    public async Task TeamList_KeepsItsOrder_AfterAcceptingATeam()
+    {
+        // Dwie drużyny o tej samej nazwie: po akceptacji pierwszej lista nie może zamienić ich miejscami,
+        // bo organizator widzi wtedy zaakceptowaną „inną” drużynę.
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
+        var (_, first) = await RegisterTeamAsync(s, "Orły");
+        var (_, second) = await RegisterTeamAsync(s, "Orły");
+        var before = (await TeamsAsync(s)).Select(t => t.GetGuid("id")).ToList();
+        before.IndexOf(first).Should().BeLessThan(before.IndexOf(second));
+
+        (await SetStatusAsync(s, first, Accepted)).IsSuccessStatusCode.Should().BeTrue();
+
+        (await TeamsAsync(s)).Select(t => t.GetGuid("id")).Should().Equal(before);
+    }
+
+    [Fact]
     public async Task DRU_004_SameTeamTwiceInTheSameCategory_IsRejected()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, schedule: false);
