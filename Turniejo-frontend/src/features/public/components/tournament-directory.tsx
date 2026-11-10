@@ -1,19 +1,11 @@
 "use client"
 
 import { Search, SlidersHorizontal, Trophy, X } from "lucide-react"
-import { type ReactNode, useId, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDate, plural } from "@/lib/format"
 import type { PublicTournamentListItem } from "@/types/public"
@@ -34,10 +26,18 @@ import {
   WHEN_LABELS,
 } from "../directory"
 import { DirectoryCard } from "./directory-card"
+import {
+  ActiveFilters,
+  ALL,
+  DateField,
+  FilterGrid,
+  FilterOption,
+  FilterPanel,
+  FilterSelect,
+} from "./filter-bar"
 
 /** Ile zakończonych pokazać, zanim kibic kliknie „Pokaż więcej”. */
 const FINISHED_PREVIEW = 6
-const ALL = "all"
 const SECTIONS: DirectorySection[] = ["live", "upcoming", "finished"]
 
 /** Filtry w adresie, żeby dało się podesłać link np. do turniejów jednego organizatora. */
@@ -109,33 +109,29 @@ export function TournamentDirectory({
   const organizer = organizers.find((o) => o.id === filters.organizerId)
   const statusCount = (s: DirectorySection) => all.filter((t) => sectionOf(t) === s).length
 
-  const active: { key: string; label: string; clear: Partial<DirectoryFilters> }[] = []
-  if (filters.query) active.push({ key: "q", label: `„${filters.query}”`, clear: { query: "" } })
+  const active: { key: string; label: string; patch: Partial<DirectoryFilters> }[] = []
+  if (filters.query) active.push({ key: "q", label: `„${filters.query}”`, patch: { query: "" } })
   if (filters.status !== "all")
-    active.push({ key: "status", label: STATUS_LABELS[filters.status], clear: { status: "all" } })
+    active.push({ key: "status", label: STATUS_LABELS[filters.status], patch: { status: "all" } })
   if (filters.when !== "any" && (filters.when !== "custom" || filters.from || filters.to))
     active.push({
       key: "when",
       label: filters.when === "custom" ? customRangeLabel(filters) : WHEN_LABELS[filters.when],
-      clear: { when: "any", from: "", to: "" },
+      patch: { when: "any", from: "", to: "" },
     })
   if (filters.organizerId)
     active.push({
       key: "org",
       label: organizer?.name ?? "Organizator",
-      clear: { organizerId: null },
+      patch: { organizerId: null },
     })
   if (filters.category)
-    active.push({ key: "cat", label: filters.category, clear: { category: null } })
+    active.push({ key: "cat", label: filters.category, patch: { category: null } })
 
   return (
     <div className="space-y-8">
       <div className="space-y-3">
-        <div
-          role="search"
-          aria-label="Filtry turniejów"
-          className="bg-card space-y-3 rounded-xl border p-3 shadow-xs sm:p-4"
-        >
+        <FilterPanel label="Filtry turniejów">
           <div className="relative">
             <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
@@ -148,7 +144,7 @@ export function TournamentDirectory({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <FilterGrid count={4}>
             <FilterSelect
               label="Status"
               value={filters.status}
@@ -156,9 +152,9 @@ export function TournamentDirectory({
               allLabel="Wszystkie"
             >
               {SECTIONS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {STATUS_LABELS[s]} <Count n={statusCount(s)} />
-                </SelectItem>
+                <FilterOption key={s} value={s} count={statusCount(s)}>
+                  {STATUS_LABELS[s]}
+                </FilterOption>
               ))}
             </FilterSelect>
 
@@ -175,9 +171,9 @@ export function TournamentDirectory({
               allLabel="Dowolny"
             >
               {(Object.keys(WHEN_LABELS) as (keyof typeof WHEN_LABELS)[]).map((key) => (
-                <SelectItem key={key} value={key}>
+                <FilterOption key={key} value={key}>
                   {WHEN_LABELS[key]}
-                </SelectItem>
+                </FilterOption>
               ))}
             </FilterSelect>
 
@@ -188,9 +184,9 @@ export function TournamentDirectory({
               allLabel="Wszyscy"
             >
               {organizers.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
-                  {o.name} <Count n={o.count} />
-                </SelectItem>
+                <FilterOption key={o.id} value={o.id} count={o.count}>
+                  {o.name}
+                </FilterOption>
               ))}
             </FilterSelect>
 
@@ -202,12 +198,12 @@ export function TournamentDirectory({
               disabled={categories.length === 0}
             >
               {categories.map((c) => (
-                <SelectItem key={c} value={c}>
+                <FilterOption key={c} value={c}>
                   {c}
-                </SelectItem>
+                </FilterOption>
               ))}
             </FilterSelect>
-          </div>
+          </FilterGrid>
 
           {filters.when === "custom" && (
             <div className="grid grid-cols-2 gap-2 sm:max-w-md sm:gap-3">
@@ -225,39 +221,13 @@ export function TournamentDirectory({
               />
             </div>
           )}
-        </div>
+        </FilterPanel>
 
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted-foreground mr-1" role="status">
-            {active.length > 0 ? "Znaleziono " : ""}
-            {plural(filtered.length, ["turniej", "turnieje", "turniejów"])}
-          </span>
-          {active.map((f) => (
-            <span
-              key={f.key}
-              className="bg-primary/10 text-primary flex max-w-full items-center gap-1 rounded-full py-0.5 pr-1 pl-2.5 text-xs font-medium"
-            >
-              <span className="truncate">{f.label}</span>
-              <button
-                type="button"
-                onClick={() => update(f.clear)}
-                aria-label={`Usuń filtr ${f.label}`}
-                className="hover:bg-primary/15 rounded-full p-0.5"
-              >
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ))}
-          {active.length > 1 && (
-            <button
-              type="button"
-              onClick={() => update(EMPTY_FILTERS)}
-              className="text-muted-foreground hover:text-foreground text-xs font-medium underline-offset-2 hover:underline"
-            >
-              Wyczyść wszystko
-            </button>
-          )}
-        </div>
+        <ActiveFilters
+          summary={`${active.length > 0 ? "Znaleziono " : ""}${plural(filtered.length, ["turniej", "turnieje", "turniejów"])}`}
+          filters={active.map((f) => ({ ...f, clear: () => update(f.patch) }))}
+          onClearAll={() => update(EMPTY_FILTERS)}
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -320,78 +290,4 @@ export function TournamentDirectory({
 function customRangeLabel({ from, to }: DirectoryFilters) {
   if (from && to) return `${formatDate(from)} – ${formatDate(to)}`
   return from ? `Od ${formatDate(from)}` : `Do ${formatDate(to)}`
-}
-
-function Count({ n }: { n: number }) {
-  return <span className="text-muted-foreground tabular-nums">{n}</span>
-}
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  allLabel,
-  disabled,
-  children,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  allLabel: string
-  disabled?: boolean
-  children: ReactNode
-}) {
-  const id = useId()
-  return (
-    <div className="min-w-0 space-y-1">
-      <span id={id} className="text-muted-foreground text-xs font-medium">
-        {label}
-      </span>
-      <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger
-          aria-label={label}
-          className={`h-10 w-full min-w-0 ${value !== ALL ? "border-primary/60 bg-primary/5" : ""}`}
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>{allLabel}</SelectItem>
-          <SelectSeparator />
-          {children}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-
-function DateField({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string
-  value: string
-  min?: string
-  max?: string
-  onChange: (value: string) => void
-}) {
-  const id = useId()
-  return (
-    <div className="min-w-0 space-y-1">
-      <label htmlFor={id} className="text-muted-foreground text-xs font-medium">
-        {label}
-      </label>
-      <Input
-        id={id}
-        type="date"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10"
-      />
-    </div>
-  )
 }

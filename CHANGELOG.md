@@ -6,6 +6,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+### Zmienione
+
+- Mecze w portalu kibica filtrujesz jednym paskiem: drużyna, kategoria, grupa, boisko i dzień. Widać, ile meczów pasuje, a filtry da się usunąć jednym kliknięciem i przesłać linkiem.
+
 ### Nowe
 
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
