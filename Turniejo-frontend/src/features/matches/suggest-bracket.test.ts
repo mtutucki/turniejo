@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { TournamentTeam } from "@/types/teams"
 import type { TournamentGroup } from "@/types/tournaments"
 
-import { autoBracketPairs, defaultPairCount, suggestPairs } from "./suggest-bracket"
+import { autoBracketPairs, bracketSizes, defaultPairCount, suggestPairs } from "./suggest-bracket"
 
 const team = (id: string, groupId: string | null = null, seedNumber: number | null = null) =>
   ({
@@ -23,6 +23,27 @@ describe("defaultPairCount", () => {
     expect(defaultPairCount([], [team("a"), team("b"), team("c"), team("d"), team("e")])).toBe(4)
     expect(defaultPairCount([group("A", 1), group("B", 2), group("C", 3)], [])).toBe(4)
     expect(defaultPairCount([group("A", 1)], [])).toBe(1)
+  })
+})
+
+describe("bracketSizes", () => {
+  it("offers sizes up to 1/8 final at least", () => {
+    expect(bracketSizes([], [team("a"), team("b")]).map((s) => s.label)).toEqual([
+      "Finał (2 drużyny)",
+      "Półfinały (3–4 drużyny)",
+      "Ćwierćfinały (5–8 drużyn)",
+      "1/8 finału (9–16 drużyn)",
+    ])
+  })
+
+  it("PUC-020: grows with the number of teams", () => {
+    const teams = Array.from({ length: 40 }, (_, i) => team(`t${i}`))
+    expect(bracketSizes([], teams).slice(4)).toEqual([
+      { pairs: 16, label: "1/16 finału (17–32 drużyny)" },
+      { pairs: 32, label: "1/32 finału (33–64 drużyny)" },
+    ])
+    const many = Array.from({ length: 100 }, (_, i) => team(`t${i}`))
+    expect(bracketSizes([], many).at(-1)).toEqual({ pairs: 64, label: "1/64 finału (65–128 drużyn)" })
   })
 })
 
@@ -94,9 +115,18 @@ describe("autoBracketPairs", () => {
     expect(autoBracketPairs(groups, teams)).toBeNull()
   })
 
-  it("gives up when not every knockout team fits", () => {
-    const teams = Array.from({ length: 17 }, (_, i) => team(`t${i}`))
-    expect(autoBracketPairs([], teams)).toBeNull()
+  // PUC-020: drabinka nie ma górnego limitu, 17 drużyn to 1/16 finału z 15 wolnymi losami.
+  it("PUC-020: fits every knockout team, also above 16", () => {
+    const teams = Array.from({ length: 17 }, (_, i) => team(`t${i}`, null, i + 1))
+    const pairs = autoBracketPairs([], teams)!
+    expect(pairs).toHaveLength(16)
+    expect(pairs.filter((p) => p.away.kind === "bye")).toHaveLength(15)
+    expect(pairs[0]).toEqual({ home: { kind: "team", tournamentTeamId: "t0" }, away: { kind: "bye" } })
+    expect(pairs[15]).toEqual({
+      home: { kind: "team", tournamentTeamId: "t15" },
+      away: { kind: "team", tournamentTeamId: "t16" },
+    })
+    expect(defaultPairCount([], Array.from({ length: 40 }, (_, i) => team(`t${i}`)))).toBe(32)
   })
 
   it("needs at least two teams", () => {
