@@ -7,6 +7,7 @@ import type { MatchLivePanel } from "@/types/matches"
 import type {
   Bracket,
   PublicMatch,
+  PublicSquadPlayer,
   PublicTeam,
   PublicTournament,
   PublicTournamentListItem,
@@ -25,6 +26,9 @@ export const publicKeys = {
   standings: (slug: string, groupId: string) => ["public", slug, "standings", groupId] as const,
   bracket: (slug: string, categoryId: string) => ["public", slug, "bracket", categoryId] as const,
   ranking: (slug: string, kind: RankingKind) => ["public", slug, "ranking", kind] as const,
+  fullRanking: (slug: string, kind: RankingKind) =>
+    ["public", slug, "ranking", kind, "all"] as const,
+  squad: (slug: string, teamId: string) => ["public", slug, "squad", teamId] as const,
   liveMatch: (slug: string, matchId: string) => ["public", slug, "live", matchId] as const,
 }
 
@@ -64,11 +68,12 @@ export function usePublicSchedule(slug: string, enabled = true) {
   })
 }
 
-export function usePublicStandings(slug: string, groupId: string) {
+export function usePublicStandings(slug: string, groupId: string, enabled = true) {
   return useQuery({
     queryKey: publicKeys.standings(slug, groupId),
     queryFn: () =>
       apiFetch<Standing[]>(`${base(slug)}/standings?groupId=${encodeURIComponent(groupId)}`),
+    enabled: enabled && !!groupId,
   })
 }
 
@@ -102,6 +107,26 @@ export function usePublicRanking(slug: string, kind: RankingKind) {
   return useQuery({
     queryKey: publicKeys.ranking(slug, kind),
     queryFn: () => apiFetch<RankingEntry[]>(`${base(slug)}/stats/${kind}?top=10`),
+  })
+}
+
+/** Cały ranking (nie tylko pierwsza dziesiątka) — gole i asysty zawodników na stronie drużyny. */
+export function usePublicFullRanking(slug: string, kind: RankingKind, enabled: boolean) {
+  return useQuery({
+    queryKey: publicKeys.fullRanking(slug, kind),
+    queryFn: () => apiFetch<RankingEntry[]>(`${base(slug)}/stats/${kind}?top=1000`),
+    enabled,
+  })
+}
+
+/** Skład drużyny. Bez „Pokazuj zawodników” backend zwraca 404 — wtedy nie pytamy. */
+export function usePublicSquad(slug: string, teamId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: publicKeys.squad(slug, teamId),
+    queryFn: () =>
+      apiFetch<PublicSquadPlayer[]>(`${base(slug)}/teams/${encodeURIComponent(teamId)}/players`),
+    enabled,
+    retry: false,
   })
 }
 

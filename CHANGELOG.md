@@ -15,6 +15,7 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ### Nowe
 
+- Każda drużyna ma swoją stronę: miejsce w grupie, bilans, forma z ostatnich meczów, wszystkie mecze z wynikami, droga w pucharze i skład z golami i asystami. Wchodzisz na nią, klikając drużynę w tabeli, drabince, na liście drużyn albo na stronie meczu, w portalu kibica i w panelu.
 - Turnieje łatwiej znaleźć w Google: strona główna i portale kibica mają opisy, sitemapę i dane o meczach. Link do turnieju albo meczu wysłany na Messengerze, WhatsAppie czy Facebooku pokazuje obrazek z nazwą turnieju, a przy meczu z drużynami i aktualnym wynikiem. Turniej ukryty z listy turniejów nie trafia do Google.
 - Po wydaniu nowej wersji aplikacja pokazuje okno „Co nowego”, a pełna lista zmian jest pod linkiem w stopce.
 - Przy dodawaniu kategorii wybierasz liczbę grup, a Grupa A, B… powstają od razu.

@@ -339,7 +339,8 @@ export function useStandings(tournamentId: string, groupId: string) {
     queryKey: matchKeys.standings(tournamentId, groupId),
     queryFn: () =>
       request<Standing[]>(`${base(tournamentId)}/standings?groupId=${encodeURIComponent(groupId)}`),
-    enabled: isAuthenticated,
+    // Drużyna bez grupy (np. w pucharze) nie ma tabeli.
+    enabled: isAuthenticated && !!groupId,
   })
 }
 

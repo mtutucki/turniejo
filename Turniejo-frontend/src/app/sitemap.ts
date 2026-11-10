@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next"
 
-import { findPublicTournament, getPublicTournaments } from "@/features/public/server"
+import {
+  findPublicTeams,
+  findPublicTournament,
+  getPublicTournaments,
+} from "@/features/public/server"
 import { publicSections } from "@/features/public/sections"
 import { absoluteUrl } from "@/lib/site"
 
@@ -26,12 +30,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const item = listed[i]!
     const live = item.liveMatchCount > 0 || item.status === "InProgress"
     const finished = item.status === "Finished"
+    const changeFrequency = live ? "always" : finished ? "monthly" : "daily"
     for (const { segment } of publicSections(tournament)) {
       pages.push({
         url: absoluteUrl(`/t/${tournament.slug}${segment ? `/${segment}` : ""}`),
-        changeFrequency: live ? "always" : finished ? "monthly" : "daily",
+        changeFrequency,
         priority: segment ? 0.6 : 0.8,
       })
+    }
+    // Strony drużyn: tylko przy „Pokazuj drużyny” (bez tego portal nie zna nazw drużyn).
+    if (tournament.settings.showTeams) {
+      for (const team of (await findPublicTeams(tournament.slug)) ?? []) {
+        pages.push({
+          url: absoluteUrl(`/t/${tournament.slug}/teams/${team.tournamentTeamId}`),
+          changeFrequency,
+          priority: 0.5,
+        })
+      }
     }
   }
 

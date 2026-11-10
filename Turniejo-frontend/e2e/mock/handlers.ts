@@ -1286,7 +1286,43 @@ const api = [
       })),
     ),
   ),
-  http.get("*/public/tournaments/:slug/standings", () => HttpResponse.json([])),
+  // Profil drużyny i skład (jak backend: zaakceptowana drużyna, skład bez usuniętych, nazwisko skrócone).
+  http.get("*/public/tournaments/:slug/teams/:teamId", ({ params }) => {
+    const t = tournamentTeams(IDS.tournament).find((x) => x.id === params.teamId)
+    return t && t.registrationStatus === "Accepted"
+      ? HttpResponse.json({
+          tournamentTeamId: t.id,
+          teamId: t.teamId,
+          name: t.teamName,
+          shortName: t.teamShortName,
+          categoryId: t.categoryId,
+          groupId: t.groupId,
+        })
+      : problem(404, "Not found")
+  }),
+  http.get("*/public/tournaments/:slug/teams/:teamId/players", ({ params }) => {
+    const settings = configOf(IDS.tournament).publicSettings
+    if (settings.showPlayers === false) return problem(404, "Not found")
+    const abbreviate = settings.abbreviatePlayerNames !== false
+    return HttpResponse.json(
+      squadEntries(String(params.teamId))
+        .filter((p) => p.status !== "Removed")
+        .map((p) => ({
+          tournamentPlayerId: p.id,
+          playerId: p.playerId,
+          firstName: p.firstName,
+          lastName: abbreviate ? `${p.lastName.charAt(0)}.` : p.lastName,
+          shirtNumber: p.shirtNumber,
+          position: p.position,
+        })),
+    )
+  }),
+  // Ta sama tabela co w panelu (z zakończonych meczów grupy).
+  http.get("*/public/tournaments/:slug/standings", ({ request }) =>
+    HttpResponse.json(
+      groupStandings(IDS.tournament, new URL(request.url).searchParams.get("groupId") ?? ""),
+    ),
+  ),
   http.get("*/public/tournaments/:slug/stats/:kind", () => HttpResponse.json([])),
   http.get("*/public/matches/:id/live", ({ params }) => {
     const m = findMatch(String(params.id))

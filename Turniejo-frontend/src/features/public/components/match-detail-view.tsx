@@ -16,8 +16,30 @@ import { useLiveMinute } from "./public-match-card"
 import { AnimatedScore } from "@/features/matches/components/live-score-board"
 
 /** Strona meczu na portalu: wynik, minuta (dla trwającego) i oś czasu goli i kartek. */
+function TeamLink({
+  slug,
+  id,
+  show,
+  children,
+}: {
+  slug: string
+  id: string
+  show: boolean
+  children: string
+}) {
+  if (!show) return <p className="min-w-0 truncate font-semibold">{children}</p>
+  return (
+    <Link
+      href={`/t/${slug}/teams/${id}`}
+      className="min-w-0 truncate font-semibold hover:underline"
+    >
+      {children}
+    </Link>
+  )
+}
+
 export function MatchDetailView({ matchId }: { matchId: string }) {
-  const { slug, lookups } = usePublicContext()
+  const { slug, tournament, lookups } = usePublicContext()
   const match = usePublicLiveMatch(slug, matchId, true)
   const minute = useLiveMinute(match.data)
 
@@ -69,11 +91,23 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
           )}
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-          <p className="min-w-0 truncate font-semibold">{home}</p>
+          <TeamLink
+            slug={slug}
+            id={m.homeTeam.tournamentTeamId}
+            show={tournament.settings.showTeams}
+          >
+            {home}
+          </TeamLink>
           <p className="font-mono text-5xl font-bold tabular-nums" data-testid="detail-score">
             <AnimatedScore value={m.homeScore} />:<AnimatedScore value={m.awayScore} />
           </p>
-          <p className="min-w-0 truncate font-semibold">{away}</p>
+          <TeamLink
+            slug={slug}
+            id={m.awayTeam.tournamentTeamId}
+            show={tournament.settings.showTeams}
+          >
+            {away}
+          </TeamLink>
         </div>
         {resultNote(m) && (
           <p className="text-muted-foreground mt-2 text-center text-sm">{resultNote(m)}</p>

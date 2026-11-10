@@ -2,6 +2,7 @@
 
 import { ListOrdered } from "lucide-react"
 import { LayoutGroup, motion } from "motion/react"
+import Link from "next/link"
 import { useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
@@ -26,7 +27,7 @@ function GroupTable({
   headingLevel: "h2" | "h3"
 }) {
   const Heading = headingLevel
-  const { slug, lookups } = usePublicContext()
+  const { slug, tournament, lookups } = usePublicContext()
   const standings = usePublicStandings(slug, groupId)
   const [favoriteTeam] = useState(() => readFavoriteTeam(slug))
   const rows = [...(standings.data ?? [])].sort((a, b) => a.position - b.position)
@@ -82,9 +83,18 @@ function GroupTable({
                     <span className="text-muted-foreground font-mono tabular-nums">
                       {row.position}
                     </span>
-                    <span className="truncate font-medium">
-                      {lookups.teamName(row.tournamentTeamId)}
-                    </span>
+                    {tournament.settings.showTeams ? (
+                      <Link
+                        href={`/t/${slug}/teams/${row.tournamentTeamId}`}
+                        className="truncate font-medium hover:underline"
+                      >
+                        {lookups.teamName(row.tournamentTeamId)}
+                      </Link>
+                    ) : (
+                      <span className="truncate font-medium">
+                        {lookups.teamName(row.tournamentTeamId)}
+                      </span>
+                    )}
                     <span className="text-center font-mono tabular-nums">{row.matchesPlayed}</span>
                     <span className="hidden text-center font-mono tabular-nums sm:block">
                       {row.wins}

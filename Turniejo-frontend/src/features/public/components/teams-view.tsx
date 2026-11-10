@@ -49,22 +49,16 @@ export function TeamsView() {
                 <ul className="space-y-2">
                   {group.teams.map((team) => (
                     <li key={team.tournamentTeamId}>
-                      {tournament.settings.showSchedule ? (
-                        <Link
-                          href={`/t/${slug}/schedule?team=${team.tournamentTeamId}`}
-                          aria-label={`${team.name} - mecze drużyny`}
-                          className="hover:bg-accent focus-visible:ring-ring -mx-2 flex items-center gap-3 rounded-lg px-2 py-1 outline-none focus-visible:ring-2"
-                        >
-                          <TeamLogo name={team.name} logoUrl={team.logoUrl} size={32} />
-                          <span className="min-w-0 flex-1 truncate">{team.name}</span>
-                          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-                        </Link>
-                      ) : (
-                        <div className="flex items-center gap-3 py-1">
-                          <TeamLogo name={team.name} logoUrl={team.logoUrl} size={32} />
-                          <span className="min-w-0 truncate">{team.name}</span>
-                        </div>
-                      )}
+                      {/* Lista drużyn istnieje tylko przy „Pokazuj drużyny”, więc strona drużyny też. */}
+                      <Link
+                        href={`/t/${slug}/teams/${team.tournamentTeamId}`}
+                        aria-label={`${team.name}: mecze, wyniki i skład`}
+                        className="hover:bg-accent focus-visible:ring-ring -mx-2 flex items-center gap-3 rounded-lg px-2 py-1 outline-none focus-visible:ring-2"
+                      >
+                        <TeamLogo name={team.name} logoUrl={team.logoUrl} size={32} />
+                        <span className="min-w-0 flex-1 truncate">{team.name}</span>
+                        <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                      </Link>
                     </li>
                   ))}
                 </ul>

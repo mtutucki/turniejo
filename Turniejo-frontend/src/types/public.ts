@@ -106,6 +106,18 @@ export type Bracket = { id: string; tournamentId: string; rounds: BracketRound[]
 /** Jeden z dwóch slotów pary w drabince. */
 export type BracketSlotRef = { nodeId: string; slot: "Home" | "Away" }
 
+/** PublicSquadPlayerDto — skład na stronie drużyny (GET /public/tournaments/{slug}/teams/{id}/players). */
+export type PublicSquadPlayer = {
+  tournamentPlayerId: string
+  /** Łączy zawodnika z rankingami (RankingEntry.playerId). */
+  playerId: string
+  firstName: string
+  /** Skrócone do inicjału, gdy portal skraca nazwiska. */
+  lastName: string
+  shirtNumber: number | null
+  position: string | null
+}
+
 /** PlayerRankingEntryDto */
 export type RankingEntry = {
   playerId: string

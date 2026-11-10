@@ -306,6 +306,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
           matches={schedule.data ?? []}
           lookups={{
             teamName: (teamId) => teamById.get(teamId) ?? "Drużyna",
+            teamHref: (teamId) => `/tournaments/${id}/teams/${teamId}`,
             groupName: (groupId) => (groupId ? (groupById.get(groupId) ?? null) : null),
             pitchName: (pitchId) => (pitchId ? (pitchById.get(pitchId) ?? null) : null),
           }}

@@ -50,6 +50,16 @@ const STAGE_TITLES: Record<string, string> = {
   Ćwierćfinał: "Ćwierćfinały",
 }
 
+/** Nazwa rundy każdego meczu drabinki: matchId → „Półfinał”, „Finał”, „Mecz o 3. miejsce”… */
+export function bracketMatchStages(bracket: Bracket): Map<string, string> {
+  const standardRounds = bracket.rounds.filter((r) => r.roundType === "Standard").length
+  const stages = new Map<string, string>()
+  for (const round of bracket.rounds)
+    for (const node of round.nodes)
+      if (node.matchId) stages.set(node.matchId, stageOf(round, standardRounds)[0])
+  return stages
+}
+
 export function bracketStages(bracket: Bracket): BracketStage[] {
   const standardRounds = bracket.rounds.filter((r) => r.roundType === "Standard").length
   return bracket.rounds

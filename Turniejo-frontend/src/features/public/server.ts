@@ -1,15 +1,19 @@
 import "server-only"
 
+import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { cache } from "react"
 
-import type { Metadata } from "next"
-
 import { apiFetch } from "@/lib/api/client"
-import { OPEN_GRAPH_DEFAULTS } from "@/lib/site"
 import { isApiError } from "@/lib/api/errors"
-import type { PublicTournament, PublicTournamentListItem, PublicVisibility } from "@/types/public"
+import { OPEN_GRAPH_DEFAULTS } from "@/lib/site"
 import type { MatchLivePanel } from "@/types/matches"
+import type {
+  PublicTeam,
+  PublicTournament,
+  PublicTournamentListItem,
+  PublicVisibility,
+} from "@/types/public"
 
 import { tournamentDescription } from "./seo"
 
@@ -95,5 +99,29 @@ export async function portalPageMetadata(
       description: tournamentDescription(tournament),
       url: path,
     },
+  }
+}
+
+/** Drużyna turnieju do tytułu strony drużyny. Niewidoczna (ukryte drużyny, wycofana) → 404. */
+export const getPublicTeam = cache(async (slug: string, teamId: string) => {
+  try {
+    return await apiFetch<PublicTeam>(
+      `/public/tournaments/${encodeURIComponent(slug)}/teams/${encodeURIComponent(teamId)}`,
+      { cache: "no-store" },
+    )
+  } catch (error) {
+    if (isApiError(error) && (error.status === 404 || error.status === 400)) notFound()
+    throw error
+  }
+})
+
+/** Drużyny turnieju do sitemapy. Błąd API → brak stron drużyn w tym odświeżeniu. */
+export async function findPublicTeams(slug: string) {
+  try {
+    return await apiFetch<PublicTeam[]>(`/public/tournaments/${encodeURIComponent(slug)}/teams`, {
+      next: { revalidate: 3600 },
+    })
+  } catch {
+    return undefined
   }
 }
