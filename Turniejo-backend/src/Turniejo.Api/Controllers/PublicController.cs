@@ -9,6 +9,7 @@ using Turniejo.Matches.Application.Stats.GetPublicMvpRanking;
 using Turniejo.Matches.Application.Stats.GetPublicTopAssists;
 using Turniejo.Matches.Application.Stats.GetPublicTopScorers;
 using Turniejo.Players.Application.TournamentPlayers.GetPublicPlayerProfile;
+using Turniejo.Players.Application.TournamentPlayers.GetPublicTeamSquad;
 using Turniejo.Standings.Application.Standings.GetPublicStandings;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeamProfile;
 using Turniejo.Teams.Application.TournamentTeams.GetPublicTeams;
@@ -46,6 +47,13 @@ namespace Turniejo.Api.Controllers
         public async Task<IActionResult> GetTeamProfile([FromRoute] string slug, [FromRoute] Guid teamId, CancellationToken cancellationToken)
         {
             var result = await sender.Send(new GetPublicTeamProfileQuery(slug, teamId), cancellationToken);
+            return result.ToActionResult();
+        }
+
+        [HttpGet("tournaments/{slug}/teams/{teamId}/players")]
+        public async Task<IActionResult> GetTeamSquad([FromRoute] string slug, [FromRoute] Guid teamId, CancellationToken cancellationToken)
+        {
+            var result = await sender.Send(new GetPublicTeamSquadQuery(slug, teamId), cancellationToken);
             return result.ToActionResult();
         }
 

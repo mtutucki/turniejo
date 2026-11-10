@@ -285,4 +285,40 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
             types.Should().Contain("MatchStarted").And.Contain("MatchFinished");
         }
     }
+
+    // Strona drużyny w portalu: skład z numerami, nazwiska skrócone jak w reszcie portalu.
+    [Fact]
+    public async Task PUB_030_TeamSquad_IsPublic_WithAbbreviatedNames_AndHiddenWithPlayers()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, start: false);
+        var (_, adam) = await s.CreatePlayerAsync("T1", "Adam", "Strzelec", shirtNumber: 9);
+        var (_, bartek) = await s.CreatePlayerAsync("T1", "Bartek", "Bramkarz", shirtNumber: 1);
+        (await PublishAsync(s, true)).IsSuccessStatusCode.Should().BeTrue();
+        var slug = (await s.TournamentAsync()).GetString("slug");
+        var anonymous = CreateClient();
+        var squadUrl = $"/public/tournaments/{slug}/teams/{s.Team("T1")}/players";
+
+        var squad = (await (await anonymous.GetAsync(squadUrl)).ReadJsonAsync()).EnumerateArray().ToList();
+
+        squad.Select(p => p.GetGuid("playerId")).Should().Equal(bartek, adam);
+        squad[1].GetString("firstName").Should().Be("Adam");
+        squad[1].GetString("lastName").Should().Be("S.");
+        squad[1].GetProperty("shirtNumber").GetInt32().Should().Be(9);
+
+        (await PublishAsync(s, true, showPlayers: false)).IsSuccessStatusCode.Should().BeTrue();
+        (await anonymous.GetAsync(squadUrl)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task PUB_031_TeamSquad_OfAnotherTournamentsTeam_IsNotFound()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, start: false);
+        var other = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2, start: false);
+        (await PublishAsync(s, true)).IsSuccessStatusCode.Should().BeTrue();
+        var slug = (await s.TournamentAsync()).GetString("slug");
+
+        var response = await CreateClient().GetAsync($"/public/tournaments/{slug}/teams/{other.Team("T1")}/players");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
