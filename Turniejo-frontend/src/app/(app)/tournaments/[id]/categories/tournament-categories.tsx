@@ -100,6 +100,10 @@ export function TournamentCategoriesView({
                 ranges={(secondStage.data?.ranges ?? []).filter(
                   (r) => r.categoryId === category.id,
                 )}
+                // Zanim drużyny się zgłoszą, ich liczbę wyznacza limit turnieju (dzielony na kategorie).
+                teamLimitShare={Math.ceil(
+                  (tournament.data?.teamLimit ?? 0) / Math.max(1, categories.data?.length ?? 1),
+                )}
                 scheduleLocked={
                   !!tournament.data && statusAtLeast(tournament.data.status, "ScheduleGenerated")
                 }

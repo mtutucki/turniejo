@@ -33,8 +33,10 @@ type SecondStageSectionProps = {
   ranges: SecondStageRange[]
   matches: Match[]
   canManage: boolean
-  /** Zgłoszone drużyny kategorii, także bez grupy. */
+  /** Zgłoszone drużyny kategorii (także bez grupy), a bez zgłoszeń część limitu turnieju. */
   categoryTeams: number
+  /** categoryTeams pochodzi z limitu drużyn turnieju, a nie ze zgłoszeń. */
+  teamsFromLimit?: boolean
   /** Terminarz istnieje: podział jest zamrożony (backend odmawia zmiany). */
   locked: boolean
 }
@@ -51,6 +53,7 @@ export function SecondStageSection({
   matches,
   canManage,
   categoryTeams,
+  teamsFromLimit = false,
   locked,
 }: SecondStageSectionProps) {
   const secondStage = groups.filter((g) => g.stage === 2)
@@ -91,6 +94,7 @@ export function SecondStageSection({
                   secondStage={secondStage}
                   ranges={ranges}
                   categoryTeams={categoryTeams}
+                  teamsFromLimit={teamsFromLimit}
                   trigger={
                     <Button variant="outline" size="sm">
                       <ListOrdered />
@@ -106,6 +110,7 @@ export function SecondStageSection({
                   secondStage={secondStage}
                   seats={seats}
                   categoryTeams={categoryTeams}
+                  teamsFromLimit={teamsFromLimit}
                   trigger={
                     <Button variant="ghost" size="sm">
                       <Shuffle />

@@ -62,6 +62,7 @@ test("[FAZ-016] organizator dodaje grupy drugiej fazy, dostaje gotowy podział i
 test("[FAZ-021] podział da się ustawić, zanim grupy mają drużyny", async ({ page }) => {
   // Kreator: grupy są, drużyn jeszcze nie.
   await mock.override({ method: "GET", path: `/api/tournaments/${TOURNAMENT_ID}/teams`, body: [] })
+  await mock.tournament(TOURNAMENT_ID, { teamLimit: 4 })
   await loginAs(page, ORGANIZER)
   await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
   await addSecondStageGroup(page, "Grupa I")
@@ -188,8 +189,10 @@ test("[FAZ-024] 8 drużyn bez grup w 4 grupach: podział domyślnie po 2 miejsca
   ).toBeVisible()
 })
 
-test("[FAZ-030] podział zakresami miejsc, zanim grupy mają drużyny", async ({ page }) => {
-  // Kreator: 4 grupy, drużyn jeszcze nie ma, więc grupa liczy się po 4 miejsca.
+test("[FAZ-030] limit 8 drużyn w 4 grupach: zakresy po jednym miejscu, dalsze miejsca z ostrzeżeniem", async ({
+  page,
+}) => {
+  // Kreator: limit turnieju 8 drużyn, 4 grupy, drużyn jeszcze nie ma - w grupie będą po 2.
   await mock.override({ method: "GET", path: `/api/tournaments/${TOURNAMENT_ID}/teams`, body: [] })
   await loginAs(page, ORGANIZER)
   await page.goto(`/tournaments/${TOURNAMENT_ID}/categories`)
@@ -207,28 +210,37 @@ test("[FAZ-030] podział zakresami miejsc, zanim grupy mają drużyny", async ({
   await addSecondStageGroup(page, "Grupa II")
   const section = page.getByRole("region", { name: "Faza 2 w kategorii U12" })
   await expect(section.getByRole("listitem").filter({ hasText: "Grupa II" })).toContainText(
-    "Domyślnie: Miejsca 3-4 z każdej grupy",
+    "Domyślnie: Miejsce 2 z każdej grupy",
+  )
+  await expect(section.getByRole("listitem").filter({ hasText: "Grupa I" }).first()).toContainText(
+    "Domyślnie: Miejsce 1 z każdej grupy",
   )
 
   await section.getByRole("button", { name: "Ustaw podział" }).click()
   const dialog = page.getByRole("dialog", { name: "Podział na drugą fazę · U12" })
+  await expect(dialog).toContainText("8 drużyn (limit turnieju) w 4 grupach: po 2 w grupie.")
   await expect(dialog.getByLabel("Grupa I: od miejsca")).toHaveValue("1")
-  await expect(dialog.getByLabel("Grupa I: do miejsca")).toHaveValue("2")
-  await expect(dialog.getByLabel("Grupa II: od miejsca")).toHaveValue("3")
+  await expect(dialog.getByLabel("Grupa I: do miejsca")).toHaveValue("1")
+  await expect(dialog.getByLabel("Grupa II: od miejsca")).toHaveValue("2")
+  await expect(dialog.getByLabel("Grupa II: do miejsca")).toHaveValue("2")
 
-  await dialog.getByLabel("Grupa II: od miejsca").fill("2")
+  await dialog.getByLabel("Grupa II: do miejsca").fill("4")
+  await expect(dialog).toContainText(
+    "Grupy będą miały po 2 drużyny, więc miejsc powyżej 2 nie będzie.",
+  )
+
+  await dialog.getByLabel("Grupa II: od miejsca").fill("1")
   await expect(dialog.getByRole("alert")).toHaveText(
     "To samo miejsce nie może trafić do dwóch grup.",
   )
   await expect(dialog.getByRole("button", { name: "Zapisz podział" })).toBeDisabled()
 
-  await dialog.getByLabel("Grupa II: od miejsca").fill("3")
-  await dialog.getByLabel("Grupa II: do miejsca").fill("3")
+  await dialog.getByRole("button", { name: "Gotowy podział" }).click()
   await dialog.getByRole("button", { name: "Zapisz podział" }).click()
   await expect(dialog).toBeHidden()
 
   await expect(section.getByRole("listitem").filter({ hasText: "Grupa II" })).toContainText(
-    "Miejsce 3 z każdej grupy",
+    "Miejsce 2 z każdej grupy",
   )
   await expect(section).not.toContainText("Domyślnie")
   expect(await mock.calls("PUT", "/second-stage/ranges")).toBe(1)

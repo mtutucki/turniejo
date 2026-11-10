@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { plural } from "@/lib/format"
 import type { SecondStageRange, SecondStageRangeInput, TournamentGroup } from "@/types/tournaments"
 
 import { useSaveSecondStageRanges } from "../api"
@@ -32,6 +33,8 @@ type SecondStageRangesDialogProps = {
   ranges: SecondStageRange[]
   /** Zgłoszone drużyny kategorii, także bez grupy - do gotowego podziału, zanim drużyny są w grupach. */
   categoryTeams: number
+  /** categoryTeams pochodzi z limitu drużyn turnieju, a nie ze zgłoszeń. */
+  teamsFromLimit?: boolean
   trigger: ReactNode
 }
 
@@ -47,6 +50,7 @@ export function SecondStageRangesDialog({
   secondStage,
   ranges,
   categoryTeams,
+  teamsFromLimit = false,
   trigger,
 }: SecondStageRangesDialogProps) {
   const [open, setOpen] = useState(false)
@@ -55,6 +59,7 @@ export function SecondStageRangesDialog({
   const groups = [...secondStage].sort((a, b) => a.order - b.order)
 
   const largest = largestGroupEstimate(firstStage, categoryTeams)
+  const assigned = firstStage.some((g) => g.teams > 0)
 
   const fromInputs = (list: SecondStageRangeInput[]) =>
     Object.fromEntries(
@@ -174,6 +179,19 @@ export function SecondStageRangesDialog({
             <Wand2 />
             Gotowy podział
           </Button>
+          <p className="text-muted-foreground text-xs">
+            {assigned
+              ? `Największa grupa pierwszej fazy ma ${plural(largest, ["drużynę", "drużyny", "drużyn"])}.`
+              : categoryTeams > 0
+                ? `${plural(categoryTeams, ["drużyna", "drużyny", "drużyn"])}${teamsFromLimit ? " (limit turnieju)" : ""} w ${plural(firstStage.length, ["grupie", "grupach", "grupach"])}: po ${largest} w grupie.`
+                : `Drużyn jeszcze nie ma, przyjmujemy po ${largest} w grupie.`}
+          </p>
+          {!error && parsed.some((r) => r.toPosition > largest) && (
+            <p className="text-live text-sm">
+              Grupy będą miały po {largest} {largest === 1 ? "drużynie" : "drużyny"}, więc miejsc
+              powyżej {largest} nie będzie.
+            </p>
+          )}
           {error && (
             <p className="text-destructive text-sm" role="alert">
               {error}

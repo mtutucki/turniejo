@@ -71,6 +71,8 @@ type CategoryCardProps = {
   seats?: SecondStageSeat[]
   /** Dwie fazy grupowe: zakresy miejsc tej kategorii. */
   ranges?: SecondStageRange[]
+  /** Część limitu drużyn turnieju na tę kategorię - liczba drużyn, zanim się zgłoszą. */
+  teamLimitShare?: number
   /** Terminarz istnieje - podział na fazę 2 jest zamrożony. */
   scheduleLocked?: boolean
 }
@@ -84,6 +86,7 @@ export function CategoryCard({
   canManage,
   seats = [],
   ranges = [],
+  teamLimitShare = 0,
   scheduleLocked = false,
 }: CategoryCardProps) {
   const twoStages = format === "TwoGroupStages"
@@ -307,7 +310,8 @@ export function CategoryCard({
             ranges={ranges}
             matches={categoryMatches}
             canManage={canManage}
-            categoryTeams={teams.length}
+            categoryTeams={teams.length || teamLimitShare}
+            teamsFromLimit={teams.length === 0 && teamLimitShare > 0}
             locked={scheduleLocked}
           />
         )}

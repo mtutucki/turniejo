@@ -51,6 +51,8 @@ type SecondStageSplitDialogProps = {
   seats: SecondStageSeat[]
   /** Zgłoszone drużyny kategorii (także bez grupy) - do domyślnej liczby miejsc i kontroli sumy. */
   categoryTeams: number
+  /** categoryTeams pochodzi z limitu drużyn turnieju, a nie ze zgłoszeń. */
+  teamsFromLimit?: boolean
   trigger: ReactNode
 }
 
@@ -66,6 +68,7 @@ export function SecondStageSplitDialog({
   secondStage,
   seats,
   categoryTeams,
+  teamsFromLimit = false,
   trigger,
 }: SecondStageSplitDialogProps) {
   const [open, setOpen] = useState(false)
@@ -183,7 +186,8 @@ export function SecondStageSplitDialog({
                   : "text-muted-foreground",
               )}
             >
-              Razem miejsc: {totalPlaces} · drużyn w kategorii: {categoryTeams}
+              Razem miejsc: {totalPlaces} · {teamsFromLimit ? "limit drużyn" : "drużyn w kategorii"}
+              : {categoryTeams}
               {categoryTeams > 0 &&
                 totalPlaces > categoryTeams &&
                 ". Miejsc jest więcej niż drużyn."}
