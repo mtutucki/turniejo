@@ -23,6 +23,8 @@ export function TeamLogo({ name, logoUrl, size = 36, className }: TeamLogoProps)
       // Inicjały tylko wizualnie (CSS): nazwa stoi obok, więc nie powtarzamy jej w tekście strony
       // ani czytnikowi ekranu ("OE Orły E2E").
       data-initials={logoUrl ? undefined : initials}
+      // Treść z CSS też trafia do nazwy dostępnej, więc inicjały ukrywamy przed czytnikiem.
+      aria-hidden={logoUrl ? undefined : true}
       className={cn(
         "bg-secondary text-muted-foreground relative flex shrink-0 items-center justify-center overflow-hidden rounded-md text-xs font-semibold",
         !logoUrl && "before:content-[attr(data-initials)]",

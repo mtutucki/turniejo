@@ -20,7 +20,7 @@ type MockState = {
   }[]
   organizations: string[]
   requests: string[]
-  connections: { tournaments: number; matches: number }
+  connections: { tournaments: number; matches: number; tournamentGroups: string[] }
 }
 
 export const mock = {
