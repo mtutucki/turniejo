@@ -18,7 +18,7 @@ import {
   type User,
   userFromAuthHeader,
 } from "./db"
-import { closeAll, connectionCount, negotiateResponse, publish } from "./signalr"
+import { closeAll, connectionCount, joinedGroups, negotiateResponse, publish } from "./signalr"
 
 /**
  * Odpowiedzi ustawione przez test (POST /__control/override): test UI sam mówi, co zwraca API,
@@ -2645,6 +2645,8 @@ const control = [
       connections: {
         tournaments: connectionCount("tournaments"),
         matches: connectionCount("matches"),
+        /** Turnieje, których zdarzenia strona już dostaje (panel sędziego słucha kilku naraz). */
+        tournamentGroups: joinedGroups("tournaments"),
       },
     }),
   ),
