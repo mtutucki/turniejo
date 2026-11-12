@@ -168,6 +168,8 @@ export type MatchTeam = {
   name: string
   shortName: string | null
   players: MatchPlayer[]
+  /** Herb drużyny (w portalu tylko przy „Pokazuj drużyny”). */
+  logoUrl?: string | null
 }
 
 /** MatchLivePanelDto — też "snapshot" pobierany po (ponownym) połączeniu z SignalR. */

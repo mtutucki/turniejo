@@ -6,6 +6,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+### Nowe
+
+- Herby drużyn widać w terminarzu, tabelach, drabince, na kartach meczów sędziego i w panelu meczu na żywo. W portalu kibica herby pokazują się razem z nazwami drużyn, czyli przy włączonym „Pokazuj drużyny”.
+
 ## [1.2.0] - 2026-11-12
 
 ### Nowe

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import { Card, CardContent } from "@/components/ui/card"
 import { prefetchHandlers, usePrefetch } from "@/hooks/use-prefetch"
 import { formatDateTime } from "@/lib/format"
@@ -20,6 +21,8 @@ type RefereeMatchCardProps = {
   match: Match
   homeName: string
   awayName: string
+  homeLogo?: string | null
+  awayLogo?: string | null
   pitchName: string | null
   tournamentName: string | null
 }
@@ -30,6 +33,8 @@ function MatchInfo({
   match,
   homeName,
   awayName,
+  homeLogo = null,
+  awayLogo = null,
   pitchName,
   tournamentName,
 }: RefereeMatchCardProps) {
@@ -41,6 +46,7 @@ function MatchInfo({
         {tournamentName && <span className="text-muted-foreground truncate">{tournamentName}</span>}
       </div>
       <p className="flex items-center gap-2 font-medium">
+        <TeamLogo name={homeName} logoUrl={homeLogo} size={20} />
         <span className="min-w-0 truncate">{homeName}</span>
         {showScore ? (
           <span className="shrink-0 font-mono tabular-nums">
@@ -49,6 +55,7 @@ function MatchInfo({
         ) : (
           <span className="text-muted-foreground shrink-0 text-sm">vs</span>
         )}
+        <TeamLogo name={awayName} logoUrl={awayLogo} size={20} />
         <span className="min-w-0 truncate">{awayName}</span>
       </p>
       <p className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 
 import { MatchStatusBadge } from "@/features/matches/components/match-status-badge"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import { formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { resultNote } from "@/features/matches/result-note"
@@ -32,18 +33,24 @@ export function useLiveMinute(live: PublicLiveMatch | undefined) {
 
 function TeamLine({
   name,
+  logoUrl,
   score,
   winner,
   showScore,
 }: {
   name: string
+  /** Bez „Pokazuj drużyny” portal nie zna drużyn, więc nie pokazuje też inicjałów. */
+  logoUrl: string | null | undefined
   score: number
   winner: boolean
   showScore: boolean
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={cn("min-w-0 truncate", winner && "font-semibold")}>{name}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        {logoUrl !== undefined && <TeamLogo name={name} logoUrl={logoUrl} size={20} />}
+        <span className={cn("min-w-0 truncate", winner && "font-semibold")}>{name}</span>
+      </span>
       {showScore && (
         <span
           className={cn(
@@ -69,6 +76,7 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
   const home = lookups.teamName(match.homeTournamentTeamId, "Gospodarze")
   const away = lookups.teamName(match.awayTournamentTeamId, "Goście")
   const pitch = lookups.pitchName(match.pitchId)
+  const showLogos = tournament.settings.showTeams
   // Mecze pucharowe nie mają grupy.
   const group =
     lookups.groupName(match.groupId) ?? (match.stageType !== "Group" ? "Faza pucharowa" : null)
@@ -136,12 +144,14 @@ export function PublicMatchCard({ match }: { match: PublicMatch }) {
       <div className="space-y-1" data-testid="match-score">
         <TeamLine
           name={home}
+          logoUrl={showLogos ? lookups.teamLogo(match.homeTournamentTeamId) : undefined}
           score={match.homeScore}
           showScore={showScore}
           winner={showScore && homeWins}
         />
         <TeamLine
           name={away}
+          logoUrl={showLogos ? lookups.teamLogo(match.awayTournamentTeamId) : undefined}
           score={match.awayScore}
           showScore={showScore}
           winner={showScore && awayWins}

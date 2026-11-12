@@ -56,11 +56,12 @@ function useTournamentLookups(tournamentIds: string[]) {
   })
 
   const teamNames = new Map(teams.flatMap((q) => q.data ?? []).map((t) => [t.id, t.teamName]))
+  const teamLogos = new Map(teams.flatMap((q) => q.data ?? []).map((t) => [t.id, t.teamLogoUrl]))
   const pitchNames = new Map(pitches.flatMap((q) => q.data ?? []).map((p) => [p.id, p.name]))
   const tournamentById = new Map(
     tournaments.flatMap((q) => (q.data ? [[q.data.id.toLowerCase(), q.data] as const] : [])),
   )
-  return { teamNames, pitchNames, tournamentById }
+  return { teamNames, teamLogos, pitchNames, tournamentById }
 }
 
 function Section({
@@ -94,6 +95,8 @@ function Section({
               match={match}
               homeName={lookups.teamNames.get(match.homeTournamentTeamId) ?? "Drużyna"}
               awayName={lookups.teamNames.get(match.awayTournamentTeamId) ?? "Drużyna"}
+              homeLogo={lookups.teamLogos.get(match.homeTournamentTeamId) ?? null}
+              awayLogo={lookups.teamLogos.get(match.awayTournamentTeamId) ?? null}
               pitchName={match.pitchId ? (lookups.pitchNames.get(match.pitchId) ?? "Boisko") : null}
               // Lista jest już podzielona na turnieje, nazwa na karcie byłaby powtórzeniem.
               tournamentName={null}

@@ -34,6 +34,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useBrackets, useClearSchedule, usePitches, useSchedule } from "@/features/matches/api"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import {
   AssignRefereeDialog,
   memberName,
@@ -72,6 +73,7 @@ const NO_REFEREE = "none"
 
 type Lookups = {
   teamName: (tournamentTeamId: string) => string
+  teamLogo: (tournamentTeamId: string) => string | null
   pitchName: (pitchId: string | null) => string | null
   groupLabel: (match: Match) => string | null
   referee: (userId: string | null) => TournamentMember | undefined
@@ -165,7 +167,14 @@ function MatchRow({
         )}
         <div className="min-w-0 flex-1 space-y-1">
           <p className="flex flex-wrap items-center gap-x-2 font-medium">
-            <span className="truncate">{home}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <TeamLogo
+                name={home}
+                logoUrl={lookups.teamLogo(match.homeTournamentTeamId)}
+                size={20}
+              />
+              <span className="truncate">{home}</span>
+            </span>
             {showScore ? (
               <span className="font-mono tabular-nums">
                 {match.homeScore}:{match.awayScore}
@@ -178,7 +187,14 @@ function MatchRow({
             ) : (
               <span className="text-muted-foreground text-sm">vs</span>
             )}
-            <span className="truncate">{away}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <TeamLogo
+                name={away}
+                logoUrl={lookups.teamLogo(match.awayTournamentTeamId)}
+                size={20}
+              />
+              <span className="truncate">{away}</span>
+            </span>
           </p>
           <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             {!unscheduled && (
@@ -444,12 +460,14 @@ export function TournamentScheduleView() {
 
   const lookups = useMemo<Lookups>(() => {
     const teamById = new Map((teams.data ?? []).map((t) => [t.id, t.teamName]))
+    const logoById = new Map((teams.data ?? []).map((t) => [t.id, t.teamLogoUrl]))
     const pitchById = new Map((pitches.data ?? []).map((p) => [p.id, p.name]))
     const groupById = new Map((groups.data ?? []).map((g) => [g.id, g.name]))
     const categoryById = new Map((categories.data ?? []).map((c) => [c.id, c.name]))
     const memberById = new Map((members.data ?? []).map((m) => [m.userId, m]))
     return {
       teamName: (tid) => teamById.get(tid) ?? "Drużyna",
+      teamLogo: (tid) => logoById.get(tid) ?? null,
       pitchName: (pid) => (pid ? (pitchById.get(pid) ?? "Boisko") : null),
       groupLabel: (m) =>
         [

@@ -1268,7 +1268,7 @@ const api = [
         shortName: t.teamShortName,
         categoryId: t.categoryId,
         groupId: t.groupId,
-        logoUrl: null,
+        logoUrl: t.teamLogoUrl,
       })),
     ),
   ),
@@ -2586,6 +2586,13 @@ const control = [
     if (!user) return problem(404, "User not found")
     user.theme = ((await request.json()) as { theme: User["theme"] }).theme
     return new HttpResponse(null, { status: 204 })
+  }),
+  // Herb drużyny w turnieju (panel: teamLogoUrl, portal: logoUrl), jak po wgraniu go w bazie drużyn.
+  http.post("*/__control/teams/:ttid/logo", async ({ params, request }) => {
+    const { logoUrl } = (await request.json()) as { logoUrl: string | null }
+    const id = params.ttid as string
+    db.teamChanges[id] = { ...db.teamChanges[id], teamLogoUrl: logoUrl }
+    return HttpResponse.json({})
   }),
   http.post("*/__control/reset", () => {
     overrides = []

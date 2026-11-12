@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarClock } from "lucide-react"
 import Link from "next/link"
 
 import { EmptyState } from "@/components/layout/empty-state"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EventTimeline, playerLabel } from "@/features/matches/components/event-timeline"
@@ -20,20 +21,24 @@ function TeamLink({
   slug,
   id,
   show,
+  logoUrl,
   children,
 }: {
   slug: string
   id: string
   show: boolean
+  logoUrl?: string | null
   children: string
 }) {
   if (!show) return <p className="min-w-0 truncate font-semibold">{children}</p>
+  // Przy „Pokazuj drużyny” nad nazwą herb (albo inicjały), jak w nagłówku meczu w telewizji.
   return (
     <Link
       href={`/t/${slug}/teams/${id}`}
-      className="min-w-0 truncate font-semibold hover:underline"
+      className="flex min-w-0 flex-col items-center gap-2 font-semibold hover:underline"
     >
-      {children}
+      <TeamLogo name={children} logoUrl={logoUrl ?? null} size={48} />
+      <span className="max-w-full truncate">{children}</span>
     </Link>
   )
 }
@@ -95,6 +100,7 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
             slug={slug}
             id={m.homeTeam.tournamentTeamId}
             show={tournament.settings.showTeams}
+            logoUrl={lookups.teamLogo(m.homeTeam.tournamentTeamId)}
           >
             {home}
           </TeamLink>
@@ -105,6 +111,7 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
             slug={slug}
             id={m.awayTeam.tournamentTeamId}
             show={tournament.settings.showTeams}
+            logoUrl={lookups.teamLogo(m.awayTeam.tournamentTeamId)}
           >
             {away}
           </TeamLink>
