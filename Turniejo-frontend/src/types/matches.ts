@@ -38,6 +38,8 @@ export type Pitch = {
   isActive: boolean
   /** Grupy (faza 1 i 2), których mecze generator kładzie na tym boisku. Puste = wszystkie grupy. */
   groupIds: string[]
+  /** Sędzia boiska: prowadzi nierozpoczęte mecze na tym boisku, które nie mają innego sędziego. */
+  refereeId: string | null
 }
 
 export type PitchInput = {
@@ -45,6 +47,7 @@ export type PitchInput = {
   description: string | null
   isActive: boolean
   groupIds: string[]
+  refereeId: string | null
 }
 
 /** MatchDto (GET /schedule) */

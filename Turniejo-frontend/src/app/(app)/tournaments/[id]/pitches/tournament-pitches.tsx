@@ -9,7 +9,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePitches } from "@/features/matches/api"
 import { PitchFormDialog } from "@/features/matches/components/pitch-form-dialog"
+import { memberName } from "@/features/matches/components/assign-referee-dialog"
 import { pitchGroupsLabel } from "@/features/matches/pitch-groups"
+import { useTournamentMembers } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 import { plural } from "@/lib/format"
@@ -20,6 +22,12 @@ export function TournamentPitchesView() {
   const pitches = usePitches(id)
   const categories = useCategories(id)
   const groups = useGroups(id)
+  const members = useTournamentMembers(id, isOrganizer)
+  const refereeName = (userId: string | null) => {
+    if (!userId) return null
+    const member = members.data?.find((m) => m.userId === userId)
+    return member ? memberName(member) : null
+  }
   const activeCount = pitches.data?.filter((p) => p.isActive).length ?? 0
 
   const addButton = isOrganizer && (
@@ -75,6 +83,9 @@ export function TournamentPitchesView() {
                         </p>
                       )}
                       {groupsLabel && <p className="mt-1 text-sm">Grupy: {groupsLabel}</p>}
+                      {refereeName(pitch.refereeId) && (
+                        <p className="mt-1 text-sm">Sędzia: {refereeName(pitch.refereeId)}</p>
+                      )}
                     </div>
                     {isOrganizer && (
                       <PitchFormDialog

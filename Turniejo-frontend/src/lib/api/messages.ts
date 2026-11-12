@@ -103,6 +103,7 @@ const EXACT: Record<string, string> = {
     "Nie udało się cofnąć etapu turnieju - spróbuj ponownie",
   "No valid active pitches belonging to this tournament were provided":
     "Wybierz co najmniej jedno aktywne boisko",
+  "The referee is already assigned to another pitch": "Ten sędzia prowadzi już inne boisko",
   "Some groups have no selected pitch assigned to them":
     "Któraś grupa nie ma wybranego boiska. Zaznacz jej boisko albo zmień grupy boisk.",
   "Some of the selected groups do not belong to this tournament":

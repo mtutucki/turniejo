@@ -536,7 +536,7 @@ function PitchAction({ tournamentId }: { tournamentId: string }) {
       disabled={save.isPending}
       onClick={() =>
         save.mutate(
-          { name: "Boisko 1", description: null, isActive: true, groupIds: [] },
+          { name: "Boisko 1", description: null, isActive: true, groupIds: [], refereeId: null },
           { onSuccess: () => toast.success("Dodano „Boisko 1”") },
         )
       }
