@@ -13,7 +13,8 @@ const EXACT: Record<string, string> = {
   "Theme must be system, light or dark.": "Nieznany motyw",
   // Dołączanie kodem
   "Invalid tournament code.": "Nieprawidłowy kod turnieju",
-  "This tournament has been cancelled": "Ten turniej został anulowany. Nie można już do niego dołączyć.",
+  "This tournament has been cancelled":
+    "Ten turniej został anulowany. Nie można już do niego dołączyć.",
   // Turniej
   "Cannot change format after schedule has been generated.":
     "Formatu nie można zmienić po wygenerowaniu harmonogramu",
@@ -48,7 +49,8 @@ const EXACT: Record<string, string> = {
   "Clear the schedule before changing teams or groups":
     "Najpierw wyczyść terminarz, potem zmień drużyny albo grupy",
   "Minute must be between 0 and 300.": "Minuta musi być od 0 do 300",
-  "The team is playing a match right now": "Drużyna gra teraz mecz. Wycofasz ją po jego zakończeniu.",
+  "The team is playing a match right now":
+    "Drużyna gra teraz mecz. Wycofasz ją po jego zakończeniu.",
   "The rules were changed by someone else. Refresh to see the latest data.":
     "Ktoś inny zmienił w międzyczasie zasady gry. Odśwież stronę, żeby zobaczyć aktualne.",
   "The portal settings were changed by someone else. Refresh to see the latest data.":
@@ -101,6 +103,10 @@ const EXACT: Record<string, string> = {
     "Nie udało się cofnąć etapu turnieju - spróbuj ponownie",
   "No valid active pitches belonging to this tournament were provided":
     "Wybierz co najmniej jedno aktywne boisko",
+  "Some groups have no selected pitch assigned to them":
+    "Któraś grupa nie ma wybranego boiska. Zaznacz jej boisko albo zmień grupy boisk.",
+  "Some of the selected groups do not belong to this tournament":
+    "Któraś z wybranych grup nie należy już do turnieju. Odśwież stronę.",
   "Tournament has no groups defined": "Turniej nie ma jeszcze grup",
   "No matches to schedule — each group needs at least 2 accepted teams":
     "Brak meczów do rozegrania - każda grupa potrzebuje co najmniej 2 zaakceptowanych drużyn",
@@ -234,8 +240,10 @@ const EXACT: Record<string, string> = {
   "Match can only be resumed from Paused status": "Wznowić można tylko wstrzymany mecz",
   "Match can only be started from Scheduled status": "Ten mecz już się rozpoczął",
   "Match is already cancelled": "Ten mecz jest już odwołany",
-  "Match must be finished to correct its score": "Wynik można poprawić dopiero po zakończeniu meczu",
-  "Match must be live or paused to set a manual score": "Wynik ręcznie ustawisz tylko w trakcie meczu",
+  "Match must be finished to correct its score":
+    "Wynik można poprawić dopiero po zakończeniu meczu",
+  "Match must be live or paused to set a manual score":
+    "Wynik ręcznie ustawisz tylko w trakcie meczu",
   "Use CorrectFinishedMatchScoreCommand to change the score of a finished match":
     "Wynik zakończonego meczu zmienisz przez „Zmień rozstrzygnięcie”",
   "Only read notifications can be deleted": "Usunąć można tylko przeczytane powiadomienia",
@@ -250,15 +258,20 @@ const EXACT: Record<string, string> = {
   "ShirtNumber must be greater than 0.": "Numer musi być większy od 0",
   "Team is not playing in this match": "Ta drużyna nie gra w tym meczu",
   "TieBreakerRule order values must be unique.": "Każde kryterium musi mieć inną pozycję",
-  "Walkover requires the tournament's walkover scores": "Ustaw wynik walkowera w zasadach gry turnieju",
+  "Walkover requires the tournament's walkover scores":
+    "Ustaw wynik walkowera w zasadach gry turnieju",
   "WalkoverHomeScore cannot equal WalkoverAwayScore.": "Wynik walkowera nie może być remisem",
   "walkoverHomeScore cannot equal to walkoverAwayScore": "Wynik walkowera nie może być remisem",
   "Winner must be one of the two teams playing": "Zwycięzca musi być jedną z drużyn meczu",
   "You must accept the terms and privacy policy.": "Zaakceptuj Regulamin, aby założyć konto",
-  "PointsForWin cannot be less than PointsForDraw.": "Punkty za wygraną nie mogą być mniejsze niż za remis",
-  "PointsForWin cannot be less than pointsForDraw": "Punkty za wygraną nie mogą być mniejsze niż za remis",
-  "PointsForDraw cannot be less than PointsForLoss.": "Punkty za remis nie mogą być mniejsze niż za porażkę",
-  "pointsForDraw cannot be less than pointsForLoss": "Punkty za remis nie mogą być mniejsze niż za porażkę",
+  "PointsForWin cannot be less than PointsForDraw.":
+    "Punkty za wygraną nie mogą być mniejsze niż za remis",
+  "PointsForWin cannot be less than pointsForDraw":
+    "Punkty za wygraną nie mogą być mniejsze niż za remis",
+  "PointsForDraw cannot be less than PointsForLoss.":
+    "Punkty za remis nie mogą być mniejsze niż za porażkę",
+  "pointsForDraw cannot be less than pointsForLoss":
+    "Punkty za remis nie mogą być mniejsze niż za porażkę",
   "PointsForLoss cannot be negative.": "Punkty za porażkę nie mogą być ujemne",
   "pointsForLoss cannot be negative": "Punkty za porażkę nie mogą być ujemne",
   "MatchDurationMinutes must be higher than 0.": "Długość meczu musi być większa od 0",

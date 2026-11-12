@@ -794,24 +794,6 @@ const api = [
     "*/api/tournaments/:id/teams",
     authed<{ id: string }>(({ params }) => HttpResponse.json(tournamentTeams(params.id))),
   ),
-  http.get(
-    "*/api/tournaments/:id/pitches",
-    authed<{ id: string }>(({ params }) =>
-      HttpResponse.json(
-        params.id === IDS.tournament
-          ? [
-              {
-                id: IDS.pitch,
-                tournamentId: params.id,
-                name: "Boisko Główne",
-                description: null,
-                isActive: true,
-              },
-            ]
-          : [],
-      ),
-    ),
-  ),
 
   // --- Sędzia / panel live ---
   http.get(
@@ -1682,6 +1664,7 @@ type Config = {
     name: string
     description: string | null
     isActive: boolean
+    groupIds: string[]
   }[]
   tieBreakers: { order: number; type: string }[]
 }
@@ -1754,7 +1737,16 @@ function configOf(tournamentId: string): Config {
       ? [{ id: IDS.group, tournamentId, categoryId: IDS.category, name: "Grupa A", order: 1 }]
       : [],
     pitches: seeded
-      ? [{ id: IDS.pitch, tournamentId, name: "Boisko Główne", description: null, isActive: true }]
+      ? [
+          {
+            id: IDS.pitch,
+            tournamentId,
+            name: "Boisko Główne",
+            description: null,
+            isActive: true,
+            groupIds: [],
+          },
+        ]
       : [],
     tieBreakers: TIEBREAKERS.slice(0, 5).map((type, i) => ({ order: i + 1, type })),
     secondStage: { seats: [], fixtures: [], ranges: [] },
@@ -2062,7 +2054,11 @@ const config = [
     authed<{ id: string }>(async ({ params, request, user }) => {
       if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
       const c = configOf(params.id)
-      const body = (await request.json()) as { name: string; description: string | null }
+      const body = (await request.json()) as {
+        name: string
+        description: string | null
+        groupIds?: string[]
+      }
       if (c.pitches.some((p) => p.name.toLowerCase() === body.name.trim().toLowerCase()))
         return validation(
           "Name",
@@ -2074,9 +2070,31 @@ const config = [
         name: body.name.trim(),
         description: body.description,
         isActive: true,
+        groupIds: body.groupIds ?? [],
       }
       c.pitches.push(pitch)
       return HttpResponse.json({ pitchId: pitch.id }, { status: 201 })
+    }),
+  ),
+  http.put(
+    "*/api/tournaments/:id/pitches/:pitchId",
+    authed<{ id: string; pitchId: string }>(async ({ params, request, user }) => {
+      if (!organizerOf(user, params.id)) return problem(403, "Forbidden")
+      const pitch = configOf(params.id).pitches.find((p) => p.id === params.pitchId)
+      if (!pitch) return problem(404, "Pitch not found")
+      const body = (await request.json()) as {
+        name: string
+        description: string | null
+        isActive: boolean
+        groupIds?: string[]
+      }
+      Object.assign(pitch, {
+        name: body.name.trim(),
+        description: body.description,
+        isActive: body.isActive,
+        groupIds: body.groupIds ?? pitch.groupIds,
+      })
+      return HttpResponse.json({ pitchId: pitch.id })
     }),
   ),
   http.get(

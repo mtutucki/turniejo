@@ -6,6 +6,10 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+### Nowe
+
+- Boisko można przypisać do wybranych grup (np. boiska A i B w jednej hali dla grup 1 i 2, C i D w drugiej dla grup 3 i 4). Generator terminarza układa mecze grupy tylko na jej boiskach, także w drugiej fazie grupowej, a mecze pucharu grają na każdym boisku.
+
 ## [1.1.1] - 2026-11-11
 
 ### Poprawione

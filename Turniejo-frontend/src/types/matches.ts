@@ -36,12 +36,15 @@ export type Pitch = {
   name: string
   description: string | null
   isActive: boolean
+  /** Grupy (faza 1 i 2), których mecze generator kładzie na tym boisku. Puste = wszystkie grupy. */
+  groupIds: string[]
 }
 
 export type PitchInput = {
   name: string
   description: string | null
   isActive: boolean
+  groupIds: string[]
 }
 
 /** MatchDto (GET /schedule) */
