@@ -20,7 +20,7 @@ namespace Turniejo.Matches.UnitTests.Matches
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new UpdateMatchScheduleCommandHandler(_dbContext, new ScheduleConflictChecker(_dbContext, _tournamentModule, Substitute.For<ITeamModule>()), new PlannedSlotShifter(_dbContext, Substitute.For<ITournamentModule>(), Substitute.For<IBracketModule>()), _currentUserContext);
+            _handler = new UpdateMatchScheduleCommandHandler(_dbContext, new ScheduleConflictChecker(_dbContext, _tournamentModule, Substitute.For<ITeamModule>()), new PlannedSlotShifter(_dbContext, Substitute.For<ITournamentModule>(), Substitute.For<IBracketModule>()), new PitchRefereeAssigner(_dbContext, Substitute.For<IUserModule>(), Substitute.For<IAuthorizationService>(), Substitute.For<ITournamentModule>()), _currentUserContext);
         }
 
         private static Match CreateFakeMatch(Guid tournamentId)

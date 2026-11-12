@@ -243,6 +243,9 @@ namespace Turniejo.Matches.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("RefereeId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TournamentId")
                         .HasColumnType("uuid");
 

@@ -10,7 +10,8 @@ namespace Turniejo.Matches.Application.Pitches.UpdatePitch
         string Name,
         string? Description,
         bool IsActive,
-        IReadOnlyList<Guid>? GroupIds = null) : ICommand<UpdatePitchResponse>, IAuthorizedRequest
+        IReadOnlyList<Guid>? GroupIds = null,
+        Guid? RefereeId = null) : ICommand<UpdatePitchResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

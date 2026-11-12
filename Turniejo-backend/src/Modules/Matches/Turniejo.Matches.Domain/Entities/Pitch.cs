@@ -15,6 +15,9 @@ namespace Turniejo.Matches.Domain.Entities
         // Tablica uuid[] bez kluczy obcych: grupy żyją w module Tournaments.
         public List<Guid> GroupIds { get; private set; } = [];
 
+        // Sędzia boiska: prowadzi nierozpoczęte mecze na tym boisku, które nie mają innego sędziego.
+        public Guid? RefereeId { get; private set; }
+
         private readonly List<IDomainEvent> _domainEvents = [];
         public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
@@ -61,6 +64,12 @@ namespace Turniejo.Matches.Domain.Entities
         public void SetGroups(IEnumerable<Guid> groupIds)
         {
             GroupIds = groupIds.Distinct().ToList();
+            SetUpdatedAt();
+        }
+
+        public void SetReferee(Guid? refereeId)
+        {
+            RefereeId = refereeId;
             SetUpdatedAt();
         }
 
