@@ -14,7 +14,8 @@ namespace Turniejo.Matches.Application.DTOs
         Guid TeamId,
         string Name,
         string? ShortName,
-        IReadOnlyList<MatchPlayerDto> Players);
+        IReadOnlyList<MatchPlayerDto> Players,
+        string? LogoUrl = null);
 
     public sealed record MatchLivePanelDto(
         Guid MatchId,

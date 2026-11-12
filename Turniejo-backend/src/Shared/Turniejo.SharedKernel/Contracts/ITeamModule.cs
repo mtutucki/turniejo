@@ -36,5 +36,5 @@ public interface ITeamModule
     Task RemoveTeamsByOrganizationIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 }
 
-public record TeamDto(Guid Id, string Name, string? ShortName);
+public record TeamDto(Guid Id, string Name, string? ShortName, string? LogoUrl = null);
 public record TournamentTeamDto(Guid Id, Guid TournamentId, Guid TeamId, Guid CategoryId, Guid? GroupId, string RegistrationStatus);

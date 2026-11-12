@@ -13,7 +13,7 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
         if (team is null)
             return null;
 
-        return new TeamDto(team.Id, team.Name, team.ShortName);
+        return new TeamDto(team.Id, team.Name, team.ShortName, team.LogoUrl);
     }
 
     public async Task<IReadOnlyList<TeamDto>> GetTeamsAsync(IReadOnlyCollection<Guid> teamIds, CancellationToken cancellationToken = default)
@@ -23,7 +23,7 @@ internal sealed class TeamModule(ITeamsDbContext dbContext) : ITeamModule
 
         var teams = await dbContext.GetTeamsByIdsAsync(teamIds, cancellationToken);
 
-        return teams.Select(t => new TeamDto(t.Id, t.Name, t.ShortName)).ToList();
+        return teams.Select(t => new TeamDto(t.Id, t.Name, t.ShortName, t.LogoUrl)).ToList();
     }
 
     public async Task<Guid?> GetTeamOrganizationIdAsync(Guid teamId, CancellationToken cancellationToken = default) =>
