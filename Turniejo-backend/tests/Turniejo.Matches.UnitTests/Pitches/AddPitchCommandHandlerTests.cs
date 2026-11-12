@@ -1,3 +1,4 @@
+using Turniejo.Matches.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
@@ -20,7 +21,7 @@ namespace Turniejo.Matches.UnitTests.Pitches
             _dbContext = Substitute.For<IMatchesDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
             _tournamentModule = Substitute.For<ITournamentModule>();
-            _handler = new AddPitchCommandHandler(_dbContext, _currentUserContext, _tournamentModule);
+            _handler = new AddPitchCommandHandler(_dbContext, _currentUserContext, _tournamentModule, Substitute.For<IAuthorizationService>());
         }
 
         [Fact]

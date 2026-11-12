@@ -21,6 +21,9 @@ test("[TAB-02] wynik zakończonego meczu pojawia się w tabeli bez odświeżania
   await page.goto(`/tournaments/${TOURNAMENT_ID}/standings`)
   const winner = table(page).getByRole("row", { name: /Orły E2E/ })
   await expect(winner.getByRole("cell").last()).toHaveText("0")
+  // Zdarzenia wysyłamy dopiero, gdy strona dołączy do grupy turnieju w SignalR. Wcześniej gol i koniec
+  // meczu potrafiły przyjść przed połączeniem i tabela czekała na nie bez końca (test niestabilny).
+  await expect.poll(async () => (await mock.state()).connections.tournaments).toBeGreaterThan(0)
 
   // Sędzia kończy mecz na swoim telefonie.
   await mock.goal(MATCH_ID, "home")

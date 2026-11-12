@@ -71,6 +71,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
       ? []
       : (groups.data ?? []).filter((g) => g.categoryId === categoryId)
   const teamById = new Map((teams.data ?? []).map((t) => [t.id, t.teamName]))
+  const logoById = new Map((teams.data ?? []).map((t) => [t.id, t.teamLogoUrl]))
   const groupById = new Map((groups.data ?? []).map((g) => [g.id, g.name]))
   const pitchById = new Map((pitches.data ?? []).map((p) => [p.id, p.name]))
 
@@ -306,6 +307,7 @@ function CategoryBracket({ categoryId }: { categoryId: string }) {
           matches={schedule.data ?? []}
           lookups={{
             teamName: (teamId) => teamById.get(teamId) ?? "Drużyna",
+            teamLogo: (teamId) => logoById.get(teamId) ?? null,
             teamHref: (teamId) => `/tournaments/${id}/teams/${teamId}`,
             groupName: (groupId) => (groupId ? (groupById.get(groupId) ?? null) : null),
             pitchName: (pitchId) => (pitchId ? (pitchById.get(pitchId) ?? null) : null),

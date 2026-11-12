@@ -22,6 +22,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -41,11 +48,14 @@ import {
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { useTournamentMembers } from "@/features/teams/api"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { applyFieldErrors } from "@/lib/api/form-errors"
 import type { Pitch } from "@/types/matches"
+import { UserRole } from "@/types/roles"
 
-import { useDeletePitch, useSavePitch } from "../api"
+import { useDeletePitch, usePitches, useSavePitch } from "../api"
+import { memberName } from "./assign-referee-dialog"
 import { pitchGroupName, pitchGroupSections } from "../pitch-groups"
 
 // Limity z AddPitchCommandValidator.
@@ -54,7 +64,10 @@ const schema = z.object({
   description: z.string().trim().max(500, "Maksymalnie 500 znaków"),
   isActive: z.boolean(),
   groupIds: z.array(z.string()),
+  refereeId: z.string(),
 })
+
+const NO_REFEREE = "none"
 
 type PitchValues = z.infer<typeof schema>
 
@@ -77,6 +90,15 @@ export function PitchFormDialog({
   const deletePitch = useDeletePitch(tournamentId)
   const categories = useCategories(tournamentId)
   const groups = useGroups(tournamentId)
+  const members = useTournamentMembers(tournamentId, open)
+  const pitches = usePitches(tournamentId)
+  const referees = (members.data ?? []).filter((m) => m.roles.includes(UserRole.Referee))
+  // Jeden sędzia prowadzi jedno boisko (backend odrzuca drugie).
+  const pitchOfReferee = new Map(
+    (pitches.data ?? [])
+      .filter((p) => p.id !== pitch?.id && p.refereeId)
+      .map((p) => [p.refereeId!, p.name]),
+  )
   const sections = pitchGroupSections(categories.data ?? [], groups.data ?? [])
   const knownGroups = new Set(sections.flatMap((section) => section.groups.map((g) => g.id)))
   const defaults: PitchValues = {
@@ -84,6 +106,7 @@ export function PitchFormDialog({
     description: pitch?.description ?? "",
     isActive: pitch?.isActive ?? true,
     groupIds: pitch?.groupIds ?? [],
+    refereeId: pitch?.refereeId ?? NO_REFEREE,
   }
   const form = useForm<PitchValues>({ resolver: zodResolver(schema), defaultValues: defaults })
   const { errors } = form.formState
@@ -96,6 +119,7 @@ export function PitchFormDialog({
         description: values.description || null,
         // Grupa usunięta w innej karcie nie wraca do boiska.
         groupIds: values.groupIds.filter((id) => knownGroups.has(id)),
+        refereeId: values.refereeId === NO_REFEREE ? null : values.refereeId,
       },
       {
         onSuccess: () => {
@@ -149,6 +173,45 @@ export function PitchFormDialog({
               />
               <FieldError errors={[errors.description]} />
             </Field>
+            <Controller
+              control={form.control}
+              name="refereeId"
+              render={({ field }) => (
+                <Field data-invalid={!!errors.refereeId}>
+                  <FieldLabel htmlFor="pitch-referee">Sędzia boiska</FieldLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="pitch-referee" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_REFEREE}>Bez sędziego</SelectItem>
+                      {referees.map((referee) => (
+                        <SelectItem
+                          key={referee.userId}
+                          value={referee.userId}
+                          disabled={pitchOfReferee.has(referee.userId)}
+                        >
+                          {memberName(referee)}
+                          {pitchOfReferee.has(referee.userId) &&
+                            ` (${pitchOfReferee.get(referee.userId)})`}
+                        </SelectItem>
+                      ))}
+                      {/* Sędzia, który opuścił turniej, zostaje widoczny, dopóki go nie zmienisz. */}
+                      {field.value !== NO_REFEREE &&
+                        !referees.some((r) => r.userId === field.value) && (
+                          <SelectItem value={field.value}>Sędzia spoza turnieju</SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    {referees.length === 0
+                      ? "Sędziowie dołączają do turnieju kodem sędziego."
+                      : "Dostaje nierozpoczęte mecze na tym boisku, które nie mają innego sędziego."}
+                  </FieldDescription>
+                  <FieldError errors={[errors.refereeId]} />
+                </Field>
+              )}
+            />
             {sections.length > 0 && (
               <Controller
                 control={form.control}

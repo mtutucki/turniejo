@@ -3,6 +3,7 @@
 import Link from "next/link"
 
 import { formatDateTime } from "@/lib/format"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import { cn } from "@/lib/utils"
 import type { Match } from "@/types/matches"
 
@@ -23,6 +24,8 @@ export type BracketSwap = {
 
 export type BracketLookups = {
   teamName: (tournamentTeamId: string) => string
+  /** Herb drużyny. Bez tej funkcji drabinka nie pokazuje herbów (portal bez „Pokazuj drużyny”). */
+  teamLogo?: (tournamentTeamId: string) => string | null
   groupName: (groupId: string | null) => string | null
   pitchName?: (pitchId: string | null) => string | null
   /** Strona drużyny. Bez niej nazwa jest zwykłym tekstem (np. w trybie zamiany par). */
@@ -78,6 +81,7 @@ function placeholder(
 
 function Slot({
   label,
+  logo,
   known,
   href,
   score,
@@ -87,6 +91,8 @@ function Slot({
   swap,
 }: {
   label: string
+  /** undefined = bez herbu (miejsce jeszcze bez drużyny albo herby wyłączone). */
+  logo?: string | null
   known: boolean
   href?: string
   score: number | null
@@ -101,7 +107,7 @@ function Slot({
     winner && "bg-primary/10 font-semibold",
     decided && !winner && "text-muted-foreground",
   )
-  const name =
+  const text =
     href && !swap ? (
       <Link href={href} className="min-w-0 truncate hover:underline">
         {label}
@@ -110,6 +116,15 @@ function Slot({
       <span className={cn("min-w-0 truncate", !known && "text-muted-foreground italic")}>
         {label}
       </span>
+    )
+  const name =
+    logo !== undefined ? (
+      <span className="flex min-w-0 items-center gap-2">
+        <TeamLogo name={label} logoUrl={logo} size={18} />
+        {text}
+      </span>
+    ) : (
+      text
     )
   if (swap) {
     return (
@@ -193,6 +208,11 @@ function NodeCard({
                 lookups,
               )
         }
+        logo={
+          node.homeTournamentTeamId && lookups.teamLogo
+            ? lookups.teamLogo(node.homeTournamentTeamId)
+            : undefined
+        }
         known={!!node.homeTournamentTeamId}
         href={node.homeTournamentTeamId ? lookups.teamHref?.(node.homeTournamentTeamId) : undefined}
         score={showScore ? match!.homeScore : null}
@@ -212,6 +232,11 @@ function NodeCard({
                 node.awaySourcePosition,
                 lookups,
               )
+        }
+        logo={
+          node.awayTournamentTeamId && lookups.teamLogo
+            ? lookups.teamLogo(node.awayTournamentTeamId)
+            : undefined
         }
         known={!!node.awayTournamentTeamId}
         href={node.awayTournamentTeamId ? lookups.teamHref?.(node.awayTournamentTeamId) : undefined}

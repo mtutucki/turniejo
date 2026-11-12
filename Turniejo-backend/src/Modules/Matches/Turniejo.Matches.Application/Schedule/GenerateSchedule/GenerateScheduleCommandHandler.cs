@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.Matches.Domain.Events;
@@ -21,6 +22,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         ITournamentModule tournamentModule,
         ITeamModule teamModule,
         IBracketModule bracketModule,
+        PitchRefereeAssigner pitchRefereeAssigner,
         ICurrentUserContext currentUserContext) : ICommandHandler<GenerateScheduleCommand, GenerateScheduleResponse>
     {
         private sealed record MatchPair(Guid CategoryId, Guid GroupId, Guid HomeTournamentTeamId, Guid AwayTournamentTeamId);
@@ -189,6 +191,18 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
 
                 return StatusConflict();
             }
+
+            // Sędziowie boisk: dopiero po zmianie etapu, żeby wycofanie terminarza nie zostawiało ról w meczach.
+            var tournamentPitches = await dbContext.GetPitchesByTournamentIdAsync(request.TournamentId, cancellationToken);
+            Guid? RefereeOf(Guid? pitchId) =>
+                pitchId is { } id ? tournamentPitches.FirstOrDefault(p => p.Id == id)?.RefereeId : null;
+            var withReferee = await pitchRefereeAssigner.ApplyAsync(
+                newMatches.Select(m => new PitchRefereeTarget(m, RefereeOf(m.PitchId)))
+                    .Concat(bracketMatches.Select(m => new PitchRefereeTarget(m, RefereeOf(m.PitchId), RefereeOf(previous[m.Id].PitchId))))
+                    .ToList(),
+                currentUserContext.UserId, cancellationToken);
+            if (withReferee > 0)
+                await dbContext.SaveChangesAsync(cancellationToken);
 
             if (plannedSlots.Count > 0)
                 await bracketModule.SetPlannedSlotsAsync(plannedSlots, cancellationToken);

@@ -11,7 +11,8 @@ namespace Turniejo.Matches.Application.Pitches.AddPitch
     internal sealed class AddPitchCommandHandler(
         IMatchesDbContext dbContext,
         ICurrentUserContext currentUserContext,
-        ITournamentModule tournamentModule) : ICommandHandler<AddPitchCommand, AddPitchResponse>
+        ITournamentModule tournamentModule,
+        IAuthorizationService authorizationService) : ICommandHandler<AddPitchCommand, AddPitchResponse>
     {
         public async Task<Result<AddPitchResponse>> Handle(AddPitchCommand request, CancellationToken cancellationToken)
         {
@@ -24,12 +25,18 @@ namespace Turniejo.Matches.Application.Pitches.AddPitch
             if (groupsCheck.IsFailure)
                 return Result.Failure<AddPitchResponse>(groupsCheck.Error);
 
+            var refereeCheck = await PitchRefereeValidation.CheckAsync(
+                dbContext, authorizationService, request.TournamentId, null, request.RefereeId, cancellationToken);
+            if (refereeCheck.IsFailure)
+                return Result.Failure<AddPitchResponse>(refereeCheck.Error);
+
             var result = Pitch.Create(Guid.NewGuid(), request.TournamentId, request.Name, request.Description, currentUserContext.UserId);
             if (result.IsFailure)
                 return Result.Failure<AddPitchResponse>(result.Error);
 
             var pitch = result.Value;
             pitch.SetGroups(groupIds);
+            pitch.SetReferee(request.RefereeId);
 
             await dbContext.AddPitchAsync(pitch, cancellationToken);
 

@@ -1,3 +1,4 @@
+using Turniejo.Matches.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
@@ -23,7 +24,8 @@ namespace Turniejo.Matches.UnitTests.Schedule
             _tournamentModule = Substitute.For<ITournamentModule>();
             _teamModule = Substitute.For<ITeamModule>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new GenerateScheduleCommandHandler(_dbContext, _tournamentModule, _teamModule, _bracketModule, _currentUserContext);
+            _handler = new GenerateScheduleCommandHandler(_dbContext, _tournamentModule, _teamModule, _bracketModule,
+                new PitchRefereeAssigner(_dbContext, Substitute.For<IUserModule>(), Substitute.For<IAuthorizationService>(), _tournamentModule), _currentUserContext);
             _bracketModule.GetNodesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<BracketNodeInfoDto>());
         }
 

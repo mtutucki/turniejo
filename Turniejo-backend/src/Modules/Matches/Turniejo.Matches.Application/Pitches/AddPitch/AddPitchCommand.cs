@@ -8,7 +8,8 @@ namespace Turniejo.Matches.Application.Pitches.AddPitch
         Guid TournamentId,
         string Name,
         string? Description,
-        IReadOnlyList<Guid>? GroupIds = null) : ICommand<AddPitchResponse>, IAuthorizedRequest
+        IReadOnlyList<Guid>? GroupIds = null,
+        Guid? RefereeId = null) : ICommand<AddPitchResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

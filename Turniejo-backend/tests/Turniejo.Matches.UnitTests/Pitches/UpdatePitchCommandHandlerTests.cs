@@ -1,3 +1,4 @@
+using Turniejo.Matches.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
@@ -17,7 +18,9 @@ namespace Turniejo.Matches.UnitTests.Pitches
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
             _tournamentModule = Substitute.For<ITournamentModule>();
-            _handler = new UpdatePitchCommandHandler(_dbContext, _tournamentModule);
+            _handler = new UpdatePitchCommandHandler(
+                _dbContext, _tournamentModule, Substitute.For<IAuthorizationService>(),
+                new PitchRefereeAssigner(_dbContext, Substitute.For<IUserModule>(), Substitute.For<IAuthorizationService>(), Substitute.For<ITournamentModule>()), Substitute.For<ICurrentUserContext>());
         }
 
         private static Pitch CreateFakePitch(Guid tournamentId)

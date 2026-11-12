@@ -10,6 +10,7 @@ import { useTournamentMatchesRealtime } from "@/features/matches/use-tournament-
 import { useSecondStage } from "@/features/second-stage/api"
 import { pendingPlaces } from "@/features/second-stage/split"
 import { useTournamentTeams } from "@/features/teams/api"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import { useCategories, useGroups } from "@/features/tournaments/api"
 import { useTournamentContext } from "@/features/tournaments/use-tournament-context"
 
@@ -17,11 +18,13 @@ function GroupTable({
   groupId,
   title,
   teamName,
+  teamLogo,
   pending = [],
 }: {
   groupId: string
   title: string
   teamName: (tournamentTeamId: string) => string
+  teamLogo: (tournamentTeamId: string) => string | null
   /** Grupa drugiej fazy: miejsca, które czekają na koniec pierwszej fazy. */
   pending?: string[]
 }) {
@@ -64,9 +67,14 @@ function GroupTable({
                 <td className="truncate px-2 py-2 font-medium">
                   <Link
                     href={`/tournaments/${id}/teams/${row.tournamentTeamId}`}
-                    className="hover:underline"
+                    className="flex min-w-0 items-center gap-2 hover:underline"
                   >
-                    {teamName(row.tournamentTeamId)}
+                    <TeamLogo
+                      name={teamName(row.tournamentTeamId)}
+                      logoUrl={teamLogo(row.tournamentTeamId)}
+                      size={20}
+                    />
+                    <span className="truncate">{teamName(row.tournamentTeamId)}</span>
                   </Link>
                 </td>
                 <td className="px-2 py-2 text-center font-mono tabular-nums">
@@ -148,6 +156,8 @@ export function TournamentStandingsView() {
 
   const teamById = new Map((teams.data ?? []).map((t) => [t.id, t.teamName]))
   const teamName = (tournamentTeamId: string) => teamById.get(tournamentTeamId) ?? "Drużyna"
+  const logoById = new Map((teams.data ?? []).map((t) => [t.id, t.teamLogoUrl]))
+  const teamLogo = (tournamentTeamId: string) => logoById.get(tournamentTeamId) ?? null
 
   return (
     <div className="space-y-8">
@@ -176,6 +186,7 @@ export function TournamentStandingsView() {
                         groupId={group.id}
                         title={group.name}
                         teamName={teamName}
+                        teamLogo={teamLogo}
                         pending={pendingPlaces(secondStage.data?.seats ?? [], group.id, groupList)}
                       />
                     ))}

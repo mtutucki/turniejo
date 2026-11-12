@@ -254,7 +254,10 @@ function seed() {
   const teamLabels: { id: string; name: string }[] = []
   const teamLabelIds: Record<string, string[]> = {}
   /** Zmiany zgłoszeń seedowanych drużyn w teście (grupa, status), klucz: tournamentTeamId. */
-  const teamChanges: Record<string, { groupId?: string | null; registrationStatus?: string }> = {}
+  const teamChanges: Record<
+    string,
+    { groupId?: string | null; registrationStatus?: string; teamLogoUrl?: string | null }
+  > = {}
   return {
     users,
     tournaments,

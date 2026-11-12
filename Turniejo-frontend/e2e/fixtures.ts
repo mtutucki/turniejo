@@ -20,7 +20,7 @@ type MockState = {
   }[]
   organizations: string[]
   requests: string[]
-  connections: { tournaments: number; matches: number }
+  connections: { tournaments: number; matches: number; tournamentGroups: string[] }
 }
 
 export const mock = {
@@ -76,6 +76,13 @@ export const mock = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version }),
+    }),
+  /** Herb drużyny w turnieju (zgłoszenie), jakby wgrany w bazie drużyn. */
+  teamLogo: (tournamentTeamId: string, logoUrl: string | null) =>
+    fetch(`${MOCK_URL}/__control/teams/${tournamentTeamId}/logo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logoUrl }),
     }),
   /** Motyw na koncie, jakby wybrany na innym urządzeniu. */
   theme: (email: string, theme: "system" | "light" | "dark") =>

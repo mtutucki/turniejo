@@ -18,7 +18,7 @@ import {
   type User,
   userFromAuthHeader,
 } from "./db"
-import { closeAll, connectionCount, negotiateResponse, publish } from "./signalr"
+import { closeAll, connectionCount, joinedGroups, negotiateResponse, publish } from "./signalr"
 
 /**
  * Odpowiedzi ustawione przez test (POST /__control/override): test UI sam mówi, co zwraca API,
@@ -1268,7 +1268,7 @@ const api = [
         shortName: t.teamShortName,
         categoryId: t.categoryId,
         groupId: t.groupId,
-        logoUrl: null,
+        logoUrl: t.teamLogoUrl,
       })),
     ),
   ),
@@ -1665,6 +1665,7 @@ type Config = {
     description: string | null
     isActive: boolean
     groupIds: string[]
+    refereeId: string | null
   }[]
   tieBreakers: { order: number; type: string }[]
 }
@@ -1745,6 +1746,7 @@ function configOf(tournamentId: string): Config {
             description: null,
             isActive: true,
             groupIds: [],
+            refereeId: null,
           },
         ]
       : [],
@@ -2058,6 +2060,7 @@ const config = [
         name: string
         description: string | null
         groupIds?: string[]
+        refereeId?: string | null
       }
       if (c.pitches.some((p) => p.name.toLowerCase() === body.name.trim().toLowerCase()))
         return validation(
@@ -2071,6 +2074,7 @@ const config = [
         description: body.description,
         isActive: true,
         groupIds: body.groupIds ?? [],
+        refereeId: body.refereeId ?? null,
       }
       c.pitches.push(pitch)
       return HttpResponse.json({ pitchId: pitch.id }, { status: 201 })
@@ -2087,12 +2091,14 @@ const config = [
         description: string | null
         isActive: boolean
         groupIds?: string[]
+        refereeId?: string | null
       }
       Object.assign(pitch, {
         name: body.name.trim(),
         description: body.description,
         isActive: body.isActive,
         groupIds: body.groupIds ?? pitch.groupIds,
+        refereeId: body.refereeId ?? null,
       })
       return HttpResponse.json({ pitchId: pitch.id })
     }),
@@ -2587,6 +2593,13 @@ const control = [
     user.theme = ((await request.json()) as { theme: User["theme"] }).theme
     return new HttpResponse(null, { status: 204 })
   }),
+  // Herb drużyny w turnieju (panel: teamLogoUrl, portal: logoUrl), jak po wgraniu go w bazie drużyn.
+  http.post("*/__control/teams/:ttid/logo", async ({ params, request }) => {
+    const { logoUrl } = (await request.json()) as { logoUrl: string | null }
+    const id = params.ttid as string
+    db.teamChanges[id] = { ...db.teamChanges[id], teamLogoUrl: logoUrl }
+    return HttpResponse.json({})
+  }),
   http.post("*/__control/reset", () => {
     overrides = []
     requests = []
@@ -2632,6 +2645,8 @@ const control = [
       connections: {
         tournaments: connectionCount("tournaments"),
         matches: connectionCount("matches"),
+        /** Turnieje, których zdarzenia strona już dostaje (panel sędziego słucha kilku naraz). */
+        tournamentGroups: joinedGroups("tournaments"),
       },
     }),
   ),

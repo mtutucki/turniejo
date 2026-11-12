@@ -75,6 +75,13 @@ export function publish(hub: string, group: string, target: string, payload: unk
 export const connectionCount = (hub: string) =>
   [...connections].filter((c) => c.hub === hub && c.ready && c.groups.size > 0).length
 
+/** Grupy (id turnieju/meczu), do których dołączyło któreś połączenie huba. */
+export const joinedGroups = (hub: string) => [
+  ...new Set(
+    [...connections].filter((c) => c.hub === hub && c.ready).flatMap((c) => [...c.groups]),
+  ),
+]
+
 /** Reset między testami — zamyka połączenia poprzedniej strony, żeby liczniki dotyczyły bieżącej. */
 export function closeAll() {
   for (const c of connections) c.socket.terminate()

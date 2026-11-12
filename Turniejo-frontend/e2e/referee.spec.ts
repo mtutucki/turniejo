@@ -1,7 +1,9 @@
-import { expect, loginAs, MATCH_ID, mock, REFEREE, test } from "./fixtures"
+import { expect, loginAs, MATCH_ID, mock, REFEREE, test, TOURNAMENT_ID } from "./fixtures"
 
 test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => {
-  test("[MNZ-004] sędzia dodaje gola, wynik zapisuje się i zostaje po odświeżeniu", async ({ page }) => {
+  test("[MNZ-004] sędzia dodaje gola, wynik zapisuje się i zostaje po odświeżeniu", async ({
+    page,
+  }) => {
     await loginAs(page, REFEREE)
     await page.goto("/referee/matches")
 
@@ -44,7 +46,11 @@ test.describe("Panel sędziego → Dodanie gola → Aktualizacja wyniku", () => 
     await loginAs(page, REFEREE)
     await page.goto("/referee/matches")
     await expect(page.getByRole("link", { name: /Orły E2E/ })).toBeVisible()
-    await expect.poll(async () => (await mock.state()).connections.tournaments).toBeGreaterThan(0)
+    // Panel słucha kilku turniejów: czekamy na grupę TEGO turnieju, nie na pierwsze lepsze połączenie.
+    // Inaczej oddanie meczu potrafiło przyjść przed dołączeniem do grupy i lista się nie odświeżała.
+    await expect
+      .poll(async () => (await mock.state()).connections.tournamentGroups)
+      .toContain(TOURNAMENT_ID.toLowerCase())
 
     await mock.release(MATCH_ID)
     // Przy pełnym przebiegu (oba projekty) odświeżenie listy po zdarzeniu bywało wolniejsze niż 8 s.

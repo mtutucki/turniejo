@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.Matches.Application.Services;
 using Turniejo.Matches.Domain.Entities;
 using Turniejo.Matches.Domain.Enums;
 using Turniejo.Matches.Domain.Events;
@@ -20,7 +21,8 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
         ITournamentModule tournamentModule,
         ITeamModule teamModule,
         IUserModule userModule,
-        IAuthorizationService authorizationService)
+        IAuthorizationService authorizationService,
+        PitchRefereeAssigner pitchRefereeAssigner)
         : ICommandHandler<CreateBracketMatchCommand, CreateBracketMatchResponse>
     {
         public async Task<Result<CreateBracketMatchResponse>> Handle(CreateBracketMatchCommand request, CancellationToken cancellationToken)
@@ -36,6 +38,14 @@ namespace Turniejo.Matches.Application.Matches.CreateBracketMatch
 
             await AwardWalkoverIfOpponentWithdrewAsync(result.Value, cancellationToken);
             await AssignPlannedRefereeAsync(result.Value, request.PlannedRefereeId, cancellationToken);
+            // Bez sędziego wskazanego przy węźle mecz prowadzi sędzia boiska (jeśli boisko go ma).
+            if (result.Value.RefereeId is null && result.Value.PitchId is { } matchPitchId)
+            {
+                var pitch = await dbContext.GetPitchByIdAsync(matchPitchId, cancellationToken);
+                if (pitch?.RefereeId is { } pitchReferee)
+                    await pitchRefereeAssigner.ApplyAsync(
+                        [new PitchRefereeTarget(result.Value, pitchReferee)], Guid.Empty, cancellationToken);
+            }
 
             await dbContext.AddMatchAsync(result.Value, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);

@@ -4,6 +4,7 @@ import { Minus, Plus } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 
 import { Button } from "@/components/ui/button"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import type { MatchStatus, MatchTeam } from "@/types/matches"
 
 import { resultNote } from "../result-note"
@@ -48,6 +49,7 @@ function TeamScore({
   const label = team.shortName || team.name
   return (
     <div className="flex min-w-0 flex-col items-center gap-3">
+      <TeamLogo name={team.name} logoUrl={team.logoUrl ?? null} size={40} />
       <p className="w-full truncate text-center text-sm font-medium" title={team.name}>
         {team.name}
       </p>

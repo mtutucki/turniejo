@@ -6,6 +6,13 @@ Kategorie: **Nowe** (funkcje), **Zmienione** (inaczej niż wcześniej), **Popraw
 
 ## [Nieopublikowane]
 
+## [1.3.0] - 2026-11-12
+
+### Nowe
+
+- Boisko może mieć swojego sędziego. Dostaje on nierozpoczęte mecze tego boiska bez sędziego, także nowe mecze z terminarza i pucharu oraz mecze przeniesione na to boisko. Sędziego boiska można wybrać w każdej chwili, także gdy dołączy do turnieju po ułożeniu terminarza.
+- Herby drużyn widać w terminarzu, tabelach, drabince, na kartach meczów sędziego i w panelu meczu na żywo. W portalu kibica herby pokazują się razem z nazwami drużyn, czyli przy włączonym „Pokazuj drużyny”.
+
 ## [1.2.0] - 2026-11-12
 
 ### Nowe
