@@ -1,3 +1,4 @@
+using Turniejo.Matches.Application.Services;
 using FluentAssertions;
 using NSubstitute;
 using Turniejo.Matches.Application.Abstractions;
@@ -20,7 +21,8 @@ namespace Turniejo.Matches.UnitTests.Matches
         public CreateBracketMatchCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
-            _handler = new CreateBracketMatchCommandHandler(_dbContext, _tournamentModule, _teamModule, _userModule, _authorizationService);
+            _handler = new CreateBracketMatchCommandHandler(_dbContext, _tournamentModule, _teamModule, _userModule, _authorizationService,
+                new PitchRefereeAssigner(_dbContext, _userModule, _authorizationService, _tournamentModule));
             _dbContext.GetMatchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<Match>());
             _dbContext.GetPitchesByTournamentIdAsync(default, default).ReturnsForAnyArgs(new List<Pitch>());
             _tournamentModule.GetTournamentSettingsAsync(default, default).ReturnsForAnyArgs(

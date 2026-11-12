@@ -52,7 +52,7 @@ namespace Turniejo.Api.Controllers
         [HttpPost("pitches")]
         public async Task<IActionResult> AddPitch([FromRoute] Guid tournamentId, [FromBody] AddPitchRequest request, CancellationToken cancellationToken)
         {
-            var command = new AddPitchCommand(tournamentId, request.Name, request.Description, request.GroupIds);
+            var command = new AddPitchCommand(tournamentId, request.Name, request.Description, request.GroupIds, request.RefereeId);
             var result = await sender.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -64,7 +64,7 @@ namespace Turniejo.Api.Controllers
         [HttpPut("pitches/{pitchId}")]
         public async Task<IActionResult> UpdatePitch([FromRoute] Guid tournamentId, [FromRoute] Guid pitchId, [FromBody] UpdatePitchRequest request, CancellationToken cancellationToken)
         {
-            var command = new UpdatePitchCommand(tournamentId, pitchId, request.Name, request.Description, request.IsActive, request.GroupIds);
+            var command = new UpdatePitchCommand(tournamentId, pitchId, request.Name, request.Description, request.IsActive, request.GroupIds, request.RefereeId);
             var result = await sender.Send(command, cancellationToken);
             return result.ToActionResult();
         }
@@ -383,8 +383,8 @@ namespace Turniejo.Api.Controllers
             return result.ToActionResult();
         }
 
-        public sealed record AddPitchRequest(string Name, string? Description, IReadOnlyList<Guid>? GroupIds = null);
-        public sealed record UpdatePitchRequest(string Name, string? Description, bool IsActive, IReadOnlyList<Guid>? GroupIds = null);
+        public sealed record AddPitchRequest(string Name, string? Description, IReadOnlyList<Guid>? GroupIds = null, Guid? RefereeId = null);
+        public sealed record UpdatePitchRequest(string Name, string? Description, bool IsActive, IReadOnlyList<Guid>? GroupIds = null, Guid? RefereeId = null);
         public sealed record ScheduleWindowRequest(DateTimeOffset StartAt, DateTimeOffset EndAt, int? MaxMatches = null);
         public sealed record GenerateScheduleRequest(
             DateTimeOffset StartAt,

@@ -47,10 +47,19 @@ export function useSavePitch(tournamentId: string) {
         : // AddPitch nie przyjmuje IsActive — nowe boisko jest zawsze aktywne.
           request(`${base(tournamentId)}/pitches`, {
             method: "POST",
-            body: { name: input.name, description: input.description, groupIds: input.groupIds },
+            body: {
+              name: input.name,
+              description: input.description,
+              groupIds: input.groupIds,
+              refereeId: input.refereeId,
+            },
           }),
     meta: { handlesValidation: true },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: matchKeys.pitches(tournamentId) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: matchKeys.pitches(tournamentId) })
+      // Sędzia boiska przechodzi na jego mecze.
+      void queryClient.invalidateQueries({ queryKey: matchKeys.schedule(tournamentId) })
+    },
   })
 }
 

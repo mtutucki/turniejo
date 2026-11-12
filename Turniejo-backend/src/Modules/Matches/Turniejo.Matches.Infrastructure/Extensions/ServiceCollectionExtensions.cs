@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ScheduleConflictChecker>();
         services.AddScoped<GoalAdjuster>();
         services.AddScoped<PlannedSlotShifter>();
+        services.AddScoped<PitchRefereeAssigner>();
         services.AddScoped<PlannedMatchContext>();
         services.AddScoped<SendOffRules>();
         services.AddScoped<RefereeIdVisibility>();

@@ -11,7 +11,7 @@ namespace Turniejo.Matches.Application.Pitches.GetTournamentPitches
         {
             var pitches = await dbContext.GetPitchesByTournamentIdAsync(request.TournamentId, cancellationToken);
 
-            var dtos = pitches.Select(p => new PitchDto(p.Id, p.TournamentId, p.Name, p.Description, p.IsActive, p.GroupIds)).ToList();
+            var dtos = pitches.Select(p => new PitchDto(p.Id, p.TournamentId, p.Name, p.Description, p.IsActive, p.GroupIds, p.RefereeId)).ToList();
 
             return Result.Success<IReadOnlyList<PitchDto>>(dtos);
         }

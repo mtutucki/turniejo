@@ -1665,6 +1665,7 @@ type Config = {
     description: string | null
     isActive: boolean
     groupIds: string[]
+    refereeId: string | null
   }[]
   tieBreakers: { order: number; type: string }[]
 }
@@ -1745,6 +1746,7 @@ function configOf(tournamentId: string): Config {
             description: null,
             isActive: true,
             groupIds: [],
+            refereeId: null,
           },
         ]
       : [],
@@ -2058,6 +2060,7 @@ const config = [
         name: string
         description: string | null
         groupIds?: string[]
+        refereeId?: string | null
       }
       if (c.pitches.some((p) => p.name.toLowerCase() === body.name.trim().toLowerCase()))
         return validation(
@@ -2071,6 +2074,7 @@ const config = [
         description: body.description,
         isActive: true,
         groupIds: body.groupIds ?? [],
+        refereeId: body.refereeId ?? null,
       }
       c.pitches.push(pitch)
       return HttpResponse.json({ pitchId: pitch.id }, { status: 201 })
@@ -2087,12 +2091,14 @@ const config = [
         description: string | null
         isActive: boolean
         groupIds?: string[]
+        refereeId?: string | null
       }
       Object.assign(pitch, {
         name: body.name.trim(),
         description: body.description,
         isActive: body.isActive,
         groupIds: body.groupIds ?? pitch.groupIds,
+        refereeId: body.refereeId ?? null,
       })
       return HttpResponse.json({ pitchId: pitch.id })
     }),

@@ -12,6 +12,7 @@ namespace Turniejo.Matches.Application.Matches.AssignMatchPitch
         IMatchesDbContext dbContext,
         ScheduleConflictChecker conflictChecker,
         PlannedSlotShifter plannedSlotShifter,
+        PitchRefereeAssigner pitchRefereeAssigner,
         ICurrentUserContext currentUserContext) : ICommandHandler<AssignMatchPitchCommand, AssignMatchPitchResponse>
     {
         public async Task<Result<AssignMatchPitchResponse>> Handle(AssignMatchPitchCommand request, CancellationToken cancellationToken)
@@ -24,6 +25,7 @@ namespace Turniejo.Matches.Application.Matches.AssignMatchPitch
             if (conflict != null)
                 return Result.Failure<AssignMatchPitchResponse>(conflict);
 
+            var previousPitchId = match.PitchId;
             var result = match.AssignPitch(request.PitchId, currentUserContext.UserId);
             if (result.IsFailure)
                 return Result.Failure<AssignMatchPitchResponse>(result.Error);
@@ -37,10 +39,26 @@ namespace Turniejo.Matches.Application.Matches.AssignMatchPitch
                 await dbContext.AddOutboxMessageAsync(outboxMessage, cancellationToken);
             }
 
+            match.ClearDomainEvents();
+            await AssignPitchRefereeAsync(match, previousPitchId, cancellationToken);
+
             await dbContext.SaveChangesAsync(cancellationToken);
             await plannedSlotShifter.ShiftAsync(match.TournamentId, cancellationToken);
 
             return Result.Success(new AssignMatchPitchResponse(match.Id));
+        }
+
+        // Mecz przeniesiony na inne boisko dostaje jego sędziego (o ile nie ma ręcznie wybranego innego).
+        private async Task AssignPitchRefereeAsync(Domain.Entities.Match match, Guid? previousPitchId, CancellationToken cancellationToken)
+        {
+            if (previousPitchId == match.PitchId)
+                return;
+
+            var pitches = await dbContext.GetPitchesByTournamentIdAsync(match.TournamentId, cancellationToken);
+            Guid? RefereeOf(Guid? pitchId) => pitches.FirstOrDefault(p => p.Id == pitchId)?.RefereeId;
+            await pitchRefereeAssigner.ApplyAsync(
+                [new PitchRefereeTarget(match, RefereeOf(match.PitchId), RefereeOf(previousPitchId))],
+                currentUserContext.UserId, cancellationToken);
         }
     }
 }

@@ -14,6 +14,7 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
         IMatchesDbContext dbContext,
         ScheduleConflictChecker conflictChecker,
         PlannedSlotShifter plannedSlotShifter,
+        PitchRefereeAssigner pitchRefereeAssigner,
         ICurrentUserContext currentUserContext) : ICommandHandler<UpdateMatchScheduleCommand, UpdateMatchScheduleResponse>
     {
         public async Task<Result<UpdateMatchScheduleResponse>> Handle(UpdateMatchScheduleCommand request, CancellationToken cancellationToken)
@@ -43,9 +44,20 @@ namespace Turniejo.Matches.Application.Matches.UpdateMatchSchedule
 
             if (followers.Count == 0)
             {
+                var previousPitchId = match.PitchId;
                 var result = await ApplyAsync(moves[0], cancellationToken);
                 if (result.IsFailure)
                     return Result.Failure<UpdateMatchScheduleResponse>(result.Error);
+
+                // Mecz przeniesiony na inne boisko dostaje jego sędziego (o ile nie ma ręcznie wybranego innego).
+                if (previousPitchId != match.PitchId)
+                {
+                    var pitches = await dbContext.GetPitchesByTournamentIdAsync(match.TournamentId, cancellationToken);
+                    Guid? RefereeOf(Guid? pitchId) => pitches.FirstOrDefault(p => p.Id == pitchId)?.RefereeId;
+                    await pitchRefereeAssigner.ApplyAsync(
+                        [new PitchRefereeTarget(match, RefereeOf(match.PitchId), RefereeOf(previousPitchId))],
+                        currentUserContext.UserId, cancellationToken);
+                }
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
             else
