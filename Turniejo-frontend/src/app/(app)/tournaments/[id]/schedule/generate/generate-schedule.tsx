@@ -52,6 +52,11 @@ import {
   useSavePitch,
   useSchedule,
 } from "@/features/matches/api"
+import {
+  groupsWithoutPitch,
+  pitchGroupName,
+  pitchGroupsLabel,
+} from "@/features/matches/pitch-groups"
 import { bracketStages } from "@/features/matches/planned-bracket-matches"
 import { autoBracketPairs } from "@/features/matches/suggest-bracket"
 import { useSecondStage } from "@/features/second-stage/api"
@@ -531,7 +536,7 @@ function PitchAction({ tournamentId }: { tournamentId: string }) {
       disabled={save.isPending}
       onClick={() =>
         save.mutate(
-          { name: "Boisko 1", description: null, isActive: true },
+          { name: "Boisko 1", description: null, isActive: true, groupIds: [] },
           { onSuccess: () => toast.success("Dodano „Boisko 1”") },
         )
       }
@@ -811,10 +816,15 @@ function GenerateForm({
   waitingTeams,
   notReadyReason,
   beforeGenerate,
+  playingGroups,
+  categories,
 }: {
   tournament: Tournament
   settings: TournamentSettings
   pitches: Pitch[]
+  /** Grupy, które dostaną mecze (faza 1 z drużynami, faza 2): każda potrzebuje swojego boiska. */
+  playingGroups: TournamentGroup[]
+  categories: TournamentCategory[]
   workload: Workload
   ready: boolean
   acceptedTeams: number
@@ -909,6 +919,7 @@ function GenerateForm({
   }, [singleDay, totalMatches, form])
 
   const pitchCount = pitchIds.length
+  const groupsLabel = (pitch: Pitch) => pitchGroupsLabel(pitch, categories, playingGroups)
   const count = (day: DayValues) => (Number.isFinite(day.matches) ? day.matches : 0)
   const assigned = days.reduce((sum, day) => sum + count(day), 0)
   const remaining = totalMatches - assigned
@@ -978,7 +989,9 @@ function GenerateForm({
     return null
   }
   const problems = days.map(dayProblem)
-  const planOk = remaining === 0 && problems.every((problem) => !problem)
+  // Boiska przypisane do grup: grupa bez żadnego wybranego boiska nie miałaby gdzie grać.
+  const homeless = groupsWithoutPitch(playingGroups, pitches, pitchIds)
+  const planOk = remaining === 0 && problems.every((problem) => !problem) && homeless.length === 0
 
   /** Po równo na wszystkie dni z listy; reszta z dzielenia trafia do pierwszych dni. */
   function splitEvenly(dayCount = days.length) {
@@ -1130,12 +1143,22 @@ function GenerateForm({
                       />
                       <FieldLabel htmlFor={`pitch-${pitch.id}`} className="font-normal">
                         {pitch.name}
+                        {groupsLabel(pitch) && (
+                          <span className="text-muted-foreground">({groupsLabel(pitch)})</span>
+                        )}
                       </FieldLabel>
                     </Field>
                   )
                 })}
               </div>
               <FieldError errors={[errors.pitchIds]} />
+              {homeless.length > 0 && pitchIds.length > 0 && (
+                <FieldError>
+                  Bez wybranego boiska:{" "}
+                  {homeless.map((g) => pitchGroupName(g, categories)).join(", ")}. Zaznacz boisko
+                  tej grupy albo zmień grupy boisk w zakładce Boiska.
+                </FieldError>
+              )}
             </FieldSet>
           )}
         />
@@ -1507,6 +1530,16 @@ export function GenerateScheduleView() {
       })
     : []
   const secondStageMatches = twoStages ? secondStageMatchCount(seats) : 0
+  // Grupy z meczami w terminarzu (jak w generatorze): faza 1 z co najmniej dwiema drużynami,
+  // faza 2 z co najmniej dwoma miejscami. Puchar gra na każdym boisku.
+  const playingGroups = hasGroupStage(t)
+    ? [
+        ...plan.filter((p) => p.matches > 0).map((p) => p.group),
+        ...(groups.data ?? []).filter(
+          (g) => g.stage === 2 && seats.filter((seat) => seat.groupId === g.id).length >= 2,
+        ),
+      ]
+    : []
   const pendingBracket = pendingBracketMatches(schedule.data ?? [])
   const bracketMatches = pendingBracket.length
   // Puchar: rozplanowujemy całą drabinkę — mecze 1. rundy i kolejne rundy, które jeszcze nie powstały.
@@ -1675,6 +1708,8 @@ export function GenerateScheduleView() {
               tournament={t}
               settings={settings.data}
               pitches={activePitches}
+              playingGroups={playingGroups}
+              categories={categories.data ?? []}
               workload={workload}
               ready={ready}
               acceptedTeams={

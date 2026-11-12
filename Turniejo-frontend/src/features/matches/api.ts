@@ -47,7 +47,7 @@ export function useSavePitch(tournamentId: string) {
         : // AddPitch nie przyjmuje IsActive — nowe boisko jest zawsze aktywne.
           request(`${base(tournamentId)}/pitches`, {
             method: "POST",
-            body: { name: input.name, description: input.description },
+            body: { name: input.name, description: input.description, groupIds: input.groupIds },
           }),
     meta: { handlesValidation: true },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: matchKeys.pitches(tournamentId) }),

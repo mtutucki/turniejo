@@ -366,8 +366,9 @@ export function useDeleteGroup(id: string) {
     mutationFn: (groupId: string) => request(`${base(id)}/groups/${groupId}`, { method: "DELETE" }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tournamentKeys.groups(id) })
-      // Usunięta grupa znika też z podziału na fazę 2.
+      // Usunięta grupa znika też z podziału na fazę 2 i z boisk, do których była przypisana.
       void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "second-stage"] })
+      void queryClient.invalidateQueries({ queryKey: ["tournaments", id, "pitches"] })
     },
   })
 }
