@@ -96,5 +96,81 @@ namespace Turniejo.Matches.UnitTests.Schedule
                 starts.Zip(starts.Skip(1)).Should().OnlyContain(p => p.Second - p.First > TimeSpan.FromMinutes(40));
             }
         }
+
+        private static ScheduleItem GroupMatch(Guid groupId) =>
+            new(Guid.NewGuid(), CategoryA, new HashSet<Guid> { Guid.NewGuid(), Guid.NewGuid() },
+                new HashSet<Guid>(), [], 0, groupId);
+
+        private static ScheduleResult BuildOnPitches(
+            IReadOnlyList<ScheduleItem> items, Dictionary<Guid, IReadOnlySet<Guid>> pitchGroups, TimeSpan length) =>
+            ScheduleBuilder.Build(items, pitchGroups.Keys.ToList(), [],
+                [new ScheduleWindow(Start, Start + length)], Settings, pitchGroups);
+
+        [Fact]
+        public void GroupMatches_ArePlacedOnlyOnPitchesAssignedToTheirGroup()
+        {
+            // Dwie hale: boiska A i B dla grupy 1, C i D dla grupy 2.
+            var (group1, group2) = (Guid.NewGuid(), Guid.NewGuid());
+            var (a, b, c, d) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+            var pitchGroups = new Dictionary<Guid, IReadOnlySet<Guid>>
+            {
+                [a] = new HashSet<Guid> { group1 }, [b] = new HashSet<Guid> { group1 },
+                [c] = new HashSet<Guid> { group2 }, [d] = new HashSet<Guid> { group2 },
+            };
+            var first = Enumerable.Range(0, 6).Select(_ => GroupMatch(group1)).ToList();
+            var second = Enumerable.Range(0, 6).Select(_ => GroupMatch(group2)).ToList();
+
+            var result = BuildOnPitches([.. first, .. second], pitchGroups, TimeSpan.FromHours(4));
+
+            result.Unplaced.Should().Be(0);
+            first.Select(m => result.Slots[m.Key].PitchId).Should().OnlyContain(p => p == a || p == b);
+            second.Select(m => result.Slots[m.Key].PitchId).Should().OnlyContain(p => p == c || p == d);
+        }
+
+        [Fact]
+        public void MatchWithoutGroup_CanPlayOnAnyPitch()
+        {
+            // Puchar nie ma grupy: gra także na boiskach przypisanych do grup.
+            var group1 = Guid.NewGuid();
+            var pitch = Guid.NewGuid();
+            var final = Item(CategoryA, [Guid.NewGuid(), Guid.NewGuid()]);
+
+            var result = BuildOnPitches([final], new() { [pitch] = new HashSet<Guid> { group1 } }, TimeSpan.FromHours(1));
+
+            result.Unplaced.Should().Be(0);
+            result.Slots[final.Key].PitchId.Should().Be(pitch);
+        }
+
+        [Fact]
+        public void PitchWithoutGroups_TakesMatchesOfAnyGroup()
+        {
+            var group1 = Guid.NewGuid();
+            var pitch = Guid.NewGuid();
+            var match = GroupMatch(group1);
+
+            var result = BuildOnPitches([match], new() { [pitch] = new HashSet<Guid>() }, TimeSpan.FromHours(1));
+
+            result.Slots[match.Key].PitchId.Should().Be(pitch);
+        }
+
+        [Fact]
+        public void MatchesInOneSlot_ArePairedWithPitchesSoThatAllFit()
+        {
+            // Jeden termin: boisko "wolne" przyjmuje każdą grupę, boisko grupy 1 tylko ją. Mecz grupy 1
+            // wybrany pierwszy bierze pierwsze boisko ("wolne"), a mecz grupy 2 może grać tylko tam,
+            // więc mecz grupy 1 przechodzi na swoje boisko.
+            var (group1, group2) = (Guid.NewGuid(), Guid.NewGuid());
+            var (open, onlyGroup1) = (Guid.NewGuid(), Guid.NewGuid());
+            var match1 = GroupMatch(group1);
+            var match2 = GroupMatch(group2);
+
+            var result = BuildOnPitches([match1, match2],
+                new() { [open] = new HashSet<Guid>(), [onlyGroup1] = new HashSet<Guid> { group1 } },
+                TimeSpan.FromMinutes(30));
+
+            result.Unplaced.Should().Be(0);
+            result.Slots[match2.Key].PitchId.Should().Be(open);
+            result.Slots[match1.Key].PitchId.Should().Be(onlyGroup1);
+        }
     }
 }

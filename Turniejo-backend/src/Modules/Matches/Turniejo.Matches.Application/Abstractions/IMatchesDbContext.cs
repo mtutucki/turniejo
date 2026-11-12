@@ -15,6 +15,7 @@ namespace Turniejo.Matches.Application.Abstractions
         Task<Pitch?> GetPitchByIdAsync(Guid pitchId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Pitch>> GetPitchesByTournamentIdAsync(Guid tournamentId, CancellationToken cancellationToken = default);
         Task<IReadOnlyList<Pitch>> GetPitchesByIdsAsync(IReadOnlyCollection<Guid> pitchIds, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Pitch>> GetPitchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default);
         Task<bool> PitchNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default);
         Task RemovePitchAsync(Pitch pitch, CancellationToken cancellationToken = default);
 

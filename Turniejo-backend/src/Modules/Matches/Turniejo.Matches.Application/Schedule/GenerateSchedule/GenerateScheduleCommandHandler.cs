@@ -130,7 +130,14 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                     new HashSet<Guid> { clubOf(m.HomeTournamentTeamId), clubOf(m.AwayTournamentTeamId) }))
                 .ToList();
 
-            var result = ScheduleBuilder.Build(items, pitches.Select(p => p.Id).ToList(), fixedMatches, windows, settings);
+            // Boisko przypisane do grup przyjmuje tylko ich mecze (puchar gra wszędzie). Grupa bez żadnego
+            // wybranego boiska nie zmieściłaby się nigdzie, a błąd "za mało czasu" myliłby organizatora.
+            var pitchGroups = pitches.ToDictionary(p => p.Id, p => (IReadOnlySet<Guid>)p.GroupIds.ToHashSet());
+            if (items.Any(item => pitches.All(p => !ScheduleBuilder.CanPlayOn(item, p.Id, pitchGroups))))
+                return Result.Failure<GenerateScheduleResponse>(Error.Validation(
+                    "PitchIds", "Some groups have no selected pitch assigned to them"));
+
+            var result = ScheduleBuilder.Build(items, pitches.Select(p => p.Id).ToList(), fixedMatches, windows, settings, pitchGroups);
             if (result.Unplaced > 0)
                 return NotEnoughTime(result.Unplaced);
 
@@ -312,7 +319,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             {
                 var possible = plan.SourceGroupIds.SelectMany(g => clubsByGroup.GetValueOrDefault(g) ?? []).ToHashSet();
                 var after = plan.SourceGroupIds.SelectMany(g => pairKeysByGroup.GetValueOrDefault(g) ?? []).ToList();
-                yield return new ScheduleItem(plan.Key, plan.Seats.CategoryId, new HashSet<Guid>(), possible, after, groupRounds + plan.Round);
+                yield return new ScheduleItem(plan.Key, plan.Seats.CategoryId, new HashSet<Guid>(), possible, after, groupRounds + plan.Round, plan.Seats.GroupId);
             }
         }
 
@@ -333,7 +340,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             foreach (var (key, pair, round) in pairs)
             {
                 var clubs = new HashSet<Guid> { clubOf(pair.HomeTournamentTeamId), clubOf(pair.AwayTournamentTeamId) };
-                items.Add(new ScheduleItem(key, pair.CategoryId, clubs, clubs, [], round));
+                items.Add(new ScheduleItem(key, pair.CategoryId, clubs, clubs, [], round, pair.GroupId));
             }
 
             var groupRounds = pairs.Count == 0 ? 0 : pairs.Max(p => p.Round) + 1;

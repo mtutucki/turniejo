@@ -1,10 +1,11 @@
 using Turniejo.Matches.Application.Abstractions;
+using Turniejo.SharedKernel.Contracts;
 using Turniejo.SharedKernel.CQRS;
 using Turniejo.SharedKernel.Results;
 
 namespace Turniejo.Matches.Application.Pitches.UpdatePitch
 {
-    internal sealed class UpdatePitchCommandHandler(IMatchesDbContext dbContext) : ICommandHandler<UpdatePitchCommand, UpdatePitchResponse>
+    internal sealed class UpdatePitchCommandHandler(IMatchesDbContext dbContext, ITournamentModule tournamentModule) : ICommandHandler<UpdatePitchCommand, UpdatePitchResponse>
     {
         public async Task<Result<UpdatePitchResponse>> Handle(UpdatePitchCommand request, CancellationToken cancellationToken)
         {
@@ -22,6 +23,16 @@ namespace Turniejo.Matches.Application.Pitches.UpdatePitch
             var updateResult = pitch.UpdateDetails(request.Name, request.Description, request.IsActive);
             if (updateResult.IsFailure)
                 return Result.Failure<UpdatePitchResponse>(updateResult.Error);
+
+            // Brak listy w żądaniu = grupy bez zmian (starszy klient).
+            if (request.GroupIds is { } groupIds)
+            {
+                var groupsCheck = await PitchGroupsValidation.CheckAsync(tournamentModule, request.TournamentId, groupIds, cancellationToken);
+                if (groupsCheck.IsFailure)
+                    return Result.Failure<UpdatePitchResponse>(groupsCheck.Error);
+
+                pitch.SetGroups(groupIds);
+            }
 
             await dbContext.SaveChangesAsync(cancellationToken);
 

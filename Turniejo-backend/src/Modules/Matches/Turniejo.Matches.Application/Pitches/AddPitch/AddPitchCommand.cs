@@ -7,7 +7,8 @@ namespace Turniejo.Matches.Application.Pitches.AddPitch
     public sealed record AddPitchCommand(
         Guid TournamentId,
         string Name,
-        string? Description) : ICommand<AddPitchResponse>, IAuthorizedRequest
+        string? Description,
+        IReadOnlyList<Guid>? GroupIds = null) : ICommand<AddPitchResponse>, IAuthorizedRequest
     {
         public string ScopeType => nameof(RoleScopeType.Tournament);
         public Guid ScopeId => TournamentId;

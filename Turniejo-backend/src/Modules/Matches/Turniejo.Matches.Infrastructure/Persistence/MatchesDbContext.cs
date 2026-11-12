@@ -62,6 +62,11 @@ public sealed class MatchesDbContext(DbContextOptions<MatchesDbContext> options)
             .Where(p => pitchIds.Contains(p.Id))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Pitch>> GetPitchesByGroupIdAsync(Guid groupId, CancellationToken cancellationToken = default) =>
+        await Pitches
+            .Where(p => p.GroupIds.Contains(groupId))
+            .ToListAsync(cancellationToken);
+
     public async Task<bool> PitchNameExistsAsync(Guid tournamentId, string name, CancellationToken cancellationToken = default) =>
         await Pitches.AnyAsync(p => p.TournamentId == tournamentId && p.Name == name, cancellationToken);
 

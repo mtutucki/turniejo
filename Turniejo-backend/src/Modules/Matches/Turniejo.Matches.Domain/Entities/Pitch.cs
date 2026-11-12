@@ -11,6 +11,10 @@ namespace Turniejo.Matches.Domain.Entities
         public string? Description { get; private set; }
         public bool IsActive { get; private set; } = true;
 
+        // Grupy (faza 1 i 2), których mecze generator kładzie na tym boisku. Puste = wszystkie grupy.
+        // Tablica uuid[] bez kluczy obcych: grupy żyją w module Tournaments.
+        public List<Guid> GroupIds { get; private set; } = [];
+
         private readonly List<IDomainEvent> _domainEvents = [];
         public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
@@ -52,6 +56,18 @@ namespace Turniejo.Matches.Domain.Entities
             SetUpdatedAt();
 
             return Result.Success();
+        }
+
+        public void SetGroups(IEnumerable<Guid> groupIds)
+        {
+            GroupIds = groupIds.Distinct().ToList();
+            SetUpdatedAt();
+        }
+
+        public void RemoveGroup(Guid groupId)
+        {
+            if (GroupIds.Contains(groupId))
+                SetGroups(GroupIds.Where(id => id != groupId));
         }
 
         public void ClearDomainEvents() => _domainEvents.Clear();
