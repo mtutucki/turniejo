@@ -30,6 +30,8 @@ namespace Turniejo.Tournaments.Application.TournamentGroups.DeleteTournamentGrou
 
             await bracketModule.RemoveSecondStageSeatsForGroupAsync(request.GroupId, cancellationToken);
 
+            await matchModule.RemoveGroupFromPitchesAsync(request.GroupId, cancellationToken);
+
             await tournamentsDbContext.RemoveTournamentGroupAsync(group, cancellationToken);
             await tournamentsDbContext.SaveChangesAsync(cancellationToken);
             return Result.Success();

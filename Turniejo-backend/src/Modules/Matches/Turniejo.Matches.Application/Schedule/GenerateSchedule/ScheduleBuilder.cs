@@ -7,6 +7,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
     /// dostanie drużyny. Clubs to drużyny z bazy (TeamId) znane na pewno, PossibleClubs te, które mogą
     /// zagrać (puchar przed rozstrzygnięciem), razem z pewnymi. After: mecze, które muszą się skończyć
     /// wcześniej (poprzednia runda, faza grupowa grup źródłowych). Round: kolejka w grupie / runda pucharu.
+    /// GroupId: grupa meczu (faza 1 albo 2), wybiera boiska przypisane do grupy; puchar nie ma grupy.
     /// </summary>
     internal sealed record ScheduleItem(
         Guid Key,
@@ -14,7 +15,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         IReadOnlySet<Guid> Clubs,
         IReadOnlySet<Guid> PossibleClubs,
         IReadOnlyList<Guid> After,
-        int Round);
+        int Round,
+        Guid? GroupId = null);
 
     /// <summary>Mecz, którego generator nie rusza: zajmuje boisko i drużyny w swoim czasie.</summary>
     internal sealed record FixedMatch(Guid? PitchId, DateTimeOffset StartAt, IReadOnlySet<Guid> Clubs);
@@ -29,6 +31,8 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
     /// meczów naraz. Cel: terminarz kończy się jak najwcześniej (boisko nie stoi puste, gdy ktoś może
     /// grać), a w jego ramach drużyny mają jak najdłuższe przerwy. Kilka kolejności wyboru meczów daje
     /// kilka terminarzy; wygrywa ten, który kończy się najwcześniej, a przy remisie ten z lepszymi przerwami.
+    /// Boisko przypisane do grup (pitchGroups) przyjmuje tylko mecze tych grup i mecze bez grupy (puchar);
+    /// boisko bez przypisania przyjmuje wszystkie.
     /// </summary>
     internal static class ScheduleBuilder
     {
@@ -39,8 +43,10 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             IReadOnlyList<Guid> pitchIds,
             IReadOnlyList<FixedMatch> fixedMatches,
             IReadOnlyList<ScheduleWindow> windows,
-            TournamentSettingsSummaryDto settings)
+            TournamentSettingsSummaryDto settings,
+            IReadOnlyDictionary<Guid, IReadOnlySet<Guid>>? pitchGroups = null)
         {
+            pitchGroups ??= new Dictionary<Guid, IReadOnlySet<Guid>>();
             var slotStarts = SlotStarts(windows, settings).ToList();
             var matchDuration = TimeSpan.FromMinutes(settings.MatchDurationMinutes);
             var slotLength = TimeSpan.FromMinutes(settings.MatchDurationMinutes + settings.BreakDurationMinutes);
@@ -52,7 +58,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             {
                 foreach (var priority in Enum.GetValues<Priority>())
                 {
-                    var candidate = Run(items, pitchIds, fixedMatches, windows, slotStarts, matchDuration, slotLength, priority, strictPossible);
+                    var candidate = Run(items, pitchIds, pitchGroups, fixedMatches, windows, slotStarts, matchDuration, slotLength, priority, strictPossible);
                     if (best == null || candidate.IsBetterThan(best))
                         best = candidate;
                 }
@@ -84,6 +90,7 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
         private static Candidate Run(
             IReadOnlyList<ScheduleItem> items,
             IReadOnlyList<Guid> pitchIds,
+            IReadOnlyDictionary<Guid, IReadOnlySet<Guid>> pitchGroups,
             IReadOnlyList<FixedMatch> fixedMatches,
             IReadOnlyList<ScheduleWindow> windows,
             List<(DateTimeOffset SlotStart, int WindowIndex)> slotStarts,
@@ -159,7 +166,10 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                         .ThenByDescending(x => x.Gap).ThenBy(x => x.Item.Round).ThenBy(x => order[x.Item.Key]),
                 };
 
+                // Mecz trafia do terminu tylko wtedy, gdy wszystkie wybrane da się rozstawić na wolnych
+                // boiskach, na których wolno im grać (skojarzenie z przesuwaniem już rozstawionych).
                 var chosen = new List<ScheduleItem>();
+                var pitchOwner = new Dictionary<Guid, int>();
                 foreach (var (item, _) in ordered)
                 {
                     if (chosen.Count >= capacity)
@@ -169,12 +179,15 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
                         continue;
 
                     chosen.Add(item);
+                    if (!Assign(chosen.Count - 1, chosen, freePitches, pitchGroups, pitchOwner, []))
+                        chosen.RemoveAt(chosen.Count - 1);
                 }
 
+                var pitchOf = pitchOwner.ToDictionary(x => x.Value, x => x.Key);
                 for (var i = 0; i < chosen.Count; i++)
                 {
                     var item = chosen[i];
-                    slots[item.Key] = new ScheduleSlot(freePitches[i], slotStart);
+                    slots[item.Key] = new ScheduleSlot(pitchOf[i], slotStart);
                     readyAt[item.Key] = slotStart + slotLength;
                     remaining.Remove(item);
                     placedInCategory[item.CategoryId] = placedInCategory.GetValueOrDefault(item.CategoryId) + 1;
@@ -186,6 +199,37 @@ namespace Turniejo.Matches.Application.Schedule.GenerateSchedule
             }
 
             return Candidate.Evaluate(items, slots, remaining.Count, slotStarts, slotLength);
+        }
+
+        public static bool CanPlayOn(ScheduleItem item, Guid pitchId, IReadOnlyDictionary<Guid, IReadOnlySet<Guid>> pitchGroups) =>
+            item.GroupId is not { } groupId ||
+            !pitchGroups.TryGetValue(pitchId, out var groups) || groups.Count == 0 ||
+            groups.Contains(groupId);
+
+        // Ścieżka powiększająca (Kuhn): mecz bierze wolne boisko albo przesuwa ten, który je zajął, na inne.
+        // Przy porażce przypisania zostają bez zmian.
+        private static bool Assign(
+            int index,
+            List<ScheduleItem> chosen,
+            List<Guid> freePitches,
+            IReadOnlyDictionary<Guid, IReadOnlySet<Guid>> pitchGroups,
+            Dictionary<Guid, int> pitchOwner,
+            HashSet<Guid> visited)
+        {
+            foreach (var pitch in freePitches)
+            {
+                if (!CanPlayOn(chosen[index], pitch, pitchGroups) || !visited.Add(pitch))
+                    continue;
+
+                if (!pitchOwner.TryGetValue(pitch, out var owner) ||
+                    Assign(owner, chosen, freePitches, pitchGroups, pitchOwner, visited))
+                {
+                    pitchOwner[pitch] = index;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // W jednej kategorii drabinka sama rozdziela drużyny (dwa mecze tej samej rundy nie mają wspólnych

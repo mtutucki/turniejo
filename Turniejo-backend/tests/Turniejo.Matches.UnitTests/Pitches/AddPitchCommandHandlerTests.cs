@@ -12,13 +12,15 @@ namespace Turniejo.Matches.UnitTests.Pitches
     {
         private readonly IMatchesDbContext _dbContext;
         private readonly ICurrentUserContext _currentUserContext;
+        private readonly ITournamentModule _tournamentModule;
         private readonly AddPitchCommandHandler _handler;
 
         public AddPitchCommandHandlerTests()
         {
             _dbContext = Substitute.For<IMatchesDbContext>();
             _currentUserContext = Substitute.For<ICurrentUserContext>();
-            _handler = new AddPitchCommandHandler(_dbContext, _currentUserContext);
+            _tournamentModule = Substitute.For<ITournamentModule>();
+            _handler = new AddPitchCommandHandler(_dbContext, _currentUserContext, _tournamentModule);
         }
 
         [Fact]
@@ -35,6 +37,35 @@ namespace Turniejo.Matches.UnitTests.Pitches
             result.IsSuccess.Should().BeTrue();
             await _dbContext.Received(1).AddPitchAsync(Arg.Any<Pitch>(), Arg.Any<CancellationToken>());
             await _dbContext.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldSaveGroups_WhenTheyBelongToTheTournament()
+        {
+            var tournamentId = Guid.NewGuid();
+            var groupId = Guid.NewGuid();
+            _tournamentModule.GetTournamentGroupsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns([new TournamentGroupDto(groupId, tournamentId, Guid.NewGuid(), "Grupa A")]);
+
+            var result = await _handler.Handle(new AddPitchCommand(tournamentId, "Boisko A", null, [groupId]), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            await _dbContext.Received(1).AddPitchAsync(
+                Arg.Is<Pitch>(p => p.GroupIds.SequenceEqual(new[] { groupId })), Arg.Any<CancellationToken>());
+        }
+
+        [Fact]
+        public async Task Handle_ShouldFail_WhenGroupIsFromAnotherTournament()
+        {
+            var tournamentId = Guid.NewGuid();
+            _tournamentModule.GetTournamentGroupsAsync(tournamentId, Arg.Any<CancellationToken>())
+                .Returns([new TournamentGroupDto(Guid.NewGuid(), tournamentId, Guid.NewGuid(), "Grupa A")]);
+
+            var result = await _handler.Handle(new AddPitchCommand(tournamentId, "Boisko A", null, [Guid.NewGuid()]), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("Validation.GroupIds");
+            await _dbContext.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         }
 
         [Fact]

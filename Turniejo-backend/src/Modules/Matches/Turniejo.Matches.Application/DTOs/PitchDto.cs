@@ -5,5 +5,6 @@ namespace Turniejo.Matches.Application.DTOs
         Guid TournamentId,
         string Name,
         string? Description,
-        bool IsActive);
+        bool IsActive,
+        IReadOnlyList<Guid> GroupIds);
 }

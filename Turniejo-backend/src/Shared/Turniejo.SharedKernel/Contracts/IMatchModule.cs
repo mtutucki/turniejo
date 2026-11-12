@@ -26,6 +26,8 @@ public interface IMatchModule
     Task<bool> AnyMatchesForCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
     // Jak wyżej, dla Match.GroupId — blokada kasowania grupy turnieju.
     Task<bool> AnyMatchesForGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+    // Usunięcie grupy turnieju zdejmuje ją z boisk, do których była przypisana (bez FK między modułami).
+    Task RemoveGroupFromPitchesAsync(Guid groupId, CancellationToken cancellationToken = default);
     // Grupa ma mecze i wszystkie (poza odwołanymi) są zakończone — dopiero wtedy miejsca w tabeli są
     // ostateczne i drabinka (moduł Brackets) może obsadzić sloty "N. miejsce grupy".
     Task<bool> IsGroupStageFinishedAsync(Guid groupId, CancellationToken cancellationToken = default);

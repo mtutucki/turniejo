@@ -111,6 +111,17 @@ internal sealed class MatchModule(IMatchesDbContext dbContext, ISender sender, I
     public async Task<bool> AnyMatchesForGroupAsync(Guid groupId, CancellationToken cancellationToken = default) =>
         await dbContext.AnyMatchesByGroupIdAsync(groupId, cancellationToken);
 
+    public async Task RemoveGroupFromPitchesAsync(Guid groupId, CancellationToken cancellationToken = default)
+    {
+        var pitches = await dbContext.GetPitchesByGroupIdAsync(groupId, cancellationToken);
+        if (pitches.Count == 0)
+            return;
+
+        foreach (var pitch in pitches)
+            pitch.RemoveGroup(groupId);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<bool> IsGroupStageFinishedAsync(Guid groupId, CancellationToken cancellationToken = default) =>
         await dbContext.AnyMatchesByGroupIdAsync(groupId, cancellationToken) &&
         !await dbContext.AnyUnfinishedMatchesByGroupIdAsync(groupId, cancellationToken);
