@@ -77,6 +77,13 @@ export const mock = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ version }),
     }),
+  /** Herb drużyny w turnieju (zgłoszenie), jakby wgrany w bazie drużyn. */
+  teamLogo: (tournamentTeamId: string, logoUrl: string | null) =>
+    fetch(`${MOCK_URL}/__control/teams/${tournamentTeamId}/logo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logoUrl }),
+    }),
   /** Motyw na koncie, jakby wybrany na innym urządzeniu. */
   theme: (email: string, theme: "system" | "light" | "dark") =>
     fetch(`${MOCK_URL}/__control/users/${encodeURIComponent(email)}/theme`, {

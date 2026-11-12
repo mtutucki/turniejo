@@ -11,6 +11,8 @@ import { useTournamentRealtime } from "./use-tournament-realtime"
 type Lookups = {
   teamName: (tournamentTeamId: string | null, fallback?: string) => string
   teamShortName: (tournamentTeamId: string | null) => string | null
+  /** Herb drużyny; null bez herbu albo bez „Pokazuj drużyny” (wtedy portal nie zna też nazw). */
+  teamLogo: (tournamentTeamId: string | null) => string | null
   groupName: (groupId: string | null) => string | null
   categoryName: (categoryId: string | null) => string | null
   pitchName: (pitchId: string | null) => string | null
@@ -50,6 +52,7 @@ export function PublicTournamentProvider({
       // ShowTeams=false → backend nie zdradza nazw drużyn, pokazujemy neutralne etykiety.
       teamName: (id, fallback = "Drużyna") => (id && teamById.get(id)?.name) || fallback,
       teamShortName: (id) => (id && teamById.get(id)?.shortName) || null,
+      teamLogo: (id) => (id && teamById.get(id)?.logoUrl) || null,
       groupName: (id) => (id ? (groupById.get(id) ?? null) : null),
       categoryName: (id) => (id ? (categoryById.get(id) ?? null) : null),
       pitchName: (id) => (id ? (pitchById.get(id) ?? null) : null),

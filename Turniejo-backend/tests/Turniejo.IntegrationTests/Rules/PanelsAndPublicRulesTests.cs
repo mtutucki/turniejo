@@ -116,6 +116,38 @@ public sealed class PanelsAndPublicRulesTests(IntegrationTestWebApplicationFacto
     }
 
     [Fact]
+    public async Task TeamLogo_IsSentWithTheLiveMatch_InThePanelAndInThePortalWithShowTeams()
+    {
+        var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);
+        const string logo = "https://example.test/orly.png";
+        (await s.Organizer.PutAsJsonAsync($"/api/organizations/{s.OrganizationId}/teams/{s.ClubTeam("T1")}/logo",
+            new { logoUrl = logo })).IsSuccessStatusCode.Should().BeTrue();
+        var match = (await s.MatchBetweenAsync("T1", "T2")).GetGuid("id");
+        (await PublishAsync(s, true)).IsSuccessStatusCode.Should().BeTrue();
+        // Portal pokazuje szczegóły meczu dopiero od jego startu.
+        (await s.Organizer.PostAsync($"{T(s)}/matches/{match}/start", null)).IsSuccessStatusCode.Should().BeTrue();
+
+        var panel = await (await s.Organizer.GetAsync($"{T(s)}/matches/{match}/live-panel")).ReadJsonAsync();
+        var portal = await (await CreateClient().GetAsync($"/public/matches/{match}/live")).ReadJsonAsync();
+
+        foreach (var view in new[] { panel, portal })
+        {
+            var home = view.GetProperty("homeTeam").GetProperty("tournamentTeamId").GetGuid() == s.Team("T1")
+                ? view.GetProperty("homeTeam")
+                : view.GetProperty("awayTeam");
+            home.GetProperty("logoUrl").GetString().Should().Be(logo);
+        }
+
+        // Bez „Pokazuj drużyny” portal nie zdradza drużyny, więc i herbu.
+        (await s.Organizer.PutAsJsonAsync($"{T(s)}/public-settings",
+            new { isPublic = true, showTeams = false, showPlayers = false, showSchedule = true, showStandings = true, showBracket = true, showLiveMatches = true, showStats = true, abbreviatePlayerNames = true, showInDirectory = false }))
+            .IsSuccessStatusCode.Should().BeTrue();
+        var hidden = await (await CreateClient().GetAsync($"/public/matches/{match}/live")).ReadJsonAsync();
+        hidden.GetProperty("homeTeam").GetProperty("logoUrl").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+        hidden.GetProperty("awayTeam").GetProperty("logoUrl").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task PUB_001_PUB_002_PublicPage_IsAvailableOnlyWhenPublished()
     {
         var s = await TournamentScenario.GroupsAsync(Factory, teamsPerGroup: 2);

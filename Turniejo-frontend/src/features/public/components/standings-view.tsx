@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useState } from "react"
 
 import { EmptyState } from "@/components/layout/empty-state"
+import { TeamLogo } from "@/features/teams/components/team-logo"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePublicSecondStage } from "@/features/second-stage/api"
 import { pendingPlaces } from "@/features/second-stage/split"
@@ -93,9 +94,14 @@ function GroupTable({
                     {tournament.settings.showTeams ? (
                       <Link
                         href={`/t/${slug}/teams/${row.tournamentTeamId}`}
-                        className="truncate font-medium hover:underline"
+                        className="flex min-w-0 items-center gap-2 font-medium hover:underline"
                       >
-                        {lookups.teamName(row.tournamentTeamId)}
+                        <TeamLogo
+                          name={lookups.teamName(row.tournamentTeamId)}
+                          logoUrl={lookups.teamLogo(row.tournamentTeamId)}
+                          size={20}
+                        />
+                        <span className="truncate">{lookups.teamName(row.tournamentTeamId)}</span>
                       </Link>
                     ) : (
                       <span className="truncate font-medium">

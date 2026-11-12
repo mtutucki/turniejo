@@ -82,7 +82,8 @@ namespace Turniejo.Matches.Application.Matches.GetPublicLiveMatch
                 team?.Id ?? Guid.Empty,
                 team?.Name ?? "Unknown",
                 team?.ShortName,
-                playerDtos);
+                playerDtos,
+                team?.LogoUrl);
         }
     }
 }

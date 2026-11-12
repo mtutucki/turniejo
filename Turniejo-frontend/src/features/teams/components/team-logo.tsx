@@ -20,8 +20,12 @@ export function TeamLogo({ name, logoUrl, size = 36, className }: TeamLogoProps)
 
   return (
     <span
+      // Inicjały tylko wizualnie (CSS): nazwa stoi obok, więc nie powtarzamy jej w tekście strony
+      // ani czytnikowi ekranu ("OE Orły E2E").
+      data-initials={logoUrl ? undefined : initials}
       className={cn(
         "bg-secondary text-muted-foreground relative flex shrink-0 items-center justify-center overflow-hidden rounded-md text-xs font-semibold",
+        !logoUrl && "before:content-[attr(data-initials)]",
         className,
       )}
       style={{ width: size, height: size }}
@@ -37,9 +41,7 @@ export function TeamLogo({ name, logoUrl, size = 36, className }: TeamLogoProps)
           unoptimized
           className="object-contain"
         />
-      ) : (
-        initials
-      )}
+      ) : null}
     </span>
   )
 }
